@@ -23,7 +23,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
   font-size: 15px;
   color: var(--text);
   background: var(--bg);
@@ -33,7 +33,8 @@ a { color: var(--primary); text-decoration: none; }
 a:hover { text-decoration: underline; }
 code { background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: .85em; }
 
-h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 600; }
+h1, h2, h3 { font-family: var(--font-heading, Georgia, "Times New Roman", serif); font-weight: 600; }
+.brand-text strong, .stat-value { font-family: var(--font-heading, Georgia, "Times New Roman", serif); }
 h1 { font-size: 1.7rem; margin: 0 0 .25rem; }
 h2 { font-size: 1.2rem; margin: 0 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
 h3 { font-size: 1rem; margin: 1.25rem 0 .5rem; color: var(--primary); }
@@ -502,6 +503,17 @@ input[type="color"] {
   padding: 2px;
   cursor: pointer;
 }
+
+/* Lettertype-voorbeeldblok */
+.font-preview {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .85rem 1rem;
+  margin: -.35rem 0 .35rem;
+}
+.font-preview h3 { color: var(--text); }
+.font-preview p { color: var(--muted); font-size: .95rem; line-height: 1.55; }
 
 /* Offline-badge */
 .offline-badge {

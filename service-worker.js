@@ -4,7 +4,7 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v6';
+const CACHE_VERSION = 'sok-uitvaart-v7';
 const SHELL = [
   './',
   './index.html',
@@ -55,8 +55,11 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // jsdelivr CDN (Supabase SDK): stale-while-revalidate
-  if (url.host === 'cdn.jsdelivr.net') {
+  // jsdelivr CDN (Supabase SDK) + Google Fonts: stale-while-revalidate
+  // (zo werkt het lettertype ook offline na de eerste keer laden)
+  if (url.host === 'cdn.jsdelivr.net' ||
+      url.host === 'fonts.googleapis.com' ||
+      url.host === 'fonts.gstatic.com') {
     e.respondWith(staleWhileRevalidate(req));
     return;
   }

@@ -219,6 +219,17 @@ function renderAccount(msg) {
           const s = Settings.all();
           return `
           <form id="ui-form" class="form" autocomplete="off">
+            <label>
+              <span>Lettertype</span>
+              <select name="font_id" id="font-select">
+                ${FONTS.map(f => `<option value="${esc(f.id)}" ${s.font_id===f.id?'selected':''}>${esc(f.label)}</option>`).join('')}
+              </select>
+              <span class="muted small">Niet-systeemfonts worden geladen via Google Fonts en daarna lokaal gecached (werken ook offline na de eerste keer).</span>
+            </label>
+            <div class="font-preview" id="font-preview">
+              <h3 style="margin:0 0 .25rem;">In den naam van de Vader</h3>
+              <p style="margin:0;">De familie nodigt u uit voor de uitvaart van een geliefde. <em>Mor Severios</em> · 14:00 uur · Hengelo. Aansluitend condoleance met koffie en simit.</p>
+            </div>
             <label class="checkbox-inline" style="font-size:.95rem;">
               <input type="checkbox" name="compact_mode" ${s.compact_mode ? 'checked' : ''}>
               Compact-modus (kleinere tekst en meer informatie per scherm)
@@ -362,12 +373,18 @@ function renderAccount(msg) {
   // Weergave-instellingen
   const uiForm = $('#ui-form');
   if (uiForm) {
+    // Lettertype live toepassen bij wijzigen — voorbeeld is meteen zichtbaar
+    const fontSel = $('#font-select');
+    if (fontSel) {
+      fontSel.addEventListener('change', () => applyFont(fontSel.value));
+    }
     uiForm.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
       Settings.set({
         compact_mode: f.compact_mode.checked,
         rounded_cards: f.rounded_cards.checked,
+        font_id: f.font_id.value,
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });

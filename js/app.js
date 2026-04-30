@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v6'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v7'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (lokaal per apparaat) ─────────────────────────────────────
@@ -22,6 +22,7 @@ const Settings = {
     // UI
     compact_mode: false,
     rounded_cards: true,
+    font_id: 'default',
   },
   all() {
     let stored = {};
@@ -38,6 +39,55 @@ const Settings = {
   },
   reset() { localStorage.removeItem(Settings.KEY); },
 };
+
+// ─── Lettertypen (curated lijst, Google Fonts gecached door SW) ─────────────
+const FONTS = [
+  { id: 'default',      label: 'Standaard — Georgia + systeem (klassiek + leesbaar)',
+    body: '', heading: '', google: null },
+  { id: 'system',       label: 'Sober — alleen systeemfonts',
+    body: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    heading: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    google: null },
+  { id: 'inter',        label: 'Modern — Inter (strak, helder)',
+    body: 'Inter, system-ui, sans-serif',
+    heading: 'Inter, system-ui, sans-serif',
+    google: 'family=Inter:wght@400;500;600;700' },
+  { id: 'merriweather', label: 'Lezen — Merriweather (rustig, traditioneel)',
+    body: 'Merriweather, Georgia, serif',
+    heading: 'Merriweather, Georgia, serif',
+    google: 'family=Merriweather:wght@400;700' },
+  { id: 'playfair',     label: 'Plechtig — Playfair Display + Lora',
+    body: 'Lora, Georgia, serif',
+    heading: '"Playfair Display", Georgia, serif',
+    google: 'family=Lora:wght@400;500;600&family=Playfair+Display:wght@600;700' },
+  { id: 'crimson',      label: 'Literair — Crimson Pro',
+    body: '"Crimson Pro", Georgia, serif',
+    heading: '"Crimson Pro", Georgia, serif',
+    google: 'family=Crimson+Pro:wght@400;600;700' },
+  { id: 'notoserif',    label: 'Universeel — Noto Serif',
+    body: '"Noto Serif", Georgia, serif',
+    heading: '"Noto Serif", Georgia, serif',
+    google: 'family=Noto+Serif:wght@400;600;700' },
+];
+
+function applyFont(fontId) {
+  const f = FONTS.find(x => x.id === fontId) || FONTS[0];
+  // Verwijder eventueel oude Google Fonts-link
+  const old = document.getElementById('dynamic-font-link');
+  if (old) old.remove();
+  // Nieuwe Google Fonts-link injecteren als nodig
+  if (f.google) {
+    const link = document.createElement('link');
+    link.id = 'dynamic-font-link';
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?${f.google}&display=swap`;
+    document.head.appendChild(link);
+  }
+  // CSS-variabelen zetten (lege string = fallback in CSS)
+  const root = document.documentElement;
+  if (f.body)    root.style.setProperty('--font-body', f.body);    else root.style.removeProperty('--font-body');
+  if (f.heading) root.style.setProperty('--font-heading', f.heading); else root.style.removeProperty('--font-heading');
+}
 
 // ─── Branding (logo, kleuren, app-naam, tagline) ────────────────────────────
 const Branding = {
@@ -77,6 +127,9 @@ const Branding = {
     // Compact / afgeronde hoeken
     document.body.classList.toggle('ui-compact', !!s.compact_mode);
     document.body.classList.toggle('ui-square', !s.rounded_cards);
+
+    // Lettertype
+    applyFont(s.font_id);
   },
 };
 
