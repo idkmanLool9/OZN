@@ -344,6 +344,19 @@ textarea { resize: vertical; }
 }
 .kist-card-actions .btn { flex: 1; }
 
+/* Autosave status-indicator */
+.autosave-status {
+  font-size: .78rem;
+  color: var(--muted);
+  font-style: italic;
+  align-self: center;
+  min-height: 1.1em;
+  transition: color .15s;
+}
+.autosave-status.saving { color: var(--amber); }
+.autosave-status.saved { color: var(--green); }
+.autosave-status.error { color: var(--red); }
+
 /* Preset buttons (kosten-catalogus) */
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .5rem; margin-top: .5rem; }
 .preset-btn { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .55rem .75rem; text-align: left; }

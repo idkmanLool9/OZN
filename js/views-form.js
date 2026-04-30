@@ -1,5 +1,28 @@
 // Dossier intake/edit formulier
 
+function dossierDraftKey(isNew, id) {
+  return `sok_draft_${isNew ? 'new' : id}`;
+}
+function snapshotDossierForm(formEl) {
+  const data = {};
+  DOSSIER_VELDEN.forEach(f => {
+    const inp = formEl.elements[f];
+    if (inp) data[f] = inp.value;
+  });
+  return data;
+}
+function applyDossierDraft(formEl, data) {
+  let changed = 0;
+  for (const f in data) {
+    const inp = formEl.elements[f];
+    if (inp && data[f] != null && inp.value !== data[f]) {
+      inp.value = data[f];
+      changed++;
+    }
+  }
+  return changed;
+}
+
 function renderDossierForm(params) {
   const isNew = !params.id;
   const dossier = isNew ? { dossier_nummer: '(wordt automatisch toegekend)', status: 'nieuw' } : DB.byId(KEYS.DOSSIERS, parseInt(params.id, 10));
@@ -16,7 +39,10 @@ function renderDossierForm(params) {
           <h1>${isNew ? 'Nieuw dossier — Intake' : 'Dossier bewerken'}</h1>
           <p class="muted">Dossiernummer: <strong>${esc(dossier.dossier_nummer)}</strong></p>
         </div>
+        <div class="autosave-status" id="autosave-status" aria-live="polite"></div>
       </div>
+
+      <div id="draft-banner" class="alert alert-info" hidden></div>
 
       <form id="dossier-form" class="form-grid" autocomplete="off">
 
@@ -198,7 +224,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <div class="form-actions">
-          <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost">Annuleren</a>
+          <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-cancel-form">Annuleren</a>
           <button type="submit" class="btn btn-primary">${isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan'}</button>
         </div>
       </form>
@@ -260,6 +286,59 @@ function renderDossierForm(params) {
   bloemSelect.addEventListener('change', updateBloemPreview);
   updateBloemPreview();
 
+  // ─── Autosave: bewaar concept tijdens typen, herstel na navigatie ───
+  const draftKey = dossierDraftKey(isNew, dossier.id);
+  const formEl = $('#dossier-form');
+  const banner = $('#draft-banner');
+  const status = $('#autosave-status');
+
+  try {
+    const raw = localStorage.getItem(draftKey);
+    if (raw) {
+      const draft = JSON.parse(raw);
+      const restored = applyDossierDraft(formEl, draft);
+      if (restored > 0) {
+        banner.hidden = false;
+        banner.innerHTML = `Niet-opgeslagen wijzigingen hersteld. <a href="#" id="btn-discard-draft">Concept verwerpen</a>`;
+        $('#btn-discard-draft').addEventListener('click', e => {
+          e.preventDefault();
+          if (!confirm('Niet-opgeslagen wijzigingen weggooien?')) return;
+          localStorage.removeItem(draftKey);
+          renderDossierForm(params);
+        });
+        // Previews bijwerken na herstel
+        updateKistPreview();
+        updateBloemPreview();
+      }
+    }
+  } catch (_) {}
+
+  let saveTimer = null;
+  function scheduleSave() {
+    if (status) { status.textContent = 'Bezig met bewaren...'; status.className = 'autosave-status saving'; }
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(snapshotDossierForm(formEl)));
+        if (status) {
+          const t = new Date();
+          status.textContent = 'Concept opgeslagen ' + t.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+          status.className = 'autosave-status saved';
+        }
+      } catch (_) {
+        if (status) { status.textContent = 'Lokaal opslaan mislukt'; status.className = 'autosave-status error'; }
+      }
+    }, 400);
+  }
+  formEl.addEventListener('input', scheduleSave);
+  formEl.addEventListener('change', scheduleSave);
+
+  // Concept verwerpen bij annuleren
+  const cancelLink = $('#btn-cancel-form');
+  if (cancelLink) {
+    cancelLink.addEventListener('click', () => { localStorage.removeItem(draftKey); });
+  }
+
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
     const data = {};
@@ -284,9 +363,11 @@ function renderDossierForm(params) {
             volgorde: i,
           });
         }
+        localStorage.removeItem(draftKey);
         Router.go('/dossiers/' + created.id);
       } else {
         await DB.update(KEYS.DOSSIERS, dossier.id, data);
+        localStorage.removeItem(draftKey);
         Router.go('/dossiers/' + dossier.id);
       }
     } catch (err) {
