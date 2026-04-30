@@ -164,6 +164,77 @@ function renderAccount(msg) {
         </form>
       </section>
       <section class="card narrow">
+        <h2>Branding</h2>
+        <p class="muted small">Logo, naam en kleuren van de app aanpassen.</p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="brand-form" class="form" autocomplete="off">
+            <label>
+              <span>App-naam</span>
+              <input type="text" name="app_name" value="${esc(s.app_name)}" maxlength="60">
+            </label>
+            <label>
+              <span>Ondertitel / organisatie</span>
+              <input type="text" name="app_tagline" value="${esc(s.app_tagline)}" maxlength="120">
+            </label>
+
+            <div class="grid-2" style="gap:.85rem;">
+              <label>
+                <span>Hoofdkleur</span>
+                <input type="color" name="primary_color" value="${esc(s.primary_color)}">
+              </label>
+              <label>
+                <span>Accentkleur</span>
+                <input type="color" name="accent_color" value="${esc(s.accent_color)}">
+              </label>
+            </div>
+
+            <label>
+              <span>Logo (jpg/png/svg, max 500 KB)</span>
+              <div class="logo-row">
+                <div class="logo-preview" id="logo-preview">
+                  ${s.logo_data_url
+                    ? `<img src="${esc(s.logo_data_url)}" alt="Logo">`
+                    : '<span>✝</span>'}
+                </div>
+                <div class="logo-actions">
+                  <label class="btn btn-sm">Bestand kiezen<input type="file" name="logo_file" accept="image/*" hidden id="logo-input"></label>
+                  ${s.logo_data_url ? '<button type="button" class="btn btn-sm btn-ghost" id="btn-remove-logo">Verwijder logo</button>' : ''}
+                </div>
+              </div>
+            </label>
+
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-reset-brand">Standaardwaarden</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow">
+        <h2>Weergave</h2>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="ui-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="compact_mode" ${s.compact_mode ? 'checked' : ''}>
+              Compact-modus (kleinere tekst en meer informatie per scherm)
+            </label>
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="rounded_cards" ${s.rounded_cards ? 'checked' : ''}>
+              Afgeronde hoeken (uit = strakke vierkante stijl)
+            </label>
+            <div class="form-actions" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
         ${(() => {
@@ -228,6 +299,80 @@ function renderAccount(msg) {
         </div>
       </section>
     </div>`;
+
+  // Branding-instellingen
+  const brandForm = $('#brand-form');
+  if (brandForm) {
+    let pendingLogo = null; // tijdelijke logo-data tot opslaan
+
+    $('#logo-input').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith('image/')) return alert('Alleen afbeeldingen toegestaan.');
+      if (file.size > 500 * 1024) return alert('Logo te groot (max. 500 KB).');
+      try {
+        pendingLogo = await fileToDataUrl(file);
+        const prev = $('#logo-preview');
+        if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
+      } catch (_) {}
+    });
+
+    const removeBtn = $('#btn-remove-logo');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        pendingLogo = '';
+        const prev = $('#logo-preview');
+        if (prev) prev.innerHTML = '<span>✝</span>';
+      });
+    }
+
+    brandForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const patch = {
+        app_name: f.app_name.value.trim() || Settings.defaults.app_name,
+        app_tagline: f.app_tagline.value.trim() || Settings.defaults.app_tagline,
+        primary_color: f.primary_color.value || Settings.defaults.primary_color,
+        accent_color: f.accent_color.value || Settings.defaults.accent_color,
+      };
+      if (pendingLogo !== null) patch.logo_data_url = pendingLogo;
+      try {
+        Settings.set(patch);
+      } catch (err) {
+        return renderAccount({ error: 'Opslaan mislukt — logo is mogelijk te groot voor lokale opslag.' });
+      }
+      Branding.apply();
+      renderAccount({ success: 'Branding opgeslagen.' });
+    });
+
+    $('#btn-reset-brand').addEventListener('click', () => {
+      if (!confirm('Branding terugzetten naar standaard? (logo wordt verwijderd)')) return;
+      Settings.set({
+        app_name: Settings.defaults.app_name,
+        app_tagline: Settings.defaults.app_tagline,
+        primary_color: Settings.defaults.primary_color,
+        accent_color: Settings.defaults.accent_color,
+        logo_data_url: Settings.defaults.logo_data_url,
+      });
+      Branding.apply();
+      renderAccount({ success: 'Standaard branding hersteld.' });
+    });
+  }
+
+  // Weergave-instellingen
+  const uiForm = $('#ui-form');
+  if (uiForm) {
+    uiForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        compact_mode: f.compact_mode.checked,
+        rounded_cards: f.rounded_cards.checked,
+      });
+      Branding.apply();
+      renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
+    });
+  }
 
   // Splash-instellingen
   const splashForm = $('#splash-form');

@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v5'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v6'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (lokaal per apparaat) ─────────────────────────────────────
@@ -13,6 +13,15 @@ const Settings = {
     splash_title: 'Welkom',
     splash_subtitle: 'Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië',
     splash_offline_title: 'Welkom terug',
+    // Branding
+    app_name: 'Uitvaartbeheer',
+    app_tagline: 'Syrisch-Orthodoxe Kerk van Antiochië',
+    primary_color: '#6b1e2a',
+    accent_color: '#c9a24a',
+    logo_data_url: '',
+    // UI
+    compact_mode: false,
+    rounded_cards: true,
   },
   all() {
     let stored = {};
@@ -29,6 +38,56 @@ const Settings = {
   },
   reset() { localStorage.removeItem(Settings.KEY); },
 };
+
+// ─── Branding (logo, kleuren, app-naam, tagline) ────────────────────────────
+const Branding = {
+  apply() {
+    const s = Settings.all();
+    const root = document.documentElement;
+
+    // Kleuren via CSS-variabelen (primary-dark/-soft worden automatisch
+    // afgeleid via color-mix() in style.css)
+    if (s.primary_color) root.style.setProperty('--primary', s.primary_color);
+    if (s.accent_color)  root.style.setProperty('--accent',  s.accent_color);
+
+    // Theme-color voor mobiele statusbalk
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta && s.primary_color) meta.setAttribute('content', s.primary_color);
+
+    // Tekst overal
+    document.querySelectorAll('.brand-text strong').forEach(el => el.textContent = s.app_name);
+    document.querySelectorAll('.brand-text small').forEach(el => el.textContent = s.app_tagline);
+    document.querySelectorAll('.login-header h1').forEach(el => el.textContent = s.app_name);
+    document.querySelectorAll('.login-header p:first-of-type').forEach(el => el.textContent = s.app_tagline);
+
+    // Document-titel
+    document.title = `${s.app_name} · ${s.app_tagline}`;
+
+    // Logo: vervang ✝ door <img> als er een eigen logo is
+    document.querySelectorAll('.brand-mark').forEach(el => {
+      if (s.logo_data_url) {
+        el.innerHTML = `<img src="${s.logo_data_url}" alt="Logo">`;
+        el.classList.add('has-custom-logo');
+      } else {
+        el.innerHTML = '✝';
+        el.classList.remove('has-custom-logo');
+      }
+    });
+
+    // Compact / afgeronde hoeken
+    document.body.classList.toggle('ui-compact', !!s.compact_mode);
+    document.body.classList.toggle('ui-square', !s.rounded_cards);
+  },
+};
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
 
 const Splash = {
   shownAt: Date.now(),
@@ -143,6 +202,9 @@ Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
 Router.add('/account', () => renderAccount());
 
 (async function init() {
+  // Branding meteen toepassen — vóór de splash zichtbaar wordt
+  Branding.apply();
+
   // Versie-indicator overal injecteren
   const verLabel = `Versie ${APP_VERSION} · ${APP_BUILD_DATE}`;
   const fv = document.getElementById('footer-version');

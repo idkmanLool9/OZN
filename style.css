@@ -5,8 +5,8 @@
   --text: #2a2724;
   --muted: #6f6a62;
   --primary: #6b1e2a;
-  --primary-dark: #4f1620;
-  --primary-soft: #f5e8ea;
+  --primary-dark: color-mix(in srgb, var(--primary) 70%, black);
+  --primary-soft: color-mix(in srgb, var(--primary) 12%, white);
   --accent: #c9a24a;
   --green: #3a7d44;
   --green-soft: #e6f3e8;
@@ -50,6 +50,26 @@ h3 { font-size: 1rem; margin: 1.25rem 0 .5rem; color: var(--primary); }
   font-size: 1.2rem;
 }
 .brand-mark.big { width: 60px; height: 60px; font-size: 2rem; margin: 0 auto 1rem; }
+.brand-mark.has-custom-logo { background: transparent; padding: 0; overflow: hidden; }
+.brand-mark img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: inherit; }
+
+/* Compact-modus + vierkante hoeken */
+body.ui-compact { font-size: 14px; }
+body.ui-compact .card { padding: .9rem 1.1rem; margin-bottom: 1rem; }
+body.ui-compact h1 { font-size: 1.4rem; }
+body.ui-compact h2 { font-size: 1.05rem; }
+body.ui-compact .table th, body.ui-compact .table td { padding: .45rem .55rem; }
+body.ui-square .card,
+body.ui-square .login-card,
+body.ui-square .splash-card,
+body.ui-square .btn,
+body.ui-square input,
+body.ui-square select,
+body.ui-square textarea,
+body.ui-square .stat-card,
+body.ui-square .kist-card { border-radius: 2px; }
+body.ui-square .brand-mark { border-radius: 4px; }
+body.ui-square .badge, body.ui-square .status, body.ui-square .offline-badge { border-radius: 3px; }
 .brand-text strong { display: block; font-size: 1rem; }
 .brand-text small { color: var(--muted); font-size: .78rem; }
 
@@ -458,6 +478,30 @@ textarea { resize: vertical; }
 .splash-hint { margin-top: .75rem; }
 .splash-version { margin: 1rem 0 0; font-size: .72rem; opacity: .55; letter-spacing: .03em; }
 .footer-version { font-size: .72rem; opacity: .7; }
+
+/* Logo-upload preview */
+.logo-row { display: flex; align-items: center; gap: 1rem; padding: .35rem 0; }
+.logo-preview {
+  width: 72px; height: 72px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  color: var(--primary);
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+.logo-preview img { width: 100%; height: 100%; object-fit: contain; }
+.logo-actions { display: flex; flex-direction: column; gap: .35rem; flex: 1; }
+.logo-actions .btn { justify-content: flex-start; }
+
+/* Color picker zonder gekke padding */
+input[type="color"] {
+  height: 38px;
+  padding: 2px;
+  cursor: pointer;
+}
 
 /* Offline-badge */
 .offline-badge {
