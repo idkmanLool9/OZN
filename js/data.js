@@ -143,7 +143,6 @@ const STANDAARD_TAKEN = [
   'Bloemstukken bestellen',
   'Avondwake / huisbezoek inplannen',
   'Condoleance en catering organiseren',
-  'Muziek / zang afstemmen met koor',
   'Aangifte bij Burgerzaken',
   'Verzekering aanmelden',
   'Eindafrekening opstellen',
@@ -162,7 +161,7 @@ const DOSSIER_VELDEN = [
   'uitvaart_type','uitvaart_datum','uitvaart_tijd','kerk_locatie',
   'begraafplaats','graf_type',
   'kist_type','rouwauto','aantal_volgauto','dragers','bloemstukken',
-  'rouwkaarten_aantal','condoleance_locatie','catering','muziek_zang',
+  'rouwkaarten_aantal','condoleance_locatie','catering',
   'verzekering_status','verzekering_maatschappij','polisnummer',
   'opdrachtgever_naam','opdrachtgever_telefoon',
   'bijzonderheden','status'

@@ -195,7 +195,6 @@ function renderDossierForm(params) {
                 <div class="kist-preview" id="ed-preview" aria-live="polite"></div>
               </div>
             </label>
-            <label class="span-3"><span>Muziek / koor / zang</span><input type="text" name="muziek_zang" value="${v('muziek_zang')}"></label>
           </div>
         </fieldset>
 

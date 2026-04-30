@@ -95,7 +95,6 @@ function renderDossierDetail(params) {
           ${dlRow('Rouwkaarten', d.rouwkaarten_aantal)}
           ${dlRow('Condoleance', d.condoleance_locatie)}
           ${dlRow('Eten & drinken', d.catering ? edRowValue(d.catering) : '')}
-          ${dlRow('Muziek / koor', d.muziek_zang)}
         </dl>
         <h3>Verzekering & opdrachtgever</h3>
         <dl class="dl">
