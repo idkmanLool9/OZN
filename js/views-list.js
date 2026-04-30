@@ -345,7 +345,25 @@ function renderAccount(msg) {
           </div>
           <p class="muted small" style="margin-top:.75rem;">
             Een JSON-export geeft je een volledig lokaal back-upbestand met alle dossiergegevens — voor in een veilige map of op een externe schijf, los van Supabase.
-          </p>`;
+          </p>
+
+          <details style="margin-top:1rem;">
+            <summary style="cursor:pointer; font-weight:600;">Wat zijn de limieten van het Supabase Free-plan?</summary>
+            <div class="muted small" style="margin-top:.5rem; line-height:1.55;">
+              <p style="margin:.25rem 0;"><strong>Database</strong>: 500 MB — voor jouw dossiergegevens (tekst) ruim voldoende voor jaren.</p>
+              <p style="margin:.25rem 0;"><strong>Storage</strong>: 1 GB totaal — voor foto's en documenten.
+                Foto's worden bij upload <strong>automatisch verkleind</strong> (max ±1600 px, JPEG 85%) zodat een telefoon-foto van 8 MB als ~400 KB wordt opgeslagen.</p>
+              <p style="margin:.25rem 0;"><strong>Bandbreedte</strong>: 5 GB/maand — alle keren dat foto's en documenten worden bekeken.</p>
+              <p style="margin:.25rem 0;"><strong>Inactiviteit</strong>: na 1 week zonder activiteit wordt het project tijdelijk gepauzeerd; één login activeert het weer. Pas na 90+ dagen onafgebroken inactiviteit kan Supabase het project verwijderen (met e-mailwaarschuwing vooraf).</p>
+              <p style="margin:.5rem 0;"><strong>Bij overschrijden van een limiet</strong>: nieuwe uploads/wijzigingen worden geblokkeerd, maar <strong>bestaande gegevens blijven bewaard</strong>. Niets wordt automatisch gewist.</p>
+              <p style="margin:.25rem 0;"><strong>Adviezen</strong>:</p>
+              <ul style="margin:.25rem 0 .25rem 1.25rem; padding:0;">
+                <li>Maandelijks een JSON-export downloaden via de knop hierboven</li>
+                <li>Periodiek inloggen via Supabase-dashboard om de opslaggrafiek te checken</li>
+                <li>Bij ruimtegebrek: oude documenten van afgeronde dossiers handmatig verwijderen, of upgraden naar Pro ($25/m: 8 GB DB / 100 GB storage)</li>
+              </ul>
+            </div>
+          </details>`;
         })()}
       </section>
     </div>`;

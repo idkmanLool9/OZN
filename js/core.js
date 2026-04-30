@@ -18,6 +18,41 @@ function fmtDate(iso) {
 }
 function fullName(d) { return [d.voornaam, d.achternaam].filter(Boolean).join(' '); }
 
+// Foto-compressie vóór upload: verkleint grote afbeeldingen naar maxDim px
+// (langste zijde) en re-encodet als JPEG met quality (0..1). SVG, GIF en kleine
+// bestanden worden ongemoeid gelaten. Bespaart fors op Supabase Storage.
+async function compressImage(file, maxDim = 1600, quality = 0.85) {
+  if (!file || !file.type) return file;
+  if (!file.type.startsWith('image/')) return file;
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
+  if (file.size < 200 * 1024) return file; // al klein genoeg
+
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = url;
+    });
+    const ratio = Math.min(maxDim / img.width, maxDim / img.height, 1);
+    if (ratio >= 1 && file.size < 800 * 1024) return file; // al klein
+    const w = Math.round(img.width  * ratio);
+    const h = Math.round(img.height * ratio);
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+    if (!blob || blob.size >= file.size) return file; // compressie maakte het groter
+    return new File([blob], file.name.replace(/\.[a-zA-Z0-9]+$/, '.jpg'), { type: 'image/jpeg' });
+  } catch (_) {
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 // Hash router
 const Router = {
   routes: [],

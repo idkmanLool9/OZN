@@ -172,9 +172,10 @@ function cleanEmpty(obj) {
 // ─── Storage (documenten-uploads, privé) ────────────────────────────────────
 const Storage = {
   async upload(dossierId, file) {
-    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const compressed = await compressImage(file, 2200, 0.9); // images compressed; PDFs etc. blijven onveranderd
+    const safe = compressed.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${dossierId}/${Date.now()}-${safe}`;
-    const { error } = await sb.storage.from('documenten').upload(path, file, { upsert: false });
+    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
     if (error) { alert('Upload mislukt: ' + error.message); throw error; }
     return path;
   },
@@ -217,6 +218,7 @@ const KistFotos = {
     return base + '?v=' + ts;
   },
   async upload(naam, file) {
+    file = await compressImage(file, 1600, 0.85);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const path = `${KistFotos.slug(naam)}.${ext}`;
     // Verwijder eerst eventueel oude bestanden (verschillende extensies) van dit model
@@ -276,6 +278,7 @@ const BloemenFotos = {
     return base + '?v=' + ts;
   },
   async uploadFoto(naam, file) {
+    file = await compressImage(file, 1600, 0.85);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const path = `${BloemenFotos.slug(naam)}.${ext}`;
     const oude = (Cloud.cache.bloemen_catalogus || []).filter(b => b.naam === naam);
@@ -323,6 +326,7 @@ const EtenDrinkenFotos = {
     return base + '?v=' + ts;
   },
   async uploadFoto(naam, file) {
+    file = await compressImage(file, 1600, 0.85);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
     const path = `${EtenDrinkenFotos.slug(naam)}.${ext}`;
     const oude = (Cloud.cache.eten_drinken_catalogus || []).filter(b => b.naam === naam);

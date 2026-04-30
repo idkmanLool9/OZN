@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v9'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v10'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -196,6 +196,7 @@ function fileToDataUrl(file) {
 // ─── BrandingFotos: logo-upload naar Supabase Storage (publieke bucket) ─────
 const BrandingFotos = {
   async uploadLogo(file) {
+    file = await compressImage(file, 800, 0.92);
     const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
     const path = `logo.${ext || 'png'}`;
     // Verwijder eerst oude logo-bestanden van andere extensies
