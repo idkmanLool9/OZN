@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="print.css" media="print" />
+</head>
+<body>
+  <!-- Login -->
+  <section id="login-screen" class="login-body" hidden>
+    <div class="login-card">
+      <div class="login-header">
+        <div class="brand-mark big">✝</div>
+        <h1>Uitvaartbeheer</h1>
+        <p>Syrisch-Orthodoxe Kerk van Antiochië</p>
+        <p class="muted small">Intern systeem · alleen voor de uitvaartleider</p>
+      </div>
+      <div id="login-error" class="alert alert-error" hidden></div>
+      <form id="login-form" class="form" autocomplete="off">
+        <label>
+          <span>Gebruikersnaam</span>
+          <input type="text" name="username" id="login-username" autofocus required />
+        </label>
+        <label>
+          <span>Wachtwoord</span>
+          <input type="password" name="password" id="login-password" required />
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
+      </form>
+      <p class="muted small center">Toegang uitsluitend voor bevoegd personeel.</p>
+      <p class="muted small center" id="default-creds-hint" hidden>
+        Eerste keer? Gebruik <code>beheerder</code> / <code>uitvaart2025</code> en wijzig daarna direct het wachtwoord.
+      </p>
+    </div>
+  </section>
+
+  <!-- App -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a href="#/" class="brand">
+          <span class="brand-mark">✝</span>
+          <span class="brand-text">
+            <strong>Uitvaartbeheer</strong>
+            <small>Syrisch-Orthodoxe Kerk van Antiochië</small>
+          </span>
+        </a>
+        <nav class="topnav" id="topnav">
+          <a href="#/" data-route="/">Dashboard</a>
+          <a href="#/dossiers" data-route="/dossiers">Dossiers</a>
+          <a href="#/dossiers/nieuw" data-route="/dossiers/nieuw">Nieuw dossier</a>
+          <a href="#/account" data-route="/account">Account</a>
+        </nav>
+        <div class="user-area">
+          <span class="user-name" id="user-name"></span>
+          <button type="button" id="btn-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
+        </div>
+      </div>
+    </header>
+    <main id="view" class="main"></main>
+    <footer class="footer">
+      <div class="footer-inner">
+        Intern systeem · Syrisch-Orthodoxe Kerk van Antiochië · Uitvaartbeheer · gegevens worden lokaal opgeslagen in deze browser
+      </div>
+    </footer>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/views-list.js"></script>
+  <script src="js/views-form.js"></script>
+  <script src="js/views-detail.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

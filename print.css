@@ -1,0 +1,29 @@
+@page { size: A4; margin: 1.2cm; }
+
+body { background: #fff !important; font-family: Georgia, "Times New Roman", serif; font-size: 10pt; color: #000; }
+.topbar, .footer, .page-actions, .tabs, .row-form, .form-actions, .filter-bar, #login-screen,
+.btn, .btn-icon, .check, .back-link, .doc-actions, .notitie-meta .right, .taken-list .right { display: none !important; }
+.main { padding: 0; }
+.page-head { margin-bottom: 1rem; }
+.card { border: none; box-shadow: none; padding: 0 0 .5rem; margin: 0 0 1rem; background: transparent; }
+fieldset.card legend { background: #f0f0f0 !important; color: #000 !important; border: 1px solid #999; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.05rem; background: #f0f0f0; padding: .25rem .5rem; border: 1px solid #999; }
+h3 { color: #000; }
+.table th, .table td { border: 1px solid #999 !important; padding: .25rem .5rem; font-size: 9.5pt; }
+.dl { display: block; }
+.dl > div { border-bottom: 1px solid #ccc !important; padding: .15rem 0; }
+.dl dt { flex: 0 0 30%; }
+.stat-grid, .grid-2, .grid-3 { display: block; }
+.taken-list li, .doc-list li, .notitie-list li {
+  border: 1px solid #ccc !important; background: #fff !important;
+  padding: .25rem .5rem !important; margin-bottom: .25rem !important;
+}
+.notitie-list li { page-break-inside: avoid; }
+.print-only { display: block !important; }
+.print-header {
+  display: flex !important; justify-content: space-between;
+  border-bottom: 2px solid #000; padding-bottom: .5rem; margin-bottom: 1rem;
+}
+.print-header h1 { margin: 0; }
+.print-header .meta { text-align: right; font-size: .85rem; }
