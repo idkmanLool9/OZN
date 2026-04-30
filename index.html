@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#6b1e2a" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
   <title>Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="print.css" media="print" />
@@ -54,6 +58,7 @@
           <a href="#/account" data-route="/account">Account</a>
         </nav>
         <div class="user-area">
+          <span class="offline-badge" id="offline-badge" hidden title="Geen internet — leesmodus">offline</span>
           <span class="user-name" id="user-name"></span>
           <button type="button" id="btn-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
         </div>

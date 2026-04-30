@@ -46,26 +46,45 @@ const Auth = {
 const Cloud = {
   cache: { dossiers: [], taken: [], kosten: [], notities: [], documenten: [], kist_afbeeldingen: [], bloemen_catalogus: [] },
   loaded: false,
+  offline: false,
 
   async loadAll() {
-    const [d, t, k, n, doc, kim, blm] = await Promise.all([
-      sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
-      sb.from('taken').select('*').order('volgorde', { ascending: true }),
-      sb.from('kosten').select('*').order('id', { ascending: true }),
-      sb.from('notities').select('*').order('created_at', { ascending: false }),
-      sb.from('documenten').select('*').order('geupload_op', { ascending: false }),
-      sb.from('kist_afbeeldingen').select('*'),
-      sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
-    ]);
-    if (d.error) throw d.error;
-    Cloud.cache.dossiers = (d.data || []).map(normRow);
-    Cloud.cache.taken = (t.data || []).map(normRow);
-    Cloud.cache.kosten = (k.data || []).map(normKosten);
-    Cloud.cache.notities = (n.data || []).map(normRow);
-    Cloud.cache.documenten = (doc.data || []).map(normRow);
-    Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
-    Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
-    Cloud.loaded = true;
+    try {
+      const [d, t, k, n, doc, kim, blm] = await Promise.all([
+        sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
+        sb.from('taken').select('*').order('volgorde', { ascending: true }),
+        sb.from('kosten').select('*').order('id', { ascending: true }),
+        sb.from('notities').select('*').order('created_at', { ascending: false }),
+        sb.from('documenten').select('*').order('geupload_op', { ascending: false }),
+        sb.from('kist_afbeeldingen').select('*'),
+        sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
+      ]);
+      if (d.error) throw d.error;
+      Cloud.cache.dossiers = (d.data || []).map(normRow);
+      Cloud.cache.taken = (t.data || []).map(normRow);
+      Cloud.cache.kosten = (k.data || []).map(normKosten);
+      Cloud.cache.notities = (n.data || []).map(normRow);
+      Cloud.cache.documenten = (doc.data || []).map(normRow);
+      Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
+      Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
+      Cloud.loaded = true;
+      Cloud.offline = false;
+      try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}
+    } catch (err) {
+      // Geen verbinding of API-fout: probeer lokale spiegel te gebruiken
+      const raw = localStorage.getItem('sok_mirror');
+      if (raw) {
+        try {
+          const m = JSON.parse(raw);
+          Cloud.cache = m.cache || Cloud.cache;
+          Cloud.cache.savedAt = m.savedAt;
+          Cloud.loaded = true;
+          Cloud.offline = true;
+          return;
+        } catch (_) {}
+      }
+      throw err;
+    }
   },
 };
 
@@ -85,6 +104,10 @@ const DB = {
   where(tbl, fn) { return (Cloud.cache[tbl] || []).filter(fn); },
 
   async insert(tbl, payload) {
+    if (!navigator.onLine) {
+      alert('Geen internetverbinding. Wijzigingen kunnen niet worden opgeslagen totdat je weer online bent.');
+      throw new Error('offline');
+    }
     const u = Auth.current();
     const row = Object.assign({}, payload);
     if (tbl === 'dossiers' && u) row.created_by = u.id;
@@ -99,6 +122,10 @@ const DB = {
   },
 
   async update(tbl, id, patch) {
+    if (!navigator.onLine) {
+      alert('Geen internetverbinding. Wijzigingen kunnen niet worden opgeslagen totdat je weer online bent.');
+      throw new Error('offline');
+    }
     const p = Object.assign({}, patch);
     cleanEmpty(p);
     const { data, error } = await sb.from(tbl).update(p).eq('id', id).select().single();
@@ -110,6 +137,10 @@ const DB = {
   },
 
   async remove(tbl, id) {
+    if (!navigator.onLine) {
+      alert('Geen internetverbinding. Verwijderen kan niet zolang je offline bent.');
+      throw new Error('offline');
+    }
     const { error } = await sb.from(tbl).delete().eq('id', id);
     if (error) { alert('Verwijderen mislukt: ' + error.message); throw error; }
     Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => x.id !== id);

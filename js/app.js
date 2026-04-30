@@ -1,4 +1,25 @@
-// Init: Supabase auth, route registratie, login form
+// Init: Supabase auth, route registratie, login form, offline-modus
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(err =>
+      console.warn('Service worker registratie mislukt:', err));
+  });
+}
+
+function updateOfflineUI() {
+  const offline = !navigator.onLine || !!Cloud.offline;
+  const badge = document.getElementById('offline-badge');
+  if (badge) badge.hidden = !offline;
+  document.body.classList.toggle('is-offline', offline);
+}
+window.addEventListener('online', () => {
+  updateOfflineUI();
+  if (Cloud.offline && Auth.current()) {
+    Cloud.loadAll().then(() => { updateOfflineUI(); Router.handle(); }).catch(() => {});
+  }
+});
+window.addEventListener('offline', updateOfflineUI);
 
 Router.add('/', () => renderDashboard());
 Router.add('/dossiers', (p, full) => renderDossierList(p, full));
@@ -15,6 +36,7 @@ Router.add('/account', () => renderAccount());
     try { await Cloud.loadAll(); }
     catch (e) { alert('Gegevens laden mislukt: ' + (e.message || e)); }
   }
+  updateOfflineUI();
 
   document.getElementById('login-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -34,6 +56,7 @@ Router.add('/account', () => renderAccount());
     }
     document.getElementById('login-password').value = '';
     try { await Cloud.loadAll(); } catch (e2) { alert('Laden mislukt: ' + (e2.message || e2)); }
+    updateOfflineUI();
     if (!location.hash || location.hash === '#/login') location.hash = '#/';
     Router.handle();
   });

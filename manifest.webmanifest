@@ -1,0 +1,15 @@
+{
+  "name": "Uitvaartbeheer SOK Antiochië",
+  "short_name": "SOK Uitvaart",
+  "description": "Intern dossierbeheer voor de uitvaartleider van de Syrisch-Orthodoxe Kerk van Antiochië",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f4ef",
+  "theme_color": "#6b1e2a",
+  "lang": "nl",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
