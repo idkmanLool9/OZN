@@ -248,6 +248,31 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="handtekeningen">
+        <h2>Handtekening-velden</h2>
+        <p class="muted small">Bepaal welke handtekeningen worden gevraagd bij het aanmaken/bewerken van een dossier. Verplichte velden moeten ingevuld zijn voor opslaan.</p>
+        ${(() => {
+          const fields = Settings.get('signature_fields') || [];
+          return `
+          <form id="sig-form" class="form" autocomplete="off">
+            <div id="sig-rows">
+              ${fields.map((f, i) => `
+                <div class="sig-row" data-idx="${i}">
+                  <input type="text" class="sig-label" value="${esc(f.label)}" placeholder="bv. Handtekening opdrachtgever">
+                  <label class="checkbox-inline" style="font-size:.85rem;white-space:nowrap;">
+                    <input type="checkbox" class="sig-required" ${f.required ? 'checked' : ''}> verplicht
+                  </label>
+                  <button type="button" class="btn-icon" data-action="del-sig" data-idx="${i}" title="verwijderen">×</button>
+                </div>`).join('')}
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-sig">+ Veld toevoegen</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
@@ -457,6 +482,48 @@ function renderAccount(msg) {
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
+    });
+  }
+
+  // Handtekening-velden beheer
+  const sigForm = $('#sig-form');
+  if (sigForm) {
+    function slug(s) {
+      return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'veld';
+    }
+    function readSigRows() {
+      return $$('#sig-rows .sig-row').map((row, i) => {
+        const label = (row.querySelector('.sig-label').value || '').trim() || ('Handtekening ' + (i + 1));
+        const required = row.querySelector('.sig-required').checked;
+        return { id: slug(label) + '_' + i, label, required };
+      });
+    }
+    $('#btn-add-sig').addEventListener('click', () => {
+      const rows = $('#sig-rows');
+      const idx = rows.children.length;
+      const div = document.createElement('div');
+      div.className = 'sig-row';
+      div.dataset.idx = idx;
+      div.innerHTML = `
+        <input type="text" class="sig-label" value="" placeholder="bv. Handtekening getuige">
+        <label class="checkbox-inline" style="font-size:.85rem;white-space:nowrap;">
+          <input type="checkbox" class="sig-required"> verplicht
+        </label>
+        <button type="button" class="btn-icon" data-action="del-sig">×</button>`;
+      rows.appendChild(div);
+      div.querySelector('.sig-label').focus();
+    });
+    sigForm.addEventListener('click', e => {
+      const del = e.target.closest('button[data-action="del-sig"]');
+      if (!del) return;
+      const row = del.closest('.sig-row');
+      if (row) row.remove();
+    });
+    sigForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const fields = readSigRows();
+      Settings.set({ signature_fields: fields });
+      renderAccount({ success: 'Handtekening-velden opgeslagen.' });
     });
   }
 

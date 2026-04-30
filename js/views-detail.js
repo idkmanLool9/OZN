@@ -105,6 +105,27 @@ function renderDossierDetail(params) {
           ${dlRow('Telefoon', d.opdrachtgever_telefoon)}
         </dl>
         ${d.bijzonderheden ? `<h3>Bijzonderheden</h3><p class="prewrap">${esc(d.bijzonderheden)}</p>` : ''}
+
+        ${(() => {
+          const sigs = (d.handtekeningen && typeof d.handtekeningen === 'object') ? d.handtekeningen : {};
+          const fields = Settings.get('signature_fields') || [];
+          if (fields.length === 0) return '';
+          const any = fields.some(f => sigs[f.id] && sigs[f.id].data);
+          if (!any) return '';
+          return `<h3>Handtekeningen</h3>
+            <div class="signatures-grid signatures-readonly">
+              ${fields.map(f => {
+                const s = sigs[f.id];
+                if (!s || !s.data) return '';
+                const when = s.signed_at ? new Date(s.signed_at).toLocaleString('nl-NL') : '';
+                return `<div class="signature-block">
+                  <div class="signature-header"><strong>${esc(f.label)}</strong></div>
+                  <img class="signature-img" src="${esc(s.data)}" alt="${esc(f.label)}">
+                  <div class="signature-actions"><span class="muted small">Ondertekend ${esc(when)}</span></div>
+                </div>`;
+              }).join('')}
+            </div>`;
+        })()}
       </section>
 
       <section id="taken" class="card">

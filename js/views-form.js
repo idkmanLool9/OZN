@@ -222,6 +222,24 @@ function renderDossierForm(params) {
           </label>
         </fieldset>
 
+        <fieldset class="card">
+          <legend>Handtekeningen <a href="#/account#handtekeningen" class="muted small" style="margin-left:.5rem;text-transform:none;letter-spacing:0;">velden beheren →</a></legend>
+          <div class="signatures-grid">
+            ${(Settings.get('signature_fields') || []).map(f => `
+              <div class="signature-block" data-sigid="${esc(f.id)}">
+                <div class="signature-header">
+                  <strong>${esc(f.label)}</strong>
+                  ${f.required ? '<span class="badge badge-amber">verplicht</span>' : '<span class="muted small">optioneel</span>'}
+                </div>
+                <canvas class="signature-pad" data-sigid="${esc(f.id)}" width="600" height="180"></canvas>
+                <div class="signature-actions">
+                  <span class="signature-status muted small" data-status="${esc(f.id)}">nog niet ondertekend</span>
+                  <button type="button" class="btn btn-sm btn-ghost" data-action="clear-sig" data-sigid="${esc(f.id)}">Wissen</button>
+                </div>
+              </div>`).join('') || '<p class="muted">Geen handtekening-velden ingesteld. <a href="#/account">Beheer in Account</a>.</p>'}
+          </div>
+        </fieldset>
+
         <div class="form-actions">
           <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-cancel-form">Annuleren</a>
           <button type="submit" class="btn btn-primary">${isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan'}</button>
@@ -284,6 +302,34 @@ function renderDossierForm(params) {
   }
   bloemSelect.addEventListener('change', updateBloemPreview);
   updateBloemPreview();
+
+  // ─── Handtekeningen activeren ──────────────────────────────────────────
+  const sigPads = {};
+  const existingSigs = (dossier.handtekeningen && typeof dossier.handtekeningen === 'object') ? dossier.handtekeningen : {};
+  $$('.signature-pad').forEach(canvas => {
+    const id = canvas.getAttribute('data-sigid');
+    const pad = new SignaturePad(canvas);
+    sigPads[id] = pad;
+    if (existingSigs[id] && existingSigs[id].data) {
+      pad.fromDataURL(existingSigs[id].data);
+      const status = $(`[data-status="${id}"]`);
+      if (status) {
+        const when = existingSigs[id].signed_at ? ' op ' + new Date(existingSigs[id].signed_at).toLocaleString('nl-NL') : '';
+        status.textContent = 'Ondertekend' + when;
+        status.classList.add('signed');
+      }
+    }
+  });
+  $('#dossier-form').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-action="clear-sig"]');
+    if (!btn) return;
+    e.preventDefault();
+    const id = btn.getAttribute('data-sigid');
+    const pad = sigPads[id]; if (!pad) return;
+    pad.clear();
+    const status = $(`[data-status="${id}"]`);
+    if (status) { status.textContent = 'nog niet ondertekend'; status.classList.remove('signed'); }
+  });
 
   // Eten & drinken-preview live bijwerken
   const edSelect = $('#ed-select');
@@ -371,6 +417,29 @@ function renderDossierForm(params) {
       if (inp) data[f] = (inp.value || '').trim();
     });
     if (!data.status) data.status = 'nieuw';
+
+    // Handtekeningen verzamelen — behoud bestaande als de pad niet opnieuw is getekend
+    const handtekeningen = Object.assign({}, existingSigs);
+    let missingRequired = [];
+    (Settings.get('signature_fields') || []).forEach(f => {
+      const pad = sigPads[f.id];
+      if (!pad) return;
+      if (!pad.isEmpty()) {
+        handtekeningen[f.id] = { data: pad.toDataURL(), signed_at: new Date().toISOString() };
+      }
+      if (f.required && !(handtekeningen[f.id] && handtekeningen[f.id].data)) {
+        missingRequired.push(f.label);
+      }
+    });
+    if (missingRequired.length > 0) {
+      Modal.show({
+        type: 'warning',
+        title: 'Handtekening vereist',
+        message: 'Vul nog de volgende handtekening(en) in: ' + missingRequired.join(', '),
+      });
+      return;
+    }
+    data.handtekeningen = handtekeningen;
 
     const btn = e.target.querySelector('button[type=submit]');
     btn.disabled = true; const oldText = btn.textContent;

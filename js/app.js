@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v13'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v14'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -26,6 +26,11 @@ const Settings = {
     compact_mode: false,
     rounded_cards: true,
     font_id: 'default',
+    // Handtekeningen-velden in het intake-formulier
+    signature_fields: [
+      { id: 'opdrachtgever',   label: 'Handtekening opdrachtgever',   required: true },
+      { id: 'uitvaartleider',  label: 'Handtekening uitvaartleider',  required: true },
+    ],
   },
   // Synchrone read uit cache + lokale spiegel
   _localOverrides() {

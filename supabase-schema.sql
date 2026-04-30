@@ -45,10 +45,15 @@ CREATE TABLE IF NOT EXISTS public.dossiers (
   opdrachtgever_naam TEXT, opdrachtgever_telefoon TEXT,
 
   bijzonderheden TEXT,
+  handtekeningen JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   created_by UUID REFERENCES auth.users(id)
 );
+
+-- Voor bestaande databases: kolom achteraf toevoegen
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS handtekeningen JSONB DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS public.taken (
   id BIGSERIAL PRIMARY KEY,

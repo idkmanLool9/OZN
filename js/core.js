@@ -171,6 +171,82 @@ const Router = {
   },
 };
 
+// ─── SignaturePad: digitale handtekening op een canvas ─────────────────────
+class SignaturePad {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.drawing = false;
+    this.lastX = 0; this.lastY = 0;
+    this.empty = true;
+    this._setup();
+    this._bind();
+  }
+  _setup() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = this.canvas.getBoundingClientRect();
+    this.canvas.width  = Math.max(1, Math.round(rect.width  * dpr));
+    this.canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    this.ctx.scale(dpr, dpr);
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+    this.ctx.lineWidth = 2.2;
+    this.ctx.strokeStyle = '#1a1714';
+  }
+  _point(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  }
+  _bind() {
+    const start = e => {
+      this.drawing = true;
+      const p = this._point(e);
+      this.lastX = p.x; this.lastY = p.y;
+      this.empty = false;
+      e.preventDefault();
+    };
+    const move = e => {
+      if (!this.drawing) return;
+      const p = this._point(e);
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.lastX, this.lastY);
+      this.ctx.lineTo(p.x, p.y);
+      this.ctx.stroke();
+      this.lastX = p.x; this.lastY = p.y;
+      e.preventDefault();
+    };
+    const end = () => { this.drawing = false; };
+    this.canvas.addEventListener('mousedown', start);
+    this.canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    this.canvas.addEventListener('mouseleave', end);
+    this.canvas.addEventListener('touchstart', start, { passive: false });
+    this.canvas.addEventListener('touchmove',  move,  { passive: false });
+    this.canvas.addEventListener('touchend',   end);
+    this.canvas.addEventListener('touchcancel', end);
+  }
+  clear() {
+    const dpr = window.devicePixelRatio || 1;
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.restore();
+    this.empty = true;
+  }
+  isEmpty() { return this.empty; }
+  toDataURL() { return this.empty ? null : this.canvas.toDataURL('image/png'); }
+  fromDataURL(url) {
+    const img = new Image();
+    img.onload = () => {
+      const dpr = window.devicePixelRatio || 1;
+      this.ctx.drawImage(img, 0, 0, this.canvas.width / dpr, this.canvas.height / dpr);
+      this.empty = false;
+    };
+    img.src = url;
+  }
+}
+
 function showLogin() { $('#login-screen').hidden = false; $('#app').hidden = true; }
 function showApp() {
   $('#login-screen').hidden = true; $('#app').hidden = false;
