@@ -259,3 +259,44 @@ ALTER TABLE public.bloemen_catalogus ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "bloemen_all_auth" ON public.bloemen_catalogus;
 CREATE POLICY "bloemen_all_auth" ON public.bloemen_catalogus
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ──────────────────────────────────────────────────────────────────
+-- 7. Storage bucket + catalogustabel voor eten & drinken
+-- ──────────────────────────────────────────────────────────────────
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('eten_drinken', 'eten_drinken', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "auth_eten_drinken_insert" ON storage.objects;
+CREATE POLICY "auth_eten_drinken_insert" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'eten_drinken');
+
+DROP POLICY IF EXISTS "auth_eten_drinken_update" ON storage.objects;
+CREATE POLICY "auth_eten_drinken_update" ON storage.objects
+  FOR UPDATE TO authenticated USING (bucket_id = 'eten_drinken');
+
+DROP POLICY IF EXISTS "auth_eten_drinken_delete" ON storage.objects;
+CREATE POLICY "auth_eten_drinken_delete" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'eten_drinken');
+
+CREATE TABLE IF NOT EXISTS public.eten_drinken_catalogus (
+  id BIGSERIAL PRIMARY KEY,
+  naam TEXT UNIQUE NOT NULL,
+  omschrijving TEXT,
+  bedrag NUMERIC(10,2) DEFAULT 0,
+  storage_pad TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS trg_eten_drinken_updated_at ON public.eten_drinken_catalogus;
+CREATE TRIGGER trg_eten_drinken_updated_at
+  BEFORE UPDATE ON public.eten_drinken_catalogus
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.eten_drinken_catalogus ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "eten_drinken_all_auth" ON public.eten_drinken_catalogus;
+CREATE POLICY "eten_drinken_all_auth" ON public.eten_drinken_catalogus
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);

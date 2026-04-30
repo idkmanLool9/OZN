@@ -182,7 +182,19 @@ function renderDossierForm(params) {
             </label>
             <label><span>Aantal rouwkaarten</span><input type="number" name="rouwkaarten_aantal" value="${v('rouwkaarten_aantal')}" min="0"></label>
             <label class="span-2"><span>Locatie condoleance</span><input type="text" name="condoleance_locatie" value="${v('condoleance_locatie')}"></label>
-            <label><span>Catering</span><input type="text" name="catering" value="${v('catering')}"></label>
+            <label class="span-3"><span>Eten &amp; drinken (catalogus) <a href="#/eten-drinken" class="muted small" style="margin-left:.5rem;">beheren →</a></span>
+              <div class="kist-picker">
+                <select name="catering" id="ed-select">
+                  <option value="">— niet gekozen —</option>
+                  ${DB.list(KEYS.ETEN_DRINKEN).slice().sort((a,b) => a.naam.localeCompare(b.naam)).map(b => {
+                    const label = `${b.naam}${b.bedrag ? ' — ' + fmtEUR(b.bedrag) : ''}`;
+                    return `<option value="${esc(b.naam)}" ${dossier.catering === b.naam ? 'selected' : ''}>${esc(label)}</option>`;
+                  }).join('')}
+                  <option value="anders" ${sel('catering','anders')}>Anders / handmatig</option>
+                </select>
+                <div class="kist-preview" id="ed-preview" aria-live="polite"></div>
+              </div>
+            </label>
             <label class="span-3"><span>Muziek / koor / zang</span><input type="text" name="muziek_zang" value="${v('muziek_zang')}"></label>
           </div>
         </fieldset>
@@ -273,6 +285,31 @@ function renderDossierForm(params) {
   }
   bloemSelect.addEventListener('change', updateBloemPreview);
   updateBloemPreview();
+
+  // Eten & drinken-preview live bijwerken
+  const edSelect = $('#ed-select');
+  const edPreview = $('#ed-preview');
+  function updateEdPreview() {
+    const v = edSelect.value;
+    if (!v) { edPreview.innerHTML = '<div class="kist-preview-empty">Niet gekozen</div>'; return; }
+    if (v === 'anders') { edPreview.innerHTML = '<div class="kist-preview-empty">Handmatig / anders</div>'; return; }
+    const b = DB.list(KEYS.ETEN_DRINKEN).find(x => x.naam === v);
+    if (!b) { edPreview.innerHTML = ''; return; }
+    const fotoUrl = EtenDrinkenFotos.urlVoor(b.naam);
+    const beeld = fotoUrl
+      ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
+      : (typeof edSVG === 'function' ? edSVG() : '');
+    edPreview.innerHTML = `
+      <div class="kist-img">${beeld}</div>
+      <div class="kist-meta">
+        <strong>${esc(b.naam)}</strong>
+        ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
+        ${b.bedrag ? `<span class="kist-price">${fmtEUR(b.bedrag)}</span>` : ''}
+        ${fotoUrl ? '' : '<span class="muted small"><a href="#/eten-drinken">Foto uploaden</a></span>'}
+      </div>`;
+  }
+  edSelect.addEventListener('change', updateEdPreview);
+  updateEdPreview();
 
   // ─── Autosave: bewaar concept tijdens typen, herstel na navigatie ───
   const draftKey = dossierDraftKey(isNew, dossier.id);

@@ -94,7 +94,7 @@ function renderDossierDetail(params) {
           ${dlRow('Bloemstukken', d.bloemstukken ? bloemRowValue(d.bloemstukken) : '')}
           ${dlRow('Rouwkaarten', d.rouwkaarten_aantal)}
           ${dlRow('Condoleance', d.condoleance_locatie)}
-          ${dlRow('Catering', d.catering)}
+          ${dlRow('Eten & drinken', d.catering ? edRowValue(d.catering) : '')}
           ${dlRow('Muziek / koor', d.muziek_zang)}
         </dl>
         <h3>Verzekering & opdrachtgever</h3>
@@ -237,6 +237,19 @@ function bloemRowValue(bloemNaam) {
   const thumb = fotoUrl
     ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
     : (typeof bloemSVG === 'function' ? bloemSVG() : '');
+  const meta = [b.omschrijving, b.bedrag ? fmtEUR(b.bedrag) : null].filter(Boolean).join(' — ');
+  return `<span class="kist-thumb-inline">${thumb}</span>` +
+         `<strong>${esc(b.naam)}</strong>` +
+         (meta ? ` <span class="muted small">— ${esc(meta)}</span>` : '');
+}
+
+function edRowValue(naam) {
+  const b = DB.list(KEYS.ETEN_DRINKEN).find(x => x.naam === naam);
+  if (!b) return esc(naam);
+  const fotoUrl = EtenDrinkenFotos.urlVoor(b.naam);
+  const thumb = fotoUrl
+    ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
+    : (typeof edSVG === 'function' ? edSVG() : '');
   const meta = [b.omschrijving, b.bedrag ? fmtEUR(b.bedrag) : null].filter(Boolean).join(' — ');
   return `<span class="kist-thumb-inline">${thumb}</span>` +
          `<strong>${esc(b.naam)}</strong>` +
