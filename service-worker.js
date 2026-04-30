@@ -4,7 +4,7 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v7';
+const CACHE_VERSION = 'sok-uitvaart-v8';
 const SHELL = [
   './',
   './index.html',
@@ -50,7 +50,14 @@ self.addEventListener('fetch', e => {
 
   const url = new URL(req.url);
 
-  // Supabase API (REST, auth, storage, realtime): nooit cachen — moet altijd vers
+  // Supabase publieke storage-objecten (logo + kistfoto's + bloemen +
+  // eten/drinken-foto's): stale-while-revalidate zodat ze offline werken
+  if ((url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) &&
+      url.pathname.startsWith('/storage/v1/object/public/')) {
+    e.respondWith(staleWhileRevalidate(req));
+    return;
+  }
+  // Overige Supabase API (REST, auth, signed URLs, realtime): nooit cachen
   if (url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) {
     return;
   }

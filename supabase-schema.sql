@@ -300,3 +300,48 @@ ALTER TABLE public.eten_drinken_catalogus ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "eten_drinken_all_auth" ON public.eten_drinken_catalogus;
 CREATE POLICY "eten_drinken_all_auth" ON public.eten_drinken_catalogus
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ──────────────────────────────────────────────────────────────────
+-- 8. App-brede instellingen (gedeeld tussen alle apparaten/gebruikers)
+-- ──────────────────────────────────────────────────────────────────
+
+-- Eén-rij-tabel met alle app-instellingen als JSONB.
+-- Branding, welkomscherm, lettertype, weergave — gesynct over apparaten.
+CREATE TABLE IF NOT EXISTS public.app_instellingen (
+  id INT PRIMARY KEY,
+  data JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Initiele lege rij
+INSERT INTO public.app_instellingen (id, data)
+VALUES (1, '{}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+DROP TRIGGER IF EXISTS trg_app_instellingen_updated_at ON public.app_instellingen;
+CREATE TRIGGER trg_app_instellingen_updated_at
+  BEFORE UPDATE ON public.app_instellingen
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.app_instellingen ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "app_instellingen_all_auth" ON public.app_instellingen;
+CREATE POLICY "app_instellingen_all_auth" ON public.app_instellingen
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- Storage-bucket voor het logo (publiek leesbaar)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('branding', 'branding', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "auth_branding_insert" ON storage.objects;
+CREATE POLICY "auth_branding_insert" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'branding');
+
+DROP POLICY IF EXISTS "auth_branding_update" ON storage.objects;
+CREATE POLICY "auth_branding_update" ON storage.objects
+  FOR UPDATE TO authenticated USING (bucket_id = 'branding');
+
+DROP POLICY IF EXISTS "auth_branding_delete" ON storage.objects;
+CREATE POLICY "auth_branding_delete" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'branding');

@@ -1,11 +1,14 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v7'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v8'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
-// ─── Instellingen (lokaal per apparaat) ─────────────────────────────────────
+// ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
-  KEY: 'sok_settings',
+  KEY: 'sok_settings',          // lokale spiegel
+  TABLE: 'app_instellingen',
+  ROW_ID: 1,                    // single-row model
+  _cache: null,                 // huidige overrides (zonder defaults)
   defaults: {
     splash_enabled: true,
     splash_duration_ms: 2500,
@@ -24,20 +27,68 @@ const Settings = {
     rounded_cards: true,
     font_id: 'default',
   },
-  all() {
-    let stored = {};
-    try { stored = JSON.parse(localStorage.getItem(Settings.KEY) || '{}') || {}; } catch (_) {}
-    return Object.assign({}, Settings.defaults, stored);
+  // Synchrone read uit cache + lokale spiegel
+  _localOverrides() {
+    if (Settings._cache) return Settings._cache;
+    try { return JSON.parse(localStorage.getItem(Settings.KEY) || '{}') || {}; } catch (_) { return {}; }
   },
+  all() { return Object.assign({}, Settings.defaults, Settings._localOverrides()); },
   get(key) { return Settings.all()[key]; },
+
+  // Synchroon: update cache + lokale spiegel; cloud-push fire-and-forget
   set(patch) {
-    const next = Object.assign({}, Settings.all(), patch);
-    // Verwijder defaults om opslag schoon te houden
+    const cur = Settings._localOverrides();
+    const next = Object.assign({}, cur, patch);
+    // Defaults eruit halen om de tabel klein te houden
     const trimmed = {};
     for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
-    localStorage.setItem(Settings.KEY, JSON.stringify(trimmed));
+    Settings._cache = trimmed;
+    try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {}
+    Settings._pushCloud(trimmed); // niet awaiten
   },
-  reset() { localStorage.removeItem(Settings.KEY); },
+
+  // Geluidloos pushen naar Supabase
+  _pushCloud(data) {
+    if (!navigator.onLine) return;
+    if (!Auth.current()) return;
+    sb.from(Settings.TABLE)
+      .upsert({ id: Settings.ROW_ID, data, updated_at: new Date().toISOString() }, { onConflict: 'id' })
+      .then(r => { if (r.error) console.warn('Settings cloud-push faalde:', r.error.message); })
+      .catch(err => console.warn('Settings cloud-push error:', err));
+  },
+
+  // Bij login / app-start: haal de gedeelde instellingen op
+  async loadFromCloud() {
+    if (!Auth.current()) return;
+    try {
+      const { data, error } = await sb.from(Settings.TABLE)
+        .select('data').eq('id', Settings.ROW_ID).maybeSingle();
+      if (error) throw error;
+      const cloud = (data && data.data) ? data.data : null;
+      if (cloud === null || Object.keys(cloud).length === 0) {
+        // Cloud is nog leeg — push de lokale overrides (eerste keer migratie)
+        const local = Settings._localOverrides();
+        if (Object.keys(local).length > 0) {
+          Settings._pushCloud(local);
+          Settings._cache = local;
+        } else {
+          Settings._cache = {};
+        }
+      } else {
+        Settings._cache = cloud;
+        try { localStorage.setItem(Settings.KEY, JSON.stringify(cloud)); } catch (_) {}
+      }
+    } catch (e) {
+      // Offline of API-fout: gebruik de lokale spiegel
+      try { Settings._cache = JSON.parse(localStorage.getItem(Settings.KEY) || '{}'); } catch (_) { Settings._cache = {}; }
+    }
+  },
+
+  reset() {
+    Settings._cache = {};
+    localStorage.removeItem(Settings.KEY);
+    Settings._pushCloud({});
+  },
 };
 
 // ─── Lettertypen (curated lijst, Google Fonts gecached door SW) ─────────────
@@ -141,6 +192,27 @@ function fileToDataUrl(file) {
     r.readAsDataURL(file);
   });
 }
+
+// ─── BrandingFotos: logo-upload naar Supabase Storage (publieke bucket) ─────
+const BrandingFotos = {
+  async uploadLogo(file) {
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `logo.${ext || 'png'}`;
+    // Verwijder eerst oude logo-bestanden van andere extensies
+    const exts = ['png','jpg','jpeg','svg','webp','gif'].filter(e => e !== ext);
+    if (exts.length) await sb.storage.from('branding').remove(exts.map(e => `logo.${e}`)).catch(() => {});
+    const { error } = await sb.storage.from('branding').upload(path, file, {
+      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
+    });
+    if (error) throw error;
+    const { data } = sb.storage.from('branding').getPublicUrl(path);
+    return data.publicUrl + '?v=' + Date.now();
+  },
+  async removeLogo() {
+    const exts = ['png','jpg','jpeg','svg','webp','gif'];
+    await sb.storage.from('branding').remove(exts.map(e => `logo.${e}`)).catch(() => {});
+  },
+};
 
 const Splash = {
   shownAt: Date.now(),
@@ -277,9 +349,12 @@ Router.add('/account', () => renderAccount());
   const sess = await Auth.init();
   if (sess) {
     try { await Cloud.loadAll(); }
-    catch (e) {
-      console.warn('Laden mislukt:', e.message || e);
-    }
+    catch (e) { console.warn('Laden mislukt:', e.message || e); }
+    // Instellingen uit de cloud halen en branding opnieuw toepassen
+    try {
+      await Settings.loadFromCloud();
+      Branding.apply();
+    } catch (e) { console.warn('Settings laden faalde:', e.message || e); }
   }
   updateOfflineUI();
 
@@ -307,6 +382,7 @@ Router.add('/account', () => renderAccount());
     }
     document.getElementById('login-password').value = '';
     try { await Cloud.loadAll(); } catch (e2) { alert('Laden mislukt: ' + (e2.message || e2)); }
+    try { await Settings.loadFromCloud(); Branding.apply(); } catch (_) {}
     updateOfflineUI();
     if (!location.hash || location.hash === '#/login') location.hash = '#/';
     Router.handle();

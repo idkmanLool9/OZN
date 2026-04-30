@@ -320,20 +320,29 @@ function renderAccount(msg) {
       const file = e.target.files[0];
       if (!file) return;
       if (!file.type.startsWith('image/')) return alert('Alleen afbeeldingen toegestaan.');
-      if (file.size > 500 * 1024) return alert('Logo te groot (max. 500 KB).');
+      if (file.size > 1024 * 1024) return alert('Logo te groot (max. 1 MB).');
+      if (!navigator.onLine) return alert('Logo uploaden kan alleen met internet (gaat naar de cloud).');
+      const lbl = e.target.closest('label');
+      if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
       try {
-        pendingLogo = await fileToDataUrl(file);
+        pendingLogo = await BrandingFotos.uploadLogo(file);
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
-      } catch (_) {}
+      } catch (err) {
+        alert('Upload mislukt: ' + (err.message || err));
+      } finally {
+        if (lbl) { lbl.style.opacity = 1; }
+      }
     });
 
     const removeBtn = $('#btn-remove-logo');
     if (removeBtn) {
-      removeBtn.addEventListener('click', () => {
+      removeBtn.addEventListener('click', async () => {
         pendingLogo = '';
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = '<span>✝</span>';
+        // Bestand uit storage verwijderen (best-effort)
+        if (navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
       });
     }
 
