@@ -1,10 +1,11 @@
 -- ====================================================================
 -- Uitvaartbeheer SOK Antiochië — Supabase schema
 -- Plak dit in: Supabase dashboard → SQL Editor → New query → Run
+-- Dit script is idempotent: meerdere keren runnen is veilig.
 -- ====================================================================
 
 -- ──────────────────────────────────────────────────────────────────
--- Tabellen
+-- 1. Tabellen
 -- ──────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.dossiers (
@@ -91,16 +92,16 @@ CREATE TABLE IF NOT EXISTS public.documenten (
 );
 
 -- ──────────────────────────────────────────────────────────────────
--- Triggers: automatisch dossiernummer + updated_at
+-- 2. Triggers: automatisch dossiernummer + updated_at
 -- ──────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.set_dossier_nummer() RETURNS TRIGGER AS $$
 DECLARE
-  jaar INT := EXTRACT(YEAR FROM CURRENT_DATE);
+  jaar TEXT := to_char(CURRENT_DATE, 'YYYY');
   volgnr INT;
 BEGIN
   IF NEW.dossier_nummer IS NULL OR NEW.dossier_nummer = '' THEN
-    SELECT COALESCE(MAX(CAST(REGEXP_REPLACE(dossier_nummer, '^SOK-\d{4}-', '') AS INT)), 0) + 1
+    SELECT COALESCE(MAX(CAST(SUBSTRING(dossier_nummer FROM '[0-9]+$') AS INT)), 0) + 1
       INTO volgnr
       FROM public.dossiers
      WHERE dossier_nummer LIKE 'SOK-' || jaar || '-%';
@@ -116,7 +117,10 @@ CREATE TRIGGER trg_dossier_nummer
   FOR EACH ROW EXECUTE FUNCTION public.set_dossier_nummer();
 
 CREATE OR REPLACE FUNCTION public.set_updated_at() RETURNS TRIGGER AS $$
-BEGIN NEW.updated_at := now(); RETURN NEW; END;
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
 $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_dossiers_updated_at ON public.dossiers;
@@ -125,7 +129,7 @@ CREATE TRIGGER trg_dossiers_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ──────────────────────────────────────────────────────────────────
--- Row Level Security: alleen ingelogde gebruikers; gedeelde org-data
+-- 3. Row Level Security: alleen ingelogde gebruikers
 -- ──────────────────────────────────────────────────────────────────
 
 ALTER TABLE public.dossiers   ENABLE ROW LEVEL SECURITY;
@@ -134,15 +138,28 @@ ALTER TABLE public.kosten     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notities   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documenten ENABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-  FOR t IN SELECT unnest(ARRAY['dossiers','taken','kosten','notities','documenten']) LOOP
-    EXECUTE format('DROP POLICY IF EXISTS "auth_all" ON public.%I', t);
-    EXECUTE format('CREATE POLICY "auth_all" ON public.%I FOR ALL TO authenticated USING (true) WITH CHECK (true)', t);
-  END LOOP;
-END $$;
+DROP POLICY IF EXISTS "auth_all" ON public.dossiers;
+CREATE POLICY "auth_all" ON public.dossiers
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "auth_all" ON public.taken;
+CREATE POLICY "auth_all" ON public.taken
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "auth_all" ON public.kosten;
+CREATE POLICY "auth_all" ON public.kosten
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "auth_all" ON public.notities;
+CREATE POLICY "auth_all" ON public.notities
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "auth_all" ON public.documenten;
+CREATE POLICY "auth_all" ON public.documenten
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ──────────────────────────────────────────────────────────────────
--- Storage bucket voor documenten
+-- 4. Storage bucket voor documenten
 -- ──────────────────────────────────────────────────────────────────
 
 INSERT INTO storage.buckets (id, name, public)
@@ -150,15 +167,17 @@ VALUES ('documenten', 'documenten', false)
 ON CONFLICT (id) DO NOTHING;
 
 DROP POLICY IF EXISTS "auth_storage_select" ON storage.objects;
-DROP POLICY IF EXISTS "auth_storage_insert" ON storage.objects;
-DROP POLICY IF EXISTS "auth_storage_update" ON storage.objects;
-DROP POLICY IF EXISTS "auth_storage_delete" ON storage.objects;
-
 CREATE POLICY "auth_storage_select" ON storage.objects
   FOR SELECT TO authenticated USING (bucket_id = 'documenten');
+
+DROP POLICY IF EXISTS "auth_storage_insert" ON storage.objects;
 CREATE POLICY "auth_storage_insert" ON storage.objects
   FOR INSERT TO authenticated WITH CHECK (bucket_id = 'documenten');
+
+DROP POLICY IF EXISTS "auth_storage_update" ON storage.objects;
 CREATE POLICY "auth_storage_update" ON storage.objects
   FOR UPDATE TO authenticated USING (bucket_id = 'documenten');
+
+DROP POLICY IF EXISTS "auth_storage_delete" ON storage.objects;
 CREATE POLICY "auth_storage_delete" ON storage.objects
   FOR DELETE TO authenticated USING (bucket_id = 'documenten');
