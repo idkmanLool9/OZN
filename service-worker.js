@@ -4,7 +4,7 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v4';
+const CACHE_VERSION = 'sok-uitvaart-v5';
 const SHELL = [
   './',
   './index.html',
@@ -61,16 +61,22 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // App-shell + eigen assets: cache-first met netwerk-fallback
+  // Eigen assets
   if (url.origin === location.origin) {
-    e.respondWith(cacheFirst(req));
+    // HTML / navigaties: network-first met cache-fallback
+    // (zo komen updates direct binnen zodra je online bent)
+    if (req.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('/') || url.pathname.endsWith('.html')) {
+      e.respondWith(networkFirst(req));
+      return;
+    }
+    // Overige assets (CSS/JS/icon): stale-while-revalidate
+    // (snelle render uit cache, vers op de achtergrond ophalen)
+    e.respondWith(staleWhileRevalidate(req));
     return;
   }
 });
 
-async function cacheFirst(req) {
-  const cached = await caches.match(req);
-  if (cached) return cached;
+async function networkFirst(req) {
   try {
     const resp = await fetch(req);
     if (resp && resp.ok && resp.type === 'basic') {
@@ -79,7 +85,8 @@ async function cacheFirst(req) {
     }
     return resp;
   } catch (e) {
-    // Voor navigaties: probeer index.html als laatste redmiddel
+    const cached = await caches.match(req);
+    if (cached) return cached;
     if (req.mode === 'navigate') {
       const fallback = await caches.match('./index.html');
       if (fallback) return fallback;

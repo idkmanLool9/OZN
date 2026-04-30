@@ -1,5 +1,8 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
+const APP_VERSION = 'v5'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_BUILD_DATE = '2026-04-30';
+
 // ─── Instellingen (lokaal per apparaat) ─────────────────────────────────────
 const Settings = {
   KEY: 'sok_settings',
@@ -140,6 +143,13 @@ Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
 Router.add('/account', () => renderAccount());
 
 (async function init() {
+  // Versie-indicator overal injecteren
+  const verLabel = `Versie ${APP_VERSION} · ${APP_BUILD_DATE}`;
+  const fv = document.getElementById('footer-version');
+  if (fv) fv.textContent = ' · ' + verLabel;
+  const sv = document.getElementById('splash-version');
+  if (sv) sv.textContent = verLabel;
+
   // Welkomscherm meteen tonen op basis van verbinding (tenzij uitgezet)
   const splashOn = Settings.get('splash_enabled');
   if (splashOn) {

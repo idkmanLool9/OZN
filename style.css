@@ -456,6 +456,8 @@ textarea { resize: vertical; }
 
 .splash-card #splash-continue { margin-top: 1.25rem; min-width: 160px; }
 .splash-hint { margin-top: .75rem; }
+.splash-version { margin: 1rem 0 0; font-size: .72rem; opacity: .55; letter-spacing: .03em; }
+.footer-version { font-size: .72rem; opacity: .7; }
 
 /* Offline-badge */
 .offline-badge {
