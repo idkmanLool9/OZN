@@ -8,6 +8,7 @@ function renderDossierDetail(params) {
   const taken = DB.where(KEYS.TAKEN, t => t.dossier_id === id).sort((a, b) => (a.volgorde||0) - (b.volgorde||0) || a.id - b.id);
   const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
   const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const documenten = DB.where(KEYS.DOCUMENTEN, doc => doc.dossier_id === id).sort((a, b) => (b.geupload_op || '').localeCompare(a.geupload_op || ''));
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
 
@@ -30,6 +31,7 @@ function renderDossierDetail(params) {
         <a href="#/dossiers/${d.id}#overzicht">Overzicht</a>
         <a href="#/dossiers/${d.id}#taken">Taken (${taken.filter(t=>!t.voltooid).length}/${taken.length})</a>
         <a href="#/dossiers/${d.id}#kosten">Kosten</a>
+        <a href="#/dossiers/${d.id}#documenten">Documenten (${documenten.length})</a>
         <a href="#/dossiers/${d.id}#notities">Notities (${notities.length})</a>
       </nav>
 
@@ -153,6 +155,33 @@ function renderDossierDetail(params) {
         </form>
       </section>
 
+      <section id="documenten" class="card">
+        <h2>Documenten</h2>
+        ${documenten.length === 0 ? '<p class="muted">Nog geen documenten geüpload.</p>' :
+          '<ul class="doc-list">' + documenten.map(doc => `
+            <li>
+              <button type="button" class="link-btn" data-action="download-doc" data-id="${doc.id}">${esc(doc.naam)}</button>
+              ${doc.type ? `<span class="badge">${esc(doc.type)}</span>` : ''}
+              <span class="muted small">${doc.grootte ? Math.round(doc.grootte/1024) + ' KB · ' : ''}${esc(fmtDate(doc.geupload_op))}</span>
+              <button type="button" class="btn-icon right" data-action="del-doc" data-id="${doc.id}">×</button>
+            </li>`).join('') + '</ul>'}
+        <form id="add-doc" class="row-form">
+          <input type="text" name="naam" placeholder="Documentnaam (optioneel)">
+          <select name="type">
+            <option value="">Type</option>
+            <option value="overlijdensakte">Overlijdensakte</option>
+            <option value="identiteitsbewijs">Identiteitsbewijs</option>
+            <option value="medische verklaring">Medische verklaring</option>
+            <option value="verzekeringspolis">Verzekeringspolis</option>
+            <option value="grafrechten">Grafrechten</option>
+            <option value="verlof tot begraven">Verlof tot begraven</option>
+            <option value="overig">Overig</option>
+          </select>
+          <input type="file" name="bestand" required>
+          <button type="submit" class="btn">+ Uploaden</button>
+        </form>
+      </section>
+
       <section id="notities" class="card">
         <h2>Notities</h2>
         <form id="add-notitie" class="form">
@@ -182,70 +211,115 @@ function dlRow(label, value) {
 
 function bindDetailEvents(id) {
   $('#btn-print').addEventListener('click', () => window.print());
-  $('#btn-delete').addEventListener('click', () => {
-    if (!confirm('Weet u zeker dat u dit dossier wilt verwijderen? Alle taken, kosten en notities worden ook verwijderd.')) return;
-    DB.remove(KEYS.DOSSIERS, id);
-    DB.removeWhere(KEYS.TAKEN, t => t.dossier_id === id);
-    DB.removeWhere(KEYS.KOSTEN, k => k.dossier_id === id);
-    DB.removeWhere(KEYS.NOTITIES, n => n.dossier_id === id);
-    Router.go('/dossiers');
+
+  $('#btn-delete').addEventListener('click', async () => {
+    if (!confirm('Weet u zeker dat u dit dossier wilt verwijderen? Alle taken, kosten, documenten en notities worden ook verwijderd.')) return;
+    try {
+      const docs = DB.where(KEYS.DOCUMENTEN, doc => doc.dossier_id === id);
+      for (const doc of docs) await Storage.remove(doc.storage_pad);
+      await DB.remove(KEYS.DOSSIERS, id); // cascade verwijdert taken/kosten/notities/documenten in DB
+      // cache opschonen voor de child-tabellen
+      ['taken','kosten','notities','documenten'].forEach(t =>
+        Cloud.cache[t] = Cloud.cache[t].filter(x => x.dossier_id !== id));
+      Router.go('/dossiers');
+    } catch (e) {}
   });
 
-  $('#add-taak').addEventListener('submit', e => {
+  $('#add-taak').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
     const omsch = f.omschrijving.value.trim(); if (!omsch) return;
-    const max = DB.list(KEYS.TAKEN).reduce((m, t) => Math.max(m, t.volgorde || 0), 0);
-    DB.insert(KEYS.TAKEN, { dossier_id: id, omschrijving: omsch, deadline: f.deadline.value || '', voltooid: false, volgorde: max + 1 });
-    DB.update(KEYS.DOSSIERS, id, {});
-    renderDossierDetail({ id });
+    const max = DB.where(KEYS.TAKEN, t => t.dossier_id === id).reduce((m, t) => Math.max(m, t.volgorde || 0), 0);
+    try {
+      await DB.insert(KEYS.TAKEN, { dossier_id: id, omschrijving: omsch, deadline: f.deadline.value || null, voltooid: false, volgorde: max + 1 });
+      await DB.touchDossier(id);
+      renderDossierDetail({ id });
+    } catch (_) {}
   });
 
-  $('#add-kosten').addEventListener('submit', e => {
+  $('#add-kosten').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
     const omsch = f.omschrijving.value.trim(); if (!omsch) return;
-    DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || '', bedrag: parseEUR(f.bedrag.value), betaald: f.betaald.checked });
-    DB.update(KEYS.DOSSIERS, id, {});
-    renderDossierDetail({ id });
+    try {
+      await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag: parseEUR(f.bedrag.value), betaald: f.betaald.checked });
+      await DB.touchDossier(id);
+      renderDossierDetail({ id });
+    } catch (_) {}
   });
 
-  $('#add-notitie').addEventListener('submit', e => {
+  $('#add-doc').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    const file = f.bestand.files[0]; if (!file) return;
+    const btn = f.querySelector('button[type=submit]');
+    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Bezig met uploaden...';
+    try {
+      const path = await Storage.upload(id, file);
+      await DB.insert(KEYS.DOCUMENTEN, {
+        dossier_id: id,
+        naam: (f.naam.value || file.name).trim(),
+        type: f.type.value || null,
+        storage_pad: path,
+        grootte: file.size,
+      });
+      await DB.touchDossier(id);
+      renderDossierDetail({ id });
+    } catch (_) {
+      btn.disabled = false; btn.textContent = old;
+    }
+  });
+
+  $('#add-notitie').addEventListener('submit', async e => {
     e.preventDefault();
     const tekst = e.target.tekst.value.trim(); if (!tekst) return;
     const u = Auth.current();
-    DB.insert(KEYS.NOTITIES, { dossier_id: id, tekst, auteur: u ? (u.fullName || u.username) : 'Onbekend' });
-    DB.update(KEYS.DOSSIERS, id, {});
-    renderDossierDetail({ id });
+    try {
+      await DB.insert(KEYS.NOTITIES, { dossier_id: id, tekst, auteur: u ? (u.fullName || u.email) : 'Onbekend' });
+      await DB.touchDossier(id);
+      renderDossierDetail({ id });
+    } catch (_) {}
   });
 
-  $('#view').addEventListener('click', e => {
+  $('#view').addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.getAttribute('data-action');
     const tid = parseInt(btn.getAttribute('data-id'), 10);
-    if (action === 'toggle-taak') {
-      const t = DB.byId(KEYS.TAKEN, tid); if (!t) return;
-      DB.update(KEYS.TAKEN, tid, { voltooid: !t.voltooid, voltooid_op: !t.voltooid ? new Date().toISOString() : null });
-      DB.update(KEYS.DOSSIERS, id, {}); renderDossierDetail({ id });
-    } else if (action === 'del-taak') {
-      if (!confirm('Taak verwijderen?')) return;
-      DB.remove(KEYS.TAKEN, tid); DB.update(KEYS.DOSSIERS, id, {}); renderDossierDetail({ id });
-    } else if (action === 'toggle-kosten') {
-      const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
-      DB.update(KEYS.KOSTEN, tid, { betaald: !k.betaald });
-      DB.update(KEYS.DOSSIERS, id, {}); renderDossierDetail({ id });
-    } else if (action === 'del-kosten') {
-      if (!confirm('Kostenpost verwijderen?')) return;
-      DB.remove(KEYS.KOSTEN, tid); DB.update(KEYS.DOSSIERS, id, {}); renderDossierDetail({ id });
-    } else if (action === 'del-notitie') {
-      if (!confirm('Notitie verwijderen?')) return;
-      DB.remove(KEYS.NOTITIES, tid); DB.update(KEYS.DOSSIERS, id, {}); renderDossierDetail({ id });
-    } else if (action === 'add-preset') {
-      const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
-      if (!p) return;
-      DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, betaald: false });
-      DB.update(KEYS.DOSSIERS, id, {}); renderDossierDetail({ id });
-    }
+    try {
+      if (action === 'toggle-taak') {
+        const t = DB.byId(KEYS.TAKEN, tid); if (!t) return;
+        await DB.update(KEYS.TAKEN, tid, { voltooid: !t.voltooid, voltooid_op: !t.voltooid ? new Date().toISOString() : null });
+        await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'del-taak') {
+        if (!confirm('Taak verwijderen?')) return;
+        await DB.remove(KEYS.TAKEN, tid); await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'toggle-kosten') {
+        const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
+        await DB.update(KEYS.KOSTEN, tid, { betaald: !k.betaald });
+        await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'del-kosten') {
+        if (!confirm('Kostenpost verwijderen?')) return;
+        await DB.remove(KEYS.KOSTEN, tid); await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'del-notitie') {
+        if (!confirm('Notitie verwijderen?')) return;
+        await DB.remove(KEYS.NOTITIES, tid); await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'add-preset') {
+        const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
+        if (!p) return;
+        await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, betaald: false });
+        await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'download-doc') {
+        const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
+        const url = await Storage.signedUrl(doc.storage_pad, 60);
+        window.open(url, '_blank');
+      } else if (action === 'del-doc') {
+        if (!confirm('Document verwijderen?')) return;
+        const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
+        await Storage.remove(doc.storage_pad);
+        await DB.remove(KEYS.DOCUMENTEN, tid);
+        await DB.touchDossier(id); renderDossierDetail({ id });
+      }
+    } catch (_) {}
   });
 }

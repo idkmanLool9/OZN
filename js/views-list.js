@@ -148,7 +148,7 @@ function renderAccount(msg) {
       <section class="card narrow">
         <h2>Gegevens</h2>
         <dl class="dl">
-          <div><dt>Gebruikersnaam</dt><dd>${esc(u.username)}</dd></div>
+          <div><dt>E-mailadres</dt><dd>${esc(u.email)}</dd></div>
           <div><dt>Naam</dt><dd>${esc(u.fullName || '—')}</dd></div>
           <div><dt>Rol</dt><dd>${esc(u.role || '—')}</dd></div>
         </dl>
@@ -158,18 +158,16 @@ function renderAccount(msg) {
         ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
         ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
         <form id="pw-form" class="form" autocomplete="off">
-          <label><span>Huidig wachtwoord</span><input type="password" name="huidig" required></label>
           <label><span>Nieuw wachtwoord</span><input type="password" name="nieuw" required minlength="6"></label>
           <label><span>Herhaal nieuw wachtwoord</span><input type="password" name="herhaal" required minlength="6"></label>
           <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
         </form>
       </section>
       <section class="card narrow">
-        <h2>Lokale gegevens</h2>
-        <p class="muted small">Alle dossiergegevens worden in deze browser opgeslagen (localStorage). Maak regelmatig een back-up via de export-knop.</p>
+        <h2>Cloud-back-up</h2>
+        <p class="muted small">Alle dossiergegevens worden veilig in Supabase opgeslagen en zijn op alle apparaten beschikbaar. Documenten staan in de Storage-bucket. Voor extra zekerheid kun je een JSON-export downloaden.</p>
         <div class="form-actions" style="justify-content:flex-start">
           <button type="button" class="btn" id="btn-export">Exporteer alle data (JSON)</button>
-          <label class="btn">Importeer JSON<input type="file" id="import-file" accept="application/json" hidden></label>
         </div>
       </section>
     </div>`;
@@ -178,34 +176,24 @@ function renderAccount(msg) {
     e.preventDefault();
     const f = e.target;
     if (f.nieuw.value !== f.herhaal.value) return renderAccount({ error: 'Wachtwoorden komen niet overeen.' });
-    const err = await Auth.changePassword(u.username, f.huidig.value, f.nieuw.value);
+    if (f.nieuw.value.length < 6) return renderAccount({ error: 'Minstens 6 tekens.' });
+    const err = await Auth.changePassword(f.nieuw.value);
     renderAccount(err ? { error: err } : { success: 'Wachtwoord gewijzigd.' });
   });
 
   $('#btn-export').addEventListener('click', () => {
-    const data = { dossiers: DB.list(KEYS.DOSSIERS), taken: DB.list(KEYS.TAKEN), kosten: DB.list(KEYS.KOSTEN), notities: DB.list(KEYS.NOTITIES), counter: DB.get(KEYS.COUNTER, {}), exported_at: new Date().toISOString() };
+    const data = {
+      dossiers: DB.list(KEYS.DOSSIERS),
+      taken: DB.list(KEYS.TAKEN),
+      kosten: DB.list(KEYS.KOSTEN),
+      notities: DB.list(KEYS.NOTITIES),
+      documenten: DB.list(KEYS.DOCUMENTEN),
+      exported_at: new Date().toISOString(),
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `uitvaart-backup-${new Date().toISOString().slice(0,10)}.json`;
     a.click(); URL.revokeObjectURL(a.href);
-  });
-
-  $('#import-file').addEventListener('change', e => {
-    const f = e.target.files[0]; if (!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const d = JSON.parse(r.result);
-        if (!confirm('Bestaande dossiers, taken, kosten en notities worden VERVANGEN. Doorgaan?')) return;
-        if (d.dossiers) DB.set(KEYS.DOSSIERS, d.dossiers);
-        if (d.taken) DB.set(KEYS.TAKEN, d.taken);
-        if (d.kosten) DB.set(KEYS.KOSTEN, d.kosten);
-        if (d.notities) DB.set(KEYS.NOTITIES, d.notities);
-        if (d.counter) DB.set(KEYS.COUNTER, d.counter);
-        renderAccount({ success: 'Import voltooid.' });
-      } catch (err) { renderAccount({ error: 'Ongeldig JSON-bestand.' }); }
-    };
-    r.readAsText(f);
   });
 }
 

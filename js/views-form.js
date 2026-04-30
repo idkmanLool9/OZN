@@ -2,7 +2,7 @@
 
 function renderDossierForm(params) {
   const isNew = !params.id;
-  const dossier = isNew ? { dossier_nummer: '(wordt toegekend)', status: 'nieuw' } : DB.byId(KEYS.DOSSIERS, parseInt(params.id, 10));
+  const dossier = isNew ? { dossier_nummer: '(wordt automatisch toegekend)', status: 'nieuw' } : DB.byId(KEYS.DOSSIERS, parseInt(params.id, 10));
   if (!isNew && !dossier) return render404();
 
   const v = (k) => esc(dossier[k] || '');
@@ -189,7 +189,7 @@ function renderDossierForm(params) {
       </form>
     </div>`;
 
-  $('#dossier-form').addEventListener('submit', e => {
+  $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
     const data = {};
     DOSSIER_VELDEN.forEach(f => {
@@ -198,20 +198,28 @@ function renderDossierForm(params) {
     });
     if (!data.status) data.status = 'nieuw';
 
-    if (isNew) {
-      data.dossier_nummer = nextDossierNummer();
-      const created = DB.insert(KEYS.DOSSIERS, data);
-      // Standaard checklist
-      const taken = DB.list(KEYS.TAKEN);
-      let counter = taken.reduce((m, t) => Math.max(m, t.id || 0), 0);
-      STANDAARD_TAKEN.forEach((omsch, i) => {
-        taken.push({ id: ++counter, dossier_id: created.id, omschrijving: omsch, deadline: '', voltooid: false, volgorde: i, created_at: new Date().toISOString() });
-      });
-      DB.set(KEYS.TAKEN, taken);
-      Router.go('/dossiers/' + created.id);
-    } else {
-      DB.update(KEYS.DOSSIERS, dossier.id, data);
-      Router.go('/dossiers/' + dossier.id);
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true; const oldText = btn.textContent;
+    btn.textContent = 'Bezig met opslaan...';
+
+    try {
+      if (isNew) {
+        const created = await DB.insert(KEYS.DOSSIERS, data);
+        for (let i = 0; i < STANDAARD_TAKEN.length; i++) {
+          await DB.insert(KEYS.TAKEN, {
+            dossier_id: created.id,
+            omschrijving: STANDAARD_TAKEN[i],
+            voltooid: false,
+            volgorde: i,
+          });
+        }
+        Router.go('/dossiers/' + created.id);
+      } else {
+        await DB.update(KEYS.DOSSIERS, dossier.id, data);
+        Router.go('/dossiers/' + dossier.id);
+      }
+    } catch (err) {
+      btn.disabled = false; btn.textContent = oldText;
     }
   });
 }

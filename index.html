@@ -19,21 +19,18 @@
         <p class="muted small">Intern systeem · alleen voor de uitvaartleider</p>
       </div>
       <div id="login-error" class="alert alert-error" hidden></div>
-      <form id="login-form" class="form" autocomplete="off">
+      <form id="login-form" class="form" autocomplete="on">
         <label>
-          <span>Gebruikersnaam</span>
-          <input type="text" name="username" id="login-username" autofocus required />
+          <span>E-mailadres</span>
+          <input type="email" name="email" id="login-username" autocomplete="username" autofocus required />
         </label>
         <label>
           <span>Wachtwoord</span>
-          <input type="password" name="password" id="login-password" required />
+          <input type="password" name="password" id="login-password" autocomplete="current-password" required />
         </label>
         <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
       </form>
       <p class="muted small center">Toegang uitsluitend voor bevoegd personeel.</p>
-      <p class="muted small center" id="default-creds-hint" hidden>
-        Eerste keer? Gebruik <code>beheerder</code> / <code>uitvaart2025</code> en wijzig daarna direct het wachtwoord.
-      </p>
     </div>
   </section>
 
@@ -63,11 +60,14 @@
     <main id="view" class="main"></main>
     <footer class="footer">
       <div class="footer-inner">
-        Intern systeem · Syrisch-Orthodoxe Kerk van Antiochië · Uitvaartbeheer · gegevens worden lokaal opgeslagen in deze browser
+        Intern systeem · Syrisch-Orthodoxe Kerk van Antiochië · Uitvaartbeheer · gegevens veilig opgeslagen in de cloud
       </div>
     </footer>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
   <script src="js/data.js"></script>
   <script src="js/core.js"></script>
   <script src="js/views-list.js"></script>
