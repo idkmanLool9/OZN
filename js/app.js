@@ -1,30 +1,78 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
+// ─── Instellingen (lokaal per apparaat) ─────────────────────────────────────
+const Settings = {
+  KEY: 'sok_settings',
+  defaults: {
+    splash_enabled: true,
+    splash_duration_ms: 2500,
+    splash_animation: 'glass', // 'glass' | 'fade' | 'scale' | 'slide'
+    splash_title: 'Welkom',
+    splash_subtitle: 'Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië',
+    splash_offline_title: 'Welkom terug',
+  },
+  all() {
+    let stored = {};
+    try { stored = JSON.parse(localStorage.getItem(Settings.KEY) || '{}') || {}; } catch (_) {}
+    return Object.assign({}, Settings.defaults, stored);
+  },
+  get(key) { return Settings.all()[key]; },
+  set(patch) {
+    const next = Object.assign({}, Settings.all(), patch);
+    // Verwijder defaults om opslag schoon te houden
+    const trimmed = {};
+    for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+    localStorage.setItem(Settings.KEY, JSON.stringify(trimmed));
+  },
+  reset() { localStorage.removeItem(Settings.KEY); },
+};
+
 const Splash = {
   shownAt: Date.now(),
   dismissed: false,
-  show(state /* 'online' | 'offline' */) {
+  handlersBound: false,
+
+  show(state /* 'online' | 'offline' */, opts = {}) {
+    const s = Settings.all();
     const splash = document.getElementById('splash');
     if (!splash) return;
+
+    // Animatie-klasse op de splash zetten
+    splash.classList.remove('anim-glass', 'anim-fade', 'anim-scale', 'anim-slide');
+    splash.classList.add('anim-' + (s.splash_animation || 'glass'));
+
     const onlineEl = document.getElementById('splash-online');
     const offlineEl = document.getElementById('splash-offline');
     const titleEl = document.getElementById('splash-title');
+    const subEl = splash.querySelector('.splash-sub');
     const cont = document.getElementById('splash-continue');
     const hint = document.getElementById('splash-hint');
+
+    if (subEl) subEl.textContent = s.splash_subtitle;
+
     onlineEl.hidden = state !== 'online';
     offlineEl.hidden = state !== 'offline';
     if (state === 'offline') {
-      titleEl.textContent = 'Welkom terug';
+      titleEl.textContent = s.splash_offline_title;
       cont.hidden = false;
       cont.textContent = 'Verder in leesmodus';
       hint.hidden = true;
     } else {
-      titleEl.textContent = 'Welkom';
+      titleEl.textContent = s.splash_title;
       cont.hidden = true;
       hint.hidden = false;
     }
+
+    splash.hidden = false;
+    splash.classList.remove('fading');
+    Splash.shownAt = Date.now();
+    Splash.dismissed = false;
+    Splash.setupHandlers();
   },
+
   setupHandlers() {
+    if (Splash.handlersBound) return;
+    Splash.handlersBound = true;
     const splash = document.getElementById('splash');
     if (!splash) return;
     const dismiss = () => Splash.dismiss();
@@ -36,18 +84,27 @@ const Splash = {
       if (!Splash.dismissed && (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape')) dismiss();
     });
   },
-  async autoDismissAfter(minMs = 1200) {
+
+  async autoDismiss() {
+    const minMs = Math.max(0, parseInt(Settings.get('splash_duration_ms'), 10) || 0);
     const elapsed = Date.now() - Splash.shownAt;
     if (elapsed < minMs) await new Promise(r => setTimeout(r, minMs - elapsed));
     Splash.dismiss();
   },
+
   dismiss() {
     if (Splash.dismissed) return;
     Splash.dismissed = true;
     const splash = document.getElementById('splash');
     if (!splash) return;
     splash.classList.add('fading');
-    setTimeout(() => { splash.hidden = true; }, 400);
+    setTimeout(() => { splash.hidden = true; }, 750);
+  },
+
+  // Voorbeeld vanuit instellingen-pagina
+  preview(state) {
+    Splash.show(state || (navigator.onLine ? 'online' : 'offline'));
+    if (state === 'online' || (!state && navigator.onLine)) Splash.autoDismiss();
   },
 };
 
@@ -83,24 +140,28 @@ Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
 Router.add('/account', () => renderAccount());
 
 (async function init() {
-  // Welkomscherm meteen tonen op basis van verbinding
-  Splash.setupHandlers();
-  Splash.show(navigator.onLine ? 'online' : 'offline');
+  // Welkomscherm meteen tonen op basis van verbinding (tenzij uitgezet)
+  const splashOn = Settings.get('splash_enabled');
+  if (splashOn) {
+    Splash.show(navigator.onLine ? 'online' : 'offline');
+  } else {
+    document.getElementById('splash').hidden = true;
+    Splash.dismissed = true;
+  }
 
   const sess = await Auth.init();
   if (sess) {
     try { await Cloud.loadAll(); }
     catch (e) {
-      // Geen alert tijdens splash; offline-modus wordt al getoond
       console.warn('Laden mislukt:', e.message || e);
     }
   }
   updateOfflineUI();
 
-  // Welkomscherm fadet automatisch weg na minimaal 1,2s online,
-  // of blijft staan bij offline tot de gebruiker op "Verder" klikt
-  if (navigator.onLine && !Cloud.offline) {
-    Splash.autoDismissAfter(1200);
+  // Online: automatisch wegfaden na de ingestelde duur.
+  // Offline: blijft staan tot de gebruiker op "Verder" klikt.
+  if (splashOn && navigator.onLine && !Cloud.offline) {
+    Splash.autoDismiss();
   }
 
   document.getElementById('login-form').addEventListener('submit', async e => {

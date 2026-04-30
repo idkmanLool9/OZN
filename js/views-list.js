@@ -164,6 +164,63 @@ function renderAccount(msg) {
         </form>
       </section>
       <section class="card narrow">
+        <h2>Welkomscherm-instellingen</h2>
+        <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="splash-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="splash_enabled" ${s.splash_enabled ? 'checked' : ''}>
+              Welkomscherm tonen bij appstart
+            </label>
+
+            <label>
+              <span>Duur online (seconden) — <strong id="dur-label">${(s.splash_duration_ms/1000).toFixed(1)}s</strong></span>
+              <input type="range" name="splash_duration_ms" min="500" max="6000" step="100" value="${s.splash_duration_ms}" id="dur-range">
+              <span class="muted small">Tussen 0,5s en 6,0s. Klikken/Enter slaat het altijd direct over.</span>
+            </label>
+
+            <label>
+              <span>Animatie</span>
+              <select name="splash_animation">
+                <option value="glass" ${s.splash_animation==='glass'?'selected':''}>Glas (zacht vervagen + verkleinen) — aanbevolen</option>
+                <option value="fade"  ${s.splash_animation==='fade' ?'selected':''}>Vervagen (eenvoudig)</option>
+                <option value="scale" ${s.splash_animation==='scale'?'selected':''}>Inzoomen</option>
+                <option value="slide" ${s.splash_animation==='slide'?'selected':''}>Naar boven schuiven</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Titel (online)</span>
+              <input type="text" name="splash_title" value="${esc(s.splash_title)}" maxlength="60">
+            </label>
+
+            <label>
+              <span>Titel (offline)</span>
+              <input type="text" name="splash_offline_title" value="${esc(s.splash_offline_title)}" maxlength="60">
+            </label>
+
+            <label>
+              <span>Ondertitel</span>
+              <input type="text" name="splash_subtitle" value="${esc(s.splash_subtitle)}" maxlength="120">
+            </label>
+
+            <div class="form-actions" style="justify-content:space-between;">
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost" id="btn-preview-online">Voorbeeld online</button>
+                <button type="button" class="btn btn-ghost" id="btn-preview-offline">Voorbeeld offline</button>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost" id="btn-reset-splash">Standaardwaarden</button>
+                <button type="submit" class="btn btn-primary">Opslaan</button>
+              </div>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow">
         <h2>Cloud-back-up</h2>
         <p class="muted small">Alle dossiergegevens worden veilig in Supabase opgeslagen en zijn op alle apparaten beschikbaar. Documenten staan in de Storage-bucket. Voor extra zekerheid kun je een JSON-export downloaden.</p>
         <div class="form-actions" style="justify-content:flex-start">
@@ -171,6 +228,69 @@ function renderAccount(msg) {
         </div>
       </section>
     </div>`;
+
+  // Splash-instellingen
+  const splashForm = $('#splash-form');
+  if (splashForm) {
+    const durRange = $('#dur-range');
+    const durLabel = $('#dur-label');
+    durRange.addEventListener('input', () => {
+      durLabel.textContent = (parseInt(durRange.value, 10)/1000).toFixed(1) + 's';
+    });
+
+    splashForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        splash_enabled: f.splash_enabled.checked,
+        splash_duration_ms: parseInt(f.splash_duration_ms.value, 10),
+        splash_animation: f.splash_animation.value,
+        splash_title: f.splash_title.value.trim() || Settings.defaults.splash_title,
+        splash_offline_title: f.splash_offline_title.value.trim() || Settings.defaults.splash_offline_title,
+        splash_subtitle: f.splash_subtitle.value.trim() || Settings.defaults.splash_subtitle,
+      });
+      renderAccount({ success: 'Welkomscherm-instellingen opgeslagen.' });
+    });
+
+    $('#btn-reset-splash').addEventListener('click', () => {
+      if (!confirm('Welkomscherm-instellingen terugzetten naar standaard?')) return;
+      // Reset alleen splash-instellingen
+      Settings.set({
+        splash_enabled: Settings.defaults.splash_enabled,
+        splash_duration_ms: Settings.defaults.splash_duration_ms,
+        splash_animation: Settings.defaults.splash_animation,
+        splash_title: Settings.defaults.splash_title,
+        splash_offline_title: Settings.defaults.splash_offline_title,
+        splash_subtitle: Settings.defaults.splash_subtitle,
+      });
+      renderAccount({ success: 'Standaardwaarden hersteld.' });
+    });
+
+    $('#btn-preview-online').addEventListener('click', () => {
+      // Sla huidige formuliergegevens tijdelijk op zodat de preview ze gebruikt
+      const f = splashForm;
+      Settings.set({
+        splash_animation: f.splash_animation.value,
+        splash_duration_ms: parseInt(f.splash_duration_ms.value, 10),
+        splash_title: f.splash_title.value.trim() || Settings.defaults.splash_title,
+        splash_offline_title: f.splash_offline_title.value.trim() || Settings.defaults.splash_offline_title,
+        splash_subtitle: f.splash_subtitle.value.trim() || Settings.defaults.splash_subtitle,
+      });
+      Splash.preview('online');
+    });
+
+    $('#btn-preview-offline').addEventListener('click', () => {
+      const f = splashForm;
+      Settings.set({
+        splash_animation: f.splash_animation.value,
+        splash_duration_ms: parseInt(f.splash_duration_ms.value, 10),
+        splash_title: f.splash_title.value.trim() || Settings.defaults.splash_title,
+        splash_offline_title: f.splash_offline_title.value.trim() || Settings.defaults.splash_offline_title,
+        splash_subtitle: f.splash_subtitle.value.trim() || Settings.defaults.splash_subtitle,
+      });
+      Splash.preview('offline');
+    });
+  }
 
   $('#pw-form').addEventListener('submit', async e => {
     e.preventDefault();

@@ -370,28 +370,56 @@ textarea { resize: vertical; }
 /* Welkomscherm / splash */
 .splash {
   position: fixed; inset: 0; z-index: 200;
-  background: linear-gradient(135deg, #f6f4ef, #ede5d8);
+  background:
+    radial-gradient(1200px 800px at 30% 20%, rgba(107,30,42,.07), transparent 60%),
+    radial-gradient(900px 600px at 80% 90%, rgba(201,162,74,.10), transparent 60%),
+    linear-gradient(135deg, #f6f4ef, #ede5d8);
   display: flex; align-items: center; justify-content: center;
   padding: 2rem 1rem;
   opacity: 1;
-  transition: opacity .35s ease;
+  filter: blur(0);
+  transform: scale(1);
+  transition:
+    opacity .7s cubic-bezier(.4,0,.2,1),
+    filter .55s ease,
+    transform .8s cubic-bezier(.4,0,.2,1);
+  will-change: opacity, filter, transform;
 }
-.splash.fading { opacity: 0; pointer-events: none; }
+.splash.fading { pointer-events: none; }
+
 .splash-card {
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 2.25rem 2rem 1.75rem;
-  max-width: 420px;
+  border-radius: 16px;
+  padding: 2.5rem 2rem 1.75rem;
+  max-width: 440px;
   width: 100%;
   text-align: center;
-  box-shadow: 0 12px 32px rgba(0,0,0,.1);
-  animation: splashIn .4s ease both;
+  box-shadow: 0 16px 48px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.04);
+  animation: splashIn .7s cubic-bezier(.2,.8,.2,1) both;
+  transition:
+    opacity .5s ease,
+    transform .65s cubic-bezier(.4,0,.2,1),
+    filter .5s ease;
+  will-change: opacity, transform, filter;
 }
 @keyframes splashIn {
-  from { transform: translateY(8px); opacity: 0; }
-  to   { transform: translateY(0);   opacity: 1; }
+  from { transform: translateY(14px) scale(.97); opacity: 0; filter: blur(6px); }
+  to   { transform: translateY(0)    scale(1);   opacity: 1; filter: blur(0); }
 }
+
+/* Animatievarianten — alleen bij wegfaden */
+.splash.anim-glass.fading                { opacity: 0; filter: blur(14px); }
+.splash.anim-glass.fading .splash-card   { opacity: 0; transform: translateY(-12px) scale(.96); filter: blur(4px); }
+
+.splash.anim-fade.fading                 { opacity: 0; }
+.splash.anim-fade.fading .splash-card    { opacity: 0; }
+
+.splash.anim-scale.fading                { opacity: 0; transform: scale(1.06); }
+.splash.anim-scale.fading .splash-card   { opacity: 0; transform: scale(.92); }
+
+.splash.anim-slide.fading                { opacity: 0; }
+.splash.anim-slide.fading .splash-card   { opacity: 0; transform: translateY(-32px); }
 .splash-card h1 {
   margin: .2rem 0 .15rem;
   font-size: 1.7rem;
