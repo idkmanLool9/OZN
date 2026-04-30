@@ -1,0 +1,184 @@
+<% const title = isNew ? 'Nieuw dossier' : 'Dossier bewerken'; %>
+<%- include('partials/header', { title: title }) %>
+
+<div class="page">
+  <div class="page-head">
+    <div>
+      <a href="/dossiers" class="back-link">← Dossiers</a>
+      <h1><%= isNew ? 'Nieuw dossier — Intake' : 'Dossier bewerken' %></h1>
+      <p class="muted">Dossiernummer: <strong><%= dossier.dossier_nummer %></strong></p>
+    </div>
+  </div>
+
+  <form method="post" action="<%= isNew ? '/dossiers/nieuw' : `/dossiers/${dossier.id}/bewerken` %>" class="form-grid" autocomplete="off">
+
+    <fieldset class="card">
+      <legend>Status</legend>
+      <div class="grid-3">
+        <label>
+          <span>Status</span>
+          <select name="status">
+            <% const statusOpts = [['nieuw','Nieuw'],['in_behandeling','In behandeling'],['voltooid','Voltooid'],['geannuleerd','Geannuleerd']]; %>
+            <% statusOpts.forEach(([v,l]) => { %>
+              <option value="<%= v %>" <%= (dossier.status||'nieuw')===v?'selected':'' %>><%= l %></option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Gegevens overledene</legend>
+      <div class="grid-3">
+        <label><span>Voornaam</span><input type="text" name="voornaam" value="<%= dossier.voornaam || '' %>" /></label>
+        <label><span>Achternaam</span><input type="text" name="achternaam" value="<%= dossier.achternaam || '' %>" /></label>
+        <label><span>Doopnaam (Syrisch)</span><input type="text" name="doopnaam" value="<%= dossier.doopnaam || '' %>" /></label>
+        <label>
+          <span>Geslacht</span>
+          <select name="geslacht">
+            <option value="">—</option>
+            <option value="man" <%= dossier.geslacht==='man'?'selected':'' %>>Man</option>
+            <option value="vrouw" <%= dossier.geslacht==='vrouw'?'selected':'' %>>Vrouw</option>
+          </select>
+        </label>
+        <label><span>Geboortedatum</span><input type="date" name="geboortedatum" value="<%= dossier.geboortedatum || '' %>" /></label>
+        <label><span>Geboorteplaats</span><input type="text" name="geboorteplaats" value="<%= dossier.geboorteplaats || '' %>" /></label>
+        <label><span>Overlijdensdatum</span><input type="date" name="overlijdensdatum" value="<%= dossier.overlijdensdatum || '' %>" /></label>
+        <label><span>Tijdstip overlijden</span><input type="time" name="overlijdenstijd" value="<%= dossier.overlijdenstijd || '' %>" /></label>
+        <label><span>Plaats van overlijden</span><input type="text" name="overlijdensplaats" value="<%= dossier.overlijdensplaats || '' %>" placeholder="bijv. ziekenhuis, thuis" /></label>
+        <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="<%= dossier.adres_overledene || '' %>" /></label>
+        <label><span>Postcode</span><input type="text" name="postcode_overledene" value="<%= dossier.postcode_overledene || '' %>" /></label>
+        <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="<%= dossier.woonplaats_overledene || '' %>" /></label>
+        <label><span>BSN</span><input type="text" name="bsn" value="<%= dossier.bsn || '' %>" /></label>
+        <label>
+          <span>Burgerlijke staat</span>
+          <select name="burgerlijke_staat">
+            <% const bs = ['','ongehuwd','gehuwd','geregistreerd partner','gescheiden','weduwe/weduwnaar']; %>
+            <% bs.forEach(v => { %><option value="<%= v %>" <%= dossier.burgerlijke_staat===v?'selected':'' %>><%= v||'—' %></option><% }) %>
+          </select>
+        </label>
+        <label><span>Nationaliteit</span><input type="text" name="nationaliteit" value="<%= dossier.nationaliteit || '' %>" /></label>
+        <label><span>Beroep</span><input type="text" name="beroep" value="<%= dossier.beroep || '' %>" /></label>
+        <label>
+          <span>Lid Syrisch-Orthodoxe Kerk</span>
+          <select name="syrisch_orthodox_lid">
+            <option value="">—</option>
+            <option value="ja" <%= dossier.syrisch_orthodox_lid==='ja'?'selected':'' %>>Ja</option>
+            <option value="nee" <%= dossier.syrisch_orthodox_lid==='nee'?'selected':'' %>>Nee</option>
+            <option value="onbekend" <%= dossier.syrisch_orthodox_lid==='onbekend'?'selected':'' %>>Onbekend</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Contactpersoon / aangever</legend>
+      <div class="grid-3">
+        <label><span>Naam contactpersoon</span><input type="text" name="contact_naam" value="<%= dossier.contact_naam || '' %>" /></label>
+        <label><span>Relatie tot overledene</span><input type="text" name="contact_relatie" value="<%= dossier.contact_relatie || '' %>" placeholder="echtgenoot, zoon, dochter..." /></label>
+        <label><span>Telefoon</span><input type="tel" name="contact_telefoon" value="<%= dossier.contact_telefoon || '' %>" /></label>
+        <label><span>E-mail</span><input type="email" name="contact_email" value="<%= dossier.contact_email || '' %>" /></label>
+        <label class="span-2"><span>Adres</span><input type="text" name="contact_adres" value="<%= dossier.contact_adres || '' %>" /></label>
+        <label><span>Postcode</span><input type="text" name="contact_postcode" value="<%= dossier.contact_postcode || '' %>" /></label>
+        <label><span>Woonplaats</span><input type="text" name="contact_woonplaats" value="<%= dossier.contact_woonplaats || '' %>" /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Kerkelijk</legend>
+      <div class="grid-3">
+        <label><span>Parochie</span>
+          <input type="text" name="parochie" value="<%= dossier.parochie || '' %>" list="parochie-list" placeholder="bijv. Mor Severios, Hengelo" />
+          <datalist id="parochie-list">
+            <option value="Mor Ephrem - Glanerbrug">
+            <option value="Mor Severios - Hengelo">
+            <option value="Mor Kuryakos - Enschede">
+            <option value="Mor Aday - Rijssen">
+            <option value="Sint Maria - Amsterdam">
+            <option value="Mor Gabriël - Holland">
+          </datalist>
+        </label>
+        <label><span>Priester / Aboono</span><input type="text" name="priester" value="<%= dossier.priester || '' %>" /></label>
+        <label><span>Huisbezoek datum</span><input type="date" name="huisbezoek_datum" value="<%= dossier.huisbezoek_datum || '' %>" /></label>
+        <label><span>Huisbezoek tijd</span><input type="time" name="huisbezoek_tijd" value="<%= dossier.huisbezoek_tijd || '' %>" /></label>
+        <label><span>Avondwake datum</span><input type="date" name="avondwake_datum" value="<%= dossier.avondwake_datum || '' %>" /></label>
+        <label><span>Avondwake tijd</span><input type="time" name="avondwake_tijd" value="<%= dossier.avondwake_tijd || '' %>" /></label>
+        <label class="span-3"><span>Locatie avondwake</span><input type="text" name="avondwake_locatie" value="<%= dossier.avondwake_locatie || '' %>" /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Uitvaartdienst & ter aardebestelling</legend>
+      <div class="grid-3">
+        <label>
+          <span>Type uitvaart</span>
+          <select name="uitvaart_type">
+            <option value="">—</option>
+            <option value="begrafenis" <%= dossier.uitvaart_type==='begrafenis'?'selected':'' %>>Begrafenis</option>
+            <option value="crematie" <%= dossier.uitvaart_type==='crematie'?'selected':'' %>>Crematie</option>
+            <option value="repatriëring" <%= dossier.uitvaart_type==='repatriëring'?'selected':'' %>>Repatriëring</option>
+          </select>
+        </label>
+        <label><span>Datum uitvaart</span><input type="date" name="uitvaart_datum" value="<%= dossier.uitvaart_datum || '' %>" /></label>
+        <label><span>Tijd uitvaart</span><input type="time" name="uitvaart_tijd" value="<%= dossier.uitvaart_tijd || '' %>" /></label>
+        <label class="span-3"><span>Kerk / dienstlocatie</span><input type="text" name="kerk_locatie" value="<%= dossier.kerk_locatie || '' %>" /></label>
+        <label class="span-2"><span>Begraafplaats</span><input type="text" name="begraafplaats" value="<%= dossier.begraafplaats || '' %>" /></label>
+        <label><span>Grafnummer</span><input type="text" name="graf_nummer" value="<%= dossier.graf_nummer || '' %>" /></label>
+        <label>
+          <span>Type graf</span>
+          <select name="graf_type">
+            <option value="">—</option>
+            <option value="eigen graf" <%= dossier.graf_type==='eigen graf'?'selected':'' %>>Eigen graf</option>
+            <option value="algemeen graf" <%= dossier.graf_type==='algemeen graf'?'selected':'' %>>Algemeen graf</option>
+            <option value="familiegraf" <%= dossier.graf_type==='familiegraf'?'selected':'' %>>Familiegraf</option>
+            <option value="urnenruimte" <%= dossier.graf_type==='urnenruimte'?'selected':'' %>>Urnenruimte</option>
+          </select>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Logistiek</legend>
+      <div class="grid-3">
+        <label><span>Type kist</span><input type="text" name="kist_type" value="<%= dossier.kist_type || '' %>" placeholder="bijv. eiken standaard" /></label>
+        <label><span>Rouwauto</span><input type="text" name="rouwauto" value="<%= dossier.rouwauto || '' %>" /></label>
+        <label><span>Aantal volgauto's</span><input type="number" name="aantal_volgauto" value="<%= dossier.aantal_volgauto || '' %>" min="0" /></label>
+        <label><span>Dragers</span><input type="text" name="dragers" value="<%= dossier.dragers || '' %>" placeholder="aantal en namen" /></label>
+        <label><span>Bloemstukken</span><input type="text" name="bloemstukken" value="<%= dossier.bloemstukken || '' %>" /></label>
+        <label><span>Aantal rouwkaarten</span><input type="number" name="rouwkaarten_aantal" value="<%= dossier.rouwkaarten_aantal || '' %>" min="0" /></label>
+        <label class="span-2"><span>Locatie condoleance</span><input type="text" name="condoleance_locatie" value="<%= dossier.condoleance_locatie || '' %>" /></label>
+        <label><span>Catering</span><input type="text" name="catering" value="<%= dossier.catering || '' %>" /></label>
+        <label class="span-3"><span>Muziek / koor / zang</span><input type="text" name="muziek_zang" value="<%= dossier.muziek_zang || '' %>" /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Verzekering & opdrachtgever</legend>
+      <div class="grid-3">
+        <label><span>Verzekeringsmaatschappij</span><input type="text" name="verzekering_maatschappij" value="<%= dossier.verzekering_maatschappij || '' %>" /></label>
+        <label><span>Polisnummer</span><input type="text" name="polisnummer" value="<%= dossier.polisnummer || '' %>" /></label>
+        <label><span>Opdrachtgever</span><input type="text" name="opdrachtgever_naam" value="<%= dossier.opdrachtgever_naam || '' %>" /></label>
+        <label><span>Telefoon opdrachtgever</span><input type="tel" name="opdrachtgever_telefoon" value="<%= dossier.opdrachtgever_telefoon || '' %>" /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Bijzonderheden</legend>
+      <label class="full">
+        <span>Notities / wensen familie</span>
+        <textarea name="bijzonderheden" rows="5"><%= dossier.bijzonderheden || '' %></textarea>
+      </label>
+    </fieldset>
+
+    <div class="form-actions">
+      <% if (!isNew) { %>
+        <a href="/dossiers/<%= dossier.id %>" class="btn btn-ghost">Annuleren</a>
+      <% } else { %>
+        <a href="/dossiers" class="btn btn-ghost">Annuleren</a>
+      <% } %>
+      <button type="submit" class="btn btn-primary"><%= isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan' %></button>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

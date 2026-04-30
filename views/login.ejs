@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Inloggen · Uitvaartbeheer SOK Antiochië</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="login-body">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="brand-mark big">✝</div>
+      <h1>Uitvaartbeheer</h1>
+      <p>Syrisch-Orthodoxe Kerk van Antiochië</p>
+      <p class="muted small">Intern systeem · alleen voor de uitvaartleider</p>
+    </div>
+    <% if (error) { %>
+      <div class="alert alert-error"><%= error %></div>
+    <% } %>
+    <form method="post" action="/login" class="form" autocomplete="off">
+      <label>
+        <span>Gebruikersnaam</span>
+        <input type="text" name="username" value="<%= username %>" autofocus required />
+      </label>
+      <label>
+        <span>Wachtwoord</span>
+        <input type="password" name="password" required />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
+    </form>
+    <p class="muted small center">Toegang uitsluitend voor bevoegd personeel.</p>
+  </div>
+</body>
+</html>

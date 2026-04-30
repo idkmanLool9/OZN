@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title><%= typeof title !== 'undefined' ? title : 'Uitvaartbeheer' %> · SOK Antiochië</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<% if (typeof user !== 'undefined' && user) { %>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a href="/" class="brand">
+      <span class="brand-mark">✝</span>
+      <span class="brand-text">
+        <strong>Uitvaartbeheer</strong>
+        <small>Syrisch-Orthodoxe Kerk van Antiochië</small>
+      </span>
+    </a>
+    <nav class="topnav">
+      <a href="/" class="<%= currentPath === '/' ? 'active' : '' %>">Dashboard</a>
+      <a href="/dossiers" class="<%= currentPath.startsWith('/dossiers') && currentPath !== '/dossiers/nieuw' ? 'active' : '' %>">Dossiers</a>
+      <a href="/dossiers/nieuw" class="<%= currentPath === '/dossiers/nieuw' ? 'active' : '' %>">Nieuw dossier</a>
+      <a href="/account" class="<%= currentPath === '/account' ? 'active' : '' %>">Account</a>
+    </nav>
+    <div class="user-area">
+      <span class="user-name"><%= user.fullName || user.username %></span>
+      <form action="/logout" method="post" class="logout-form">
+        <button type="submit" class="btn btn-ghost btn-sm">Uitloggen</button>
+      </form>
+    </div>
+  </div>
+</header>
+<% } %>
+<main class="main">

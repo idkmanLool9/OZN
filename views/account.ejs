@@ -1,0 +1,31 @@
+<% const title = 'Account'; %>
+<%- include('partials/header', { title: title }) %>
+
+<div class="page">
+  <div class="page-head">
+    <h1>Mijn account</h1>
+  </div>
+
+  <section class="card narrow">
+    <h2>Gegevens</h2>
+    <dl class="dl">
+      <div><dt>Gebruikersnaam</dt><dd><%= user.username %></dd></div>
+      <div><dt>Naam</dt><dd><%= user.fullName || '—' %></dd></div>
+      <div><dt>Rol</dt><dd><%= user.role %></dd></div>
+    </dl>
+  </section>
+
+  <section class="card narrow">
+    <h2>Wachtwoord wijzigen</h2>
+    <% if (error) { %><div class="alert alert-error"><%= error %></div><% } %>
+    <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+    <form method="post" action="/account/wachtwoord" class="form" autocomplete="off">
+      <label><span>Huidig wachtwoord</span><input type="password" name="huidig" required /></label>
+      <label><span>Nieuw wachtwoord</span><input type="password" name="nieuw" required minlength="6" /></label>
+      <label><span>Herhaal nieuw wachtwoord</span><input type="password" name="herhaal" required minlength="6" /></label>
+      <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
+    </form>
+  </section>
+</div>
+
+<%- include('partials/footer') %>

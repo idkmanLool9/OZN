@@ -1,0 +1,20 @@
+{
+  "name": "uitvaart-syrisch-orthodox",
+  "version": "1.0.0",
+  "description": "Intern dossierbeheer voor de uitvaartleider van de Syrisch-Orthodoxe Kerk van Antiochië",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.3.0",
+    "connect-sqlite3": "^0.9.15",
+    "ejs": "^3.1.10",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "multer": "^2.1.1"
+  }
+}

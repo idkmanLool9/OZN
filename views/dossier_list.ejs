@@ -1,0 +1,57 @@
+<% const title = 'Dossiers'; %>
+<%- include('partials/header', { title: title }) %>
+
+<div class="page">
+  <div class="page-head">
+    <h1>Dossiers</h1>
+    <a href="/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
+  </div>
+
+  <form class="filter-bar" method="get" action="/dossiers">
+    <input type="search" name="q" value="<%= q %>" placeholder="Zoek op naam, dossiernummer, contactpersoon..." />
+    <select name="status">
+      <option value="">Alle statussen</option>
+      <option value="nieuw" <%= status==='nieuw'?'selected':'' %>>Nieuw</option>
+      <option value="in_behandeling" <%= status==='in_behandeling'?'selected':'' %>>In behandeling</option>
+      <option value="voltooid" <%= status==='voltooid'?'selected':'' %>>Voltooid</option>
+      <option value="geannuleerd" <%= status==='geannuleerd'?'selected':'' %>>Geannuleerd</option>
+    </select>
+    <button type="submit" class="btn">Filteren</button>
+    <% if (q || status) { %>
+      <a href="/dossiers" class="btn btn-ghost">Wissen</a>
+    <% } %>
+  </form>
+
+  <% if (dossiers.length === 0) { %>
+    <div class="card">
+      <p class="muted">Geen dossiers gevonden.</p>
+    </div>
+  <% } else { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Dossier</th>
+          <th>Overledene</th>
+          <th>Contactpersoon</th>
+          <th>Overlijdensdatum</th>
+          <th>Uitvaartdatum</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% dossiers.forEach(d => { %>
+          <tr>
+            <td><a href="/dossiers/<%= d.id %>"><%= d.dossier_nummer %></a></td>
+            <td><strong><%= [d.voornaam, d.achternaam].filter(Boolean).join(' ') || '—' %></strong></td>
+            <td><%= d.contact_naam || '—' %><% if (d.contact_telefoon) { %><br><span class="muted small"><%= d.contact_telefoon %></span><% } %></td>
+            <td><%= d.overlijdensdatum || '—' %></td>
+            <td><%= d.uitvaart_datum || '—' %><% if (d.uitvaart_tijd) { %> <span class="muted"><%= d.uitvaart_tijd %></span><% } %></td>
+            <td><span class="status status-<%= d.status %>"><%= d.status.replace('_', ' ') %></span></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>
