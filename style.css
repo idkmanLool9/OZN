@@ -388,6 +388,72 @@ textarea { resize: vertical; }
 }
 .kist-card-actions .btn { flex: 1; }
 
+/* Pop-up modal (waarschuwing / fout / succes / info) */
+.modal {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease;
+}
+.modal.shown { opacity: 1; pointer-events: auto; }
+.modal.fading { opacity: 0; }
+.modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(20, 18, 16, .55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.modal-card {
+  position: relative;
+  background: #fff;
+  border-radius: 16px;
+  padding: 2rem 1.75rem 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.12);
+  transform: translateY(12px) scale(.96);
+  opacity: 0;
+  transition: transform .35s cubic-bezier(.2,.9,.3,1.2), opacity .25s ease;
+}
+.modal.shown .modal-card { transform: translateY(0) scale(1); opacity: 1; }
+.modal.fading .modal-card { transform: translateY(-6px) scale(.98); opacity: 0; }
+
+.modal-card h2 {
+  margin: .25rem 0 .5rem;
+  font-size: 1.25rem;
+  border: none; padding: 0;
+  color: var(--text);
+}
+.modal-card p {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: .95rem;
+}
+.modal-card .btn { min-width: 140px; }
+
+.modal-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  margin: 0 auto .85rem;
+}
+.modal-offline .modal-icon, .modal-warning .modal-icon {
+  background: var(--amber-soft); color: var(--amber);
+}
+.modal-error .modal-icon {
+  background: var(--red-soft); color: var(--red);
+}
+.modal-success .modal-icon {
+  background: var(--green-soft); color: var(--green);
+}
+.modal-info .modal-icon {
+  background: var(--blue-soft); color: var(--blue);
+}
+
 /* Welkomscherm / splash */
 .splash {
   position: fixed; inset: 0; z-index: 200;

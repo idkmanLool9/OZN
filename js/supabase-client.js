@@ -108,7 +108,11 @@ const DB = {
 
   async insert(tbl, payload) {
     if (!navigator.onLine) {
-      alert('Geen internetverbinding — wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.');
+      Modal.show({
+        type: 'offline',
+        title: 'Geen internetverbinding',
+        message: 'Wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.',
+      });
       throw new Error('offline');
     }
     const u = Auth.current();
@@ -118,7 +122,10 @@ const DB = {
     if (tbl === 'documenten' && u) row.geupload_door = u.id;
     cleanEmpty(row);
     const { data, error } = await sb.from(tbl).insert(row).select().single();
-    if (error) { alert('Opslaan mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Opslaan mislukt', message: error.message });
+      throw error;
+    }
     const norm = normalize(tbl, data);
     Cloud.cache[tbl].push(norm);
     return norm;
@@ -126,13 +133,20 @@ const DB = {
 
   async update(tbl, id, patch) {
     if (!navigator.onLine) {
-      alert('Geen internetverbinding — wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.');
+      Modal.show({
+        type: 'offline',
+        title: 'Geen internetverbinding',
+        message: 'Wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.',
+      });
       throw new Error('offline');
     }
     const p = Object.assign({}, patch);
     cleanEmpty(p);
     const { data, error } = await sb.from(tbl).update(p).eq('id', id).select().single();
-    if (error) { alert('Bijwerken mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Bijwerken mislukt', message: error.message });
+      throw error;
+    }
     const norm = normalize(tbl, data);
     const i = Cloud.cache[tbl].findIndex(x => x.id === id);
     if (i >= 0) Cloud.cache[tbl][i] = norm;
@@ -141,11 +155,18 @@ const DB = {
 
   async remove(tbl, id) {
     if (!navigator.onLine) {
-      alert('Geen internetverbinding — verwijderen kan niet zolang je offline bent. Probeer opnieuw zodra je weer online bent.');
+      Modal.show({
+        type: 'offline',
+        title: 'Geen internetverbinding',
+        message: 'Verwijderen kan niet zolang je offline bent. Probeer opnieuw zodra je weer online bent.',
+      });
       throw new Error('offline');
     }
     const { error } = await sb.from(tbl).delete().eq('id', id);
-    if (error) { alert('Verwijderen mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: error.message });
+      throw error;
+    }
     Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => x.id !== id);
   },
 
@@ -153,7 +174,10 @@ const DB = {
     const ids = Cloud.cache[tbl].filter(fn).map(x => x.id);
     if (ids.length === 0) return;
     const { error } = await sb.from(tbl).delete().in('id', ids);
-    if (error) { alert('Verwijderen mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: error.message });
+      throw error;
+    }
     Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => !ids.includes(x.id));
   },
 
@@ -176,12 +200,18 @@ const Storage = {
     const safe = compressed.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `${dossierId}/${Date.now()}-${safe}`;
     const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-    if (error) { alert('Upload mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
+      throw error;
+    }
     return path;
   },
   async signedUrl(path, seconds = 60) {
     const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
-    if (error) { alert('Download-link mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Download-link mislukt', message: error.message });
+      throw error;
+    }
     return data.signedUrl;
   },
   async remove(path) {
@@ -233,10 +263,16 @@ const KistFotos = {
       cacheControl: '3600',
       contentType: file.type || undefined,
     });
-    if (upErr) { alert('Upload mislukt: ' + upErr.message); throw upErr; }
+    if (upErr) {
+      Modal.show({ type: 'error', title: 'Upload mislukt', message: upErr.message });
+      throw upErr;
+    }
     const row = { naam, storage_pad: path, updated_at: new Date().toISOString() };
     const { data, error } = await sb.from('kist_afbeeldingen').upsert(row, { onConflict: 'naam' }).select().single();
-    if (error) { alert('Opslaan in DB mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Opslaan in database mislukt', message: error.message });
+      throw error;
+    }
     const i = Cloud.cache.kist_afbeeldingen.findIndex(k => k.naam === naam);
     if (i >= 0) Cloud.cache.kist_afbeeldingen[i] = data;
     else Cloud.cache.kist_afbeeldingen.push(data);
@@ -247,7 +283,10 @@ const KistFotos = {
     if (!r) return;
     await sb.storage.from('kisten').remove([r.storage_pad]).catch(() => {});
     const { error } = await sb.from('kist_afbeeldingen').delete().eq('naam', naam);
-    if (error) { alert('Verwijderen mislukt: ' + error.message); throw error; }
+    if (error) {
+      Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: error.message });
+      throw error;
+    }
     Cloud.cache.kist_afbeeldingen = Cloud.cache.kist_afbeeldingen.filter(k => k.naam !== naam);
   },
 };
@@ -290,7 +329,10 @@ const BloemenFotos = {
     const { error: upErr } = await sb.storage.from('bloemen').upload(path, file, {
       upsert: true, cacheControl: '3600', contentType: file.type || undefined,
     });
-    if (upErr) { alert('Upload mislukt: ' + upErr.message); throw upErr; }
+    if (upErr) {
+      Modal.show({ type: 'error', title: 'Upload mislukt', message: upErr.message });
+      throw upErr;
+    }
     return path;
   },
   async removeFoto(b) {
@@ -338,7 +380,10 @@ const EtenDrinkenFotos = {
     const { error: upErr } = await sb.storage.from('eten_drinken').upload(path, file, {
       upsert: true, cacheControl: '3600', contentType: file.type || undefined,
     });
-    if (upErr) { alert('Upload mislukt: ' + upErr.message); throw upErr; }
+    if (upErr) {
+      Modal.show({ type: 'error', title: 'Upload mislukt', message: upErr.message });
+      throw upErr;
+    }
     return path;
   },
   async removeFoto(b) {

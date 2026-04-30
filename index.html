@@ -45,6 +45,17 @@
     </div>
   </section>
 
+  <!-- Pop-up modal (waarschuwing / fout / succes) -->
+  <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-backdrop"></div>
+    <div class="modal-card">
+      <div class="modal-icon" id="modal-icon" aria-hidden="true"></div>
+      <h2 id="modal-title">Titel</h2>
+      <p id="modal-message">Bericht</p>
+      <button type="button" class="btn btn-primary" id="modal-confirm">Begrepen</button>
+    </div>
+  </div>
+
   <!-- Login -->
   <section id="login-screen" class="login-body" hidden>
     <div class="login-card">

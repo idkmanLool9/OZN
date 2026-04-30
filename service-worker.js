@@ -4,7 +4,7 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v12';
+const CACHE_VERSION = 'sok-uitvaart-v13';
 const SHELL = [
   './',
   './index.html',

@@ -53,6 +53,81 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
   }
 }
 
+// ─── Modal-pop-up (vervangt browser-alert) ─────────────────────────────────
+const Modal = {
+  _busy: false,
+  _queue: [],
+  show(opts) {
+    if (Modal._busy) {
+      // Volgende boodschap pas tonen na huidige
+      Modal._queue.push(opts);
+      return Promise.resolve();
+    }
+    return Modal._present(opts);
+  },
+  _present(opts) {
+    const { type = 'info', title = '', message = '', confirmText = 'Begrepen' } = opts || {};
+    const m = document.getElementById('modal');
+    if (!m) { alert((title ? title + ': ' : '') + message); return Promise.resolve(); }
+    Modal._busy = true;
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-message').textContent = message;
+    const btn = document.getElementById('modal-confirm');
+    btn.textContent = confirmText;
+    document.getElementById('modal-icon').innerHTML = Modal._iconFor(type);
+    m.className = 'modal modal-' + type;
+    m.hidden = false;
+    requestAnimationFrame(() => m.classList.add('shown'));
+    setTimeout(() => btn.focus(), 60);
+
+    return new Promise(resolve => {
+      const dismiss = () => {
+        m.classList.remove('shown');
+        m.classList.add('fading');
+        btn.removeEventListener('click', dismiss);
+        document.removeEventListener('keydown', keyHandler);
+        backdrop && backdrop.removeEventListener('click', dismiss);
+        setTimeout(() => {
+          m.hidden = true;
+          m.classList.remove('fading');
+          Modal._busy = false;
+          resolve();
+          // Volgende uit queue
+          if (Modal._queue.length) {
+            const next = Modal._queue.shift();
+            setTimeout(() => Modal._present(next), 60);
+          }
+        }, 280);
+      };
+      const keyHandler = e => {
+        if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') { e.preventDefault(); dismiss(); }
+      };
+      btn.addEventListener('click', dismiss);
+      document.addEventListener('keydown', keyHandler);
+      const backdrop = m.querySelector('.modal-backdrop');
+      if (backdrop) backdrop.addEventListener('click', dismiss);
+    });
+  },
+  _iconFor(type) {
+    if (type === 'offline' || type === 'warning') {
+      return `<svg viewBox="0 0 64 64" width="42" height="42" aria-hidden="true">
+        <path d="M32 50 L36 54 L32 58 L28 54 Z" fill="currentColor"/>
+        <path d="M22 40 Q32 32 42 40" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <path d="M14 32 Q32 18 50 32" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".75"/>
+        <path d="M6 24 Q32 4 58 24" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".5"/>
+        <line x1="10" y1="10" x2="54" y2="54" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+      </svg>`;
+    }
+    if (type === 'error') {
+      return `<svg viewBox="0 0 64 64" width="42" height="42"><circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="3.5"/><line x1="22" y1="22" x2="42" y2="42" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/><line x1="42" y1="22" x2="22" y2="42" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>`;
+    }
+    if (type === 'success') {
+      return `<svg viewBox="0 0 64 64" width="42" height="42"><circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="3.5"/><polyline points="20,33 28,41 44,24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    return `<svg viewBox="0 0 64 64" width="42" height="42"><circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="3.5"/><circle cx="32" cy="22" r="2.5" fill="currentColor"/><line x1="32" y1="30" x2="32" y2="46" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>`;
+  },
+};
+
 // Hash router
 const Router = {
   routes: [],
