@@ -218,3 +218,44 @@ CREATE POLICY "kist_select_all" ON public.kist_afbeeldingen
 DROP POLICY IF EXISTS "kist_write_auth" ON public.kist_afbeeldingen;
 CREATE POLICY "kist_write_auth" ON public.kist_afbeeldingen
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ──────────────────────────────────────────────────────────────────
+-- 6. Storage bucket + catalogustabel voor bloemstukken
+-- ──────────────────────────────────────────────────────────────────
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('bloemen', 'bloemen', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "auth_bloemen_insert" ON storage.objects;
+CREATE POLICY "auth_bloemen_insert" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'bloemen');
+
+DROP POLICY IF EXISTS "auth_bloemen_update" ON storage.objects;
+CREATE POLICY "auth_bloemen_update" ON storage.objects
+  FOR UPDATE TO authenticated USING (bucket_id = 'bloemen');
+
+DROP POLICY IF EXISTS "auth_bloemen_delete" ON storage.objects;
+CREATE POLICY "auth_bloemen_delete" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'bloemen');
+
+CREATE TABLE IF NOT EXISTS public.bloemen_catalogus (
+  id BIGSERIAL PRIMARY KEY,
+  naam TEXT UNIQUE NOT NULL,
+  omschrijving TEXT,
+  bedrag NUMERIC(10,2) DEFAULT 0,
+  storage_pad TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS trg_bloemen_updated_at ON public.bloemen_catalogus;
+CREATE TRIGGER trg_bloemen_updated_at
+  BEFORE UPDATE ON public.bloemen_catalogus
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.bloemen_catalogus ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "bloemen_all_auth" ON public.bloemen_catalogus;
+CREATE POLICY "bloemen_all_auth" ON public.bloemen_catalogus
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);

@@ -6,6 +6,7 @@ Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/kisten', () => renderKistenBeheer());
+Router.add('/bloemen', () => renderBloemenBeheer());
 Router.add('/account', () => renderAccount());
 
 (async function init() {

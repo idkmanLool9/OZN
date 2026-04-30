@@ -153,7 +153,19 @@ function renderDossierForm(params) {
             <label><span>Rouwauto</span><input type="text" name="rouwauto" value="${v('rouwauto')}"></label>
             <label><span>Aantal volgauto's</span><input type="number" name="aantal_volgauto" value="${v('aantal_volgauto')}" min="0"></label>
             <label><span>Dragers</span><input type="text" name="dragers" value="${v('dragers')}" placeholder="aantal en namen"></label>
-            <label><span>Bloemstukken</span><input type="text" name="bloemstukken" value="${v('bloemstukken')}"></label>
+            <label class="span-3"><span>Bloemstuk (eigen catalogus) <a href="#/bloemen" class="muted small" style="margin-left:.5rem;">beheren →</a></span>
+              <div class="kist-picker">
+                <select name="bloemstukken" id="bloem-select">
+                  <option value="">— niet gekozen —</option>
+                  ${DB.list(KEYS.BLOEMEN).slice().sort((a,b) => a.naam.localeCompare(b.naam)).map(b => {
+                    const label = `${b.naam}${b.bedrag ? ' — ' + fmtEUR(b.bedrag) : ''}`;
+                    return `<option value="${esc(b.naam)}" ${dossier.bloemstukken === b.naam ? 'selected' : ''}>${esc(label)}</option>`;
+                  }).join('')}
+                  <option value="anders" ${sel('bloemstukken','anders')}>Anders / handmatig</option>
+                </select>
+                <div class="kist-preview" id="bloem-preview" aria-live="polite"></div>
+              </div>
+            </label>
             <label><span>Aantal rouwkaarten</span><input type="number" name="rouwkaarten_aantal" value="${v('rouwkaarten_aantal')}" min="0"></label>
             <label class="span-2"><span>Locatie condoleance</span><input type="text" name="condoleance_locatie" value="${v('condoleance_locatie')}"></label>
             <label><span>Catering</span><input type="text" name="catering" value="${v('catering')}"></label>
@@ -222,6 +234,31 @@ function renderDossierForm(params) {
   }
   kistSelect.addEventListener('change', updateKistPreview);
   updateKistPreview();
+
+  // Bloem-preview live bijwerken
+  const bloemSelect = $('#bloem-select');
+  const bloemPreview = $('#bloem-preview');
+  function updateBloemPreview() {
+    const v = bloemSelect.value;
+    if (!v) { bloemPreview.innerHTML = '<div class="kist-preview-empty">Geen bloemstuk gekozen</div>'; return; }
+    if (v === 'anders') { bloemPreview.innerHTML = '<div class="kist-preview-empty">Handmatig / anders</div>'; return; }
+    const b = DB.list(KEYS.BLOEMEN).find(x => x.naam === v);
+    if (!b) { bloemPreview.innerHTML = ''; return; }
+    const fotoUrl = BloemenFotos.urlVoor(b.naam);
+    const beeld = fotoUrl
+      ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
+      : (typeof bloemSVG === 'function' ? bloemSVG() : '');
+    bloemPreview.innerHTML = `
+      <div class="kist-img">${beeld}</div>
+      <div class="kist-meta">
+        <strong>${esc(b.naam)}</strong>
+        ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
+        ${b.bedrag ? `<span class="kist-price">${fmtEUR(b.bedrag)}</span>` : ''}
+        ${fotoUrl ? '' : '<span class="muted small"><a href="#/bloemen">Foto uploaden</a></span>'}
+      </div>`;
+  }
+  bloemSelect.addEventListener('change', updateBloemPreview);
+  updateBloemPreview();
 
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
