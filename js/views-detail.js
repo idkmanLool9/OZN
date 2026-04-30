@@ -18,7 +18,14 @@ function renderDossierDetail(params) {
         <div>
           <a href="#/dossiers" class="back-link">← Dossiers</a>
           <h1>${esc(fullName(d) || 'Dossier')}</h1>
-          <p class="muted"><strong>${esc(d.dossier_nummer)}</strong> · <span class="status status-${esc(d.status)}">${esc((d.status||'nieuw').replace('_',' '))}</span>${d.gezinsnummer ? ' · gezinsnr. ' + esc(d.gezinsnummer) : ''}</p>
+          <p class="muted">
+            <strong>${esc(d.dossier_nummer)}</strong> ·
+            <select id="status-select" class="status-inline status-${esc(d.status)}" data-id="${d.id}" aria-label="Status wijzigen">
+              ${['nieuw','in_behandeling','voltooid','geannuleerd'].map(s =>
+                `<option value="${s}" ${(d.status||'nieuw')===s?'selected':''}>${s.replace('_',' ')}</option>`).join('')}
+            </select>
+            ${d.gezinsnummer ? ' · gezinsnr. ' + esc(d.gezinsnummer) : ''}
+          </p>
         </div>
         <div class="page-actions">
           <button type="button" class="btn btn-ghost" id="btn-print">Print</button>
@@ -238,6 +245,19 @@ function bloemRowValue(bloemNaam) {
 
 function bindDetailEvents(id) {
   $('#btn-print').addEventListener('click', () => window.print());
+
+  const statusSel = $('#status-select');
+  if (statusSel) {
+    statusSel.addEventListener('change', async e => {
+      const nieuw = e.target.value;
+      try {
+        await DB.update(KEYS.DOSSIERS, id, { status: nieuw });
+        renderDossierDetail({ id });
+      } catch (_) {
+        renderDossierDetail({ id });
+      }
+    });
+  }
 
   $('#btn-delete').addEventListener('click', async () => {
     if (!confirm('Weet u zeker dat u dit dossier wilt verwijderen? Alle taken, kosten, documenten en notities worden ook verwijderd.')) return;

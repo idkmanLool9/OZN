@@ -46,21 +46,7 @@ function renderDossierForm(params) {
 
       <form id="dossier-form" class="form-grid" autocomplete="off">
 
-        <fieldset class="card">
-          <legend>Status</legend>
-          <div class="grid-3">
-            <label><span>Status</span>
-              <select name="status">
-                <option value="nieuw" ${sel('status','nieuw')||(!dossier.status?'selected':'')}>Nieuw</option>
-                <option value="in_behandeling" ${sel('status','in_behandeling')}>In behandeling</option>
-                <option value="voltooid" ${sel('status','voltooid')}>Voltooid</option>
-                <option value="geannuleerd" ${sel('status','geannuleerd')}>Geannuleerd</option>
-              </select>
-            </label>
-            <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
-            <label><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
-          </div>
-        </fieldset>
+        <input type="hidden" name="status" value="${esc(dossier.status || 'nieuw')}">
 
         <fieldset class="card">
           <legend>Gegevens overledene</legend>
@@ -113,7 +99,8 @@ function renderDossierForm(params) {
             <label class="span-2"><span>E-mail</span><input type="email" name="contact_email" value="${v('contact_email')}"></label>
             <label class="span-2"><span>Adres</span><input type="text" name="contact_adres" value="${v('contact_adres')}"></label>
             <label><span>Postcode</span><input type="text" name="contact_postcode" value="${v('contact_postcode')}"></label>
-            <label class="span-3"><span>Woonplaats</span><input type="text" name="contact_woonplaats" value="${v('contact_woonplaats')}"></label>
+            <label class="span-2"><span>Woonplaats</span><input type="text" name="contact_woonplaats" value="${v('contact_woonplaats')}"></label>
+            <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
           </div>
         </fieldset>
 
@@ -150,7 +137,8 @@ function renderDossierForm(params) {
             <label><span>Tijd uitvaart</span><input type="time" name="uitvaart_tijd" value="${v('uitvaart_tijd')}"></label>
             <label class="span-3"><span>Kerk / dienstlocatie</span><input type="text" name="kerk_locatie" value="${v('kerk_locatie')}" placeholder="bijv. Kerk en Dolabani Zaal"></label>
             <label class="span-2"><span>Begraafplaats</span><input type="text" name="begraafplaats" value="${v('begraafplaats')}"></label>
-            <label><span>Type graf</span>
+            <label><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
+            <label class="span-3"><span>Type graf</span>
               <select name="graf_type">
                 <option value="">—</option>
                 ${['eigen graf','algemeen graf','familiegraf','urnenruimte'].map(x =>
