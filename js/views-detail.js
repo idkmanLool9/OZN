@@ -80,7 +80,7 @@ function renderDossierDetail(params) {
         </dl>
         <h3>Logistiek</h3>
         <dl class="dl">
-          ${dlRow('Kist', d.kist_type)}
+          ${dlRow('Kist', d.kist_type ? kistRowValue(d.kist_type) : '')}
           ${dlRow('Rouwauto', d.rouwauto)}
           ${dlRow("Volgauto's", d.aantal_volgauto)}
           ${dlRow('Dragers', d.dragers)}
@@ -205,8 +205,18 @@ function renderDossierDetail(params) {
 }
 
 function dlRow(label, value) {
-  const v = value && String(value).trim() ? esc(value) : '—';
-  return `<div><dt>${esc(label)}</dt><dd>${v}</dd></div>`;
+  const v = value && String(value).trim() ? value : '—';
+  // value mag al HTML zijn als 'ie van kistRowValue komt; anders escapen
+  const isHtml = typeof v === 'string' && v.startsWith('<');
+  return `<div><dt>${esc(label)}</dt><dd>${isHtml ? v : esc(v)}</dd></div>`;
+}
+
+function kistRowValue(kistNaam) {
+  const k = KISTEN_CATALOGUS.find(x => x.naam === kistNaam);
+  if (!k) return esc(kistNaam);
+  return `<span class="kist-thumb-inline">${kistSVG(k.materiaal)}</span>` +
+         `<strong>${esc(k.naam)}</strong> ` +
+         `<span class="muted small">— ${esc(k.materiaal)} — ${fmtEUR(k.bedrag)}</span>`;
 }
 
 function bindDetailEvents(id) {

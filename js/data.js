@@ -76,6 +76,59 @@ const KISTEN_CATALOGUS = [
   { naam: 'Provincial',                 materiaal: 'Massief Hout',                bedrag: 4664.00 },
 ];
 
+// Geef een kleur per kist-materiaal voor de preview-afbeelding
+function kistKleur(materiaal) {
+  const m = (materiaal || '').toLowerCase();
+  if (m.includes('zwart') || m.includes('arti zwart')) return '#1f1c1a';
+  if (m.includes('wit'))                                return '#ece6d6';
+  if (m.includes('grijs'))                              return '#7d7872';
+  if (m.includes('mahonie'))                            return '#5a2418';
+  if (m.includes('rotan') || m.includes('bamboe') || m.includes('manilla') || m.includes('wilgen'))
+                                                        return '#c8a268';
+  if (m.includes('eiken') && m.includes('wild'))        return '#9a6a36';
+  if (m.includes('eiken'))                              return '#7a4a20';
+  if (m.includes('grenen') || m.includes('vuren'))      return '#d2a972';
+  if (m.includes('populieren') || m.includes('eco'))    return '#dcc09a';
+  if (m.includes('houtdecor'))                          return '#b88a55';
+  return '#a07a4a';
+}
+
+// SVG-silhouet van een kist in de gegeven kleur (zes-zijdige top-down look)
+function kistSVG(materiaal) {
+  const k = kistKleur(materiaal);
+  const m = (materiaal || '').toLowerCase();
+  const grain = m.includes('wit') ? '#a99878' : (m.includes('zwart') ? '#3a3633' : '#00000022');
+  const handle = m.includes('zwart') ? '#888' : (m.includes('wit') ? '#9a8a6a' : '#3a2a18');
+  return `
+    <svg viewBox="0 0 240 130" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="kg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${k}" stop-opacity="1"/>
+          <stop offset="1" stop-color="${k}" stop-opacity="0.78"/>
+        </linearGradient>
+        <pattern id="kgrain" patternUnits="userSpaceOnUse" width="6" height="60" patternTransform="rotate(0)">
+          <rect width="6" height="60" fill="url(#kg)"/>
+          <path d="M 0 12 Q 3 14 6 12 M 0 28 Q 3 30 6 28 M 0 44 Q 3 46 6 44" stroke="${grain}" stroke-width=".4" fill="none"/>
+        </pattern>
+      </defs>
+      <!-- kist top-down met taps toelopende voetzijde -->
+      <path d="M 30 35 L 95 25 L 145 25 L 210 35 L 210 95 L 145 105 L 95 105 L 30 95 Z"
+            fill="url(#kgrain)" stroke="#1a120a" stroke-width="1.2"/>
+      <!-- kistdeksel-rand -->
+      <path d="M 30 35 L 95 25 L 145 25 L 210 35" fill="none" stroke="#00000033" stroke-width=".8"/>
+      <!-- handvatten -->
+      <rect x="60"  y="55" width="14" height="3" rx="1" fill="${handle}"/>
+      <rect x="165" y="55" width="14" height="3" rx="1" fill="${handle}"/>
+      <rect x="60"  y="74" width="14" height="3" rx="1" fill="${handle}"/>
+      <rect x="165" y="74" width="14" height="3" rx="1" fill="${handle}"/>
+      <!-- kruisje midden (subtiel) -->
+      <g opacity=".25" fill="${handle}">
+        <rect x="118" y="55" width="4" height="20" rx="1"/>
+        <rect x="110" y="62" width="20" height="4" rx="1"/>
+      </g>
+    </svg>`;
+}
+
 const STANDAARD_TAKEN = [
   'Familie informeren en intake afnemen',
   'Overlijdensakte opvragen bij gemeente',

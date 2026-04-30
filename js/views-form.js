@@ -137,15 +137,18 @@ function renderDossierForm(params) {
         <fieldset class="card">
           <legend>Logistiek</legend>
           <div class="grid-3">
-            <label class="span-2"><span>Kistmodel (Unigra catalogus)</span>
-              <select name="kist_type">
-                <option value="">— niet gekozen —</option>
-                ${KISTEN_CATALOGUS.map(k => {
-                  const label = `${k.naam} — ${k.materiaal} — ${fmtEUR(k.bedrag)}`;
-                  return `<option value="${esc(k.naam)}" ${dossier.kist_type === k.naam ? 'selected' : ''}>${esc(label)}</option>`;
-                }).join('')}
-                <option value="anders" ${sel('kist_type','anders')}>Anders / handmatig</option>
-              </select>
+            <label class="span-3"><span>Kistmodel (Unigra catalogus)</span>
+              <div class="kist-picker">
+                <select name="kist_type" id="kist-select">
+                  <option value="">— niet gekozen —</option>
+                  ${KISTEN_CATALOGUS.map(k => {
+                    const label = `${k.naam} — ${k.materiaal} — ${fmtEUR(k.bedrag)}`;
+                    return `<option value="${esc(k.naam)}" ${dossier.kist_type === k.naam ? 'selected' : ''}>${esc(label)}</option>`;
+                  }).join('')}
+                  <option value="anders" ${sel('kist_type','anders')}>Anders / handmatig</option>
+                </select>
+                <div class="kist-preview" id="kist-preview" aria-live="polite"></div>
+              </div>
             </label>
             <label><span>Rouwauto</span><input type="text" name="rouwauto" value="${v('rouwauto')}"></label>
             <label><span>Aantal volgauto's</span><input type="number" name="aantal_volgauto" value="${v('aantal_volgauto')}" min="0"></label>
@@ -188,6 +191,32 @@ function renderDossierForm(params) {
         </div>
       </form>
     </div>`;
+
+  // Kist-preview live bijwerken
+  const kistSelect = $('#kist-select');
+  const kistPreview = $('#kist-preview');
+  function updateKistPreview() {
+    const v = kistSelect.value;
+    if (!v) {
+      kistPreview.innerHTML = '<div class="kist-preview-empty">Geen kist gekozen</div>';
+      return;
+    }
+    if (v === 'anders') {
+      kistPreview.innerHTML = '<div class="kist-preview-empty">Handmatig / anders gekozen</div>';
+      return;
+    }
+    const k = KISTEN_CATALOGUS.find(x => x.naam === v);
+    if (!k) { kistPreview.innerHTML = ''; return; }
+    kistPreview.innerHTML = `
+      <div class="kist-img">${kistSVG(k.materiaal)}</div>
+      <div class="kist-meta">
+        <strong>${esc(k.naam)}</strong>
+        <span class="muted small">${esc(k.materiaal)}</span>
+        <span class="kist-price">${fmtEUR(k.bedrag)}</span>
+      </div>`;
+  }
+  kistSelect.addEventListener('change', updateKistPreview);
+  updateKistPreview();
 
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
