@@ -108,7 +108,7 @@ const DB = {
 
   async insert(tbl, payload) {
     if (!navigator.onLine) {
-      alert('Geen internetverbinding. Wijzigingen kunnen niet worden opgeslagen totdat je weer online bent.');
+      alert('Geen internetverbinding — wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.');
       throw new Error('offline');
     }
     const u = Auth.current();
@@ -126,7 +126,7 @@ const DB = {
 
   async update(tbl, id, patch) {
     if (!navigator.onLine) {
-      alert('Geen internetverbinding. Wijzigingen kunnen niet worden opgeslagen totdat je weer online bent.');
+      alert('Geen internetverbinding — wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.');
       throw new Error('offline');
     }
     const p = Object.assign({}, patch);
@@ -141,7 +141,7 @@ const DB = {
 
   async remove(tbl, id) {
     if (!navigator.onLine) {
-      alert('Geen internetverbinding. Verwijderen kan niet zolang je offline bent.');
+      alert('Geen internetverbinding — verwijderen kan niet zolang je offline bent. Probeer opnieuw zodra je weer online bent.');
       throw new Error('offline');
     }
     const { error } = await sb.from(tbl).delete().eq('id', id);

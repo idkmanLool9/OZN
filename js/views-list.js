@@ -303,11 +303,50 @@ function renderAccount(msg) {
       </section>
 
       <section class="card narrow">
-        <h2>Cloud-back-up</h2>
-        <p class="muted small">Alle dossiergegevens worden veilig in Supabase opgeslagen en zijn op alle apparaten beschikbaar. Documenten staan in de Storage-bucket. Voor extra zekerheid kun je een JSON-export downloaden.</p>
-        <div class="form-actions" style="justify-content:flex-start">
-          <button type="button" class="btn" id="btn-export">Exporteer alle data (JSON)</button>
-        </div>
+        <h2>Data &amp; synchronisatie</h2>
+        ${(() => {
+          const m = (() => { try { return JSON.parse(localStorage.getItem('sok_mirror') || '{}'); } catch (_) { return {}; } })();
+          const lastSync = m.savedAt ? new Date(m.savedAt) : null;
+          const offline = !!Cloud.offline || !navigator.onLine;
+          const cnt = {
+            dossiers: DB.list(KEYS.DOSSIERS).length,
+            taken: DB.list(KEYS.TAKEN).length,
+            kosten: DB.list(KEYS.KOSTEN).length,
+            notities: DB.list(KEYS.NOTITIES).length,
+            documenten: DB.list(KEYS.DOCUMENTEN).length,
+            kisten_fotos: DB.list(KEYS.KIST_AFBEELDINGEN).length,
+            bloemen: DB.list(KEYS.BLOEMEN).length,
+            eten_drinken: DB.list(KEYS.ETEN_DRINKEN).length,
+          };
+          return `
+          <div class="alert ${offline ? 'alert-error' : 'alert-success'}" style="margin-bottom:.75rem;">
+            <strong>${offline ? '⚠ Offline — leesmodus' : '✓ Veilig in de cloud'}</strong>
+            <p class="muted small" style="margin:.35rem 0 0;color:inherit;opacity:.9;">
+              Alle dossiers, taken, kosten, notities, documenten, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
+              ${offline
+                ? 'Op dit moment offline — wijzigingen kunnen pas worden opgeslagen zodra je weer internet hebt. Bestaande gegevens blijven veilig staan.'
+                : 'Op elk apparaat zichtbaar zodra je inlogt. localStorage wordt enkel als offline-kopie gebruikt — niets gaat verloren bij cache wissen of nieuwe browser.'}
+            </p>
+          </div>
+          <dl class="dl" style="grid-template-columns: 1fr 1fr;">
+            <div><dt>Dossiers</dt><dd><strong>${cnt.dossiers}</strong></dd></div>
+            <div><dt>Taken</dt><dd>${cnt.taken}</dd></div>
+            <div><dt>Kostenposten</dt><dd>${cnt.kosten}</dd></div>
+            <div><dt>Notities</dt><dd>${cnt.notities}</dd></div>
+            <div><dt>Documenten</dt><dd>${cnt.documenten}</dd></div>
+            <div><dt>Bloemstukken</dt><dd>${cnt.bloemen}</dd></div>
+            <div><dt>Eten &amp; drinken</dt><dd>${cnt.eten_drinken}</dd></div>
+            <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
+            <div style="grid-column:span 2;"><dt>Laatst gesynchroniseerd</dt><dd>${lastSync ? lastSync.toLocaleString('nl-NL') : '—'}</dd></div>
+          </dl>
+          <div class="form-actions" style="justify-content:flex-start; gap:.5rem; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" id="btn-sync-now" ${offline ? 'disabled' : ''}>Sync nu opnieuw</button>
+            <button type="button" class="btn" id="btn-export">Exporteer alle data (JSON)</button>
+          </div>
+          <p class="muted small" style="margin-top:.75rem;">
+            Een JSON-export geeft je een volledig lokaal back-upbestand met alle dossiergegevens — voor in een veilige map of op een externe schijf, los van Supabase.
+          </p>`;
+        })()}
       </section>
     </div>`;
 
@@ -471,6 +510,25 @@ function renderAccount(msg) {
     const err = await Auth.changePassword(f.nieuw.value);
     renderAccount(err ? { error: err } : { success: 'Wachtwoord gewijzigd.' });
   });
+
+  const syncBtn = $('#btn-sync-now');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', async () => {
+      syncBtn.disabled = true;
+      const orig = syncBtn.textContent;
+      syncBtn.textContent = 'Bezig met synchroniseren...';
+      try {
+        await Cloud.loadAll();
+        await Settings.loadFromCloud();
+        Branding.apply();
+        renderAccount({ success: 'Synchronisatie voltooid — alle gegevens zijn vers opgehaald.' });
+      } catch (e) {
+        syncBtn.disabled = false;
+        syncBtn.textContent = orig;
+        renderAccount({ error: 'Synchronisatie mislukt: ' + (e.message || 'geen verbinding') });
+      }
+    });
+  }
 
   $('#btn-export').addEventListener('click', () => {
     const data = {
