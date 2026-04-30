@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v11'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v12'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -181,6 +181,53 @@ const Branding = {
 
     // Lettertype
     applyFont(s.font_id);
+
+    // Favicon + PWA-icoon meekleuren met het logo
+    Branding.applyFaviconAndManifest(s);
+  },
+
+  applyFaviconAndManifest(s) {
+    const iconLink     = document.querySelector('link[rel="icon"]');
+    const appleLink    = document.querySelector('link[rel="apple-touch-icon"]');
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+
+    if (s.logo_data_url) {
+      if (iconLink)  iconLink.href  = s.logo_data_url;
+      if (appleLink) appleLink.href = s.logo_data_url;
+
+      // Dynamische manifest met eigen logo + naam + kleur
+      if (manifestLink) {
+        const manifest = {
+          name: `${s.app_name} — ${s.app_tagline}`,
+          short_name: s.app_name,
+          start_url: './',
+          scope: './',
+          display: 'standalone',
+          background_color: '#f6f4ef',
+          theme_color: s.primary_color,
+          lang: 'nl',
+          icons: [
+            { src: s.logo_data_url, sizes: 'any', purpose: 'any maskable' }
+          ],
+        };
+        // Oude blob-URL opruimen
+        const old = manifestLink.dataset.dynamicHref;
+        if (old) { try { URL.revokeObjectURL(old); } catch (_) {} }
+        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        const url = URL.createObjectURL(blob);
+        manifestLink.href = url;
+        manifestLink.dataset.dynamicHref = url;
+      }
+    } else {
+      // Reset naar standaard
+      if (iconLink)  iconLink.href  = 'icon.svg';
+      if (appleLink) appleLink.href = 'icon.svg';
+      if (manifestLink) {
+        const old = manifestLink.dataset.dynamicHref;
+        if (old) { try { URL.revokeObjectURL(old); } catch (_) {} delete manifestLink.dataset.dynamicHref; }
+        manifestLink.href = 'manifest.webmanifest';
+      }
+    }
   },
 };
 

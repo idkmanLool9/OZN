@@ -191,7 +191,10 @@ function renderAccount(msg) {
             </div>
 
             <label>
-              <span>Logo (jpg/png/svg, max 500 KB)</span>
+              <span>Logo (jpg/png/svg, max 1 MB)</span>
+              <span class="muted small" style="margin-bottom:.35rem;display:block;">
+                Wordt gebruikt in de app, als <strong>favicon</strong> in het browsertabblad én als <strong>homescreen-icoon</strong> wanneer de app op een telefoon/desktop wordt geïnstalleerd. Voor reeds geïnstalleerde PWA's: kort verwijderen en opnieuw aan beginscherm toevoegen om het nieuwe icoon te zien.
+              </span>
               <div class="logo-row">
                 <div class="logo-preview" id="logo-preview">
                   ${s.logo_data_url
