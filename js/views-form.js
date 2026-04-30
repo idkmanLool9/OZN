@@ -207,12 +207,17 @@ function renderDossierForm(params) {
     }
     const k = KISTEN_CATALOGUS.find(x => x.naam === v);
     if (!k) { kistPreview.innerHTML = ''; return; }
+    const fotoUrl = KistFotos.urlVoor(k.naam);
+    const beeld = fotoUrl
+      ? `<img src="${esc(fotoUrl)}" alt="${esc(k.naam)}" loading="lazy">`
+      : kistSVG(k.materiaal);
     kistPreview.innerHTML = `
-      <div class="kist-img">${kistSVG(k.materiaal)}</div>
+      <div class="kist-img">${beeld}</div>
       <div class="kist-meta">
         <strong>${esc(k.naam)}</strong>
         <span class="muted small">${esc(k.materiaal)}</span>
         <span class="kist-price">${fmtEUR(k.bedrag)}</span>
+        ${fotoUrl ? '' : '<span class="muted small"><a href="#/kisten">Foto uploaden</a></span>'}
       </div>`;
   }
   kistSelect.addEventListener('change', updateKistPreview);

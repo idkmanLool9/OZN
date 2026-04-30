@@ -214,7 +214,11 @@ function dlRow(label, value) {
 function kistRowValue(kistNaam) {
   const k = KISTEN_CATALOGUS.find(x => x.naam === kistNaam);
   if (!k) return esc(kistNaam);
-  return `<span class="kist-thumb-inline">${kistSVG(k.materiaal)}</span>` +
+  const fotoUrl = KistFotos.urlVoor(k.naam);
+  const thumb = fotoUrl
+    ? `<img src="${esc(fotoUrl)}" alt="${esc(k.naam)}" loading="lazy">`
+    : kistSVG(k.materiaal);
+  return `<span class="kist-thumb-inline">${thumb}</span>` +
          `<strong>${esc(k.naam)}</strong> ` +
          `<span class="muted small">— ${esc(k.materiaal)} — ${fmtEUR(k.bedrag)}</span>`;
 }

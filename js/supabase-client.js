@@ -10,6 +10,7 @@ const KEYS = {
   KOSTEN: 'kosten',
   NOTITIES: 'notities',
   DOCUMENTEN: 'documenten',
+  KIST_AFBEELDINGEN: 'kist_afbeeldingen',
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -42,16 +43,17 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], taken: [], kosten: [], notities: [], documenten: [] },
+  cache: { dossiers: [], taken: [], kosten: [], notities: [], documenten: [], kist_afbeeldingen: [] },
   loaded: false,
 
   async loadAll() {
-    const [d, t, k, n, doc] = await Promise.all([
+    const [d, t, k, n, doc, kim] = await Promise.all([
       sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
       sb.from('taken').select('*').order('volgorde', { ascending: true }),
       sb.from('kosten').select('*').order('id', { ascending: true }),
       sb.from('notities').select('*').order('created_at', { ascending: false }),
       sb.from('documenten').select('*').order('geupload_op', { ascending: false }),
+      sb.from('kist_afbeeldingen').select('*'),
     ]);
     if (d.error) throw d.error;
     Cloud.cache.dossiers = (d.data || []).map(normRow);
@@ -59,6 +61,7 @@ const Cloud = {
     Cloud.cache.kosten = (k.data || []).map(normKosten);
     Cloud.cache.notities = (n.data || []).map(normRow);
     Cloud.cache.documenten = (doc.data || []).map(normRow);
+    Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
     Cloud.loaded = true;
   },
 };
@@ -123,7 +126,7 @@ function cleanEmpty(obj) {
   }
 }
 
-// ─── Storage (documenten-uploads) ───────────────────────────────────────────
+// ─── Storage (documenten-uploads, privé) ────────────────────────────────────
 const Storage = {
   async upload(dossierId, file) {
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -140,5 +143,66 @@ const Storage = {
   async remove(path) {
     const { error } = await sb.storage.from('documenten').remove([path]);
     if (error) console.warn('Bestand verwijderen faalde:', error.message);
+  },
+};
+
+// ─── Kistfoto's (publieke bucket) ───────────────────────────────────────────
+const KistFotos = {
+  slug(naam) {
+    return naam.toLowerCase()
+      .replace(/[\s/]+/g, '-')
+      .replace(/[^a-z0-9._-]/g, '')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+  },
+  publicUrl(path) {
+    if (!path) return null;
+    const { data } = sb.storage.from('kisten').getPublicUrl(path);
+    return data?.publicUrl || null;
+  },
+  // Lookup helpers — werken op de cache
+  byNaam(naam) {
+    return (Cloud.cache.kist_afbeeldingen || []).find(k => k.naam === naam);
+  },
+  urlVoor(naam) {
+    const r = KistFotos.byNaam(naam);
+    if (!r) return null;
+    const base = KistFotos.publicUrl(r.storage_pad);
+    if (!base) return null;
+    // cache-buster zodat een nieuwe upload meteen zichtbaar is
+    const ts = r.updated_at ? new Date(r.updated_at).getTime() : Date.now();
+    return base + '?v=' + ts;
+  },
+  async upload(naam, file) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${KistFotos.slug(naam)}.${ext}`;
+    // Verwijder eerst eventueel oude bestanden (verschillende extensies) van dit model
+    const oude = (Cloud.cache.kist_afbeeldingen || []).filter(k => k.naam === naam);
+    for (const o of oude) {
+      if (o.storage_pad !== path) {
+        await sb.storage.from('kisten').remove([o.storage_pad]).catch(() => {});
+      }
+    }
+    const { error: upErr } = await sb.storage.from('kisten').upload(path, file, {
+      upsert: true,
+      cacheControl: '3600',
+      contentType: file.type || undefined,
+    });
+    if (upErr) { alert('Upload mislukt: ' + upErr.message); throw upErr; }
+    const row = { naam, storage_pad: path, updated_at: new Date().toISOString() };
+    const { data, error } = await sb.from('kist_afbeeldingen').upsert(row, { onConflict: 'naam' }).select().single();
+    if (error) { alert('Opslaan in DB mislukt: ' + error.message); throw error; }
+    const i = Cloud.cache.kist_afbeeldingen.findIndex(k => k.naam === naam);
+    if (i >= 0) Cloud.cache.kist_afbeeldingen[i] = data;
+    else Cloud.cache.kist_afbeeldingen.push(data);
+    return data;
+  },
+  async remove(naam) {
+    const r = KistFotos.byNaam(naam);
+    if (!r) return;
+    await sb.storage.from('kisten').remove([r.storage_pad]).catch(() => {});
+    const { error } = await sb.from('kist_afbeeldingen').delete().eq('naam', naam);
+    if (error) { alert('Verwijderen mislukt: ' + error.message); throw error; }
+    Cloud.cache.kist_afbeeldingen = Cloud.cache.kist_afbeeldingen.filter(k => k.naam !== naam);
   },
 };

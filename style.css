@@ -279,6 +279,8 @@ textarea { resize: vertical; }
 .kist-meta strong { font-size: .9rem; color: var(--text); }
 .kist-price { color: var(--primary); font-weight: 600; font-variant-numeric: tabular-nums; font-size: .9rem; }
 
+.kist-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
 /* Inline kist-thumb in overzicht */
 .kist-thumb-inline {
   display: inline-block;
@@ -291,7 +293,56 @@ textarea { resize: vertical; }
   margin-right: .4rem;
   overflow: hidden;
 }
-.kist-thumb-inline svg { width: 100%; height: 100%; display: block; }
+.kist-thumb-inline svg, .kist-thumb-inline img { width: 100%; height: 100%; display: block; object-fit: cover; }
+
+/* Kistenbeheer-galerij */
+.kist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.kist-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: opacity .15s;
+}
+.kist-card.is-uploading { opacity: .55; }
+.kist-card.is-uploading::after {
+  content: 'Bezig met uploaden...';
+  position: absolute;
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.7);
+  font-weight: 600;
+  color: var(--primary);
+}
+.kist-card-img {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #f0ece2;
+  overflow: hidden;
+}
+.kist-card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kist-card-svg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.kist-card-svg svg { width: 90%; height: 90%; }
+.kist-card-no-img {
+  position: absolute; top: .35rem; right: .5rem;
+  background: rgba(0,0,0,.55); color: #fff;
+  font-size: .7rem; padding: .15rem .45rem; border-radius: 3px;
+  letter-spacing: .03em; text-transform: uppercase;
+}
+.kist-card-meta { padding: .6rem .75rem .25rem; display: flex; flex-direction: column; gap: .15rem; }
+.kist-card-actions {
+  padding: .35rem .75rem .65rem;
+  display: flex; gap: .35rem; flex-wrap: wrap;
+  margin-top: auto;
+}
+.kist-card-actions .btn { flex: 1; }
 
 /* Preset buttons (kosten-catalogus) */
 .preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .5rem; margin-top: .5rem; }

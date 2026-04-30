@@ -159,25 +159,62 @@ CREATE POLICY "auth_all" ON public.documenten
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ──────────────────────────────────────────────────────────────────
--- 4. Storage bucket voor documenten
+-- 4. Storage bucket voor documenten (privé)
 -- ──────────────────────────────────────────────────────────────────
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('documenten', 'documenten', false)
 ON CONFLICT (id) DO NOTHING;
 
-DROP POLICY IF EXISTS "auth_storage_select" ON storage.objects;
-CREATE POLICY "auth_storage_select" ON storage.objects
+DROP POLICY IF EXISTS "auth_documenten_select" ON storage.objects;
+CREATE POLICY "auth_documenten_select" ON storage.objects
   FOR SELECT TO authenticated USING (bucket_id = 'documenten');
 
-DROP POLICY IF EXISTS "auth_storage_insert" ON storage.objects;
-CREATE POLICY "auth_storage_insert" ON storage.objects
+DROP POLICY IF EXISTS "auth_documenten_insert" ON storage.objects;
+CREATE POLICY "auth_documenten_insert" ON storage.objects
   FOR INSERT TO authenticated WITH CHECK (bucket_id = 'documenten');
 
-DROP POLICY IF EXISTS "auth_storage_update" ON storage.objects;
-CREATE POLICY "auth_storage_update" ON storage.objects
+DROP POLICY IF EXISTS "auth_documenten_update" ON storage.objects;
+CREATE POLICY "auth_documenten_update" ON storage.objects
   FOR UPDATE TO authenticated USING (bucket_id = 'documenten');
 
-DROP POLICY IF EXISTS "auth_storage_delete" ON storage.objects;
-CREATE POLICY "auth_storage_delete" ON storage.objects
+DROP POLICY IF EXISTS "auth_documenten_delete" ON storage.objects;
+CREATE POLICY "auth_documenten_delete" ON storage.objects
   FOR DELETE TO authenticated USING (bucket_id = 'documenten');
+
+-- ──────────────────────────────────────────────────────────────────
+-- 5. Storage bucket voor kistfoto's (publiek leesbaar)
+-- ──────────────────────────────────────────────────────────────────
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('kisten', 'kisten', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "auth_kisten_insert" ON storage.objects;
+CREATE POLICY "auth_kisten_insert" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'kisten');
+
+DROP POLICY IF EXISTS "auth_kisten_update" ON storage.objects;
+CREATE POLICY "auth_kisten_update" ON storage.objects
+  FOR UPDATE TO authenticated USING (bucket_id = 'kisten');
+
+DROP POLICY IF EXISTS "auth_kisten_delete" ON storage.objects;
+CREATE POLICY "auth_kisten_delete" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'kisten');
+
+-- Tabel die kist-modelnamen koppelt aan hun foto-pad in storage
+CREATE TABLE IF NOT EXISTS public.kist_afbeeldingen (
+  naam TEXT PRIMARY KEY,
+  storage_pad TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.kist_afbeeldingen ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "kist_select_all" ON public.kist_afbeeldingen;
+CREATE POLICY "kist_select_all" ON public.kist_afbeeldingen
+  FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "kist_write_auth" ON public.kist_afbeeldingen;
+CREATE POLICY "kist_write_auth" ON public.kist_afbeeldingen
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
