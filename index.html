@@ -13,6 +13,37 @@
   <link rel="stylesheet" href="print.css" media="print" />
 </head>
 <body>
+  <!-- Welkomscherm / splash -->
+  <section id="splash" class="splash" role="dialog" aria-label="Welkom">
+    <div class="splash-card">
+      <div class="brand-mark big">✝</div>
+      <h1 id="splash-title">Welkom</h1>
+      <p class="splash-sub">Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</p>
+
+      <div id="splash-online" class="splash-state" hidden>
+        <div class="splash-spinner" aria-hidden="true"></div>
+        <p class="splash-msg">Even verbinden met de server...</p>
+      </div>
+
+      <div id="splash-offline" class="splash-state splash-state-offline" hidden>
+        <div class="splash-icon-offline" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="56" height="56">
+            <path d="M32 50 L36 54 L32 58 L28 54 Z" fill="currentColor"/>
+            <path d="M22 40 Q32 32 42 40" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M14 32 Q32 18 50 32" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".75"/>
+            <path d="M6 24 Q32 4 58 24" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".5"/>
+            <line x1="10" y1="10" x2="54" y2="54" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="splash-msg"><strong>Geen internetverbinding</strong></p>
+        <p class="splash-msg-sub">Je werkt nu in <em>leesmodus</em>. Bestaande dossiers blijven zichtbaar; nieuwe wijzigingen kun je opslaan zodra je weer online bent.</p>
+      </div>
+
+      <button type="button" id="splash-continue" class="btn btn-primary" hidden>Verder</button>
+      <p class="splash-hint muted small" id="splash-hint" hidden>Tik om verder te gaan</p>
+    </div>
+  </section>
+
   <!-- Login -->
   <section id="login-screen" class="login-body" hidden>
     <div class="login-card">

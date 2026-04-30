@@ -1,5 +1,56 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
+const Splash = {
+  shownAt: Date.now(),
+  dismissed: false,
+  show(state /* 'online' | 'offline' */) {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    const onlineEl = document.getElementById('splash-online');
+    const offlineEl = document.getElementById('splash-offline');
+    const titleEl = document.getElementById('splash-title');
+    const cont = document.getElementById('splash-continue');
+    const hint = document.getElementById('splash-hint');
+    onlineEl.hidden = state !== 'online';
+    offlineEl.hidden = state !== 'offline';
+    if (state === 'offline') {
+      titleEl.textContent = 'Welkom terug';
+      cont.hidden = false;
+      cont.textContent = 'Verder in leesmodus';
+      hint.hidden = true;
+    } else {
+      titleEl.textContent = 'Welkom';
+      cont.hidden = true;
+      hint.hidden = false;
+    }
+  },
+  setupHandlers() {
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    const dismiss = () => Splash.dismiss();
+    splash.addEventListener('click', dismiss);
+    document.getElementById('splash-continue').addEventListener('click', e => {
+      e.stopPropagation(); dismiss();
+    });
+    document.addEventListener('keydown', e => {
+      if (!Splash.dismissed && (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape')) dismiss();
+    });
+  },
+  async autoDismissAfter(minMs = 1200) {
+    const elapsed = Date.now() - Splash.shownAt;
+    if (elapsed < minMs) await new Promise(r => setTimeout(r, minMs - elapsed));
+    Splash.dismiss();
+  },
+  dismiss() {
+    if (Splash.dismissed) return;
+    Splash.dismissed = true;
+    const splash = document.getElementById('splash');
+    if (!splash) return;
+    splash.classList.add('fading');
+    setTimeout(() => { splash.hidden = true; }, 400);
+  },
+};
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./service-worker.js').catch(err =>
@@ -32,12 +83,25 @@ Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
 Router.add('/account', () => renderAccount());
 
 (async function init() {
+  // Welkomscherm meteen tonen op basis van verbinding
+  Splash.setupHandlers();
+  Splash.show(navigator.onLine ? 'online' : 'offline');
+
   const sess = await Auth.init();
   if (sess) {
     try { await Cloud.loadAll(); }
-    catch (e) { alert('Gegevens laden mislukt: ' + (e.message || e)); }
+    catch (e) {
+      // Geen alert tijdens splash; offline-modus wordt al getoond
+      console.warn('Laden mislukt:', e.message || e);
+    }
   }
   updateOfflineUI();
+
+  // Welkomscherm fadet automatisch weg na minimaal 1,2s online,
+  // of blijft staan bij offline tot de gebruiker op "Verder" klikt
+  if (navigator.onLine && !Cloud.offline) {
+    Splash.autoDismissAfter(1200);
+  }
 
   document.getElementById('login-form').addEventListener('submit', async e => {
     e.preventDefault();
