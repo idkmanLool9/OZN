@@ -176,7 +176,7 @@ CREATE POLICY "auth_documenten_insert" ON storage.objects
 
 DROP POLICY IF EXISTS "auth_documenten_update" ON storage.objects;
 CREATE POLICY "auth_documenten_update" ON storage.objects
-  FOR UPDATE TO authenticated USING (bucket_id = 'documenten');
+  FOR UPDATE TO authenticated USING (bucket_id = 'documenten') WITH CHECK (bucket_id = 'documenten');
 
 DROP POLICY IF EXISTS "auth_documenten_delete" ON storage.objects;
 CREATE POLICY "auth_documenten_delete" ON storage.objects
@@ -196,7 +196,7 @@ CREATE POLICY "auth_kisten_insert" ON storage.objects
 
 DROP POLICY IF EXISTS "auth_kisten_update" ON storage.objects;
 CREATE POLICY "auth_kisten_update" ON storage.objects
-  FOR UPDATE TO authenticated USING (bucket_id = 'kisten');
+  FOR UPDATE TO authenticated USING (bucket_id = 'kisten') WITH CHECK (bucket_id = 'kisten');
 
 DROP POLICY IF EXISTS "auth_kisten_delete" ON storage.objects;
 CREATE POLICY "auth_kisten_delete" ON storage.objects
@@ -233,7 +233,7 @@ CREATE POLICY "auth_bloemen_insert" ON storage.objects
 
 DROP POLICY IF EXISTS "auth_bloemen_update" ON storage.objects;
 CREATE POLICY "auth_bloemen_update" ON storage.objects
-  FOR UPDATE TO authenticated USING (bucket_id = 'bloemen');
+  FOR UPDATE TO authenticated USING (bucket_id = 'bloemen') WITH CHECK (bucket_id = 'bloemen');
 
 DROP POLICY IF EXISTS "auth_bloemen_delete" ON storage.objects;
 CREATE POLICY "auth_bloemen_delete" ON storage.objects
@@ -274,7 +274,7 @@ CREATE POLICY "auth_eten_drinken_insert" ON storage.objects
 
 DROP POLICY IF EXISTS "auth_eten_drinken_update" ON storage.objects;
 CREATE POLICY "auth_eten_drinken_update" ON storage.objects
-  FOR UPDATE TO authenticated USING (bucket_id = 'eten_drinken');
+  FOR UPDATE TO authenticated USING (bucket_id = 'eten_drinken') WITH CHECK (bucket_id = 'eten_drinken');
 
 DROP POLICY IF EXISTS "auth_eten_drinken_delete" ON storage.objects;
 CREATE POLICY "auth_eten_drinken_delete" ON storage.objects
@@ -340,7 +340,7 @@ CREATE POLICY "auth_branding_insert" ON storage.objects
 
 DROP POLICY IF EXISTS "auth_branding_update" ON storage.objects;
 CREATE POLICY "auth_branding_update" ON storage.objects
-  FOR UPDATE TO authenticated USING (bucket_id = 'branding');
+  FOR UPDATE TO authenticated USING (bucket_id = 'branding') WITH CHECK (bucket_id = 'branding');
 
 DROP POLICY IF EXISTS "auth_branding_delete" ON storage.objects;
 CREATE POLICY "auth_branding_delete" ON storage.objects
