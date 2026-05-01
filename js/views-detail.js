@@ -258,43 +258,122 @@ function toWaNumber(tel) {
   return num;
 }
 
+function emTable(rows) {
+  const valid = rows.filter(r => r && r[1] != null && String(r[1]).trim() !== '');
+  if (!valid.length) return '';
+  return `<table cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:6px 0 14px;">
+    ${valid.map(([k, v]) => `
+      <tr>
+        <td style="padding:6px 10px 6px 0;color:#6f6a62;vertical-align:top;width:38%;font-size:13px;">${esc(k)}</td>
+        <td style="padding:6px 0;color:#2a2724;vertical-align:top;font-size:14px;">${esc(v)}</td>
+      </tr>`).join('')}
+  </table>`;
+}
+function emH3(t) {
+  return `<h3 style="margin:18px 0 4px;font-family:Georgia,serif;font-size:15px;color:#6b1e2a;border-bottom:1px solid #e5e2da;padding-bottom:4px;">${esc(t)}</h3>`;
+}
+
 function buildDossierEmail(d) {
-  const L = [];
-  L.push('Beste,', '');
-  L.push('Hierbij de gegevens van het uitvaartdossier.', '');
-  L.push(`Dossiernummer: ${d.dossier_nummer || ''}`);
-  if (d.status) L.push(`Status: ${(d.status||'').replace('_', ' ')}`);
-  L.push('');
-  L.push('— OVERLEDENE —');
-  L.push(`Naam: ${fullName(d) || '—'}`);
-  if (d.doopnaam) L.push(`Doopnaam: ${d.doopnaam}`);
-  if (d.geboortedatum) L.push(`Geboren: ${fmtDate(d.geboortedatum)}${d.geboorteplaats ? ' te ' + d.geboorteplaats : ''}`);
-  if (d.overlijdensdatum) L.push(`Overleden: ${fmtDate(d.overlijdensdatum)}${d.overlijdenstijd ? ' om ' + d.overlijdenstijd : ''}${d.overlijdensplaats ? ' te ' + d.overlijdensplaats : ''}`);
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
-  if (adresO) L.push(`Adres: ${adresO}`);
-  if (d.bsn) L.push(`BSN: ${d.bsn}`);
-  L.push('');
-  L.push('— CONTACTPERSOON —');
-  L.push(`Naam: ${[d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') || '—'}${d.contact_relatie ? ' (' + d.contact_relatie + ')' : ''}`);
-  if (d.contact_telefoon) L.push(`Telefoon: ${d.contact_telefoon}`);
-  if (d.contact_email)    L.push(`E-mail: ${d.contact_email}`);
-  L.push('');
-  L.push('— KERKELIJK —');
-  if (d.parochie) L.push(`Parochie: ${d.parochie}`);
-  if (d.priester) L.push(`Priester: ${d.priester}`);
-  L.push('');
-  L.push('— UITVAART —');
-  if (d.uitvaart_type)   L.push(`Type: ${d.uitvaart_type}`);
-  if (d.uitvaart_datum)  L.push(`Datum: ${fmtDate(d.uitvaart_datum)}${d.uitvaart_tijd ? ' om ' + d.uitvaart_tijd : ''}`);
-  if (d.kerk_locatie)    L.push(`Kerk: ${d.kerk_locatie}`);
-  if (d.begraafplaats)   L.push(`Begraafplaats: ${d.begraafplaats}${d.grafnummer ? ' — graf ' + d.grafnummer : ''}`);
-  L.push('');
-  if (d.bijzonderheden) { L.push('— BIJZONDERHEDEN —'); L.push(d.bijzonderheden); L.push(''); }
-  L.push('Met vriendelijke groet,');
+  const adresC = [d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
+  const huis = [fmtDate(d.huisbezoek_datum), d.huisbezoek_tijd].filter(Boolean).join(' ');
+  const avond = [fmtDate(d.avondwake_datum), d.avondwake_tijd, d.avondwake_locatie && '— ' + d.avondwake_locatie].filter(Boolean).join(' ');
+  const uitv = [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' ');
+  const grafstuk = [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — ');
+
+  const parts = [];
+  parts.push(`<p style="margin:0 0 12px;">Beste,</p>`);
+  parts.push(`<p style="margin:0 0 14px;">Hierbij de gegevens van het uitvaartdossier <strong>${esc(d.dossier_nummer || '')}</strong>${d.status ? ' (status: ' + esc((d.status||'').replace('_',' ')) + ')' : ''}.</p>`);
+
+  parts.push(emH3('Overledene'));
+  parts.push(emTable([
+    ['Naam', fullName(d)],
+    ['Doopnaam', d.doopnaam],
+    ['Geslacht', d.geslacht],
+    ['Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
+    ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdenstijd && 'om ' + d.overlijdenstijd, d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
+    ['Adres', adresO],
+    ['BSN', d.bsn],
+    ['Burgerlijke staat', d.burgerlijke_staat],
+    ['Nationaliteit', d.nationaliteit],
+    ['Beroep', d.beroep],
+    ['Lid SOK', d.syrisch_orthodox_lid],
+    ['Gezinsnummer', d.gezinsnummer],
+  ]));
+
+  parts.push(emH3('Contactpersoon'));
+  parts.push(emTable([
+    ['Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') + (d.contact_relatie ? ' (' + d.contact_relatie + ')' : '')],
+    ['Telefoon', d.contact_telefoon],
+    ['E-mail', d.contact_email],
+    ['Adres', adresC],
+  ]));
+
+  parts.push(emH3('Kerkelijk'));
+  parts.push(emTable([
+    ['Parochie', d.parochie],
+    ['Priester', d.priester],
+    ['Huisbezoek', huis],
+    ['Avondwake', avond],
+  ]));
+
+  parts.push(emH3('Uitvaartdienst & ter aardebestelling'));
+  parts.push(emTable([
+    ['Type', d.uitvaart_type],
+    ['Datum & tijd', uitv],
+    ['Kerk', d.kerk_locatie],
+    ['Begraafplaats', grafstuk],
+  ]));
+
+  parts.push(emH3('Logistiek'));
+  parts.push(emTable([
+    ['Kist', d.kist_type],
+    ['Rouwauto', d.rouwauto],
+    ["Volgauto's", d.aantal_volgauto],
+    ['Dragers', d.dragers],
+    ['Bloemstukken', d.bloemstukken],
+    ['Rouwkaarten', d.rouwkaarten_aantal],
+    ['Condoleance', d.condoleance_locatie],
+    ['Eten & drinken', d.catering],
+  ]));
+
+  if (d.verzekering_status === 'met verzekering') {
+    parts.push(emH3('Verzekering'));
+    parts.push(emTable([
+      ['Maatschappij', d.verzekering_maatschappij],
+      ['Polisnummer', d.polisnummer],
+      ['Polishouder', d.verzekering_polishouder],
+      ['Dekkingsbedrag', d.verzekering_dekking ? fmtEUR(d.verzekering_dekking) : ''],
+      ['Pakket', d.verzekering_pakket],
+      ['Aanmelding-status', d.verzekering_aanmelding_status],
+      ['Contactpersoon', d.verzekering_contact_naam],
+      ['Telefoon contact', d.verzekering_contact_telefoon],
+    ]));
+  } else if (d.verzekering_status === 'zonder verzekering') {
+    parts.push(emH3('Betaling (zonder verzekering)'));
+    parts.push(emTable([
+      ['Betaalwijze', d.betaalwijze],
+      ['Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : ''],
+      ['Eindafrekening', d.eindafrekening_bedrag ? fmtEUR(d.eindafrekening_bedrag) + (d.eindafrekening_status ? ' (' + d.eindafrekening_status + ')' : '') : ''],
+      ['Betalingstermijn', d.betalingstermijn],
+      ['Verantwoordelijke', d.verantwoordelijke_persoon],
+    ]));
+  }
+
+  parts.push(emH3('Opdrachtgever'));
+  parts.push(emTable([
+    ['Naam', d.opdrachtgever_naam],
+    ['Telefoon', d.opdrachtgever_telefoon],
+  ]));
+
+  if (d.bijzonderheden) {
+    parts.push(emH3('Bijzonderheden'));
+    parts.push(`<p style="white-space:pre-wrap;margin:6px 0 14px;font-size:14px;line-height:1.55;">${esc(d.bijzonderheden)}</p>`);
+  }
+
   const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
-  L.push(s.app_name || 'Uitvaartleider');
-  if (s.app_tagline) L.push(s.app_tagline);
-  return L.join('\n');
+  parts.push(`<p style="margin:18px 0 0;font-size:13px;color:#6f6a62;">Met vriendelijke groet,<br><strong>${esc(s.app_name || 'Uitvaartleider')}</strong>${s.app_tagline ? '<br>' + esc(s.app_tagline) : ''}</p>`);
+  return parts.join('\n');
 }
 
 function buildFactuurEmail(d, kosten) {
@@ -304,35 +383,86 @@ function buildFactuurEmail(d, kosten) {
   const familie = totaal - gedekt;
   const aanbet = Number(d.aanbetaling_bedrag) || 0;
   const teBetalen = familie - aanbet;
-  const L = [];
-  L.push('Beste,', '');
-  L.push(`Hierbij de factuur voor uitvaartdossier ${d.dossier_nummer || ''}.`, '');
-  L.push(`Betreft: ${fullName(d) || '—'}`);
-  if (d.uitvaart_datum) L.push(`Uitvaart: ${fmtDate(d.uitvaart_datum)}`);
-  L.push('');
-  L.push('— KOSTEN —');
-  kosten.forEach(k => {
-    L.push(`${k.omschrijving}${verzekerd && k.gedekt ? ' (gedekt door verzekering)' : ''}: ${fmtEUR(k.bedrag)}`);
-  });
-  L.push('');
-  L.push(`Totaal: ${fmtEUR(totaal)}`);
-  if (verzekerd) {
-    L.push(`Gedekt door verzekering: ${fmtEUR(gedekt)}`);
-    L.push(`Door familie te betalen: ${fmtEUR(familie)}`);
-  }
-  if (aanbet > 0) {
-    L.push(`Aanbetaling${d.aanbetaling_datum ? ' ('+fmtDate(d.aanbetaling_datum)+')' : ''}: ${fmtEUR(aanbet)}`);
-    L.push(`Nog te voldoen: ${fmtEUR(teBetalen)}`);
-  }
-  L.push('');
-  if (d.betalingstermijn) L.push(`Betalingstermijn: ${d.betalingstermijn}`);
-  if (d.eindafrekening_status) L.push(`Status: ${d.eindafrekening_status}`);
-  L.push('');
-  L.push('Met vriendelijke groet,');
   const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
-  L.push(s.app_name || 'Uitvaartleider');
-  if (s.app_tagline) L.push(s.app_tagline);
-  return L.join('\n');
+
+  const parts = [];
+  parts.push(`<p style="margin:0 0 12px;">Beste,</p>`);
+  parts.push(`<p style="margin:0 0 14px;">Hierbij de factuur voor uitvaartdossier <strong>${esc(d.dossier_nummer || '')}</strong>.</p>`);
+
+  parts.push(emTable([
+    ['Voor', d.opdrachtgever_naam || d.contact_naam],
+    ['Betreft', `Uitvaart van ${fullName(d) || '—'}`],
+    ['Overlijdensdatum', fmtDate(d.overlijdensdatum)],
+    ['Uitvaartdatum', fmtDate(d.uitvaart_datum)],
+  ]));
+
+  if (verzekerd) {
+    parts.push(`<p style="background:#e6eef9;color:#2b5d99;padding:10px 14px;border-radius:6px;margin:10px 0;font-size:13px;">
+      Via verzekering: <strong>${esc(d.verzekering_maatschappij || '—')}</strong>${d.polisnummer ? ' — polisnummer ' + esc(d.polisnummer) : ''}${d.verzekering_pakket ? ' — ' + esc(d.verzekering_pakket) : ''}
+    </p>`);
+  }
+
+  parts.push(emH3('Kosten'));
+  if (kosten.length === 0) {
+    parts.push(`<p style="color:#6f6a62;font-style:italic;">Nog geen kostenposten geregistreerd.</p>`);
+  } else {
+    parts.push(`<table cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:6px 0 14px;font-size:13px;">
+      <thead>
+        <tr style="background:#f6f4ef;">
+          <th align="left" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Omschrijving</th>
+          <th align="left" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Categorie</th>
+          ${verzekerd ? '<th align="center" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Gedekt</th>' : ''}
+          <th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Bedrag</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${kosten.map(k => `
+          <tr>
+            <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${esc(k.omschrijving)}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;color:#6f6a62;">${esc(k.categorie || '')}</td>
+            ${verzekerd ? `<td align="center" style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${k.gedekt ? '✓' : ''}</td>` : ''}
+            <td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${esc(fmtEUR(k.bedrag))}</td>
+          </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="${verzekerd ? 3 : 2}" align="right" style="padding:8px 10px;font-weight:600;">Totaal</td>
+          <td align="right" style="padding:8px 10px;font-weight:600;font-variant-numeric:tabular-nums;">${esc(fmtEUR(totaal))}</td>
+        </tr>
+        ${verzekerd ? `
+          <tr>
+            <td colspan="3" align="right" style="padding:6px 10px;color:#6f6a62;">Gedekt door verzekering</td>
+            <td align="right" style="padding:6px 10px;color:#6f6a62;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(gedekt))}</td>
+          </tr>
+          <tr style="background:#f5e8ea;">
+            <td colspan="3" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Door familie te betalen</td>
+            <td align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;font-variant-numeric:tabular-nums;">${esc(fmtEUR(familie))}</td>
+          </tr>` : ''}
+        ${aanbet > 0 ? `
+          <tr>
+            <td colspan="${verzekerd ? 3 : 2}" align="right" style="padding:6px 10px;color:#6f6a62;">Aanbetaling${d.aanbetaling_datum ? ' (' + fmtDate(d.aanbetaling_datum) + ')' : ''}</td>
+            <td align="right" style="padding:6px 10px;color:#6f6a62;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(aanbet))}</td>
+          </tr>
+          <tr style="background:#f5e8ea;">
+            <td colspan="${verzekerd ? 3 : 2}" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Nog te voldoen</td>
+            <td align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;font-variant-numeric:tabular-nums;">${esc(fmtEUR(teBetalen))}</td>
+          </tr>` : ''}
+      </tfoot>
+    </table>`);
+  }
+
+  if (d.betalingstermijn || d.betaalwijze || d.eindafrekening_status || d.verantwoordelijke_persoon) {
+    parts.push(emH3('Betalingsafspraken'));
+    parts.push(emTable([
+      ['Betaalwijze', d.betaalwijze],
+      ['Termijn', d.betalingstermijn],
+      ['Status', d.eindafrekening_status],
+      ['Verantwoordelijke', d.verantwoordelijke_persoon],
+    ]));
+  }
+
+  parts.push(`<p style="margin:18px 0 0;font-size:13px;color:#6f6a62;">Met vriendelijke groet,<br><strong>${esc(s.app_name || 'Uitvaartleider')}</strong>${s.app_tagline ? '<br>' + esc(s.app_tagline) : ''}</p>`);
+  return parts.join('\n');
 }
 
 function openMailto(to, subject, body) {
