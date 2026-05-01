@@ -332,27 +332,27 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .kost-toggle.off-gedekt { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
 .table .center { text-align: center; }
 
-/* Foto-overledene upload-veld in intake */
-.foto-overledene-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.foto-preview {
+/* Scan-preview na auto-crop */
+.scan-preview {
+  display: flex; gap: 1rem; align-items: center;
+  margin-top: .75rem; padding: .75rem;
+  border: 1px solid var(--green);
+  background: var(--green-soft);
+  border-radius: 8px;
+}
+.scan-preview img {
   width: 110px; height: 140px;
-  border: 1px dashed var(--border); border-radius: 8px;
-  overflow: hidden; background: var(--bg);
-  display: flex; align-items: center; justify-content: center;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
   flex-shrink: 0;
 }
-.foto-preview img { width: 100%; height: 100%; object-fit: cover; }
-.foto-actions { display: flex; flex-direction: column; gap: .35rem; flex: 1; min-width: 200px; }
-
-/* Foto-overledene in dossier-overzicht */
-.dossier-foto {
-  float: right;
-  width: 130px; height: 165px;
-  margin: 0 0 .75rem 1rem;
-  border: 1px solid var(--border); border-radius: 6px;
-  overflow: hidden; background: var(--bg);
+.scan-preview-meta {
+  display: flex; flex-direction: column; gap: .25rem; flex: 1;
 }
-.dossier-foto img { width: 100%; height: 100%; object-fit: cover; }
+.scan-preview-meta strong { color: var(--green); }
+.scan-preview-actions { display: flex; gap: .35rem; margin-top: .35rem; flex-wrap: wrap; }
 
 /* Rouwkaart-pagina */
 .rouwkaart-page { padding: 1rem; }

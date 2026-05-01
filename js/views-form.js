@@ -273,25 +273,6 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card">
-          <legend>Foto overledene <span style="text-transform:none;letter-spacing:0;font-size:.75rem;opacity:.7;">(voor rouwkaart)</span></legend>
-          <div class="foto-overledene-row">
-            <div class="foto-preview" id="foto-overledene-preview">
-              ${dossier.foto_overledene_pad
-                ? `<img src="${esc(FotoOverledene.urlVoor(dossier.foto_overledene_pad))}" alt="Foto">`
-                : '<span class="muted small">geen foto</span>'}
-            </div>
-            <div class="foto-actions">
-              <input type="hidden" name="foto_overledene_pad" value="${esc(dossier.foto_overledene_pad || '')}">
-              <label class="btn btn-sm">📷 Foto kiezen / maken
-                <input type="file" id="foto-overledene-input" accept="image/*" capture="environment" hidden>
-              </label>
-              ${dossier.foto_overledene_pad ? '<button type="button" class="btn btn-sm btn-ghost" id="foto-overledene-remove">Verwijder</button>' : ''}
-              <span class="muted small">Optioneel — verschijnt op de rouwkaart en in het overzicht.</span>
-            </div>
-          </div>
-        </fieldset>
-
-        <fieldset class="card">
           <legend>Bijzonderheden</legend>
           <label class="full"><span>Notities / wensen familie</span>
             <textarea name="bijzonderheden" rows="5">${v('bijzonderheden')}</textarea>
@@ -443,46 +424,6 @@ function renderDossierForm(params) {
   }
   vsel.addEventListener('change', updateVerzekeringSections);
   updateVerzekeringSections();
-
-  // ─── Foto overledene upload ───────────────────────────────────────────
-  const fotoInput = $('#foto-overledene-input');
-  if (fotoInput) {
-    fotoInput.addEventListener('change', async e => {
-      const file = e.target.files[0]; if (!file) return;
-      if (!file.type.startsWith('image/')) {
-        Modal.show({ type: 'error', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen toegestaan.' });
-        return;
-      }
-      // Wacht tot dossier bestaat — bij nieuw dossier eerst opslaan!
-      if (isNew) {
-        Modal.show({ type: 'info', title: 'Eerst dossier opslaan',
-          message: 'Sla het dossier eerst op (klik op "Dossier aanmaken"), open daarna het dossier en upload de foto via "Bewerken".' });
-        return;
-      }
-      const lbl = e.target.closest('label');
-      if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
-      try {
-        const compressed = await compressImage(file, 1200, 0.88);
-        const path = await FotoOverledene.upload(dossier.id, compressed);
-        $('input[name="foto_overledene_pad"]').value = path;
-        const prev = $('#foto-overledene-preview');
-        if (prev) prev.innerHTML = `<img src="${esc(FotoOverledene.urlVoor(path))}" alt="Foto">`;
-      } catch (_) {
-      } finally {
-        if (lbl) { lbl.style.opacity = 1; }
-      }
-    });
-  }
-  const fotoRemove = $('#foto-overledene-remove');
-  if (fotoRemove) {
-    fotoRemove.addEventListener('click', async () => {
-      const path = $('input[name="foto_overledene_pad"]').value;
-      if (path) await FotoOverledene.remove(path);
-      $('input[name="foto_overledene_pad"]').value = '';
-      const prev = $('#foto-overledene-preview');
-      if (prev) prev.innerHTML = '<span class="muted small">geen foto</span>';
-    });
-  }
 
   // ─── #3 Auto-fill contactpersoon-gegevens uit eerder dossier ──────────
   const contactNaamInp = $('input[name="contact_naam"]');

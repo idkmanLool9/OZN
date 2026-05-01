@@ -5,7 +5,6 @@ function renderRouwkaart(params) {
   const d = DB.byId(KEYS.DOSSIERS, id);
   if (!d) return render404();
 
-  const fotoUrl = d.foto_overledene_pad ? FotoOverledene.urlVoor(d.foto_overledene_pad) : null;
   const naam = fullName(d) || '—';
   const dpa = d.doopnaam ? '<div class="rk-doopnaam">' + esc(d.doopnaam) + '</div>' : '';
   const geb = [fmtDate(d.geboortedatum), d.geboorteplaats].filter(Boolean).join(' te ');
@@ -30,7 +29,6 @@ function renderRouwkaart(params) {
         <div class="rouwkaart-card">
           <div class="rk-cross">✝</div>
           <p class="rk-intro">In dankbare herinnering aan</p>
-          ${fotoUrl ? `<div class="rk-foto"><img src="${esc(fotoUrl)}" alt="${esc(naam)}"></div>` : ''}
           <h2 class="rk-naam">${esc(naam)}</h2>
           ${dpa}
           <div class="rk-data">

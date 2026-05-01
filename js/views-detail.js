@@ -54,7 +54,6 @@ function renderDossierDetail(params) {
           <div class="meta"><p><strong>${esc(d.dossier_nummer)}</strong></p><p>Status: ${esc((d.status||'').replace('_',' '))}</p><p>Afgedrukt: ${new Date().toLocaleString('nl-NL')}</p></div>
         </div>
         <h2>Overzicht</h2>
-        ${d.foto_overledene_pad ? `<div class="dossier-foto"><img src="${esc(FotoOverledene.urlVoor(d.foto_overledene_pad))}" alt="Foto"></div>` : ''}
         <h3>Overledene</h3>
         <dl class="dl">
           ${dlRow('Naam', fullName(d))}
@@ -233,6 +232,16 @@ function renderDossierDetail(params) {
           </label>
           <button type="submit" class="btn">+ Uploaden</button>
         </form>
+        <div id="scan-preview" class="scan-preview" hidden>
+          <img id="scan-preview-img" alt="Scan-voorbeeld">
+          <div class="scan-preview-meta">
+            <strong>Scan klaar</strong>
+            <span class="muted small" id="scan-preview-info"></span>
+            <div class="scan-preview-actions">
+              <button type="button" class="btn btn-sm btn-ghost" id="scan-preview-clear">✕ Wis scan</button>
+            </div>
+          </div>
+        </div>
         <p class="muted small" style="margin-top:.35rem;">Tip: <strong>📸 Scan ID</strong> snijdt automatisch het document uit, zet het recht en corrigeert het perspectief — zoals een professionele scan-app.</p>
       </section>
 
@@ -651,17 +660,35 @@ function bindDetailEvents(id) {
         // Stel automatisch type in op identiteitsbewijs als nog niet ingevuld
         const typeSel = $('#add-doc select[name="type"]');
         if (typeSel && !typeSel.value) typeSel.value = 'identiteitsbewijs';
-        // Sluit loading-modal automatisch (door ander modal te tonen)
-        Modal.show({
-          type: 'success',
-          title: 'Scan gelukt',
-          message: 'De foto is uitgesneden en rechtgezet. Klik op "+ Uploaden" om hem op te slaan.',
-        });
+        // Toon preview
+        const prev = $('#scan-preview');
+        const img = $('#scan-preview-img');
+        const info = $('#scan-preview-info');
+        if (img._objectUrl) URL.revokeObjectURL(img._objectUrl);
+        const url = URL.createObjectURL(scanned);
+        img._objectUrl = url;
+        img.src = url;
+        info.textContent = `${(scanned.size/1024).toFixed(0)} KB · klaar om te uploaden`;
+        prev.hidden = false;
+        // Geen success-modal; preview spreekt voor zich
       } catch (err) {
         Modal.show({ type: 'error', title: 'Scannen mislukt', message: err.message || String(err) });
       } finally {
         scanInput.value = ''; // reset zodat hetzelfde bestand opnieuw te kiezen is
       }
+    });
+  }
+
+  const scanClear = $('#scan-preview-clear');
+  if (scanClear) {
+    scanClear.addEventListener('click', () => {
+      const fileInp = $('#add-doc-file');
+      if (fileInp) fileInp.value = '';
+      const prev = $('#scan-preview');
+      const img = $('#scan-preview-img');
+      if (img._objectUrl) { URL.revokeObjectURL(img._objectUrl); img._objectUrl = null; }
+      img.removeAttribute('src');
+      prev.hidden = true;
     });
   }
 
