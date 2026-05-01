@@ -270,7 +270,7 @@ function emTable(rows) {
   </table>`;
 }
 function emH3(t) {
-  return `<h3 style="margin:18px 0 4px;font-family:Georgia,serif;font-size:15px;color:#6b1e2a;border-bottom:1px solid #e5e2da;padding-bottom:4px;">${esc(t)}</h3>`;
+  return `<h3 style="margin:18px 0 4px;font-family:inherit;font-size:15px;font-weight:600;color:#6b1e2a;border-bottom:1px solid #e5e2da;padding-bottom:4px;">${esc(t)}</h3>`;
 }
 
 function buildDossierEmail(d) {
