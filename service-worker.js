@@ -4,7 +4,7 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v22';
+const CACHE_VERSION = 'sok-uitvaart-v23';
 const SHELL = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ const SHELL = [
   './js/views-factuur.js',
   './js/app.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
 ];
 
 self.addEventListener('install', e => {

@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v22'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v23'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -35,6 +35,10 @@ const Settings = {
       { id: 'opdrachtgever',   label: 'Handtekening opdrachtgever',   required: true },
       { id: 'uitvaartleider',  label: 'Handtekening uitvaartleider',  required: true },
     ],
+    // EmailJS-koppeling voor auto-versturen
+    emailjs_public_key: '',
+    emailjs_service_id: '',
+    emailjs_template_id: '',
     // Verzekeringsmaatschappijen (datalist in intake)
     verzekering_maatschappijen: [
       'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema', 'Klooster eigen polis',
@@ -370,6 +374,27 @@ if ('serviceWorker' in navigator) {
       console.warn('Service worker registratie mislukt:', err));
   });
 }
+
+// ─── E-mail-service (EmailJS) ───────────────────────────────────────────────
+const EmailService = {
+  isConfigured() {
+    const s = Settings.all();
+    return !!(s.emailjs_public_key && s.emailjs_service_id && s.emailjs_template_id);
+  },
+  async send(toEmail, subject, message) {
+    if (!EmailService.isConfigured()) throw new Error('E-mail-koppeling niet ingesteld in Account.');
+    if (!window.emailjs) throw new Error('E-mail-bibliotheek niet geladen — controleer internet.');
+    const s = Settings.all();
+    emailjs.init({ publicKey: s.emailjs_public_key });
+    return emailjs.send(s.emailjs_service_id, s.emailjs_template_id, {
+      to_email: toEmail,
+      subject: subject,
+      message: message,
+      from_name: s.app_name || 'Uitvaartleider',
+      reply_to: '',
+    });
+  },
+};
 
 // ─── Update-check (handmatig vanuit Account) ────────────────────────────────
 const Updater = {

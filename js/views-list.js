@@ -196,6 +196,50 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="email-instellingen">
+        <h2>E-mail verzenden (automatisch)</h2>
+        <p class="muted small">
+          Standaard openen de e-mail-knoppen je mail-app met de tekst klaar.
+          Wil je dat de app de e-mail <strong>direct verstuurt</strong> (geen mail-app nodig),
+          koppel dan een gratis EmailJS-account.
+        </p>
+
+        <details style="margin: .5rem 0 1rem;">
+          <summary style="cursor:pointer; font-weight:600;">Eenmalige setup (5 minuten) — klik voor instructies</summary>
+          <ol class="muted small" style="padding-left:1.5rem; line-height:1.55; margin-top:.5rem;">
+            <li>Maak een gratis account op <a href="https://emailjs.com" target="_blank" rel="noopener">emailjs.com</a> (200 mails/maand gratis)</li>
+            <li>In <strong>Email Services</strong>: voeg je Gmail of Outlook toe en klik <em>Connect Account</em>. Onthoud de <strong>Service ID</strong> (begint met <code>service_</code>)</li>
+            <li>In <strong>Email Templates</strong>: maak een nieuw template aan
+              <ul>
+                <li>To Email: <code>{{to_email}}</code></li>
+                <li>From Name: <code>{{from_name}}</code></li>
+                <li>Subject: <code>{{subject}}</code></li>
+                <li>Content: <code>{{message}}</code></li>
+              </ul>
+              Sla op en onthoud de <strong>Template ID</strong> (begint met <code>template_</code>)
+            </li>
+            <li>In <strong>Account → General</strong>: kopieer je <strong>Public Key</strong></li>
+            <li>Plak alle drie hieronder en klik <em>Test verzenden</em></li>
+          </ol>
+        </details>
+
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="email-form" class="form" autocomplete="off">
+            <label><span>EmailJS Public Key</span><input type="text" name="emailjs_public_key" value="${esc(s.emailjs_public_key)}" placeholder="bv. xK_abc123..."></label>
+            <label><span>EmailJS Service ID</span><input type="text" name="emailjs_service_id" value="${esc(s.emailjs_service_id)}" placeholder="bv. service_abc123"></label>
+            <label><span>EmailJS Template ID</span><input type="text" name="emailjs_template_id" value="${esc(s.emailjs_template_id)}" placeholder="bv. template_abc123"></label>
+            <label><span>Test-e-mailadres (voor verificatie)</span><input type="email" name="email_test_to" placeholder="bv. je eigen e-mail"></label>
+            <div id="email-test-result"></div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-email-test">Test verzenden</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="verzekeringen">
         <h2>Verzekeringsmaatschappijen &amp; pakketten</h2>
         <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is.</p>
@@ -460,6 +504,48 @@ function renderAccount(msg) {
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
+    });
+  }
+
+  // EmailJS-instellingen
+  const emailForm = $('#email-form');
+  if (emailForm) {
+    emailForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        emailjs_public_key: f.emailjs_public_key.value.trim(),
+        emailjs_service_id: f.emailjs_service_id.value.trim(),
+        emailjs_template_id: f.emailjs_template_id.value.trim(),
+      });
+      renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
+    });
+
+    $('#btn-email-test').addEventListener('click', async () => {
+      const f = emailForm;
+      const to = f.email_test_to.value.trim();
+      const result = $('#email-test-result');
+      result.innerHTML = '';
+      if (!to) { result.innerHTML = '<div class="alert alert-error">Vul eerst een test-e-mailadres in.</div>'; return; }
+      // Tijdelijk toepassen wat in het formulier staat (zonder eerst opslaan)
+      Settings.set({
+        emailjs_public_key: f.emailjs_public_key.value.trim(),
+        emailjs_service_id: f.emailjs_service_id.value.trim(),
+        emailjs_template_id: f.emailjs_template_id.value.trim(),
+      });
+      const btn = $('#btn-email-test');
+      btn.disabled = true; const orig = btn.textContent;
+      btn.textContent = 'Bezig met verzenden...';
+      try {
+        await EmailService.send(to,
+          'Test — ' + (Settings.get('app_name') || 'Uitvaartbeheer'),
+          'Dit is een test-e-mail vanuit je Uitvaartbeheer-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
+        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Check de inbox (en spam-map).</div>`;
+      } catch (e) {
+        result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.text ? e.text : (e.message || String(e)))}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = orig;
+      }
     });
   }
 

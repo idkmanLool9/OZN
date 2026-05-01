@@ -389,13 +389,44 @@ function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
 
+  async function sendOrFallback(btn, toEmail, subject, body) {
+    if (!toEmail) {
+      Modal.show({ type: 'warning', title: 'Geen e-mailadres',
+        message: 'De contactpersoon heeft nog geen e-mailadres in dit dossier. Vul het in via "Bewerken".' });
+      return;
+    }
+    if (!EmailService.isConfigured()) {
+      // Niet ingesteld — fallback: open mailclient
+      Modal.show({
+        type: 'info',
+        title: 'E-mail-koppeling niet ingesteld',
+        message: 'Stel EmailJS in via Account → E-mail verzenden om automatisch te versturen. Voor nu open ik je mail-app met de tekst klaar.',
+      }).then(() => openMailto(toEmail, subject, body));
+      return;
+    }
+    if (!confirm(`E-mail versturen naar ${toEmail}?`)) return;
+    btn.disabled = true; const orig = btn.textContent;
+    btn.textContent = 'Bezig met verzenden...';
+    try {
+      await EmailService.send(toEmail, subject, body);
+      Modal.show({ type: 'success', title: 'E-mail verzonden',
+        message: `Verstuurd naar ${toEmail}.` });
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'Verzenden mislukt',
+        message: (e && e.text) ? e.text : (e.message || String(e)) });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  }
+
   const emailDosBtn = $('#btn-email-dossier');
   if (emailDosBtn) {
     emailDosBtn.addEventListener('click', () => {
       const d = DB.byId(KEYS.DOSSIERS, id); if (!d) return;
       const subj = `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim();
       const body = buildDossierEmail(d);
-      openMailto(d.contact_email, subj, body);
+      sendOrFallback(emailDosBtn, d.contact_email, subj, body);
     });
   }
   const emailFactBtn = $('#btn-email-factuur');
@@ -405,7 +436,7 @@ function bindDetailEvents(id) {
       const ks = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
       const subj = `Factuur uitvaart ${d.dossier_nummer} — ${fullName(d) || ''}`.trim();
       const body = buildFactuurEmail(d, ks);
-      openMailto(d.contact_email, subj, body);
+      sendOrFallback(emailFactBtn, d.contact_email, subj, body);
     });
   }
   const copyBtn = $('#btn-copy-nr');
