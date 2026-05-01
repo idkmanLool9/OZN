@@ -123,6 +123,10 @@ const DB = {
     cleanEmpty(row);
     const { data, error } = await sb.from(tbl).insert(row).select().single();
     if (error) {
+      if (isStaleReferenceError(error)) {
+        await handleStaleCache();
+        throw error;
+      }
       Modal.show({ type: 'error', title: 'Opslaan mislukt', message: error.message });
       throw error;
     }
@@ -144,6 +148,10 @@ const DB = {
     cleanEmpty(p);
     const { data, error } = await sb.from(tbl).update(p).eq('id', id).select().single();
     if (error) {
+      if (isStaleReferenceError(error)) {
+        await handleStaleCache();
+        throw error;
+      }
       Modal.show({ type: 'error', title: 'Bijwerken mislukt', message: error.message });
       throw error;
     }
@@ -191,6 +199,28 @@ function cleanEmpty(obj) {
   for (const k in obj) {
     if (obj[k] === '' || obj[k] === undefined) obj[k] = null;
   }
+}
+
+// Detecteert FK-violation of dossier-niet-gevonden errors
+function isStaleReferenceError(err) {
+  if (!err) return false;
+  const code = err.code || '';
+  const msg = (err.message || '').toLowerCase();
+  // Postgres FK-violation = 23503 ; ook 'PGRST...' codes voor row-not-found
+  return code === '23503' ||
+         msg.includes('violates foreign key') ||
+         msg.includes('not found in') ||
+         msg.includes('jsonb_object_field');
+}
+
+// Cache opnieuw laden + duidelijke uitleg aan de gebruiker
+async function handleStaleCache() {
+  try { await Cloud.loadAll(); } catch (_) {}
+  Modal.show({
+    type: 'warning',
+    title: 'Gegevens waren verouderd',
+    message: 'Je lokale kopie liep niet meer synchroon met de cloud. Alles is nu opnieuw geladen — open het dossier opnieuw via "Dossiers" en probeer het nog een keer.',
+  });
 }
 
 // ─── Storage (documenten-uploads, privé) ────────────────────────────────────
