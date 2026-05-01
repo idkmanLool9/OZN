@@ -129,7 +129,7 @@ function kistSVG(materiaal) {
     </svg>`;
 }
 
-const STANDAARD_TAKEN = [
+const STANDAARD_TAKEN_GEMEEN = [
   'Familie informeren en intake afnemen',
   'Overlijdensakte opvragen bij gemeente',
   'Parochie en priester aanstellen',
@@ -144,7 +144,28 @@ const STANDAARD_TAKEN = [
   'Avondwake / huisbezoek inplannen',
   'Condoleance en catering organiseren',
   'Aangifte bij Burgerzaken',
-  'Verzekering aanmelden',
+];
+
+const STANDAARD_TAKEN_MET_VERZEKERING = [
+  ...STANDAARD_TAKEN_GEMEEN,
+  'Polis controleren bij verzekeraar',
+  'Declaratie / aanmelding indienen',
+  'Akkoord en pakketinhoud bevestigen',
+  'Meerprijs met familie afstemmen indien dekking onvoldoende',
+];
+
+const STANDAARD_TAKEN_ZONDER_VERZEKERING = [
+  ...STANDAARD_TAKEN_GEMEEN,
+  'Budget bespreken met familie',
+  'Aanbetaling vragen vóór de uitvaart',
+  'Eindfactuur opstellen',
+  'Eindbetaling ontvangen / voldaan',
+];
+
+// Backwards compat: oude lijst gebruikt voor onbekende status (pre-bestaande dossiers)
+const STANDAARD_TAKEN = [
+  ...STANDAARD_TAKEN_GEMEEN,
+  'Verzekering / financiële afhandeling regelen',
   'Eindafrekening opstellen',
 ];
 
@@ -163,6 +184,11 @@ const DOSSIER_VELDEN = [
   'kist_type','rouwauto','aantal_volgauto','dragers','bloemstukken',
   'rouwkaarten_aantal','condoleance_locatie','catering',
   'verzekering_status','verzekering_maatschappij','polisnummer',
+  'verzekering_polishouder','verzekering_dekking','verzekering_pakket',
+  'verzekering_aanmelding_status','verzekering_contact_naam','verzekering_contact_telefoon',
+  'betaalwijze','aanbetaling_bedrag','aanbetaling_datum',
+  'eindafrekening_bedrag','eindafrekening_status','betalingstermijn',
+  'verantwoordelijke_persoon',
   'opdrachtgever_naam','opdrachtgever_telefoon',
   'bijzonderheden','status'
 ];

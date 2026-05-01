@@ -11,6 +11,9 @@ function renderDossierDetail(params) {
   const documenten = DB.where(KEYS.DOCUMENTEN, doc => doc.dossier_id === id).sort((a, b) => (b.geupload_op || '').localeCompare(a.geupload_op || ''));
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const verzekerd = d.verzekering_status === 'met verzekering';
+  const gedektTotaal = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const familieTotaal = totaal - gedektTotaal;
 
   $('#view').innerHTML = `
     <div class="page">
@@ -96,13 +99,28 @@ function renderDossierDetail(params) {
           ${dlRow('Condoleance', d.condoleance_locatie)}
           ${dlRow('Eten & drinken', d.catering ? edRowValue(d.catering) : '')}
         </dl>
-        <h3>Verzekering & opdrachtgever</h3>
+        <h3>Verzekering & betaling</h3>
         <dl class="dl">
-          ${dlRow('Verzekering', d.verzekering_status)}
-          ${dlRow('Maatschappij', d.verzekering_maatschappij)}
-          ${dlRow('Polisnummer', d.polisnummer)}
+          ${dlRow('Status', d.verzekering_status)}
+          ${d.verzekering_status === 'met verzekering' ? `
+            ${dlRow('Maatschappij', d.verzekering_maatschappij)}
+            ${dlRow('Polisnummer', d.polisnummer)}
+            ${dlRow('Polishouder', d.verzekering_polishouder)}
+            ${dlRow('Dekkingsbedrag', d.verzekering_dekking ? fmtEUR(d.verzekering_dekking) : '')}
+            ${dlRow('Pakket', d.verzekering_pakket)}
+            ${dlRow('Aanmelding-status', d.verzekering_aanmelding_status)}
+            ${dlRow('Contactpersoon', d.verzekering_contact_naam)}
+            ${dlRow('Telefoon contact', d.verzekering_contact_telefoon)}
+          ` : ''}
+          ${d.verzekering_status === 'zonder verzekering' ? `
+            ${dlRow('Betaalwijze', d.betaalwijze)}
+            ${dlRow('Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : '')}
+            ${dlRow('Eindafrekening', d.eindafrekening_bedrag ? fmtEUR(d.eindafrekening_bedrag) + (d.eindafrekening_status ? ' (' + d.eindafrekening_status + ')' : '') : '')}
+            ${dlRow('Betalingstermijn', d.betalingstermijn)}
+            ${dlRow('Verantwoordelijke', d.verantwoordelijke_persoon)}
+          ` : ''}
           ${dlRow('Opdrachtgever', d.opdrachtgever_naam)}
-          ${dlRow('Telefoon', d.opdrachtgever_telefoon)}
+          ${dlRow('Telefoon opdrachtgever', d.opdrachtgever_telefoon)}
         </dl>
         ${d.bijzonderheden ? `<h3>Bijzonderheden</h3><p class="prewrap">${esc(d.bijzonderheden)}</p>` : ''}
 
@@ -147,17 +165,29 @@ function renderDossierDetail(params) {
       </section>
 
       <section id="kosten" class="card">
-        <h2>Kosten</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
+          <h2 style="border:none;padding:0;margin:0;">Kosten</h2>
+          ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm">📄 Factuur openen</a>` : ''}
+        </div>
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' :
-          `<table class="table"><thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th><th>Betaald</th><th></th></tr></thead><tbody>
+          `<table class="table"><thead><tr>
+            <th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th>
+            ${verzekerd ? '<th>Gedekt</th>' : ''}
+            <th>Betaald</th><th></th>
+          </tr></thead><tbody>
             ${kosten.map(k => `<tr>
               <td>${esc(k.omschrijving)}</td>
               <td>${esc(k.categorie || '—')}</td>
               <td class="num">${fmtEUR(k.bedrag)}</td>
+              ${verzekerd ? `<td><button type="button" class="check small" data-action="toggle-gedekt" data-id="${k.id}" title="gedekt door verzekering">${k.gedekt ? '✓' : '○'}</button></td>` : ''}
               <td><button type="button" class="check small" data-action="toggle-kosten" data-id="${k.id}">${k.betaald ? '✓' : '○'}</button></td>
               <td><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}">×</button></td>
             </tr>`).join('')}
-            <tr class="total-row"><td colspan="2"><strong>Totaal</strong></td><td class="num"><strong>${fmtEUR(totaal)}</strong></td><td colspan="2" class="muted small">waarvan betaald: ${fmtEUR(betaald)}</td></tr>
+            <tr class="total-row"><td colspan="2"><strong>Totaal</strong></td><td class="num"><strong>${fmtEUR(totaal)}</strong></td><td colspan="${verzekerd ? 3 : 2}" class="muted small">waarvan betaald: ${fmtEUR(betaald)}</td></tr>
+            ${verzekerd ? `
+              <tr><td colspan="2" class="muted small">Gedekt door verzekering</td><td class="num muted small">${fmtEUR(gedektTotaal)}</td><td colspan="3"></td></tr>
+              <tr><td colspan="2"><strong>Door familie te betalen</strong></td><td class="num"><strong style="color:var(--primary);">${fmtEUR(familieTotaal)}</strong></td><td colspan="3"></td></tr>
+            ` : ''}
           </tbody></table>`}
         <h3 style="margin-top:1rem;">Snel toevoegen uit catalogus</h3>
         <p class="muted small">Klik om een vast tarief direct toe te voegen.</p>
@@ -377,6 +407,10 @@ function bindDetailEvents(id) {
       } else if (action === 'toggle-kosten') {
         const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
         await DB.update(KEYS.KOSTEN, tid, { betaald: !k.betaald });
+        await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'toggle-gedekt') {
+        const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
+        await DB.update(KEYS.KOSTEN, tid, { gedekt: !k.gedekt });
         await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'del-kosten') {
         if (!confirm('Kostenpost verwijderen?')) return;

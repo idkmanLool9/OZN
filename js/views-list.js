@@ -172,6 +172,27 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="verzekeringen">
+        <h2>Verzekeringsmaatschappijen &amp; pakketten</h2>
+        <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is.</p>
+        ${(() => {
+          const ms = Settings.get('verzekering_maatschappijen') || [];
+          const pk = Settings.get('verzekering_pakketten') || [];
+          return `
+          <form id="verz-form" class="form" autocomplete="off">
+            <label><span>Maatschappijen (één per regel)</span>
+              <textarea name="maatschappijen" rows="6" placeholder="DELA&#10;Monuta&#10;...">${esc(ms.join('\n'))}</textarea>
+            </label>
+            <label><span>Pakket-uitvoeringen (één per regel)</span>
+              <textarea name="pakketten" rows="4" placeholder="Standaard pakket&#10;Vrije keuze&#10;...">${esc(pk.join('\n'))}</textarea>
+            </label>
+            <div class="form-actions" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="handtekeningen">
         <h2>Handtekening-velden</h2>
         <p class="muted small">Bepaal welke handtekeningen worden gevraagd bij het aanmaken/bewerken van een dossier. Verplichte velden moeten ingevuld zijn voor opslaan.</p>
@@ -407,6 +428,21 @@ function renderAccount(msg) {
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
+    });
+  }
+
+  // Verzekeringsmaatschappijen + pakketten beheer
+  const verzForm = $('#verz-form');
+  if (verzForm) {
+    verzForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const parseList = txt => txt.split('\n').map(s => s.trim()).filter(Boolean);
+      Settings.set({
+        verzekering_maatschappijen: parseList(f.maatschappijen.value),
+        verzekering_pakketten: parseList(f.pakketten.value),
+      });
+      renderAccount({ success: 'Verzekeringslijsten opgeslagen.' });
     });
   }
 

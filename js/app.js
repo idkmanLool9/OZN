@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v17'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v18'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -33,6 +33,14 @@ const Settings = {
     signature_fields: [
       { id: 'opdrachtgever',   label: 'Handtekening opdrachtgever',   required: true },
       { id: 'uitvaartleider',  label: 'Handtekening uitvaartleider',  required: true },
+    ],
+    // Verzekeringsmaatschappijen (datalist in intake)
+    verzekering_maatschappijen: [
+      'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema', 'Klooster eigen polis',
+    ],
+    // Pakket-uitvoeringen
+    verzekering_pakketten: [
+      'Standaard pakket', 'Uitgebreid pakket', 'Vrije keuze', 'Maatwerk',
     ],
   },
   // Synchrone read uit cache + lokale spiegel
@@ -377,6 +385,7 @@ Router.add('/dossiers', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
+Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
 Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());

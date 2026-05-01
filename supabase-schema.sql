@@ -55,6 +55,29 @@ CREATE TABLE IF NOT EXISTS public.dossiers (
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS handtekeningen JSONB DEFAULT '{}'::jsonb;
 
+-- Verzekering-uitbreiding (alleen relevant bij 'met verzekering')
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS verzekering_polishouder TEXT,
+  ADD COLUMN IF NOT EXISTS verzekering_dekking NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS verzekering_pakket TEXT,
+  ADD COLUMN IF NOT EXISTS verzekering_aanmelding_status TEXT,
+  ADD COLUMN IF NOT EXISTS verzekering_contact_naam TEXT,
+  ADD COLUMN IF NOT EXISTS verzekering_contact_telefoon TEXT;
+
+-- Betaling (alleen relevant bij 'zonder verzekering')
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS betaalwijze TEXT,
+  ADD COLUMN IF NOT EXISTS aanbetaling_bedrag NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS aanbetaling_datum DATE,
+  ADD COLUMN IF NOT EXISTS eindafrekening_bedrag NUMERIC(10,2),
+  ADD COLUMN IF NOT EXISTS eindafrekening_status TEXT,
+  ADD COLUMN IF NOT EXISTS betalingstermijn TEXT,
+  ADD COLUMN IF NOT EXISTS verantwoordelijke_persoon TEXT;
+
+-- Kosten: 'gedekt door verzekering' markering
+ALTER TABLE public.kosten
+  ADD COLUMN IF NOT EXISTS gedekt BOOLEAN DEFAULT false;
+
 CREATE TABLE IF NOT EXISTS public.taken (
   id BIGSERIAL PRIMARY KEY,
   dossier_id BIGINT NOT NULL REFERENCES public.dossiers(id) ON DELETE CASCADE,
