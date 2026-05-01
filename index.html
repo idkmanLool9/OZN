@@ -74,28 +74,52 @@
   </div>
 
   <!-- Login -->
-  <section id="login-screen" class="login-body" hidden>
-    <div class="login-card">
-      <div class="login-header">
-        <div class="brand-mark big">✝</div>
-        <h1>Uitvaartbeheer</h1>
-        <p>Syrisch-Orthodoxe Kerk van Antiochië</p>
-        <p class="muted small">Intern systeem · alleen voor de uitvaartleider</p>
+  <section id="login-screen" class="login-screen" hidden>
+    <aside class="login-brand">
+      <div class="login-brand-inner">
+        <div class="login-brand-head">
+          <div class="brand-mark big" id="login-logo">✝</div>
+          <div class="login-brand-name">
+            <strong id="login-app-name">Uitvaartbeheer</strong>
+            <span id="login-app-tagline">Syrisch-Orthodoxe Kerk van Antiochië</span>
+          </div>
+        </div>
+        <div class="login-brand-body">
+          <h1 id="login-brand-title">Welkom terug</h1>
+          <p id="login-brand-subtitle">Beheer dossiers, kosten, documenten en facturen — alles op één plek.</p>
+          <ul class="login-brand-features" id="login-brand-features"></ul>
+        </div>
+        <p class="login-brand-foot" id="login-brand-foot">© Syrisch-Orthodoxe parochies</p>
       </div>
-      <div id="login-error" class="alert alert-error" hidden></div>
-      <form id="login-form" class="form" autocomplete="on">
-        <label>
-          <span>E-mailadres</span>
-          <input type="email" name="email" id="login-username" autocomplete="username" autofocus required />
-        </label>
-        <label>
-          <span>Wachtwoord</span>
-          <input type="password" name="password" id="login-password" autocomplete="current-password" required />
-        </label>
-        <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
-      </form>
-      <p class="muted small center">Toegang uitsluitend voor bevoegd personeel.</p>
-    </div>
+      <span class="login-brand-orb login-brand-orb-1" aria-hidden="true"></span>
+      <span class="login-brand-orb login-brand-orb-2" aria-hidden="true"></span>
+    </aside>
+
+    <main class="login-form-pane">
+      <div class="login-form-wrap">
+        <h2 id="login-form-title">Inloggen</h2>
+        <p class="login-form-sub" id="login-form-subtitle">Voer uw e-mailadres en wachtwoord in om door te gaan.</p>
+        <div id="login-error" class="alert alert-error" hidden></div>
+        <form id="login-form" class="form" autocomplete="on">
+          <label>
+            <span>E-mailadres</span>
+            <input type="email" name="email" id="login-username" autocomplete="username" placeholder="naam@parochie.nl" autofocus required />
+          </label>
+          <label>
+            <span>Wachtwoord</span>
+            <input type="password" name="password" id="login-password" autocomplete="current-password" required />
+          </label>
+          <div class="login-actions">
+            <button type="submit" class="btn btn-primary btn-block">Inloggen</button>
+            <button type="button" class="btn btn-ghost" id="login-clear" title="Velden wissen">Wis</button>
+          </div>
+        </form>
+        <div class="login-form-foot">
+          <a href="#" id="login-forgot">Wachtwoord vergeten?</a>
+          <span class="muted small" id="login-secretariaat">Geen account? Vraag het secretariaat.</span>
+        </div>
+      </div>
+    </main>
   </section>
 
   <!-- App -->

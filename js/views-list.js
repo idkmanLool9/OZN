@@ -168,6 +168,52 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="login-instellingen">
+        <h2>Loginscherm</h2>
+        <p class="muted small">Pas de teksten en bullet-points aan die te zien zijn op het inlog-scherm. De achtergrondkleur volgt automatisch de hoofdkleur uit Branding.</p>
+        ${(() => {
+          const s = Settings.all();
+          const feats = Array.isArray(s.login_brand_features) ? s.login_brand_features : [];
+          return `
+          <form id="login-form-settings" class="form" autocomplete="off">
+            <label>
+              <span>Titel (links, groot)</span>
+              <input type="text" name="login_brand_title" value="${esc(s.login_brand_title)}" maxlength="80">
+            </label>
+            <label>
+              <span>Onderschrift (links, onder titel)</span>
+              <textarea name="login_brand_subtitle" rows="2" maxlength="280">${esc(s.login_brand_subtitle)}</textarea>
+            </label>
+            <label>
+              <span>Bullet-points (links — één per regel)</span>
+              <textarea name="login_brand_features" rows="5" placeholder="Eén regel = één bullet">${esc(feats.join('\n'))}</textarea>
+              <span class="muted small">Lege regels worden overgeslagen. Gebruik voor productkenmerken, voordelen, korte beloftes.</span>
+            </label>
+            <label>
+              <span>Voettekst (links, klein)</span>
+              <input type="text" name="login_brand_foot" value="${esc(s.login_brand_foot)}" maxlength="120">
+            </label>
+            <hr style="border:none;border-top:1px solid var(--border);margin:.25rem 0;">
+            <label>
+              <span>Form-titel (rechts)</span>
+              <input type="text" name="login_form_title" value="${esc(s.login_form_title)}" maxlength="40">
+            </label>
+            <label>
+              <span>Form-ondertitel (rechts, onder titel)</span>
+              <input type="text" name="login_form_subtitle" value="${esc(s.login_form_subtitle)}" maxlength="200">
+            </label>
+            <label>
+              <span>Account-aanvraag-tekst (onderin het form)</span>
+              <input type="text" name="login_secretariaat_text" value="${esc(s.login_secretariaat_text)}" maxlength="160">
+            </label>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-reset-login">Standaardwaarden</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow">
         <h2>Weergave</h2>
         ${(() => {
@@ -493,6 +539,41 @@ function renderAccount(msg) {
       });
       Branding.apply();
       renderAccount({ success: 'Standaard branding hersteld.' });
+    });
+  }
+
+  // Login-scherm-instellingen
+  const loginForm = $('#login-form-settings');
+  if (loginForm) {
+    const parseLines = txt => txt.split('\n').map(s => s.trim()).filter(Boolean);
+    loginForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        login_brand_title:    f.login_brand_title.value.trim()    || Settings.defaults.login_brand_title,
+        login_brand_subtitle: f.login_brand_subtitle.value.trim() || Settings.defaults.login_brand_subtitle,
+        login_brand_features: parseLines(f.login_brand_features.value),
+        login_brand_foot:     f.login_brand_foot.value.trim()     || Settings.defaults.login_brand_foot,
+        login_form_title:     f.login_form_title.value.trim()     || Settings.defaults.login_form_title,
+        login_form_subtitle:  f.login_form_subtitle.value.trim()  || Settings.defaults.login_form_subtitle,
+        login_secretariaat_text: f.login_secretariaat_text.value.trim() || Settings.defaults.login_secretariaat_text,
+      });
+      Branding.apply();
+      renderAccount({ success: 'Loginscherm-teksten opgeslagen.' });
+    });
+    $('#btn-reset-login').addEventListener('click', () => {
+      if (!confirm('Loginscherm-teksten terugzetten naar standaard?')) return;
+      Settings.set({
+        login_brand_title:    Settings.defaults.login_brand_title,
+        login_brand_subtitle: Settings.defaults.login_brand_subtitle,
+        login_brand_features: Settings.defaults.login_brand_features,
+        login_brand_foot:     Settings.defaults.login_brand_foot,
+        login_form_title:     Settings.defaults.login_form_title,
+        login_form_subtitle:  Settings.defaults.login_form_subtitle,
+        login_secretariaat_text: Settings.defaults.login_secretariaat_text,
+      });
+      Branding.apply();
+      renderAccount({ success: 'Standaardwaarden hersteld.' });
     });
   }
 

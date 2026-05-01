@@ -1,7 +1,7 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v32'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
-const APP_BUILD_DATE = '2026-04-30';
+const APP_VERSION = 'v33'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_BUILD_DATE = '2026-05-01';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -39,6 +39,19 @@ const Settings = {
     emailjs_public_key: '',
     emailjs_service_id: '',
     emailjs_template_id: '',
+    // Login-scherm teksten (split-screen)
+    login_brand_title: 'Welkom terug',
+    login_brand_subtitle: 'Beheer dossiers, kosten, documenten en facturen — alles op één plek.',
+    login_brand_features: [
+      'Dossiers met taken, kosten en documenten',
+      'Automatische ID-kaart-scan met perspectief-correctie',
+      'Digitale handtekeningen + e-mail-verzending',
+      'Versleutelde sessie · automatische uitlog',
+    ],
+    login_brand_foot: '© Syrisch-Orthodoxe parochies',
+    login_form_title: 'Inloggen',
+    login_form_subtitle: 'Voer uw e-mailadres en wachtwoord in om door te gaan.',
+    login_secretariaat_text: 'Geen account? Vraag het secretariaat.',
     // Verzekeringsmaatschappijen (datalist in intake)
     verzekering_maatschappijen: [
       'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema', 'Klooster eigen polis',
@@ -179,8 +192,25 @@ const Branding = {
     // Tekst overal
     document.querySelectorAll('.brand-text strong').forEach(el => el.textContent = s.app_name);
     document.querySelectorAll('.brand-text small').forEach(el => el.textContent = s.app_tagline);
-    document.querySelectorAll('.login-header h1').forEach(el => el.textContent = s.app_name);
-    document.querySelectorAll('.login-header p:first-of-type').forEach(el => el.textContent = s.app_tagline);
+
+    // Login-scherm
+    const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setText('login-app-name', s.app_name);
+    setText('login-app-tagline', s.app_tagline);
+    setText('login-brand-title', s.login_brand_title);
+    setText('login-brand-subtitle', s.login_brand_subtitle);
+    setText('login-form-title', s.login_form_title);
+    setText('login-form-subtitle', s.login_form_subtitle);
+    setText('login-secretariaat', s.login_secretariaat_text);
+    setText('login-brand-foot', s.login_brand_foot);
+    const featUl = document.getElementById('login-brand-features');
+    if (featUl) {
+      const items = Array.isArray(s.login_brand_features) ? s.login_brand_features : [];
+      featUl.innerHTML = items.filter(Boolean).map(t => {
+        const safe = String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        return `<li>${safe}</li>`;
+      }).join('');
+    }
 
     // Document-titel
     document.title = `${s.app_name} · ${s.app_tagline}`;
@@ -528,6 +558,38 @@ Router.add('/account', () => renderAccount());
   // Offline: blijft staan tot de gebruiker op "Verder" klikt.
   if (splashOn && navigator.onLine && !Cloud.offline) {
     Splash.autoDismiss();
+  }
+
+  const clearBtn = document.getElementById('login-clear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      document.getElementById('login-username').value = '';
+      document.getElementById('login-password').value = '';
+      const errEl = document.getElementById('login-error');
+      if (errEl) errEl.hidden = true;
+      document.getElementById('login-username').focus();
+    });
+  }
+
+  const forgot = document.getElementById('login-forgot');
+  if (forgot) {
+    forgot.addEventListener('click', async e => {
+      e.preventDefault();
+      const def = document.getElementById('login-username').value.trim();
+      const email = prompt('Vul je e-mailadres in om een herstel-link te ontvangen:', def);
+      if (!email) return;
+      try {
+        const { error } = await sb.auth.resetPasswordForEmail(email.trim(), {
+          redirectTo: location.origin + location.pathname,
+        });
+        if (error) throw error;
+        Modal.show({ type: 'success', title: 'Herstel-link verstuurd',
+          message: `We hebben een wachtwoord-herstel-link gestuurd naar ${email}. Check je inbox (en spam-map).` });
+      } catch (err) {
+        Modal.show({ type: 'error', title: 'Verzenden mislukt',
+          message: err.message || String(err) });
+      }
+    });
   }
 
   document.getElementById('login-form').addEventListener('submit', async e => {
