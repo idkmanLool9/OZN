@@ -244,6 +244,100 @@ const Router = {
   },
 };
 
+// ─── DocumentScanner: auto-crop, perspective-correctie en deskew via jscanify ──
+// Gebruikt jscanify (CDN) dat OpenCV.js dynamisch laadt. Bij eerste scan wordt
+// OpenCV ingeladen (~7MB), daarna gecached door de service-worker.
+const DocumentScanner = {
+  _ready: false,
+  _opencvLoaded: false,
+  _initPromise: null,
+
+  async _loadOpenCV() {
+    if (window.cv && window.cv.Mat) { this._opencvLoaded = true; return; }
+    return new Promise((resolve, reject) => {
+      if (document.getElementById('opencv-script')) {
+        const t = setInterval(() => {
+          if (window.cv && window.cv.Mat) { clearInterval(t); this._opencvLoaded = true; resolve(); }
+        }, 100);
+        return;
+      }
+      const s = document.createElement('script');
+      s.id = 'opencv-script';
+      s.async = true;
+      s.src = 'https://docs.opencv.org/4.10.0/opencv.js';
+      s.onload = () => {
+        if (window.cv && window.cv.then) {
+          window.cv.then(() => { this._opencvLoaded = true; resolve(); });
+        } else {
+          // Wacht tot cv.Mat beschikbaar is
+          const t = setInterval(() => {
+            if (window.cv && window.cv.Mat) { clearInterval(t); this._opencvLoaded = true; resolve(); }
+          }, 100);
+        }
+      };
+      s.onerror = () => reject(new Error('OpenCV.js kon niet worden geladen'));
+      document.head.appendChild(s);
+    });
+  },
+
+  async init() {
+    if (this._ready) return;
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      if (typeof jscanify === 'undefined') {
+        throw new Error('jscanify-bibliotheek niet geladen');
+      }
+      await this._loadOpenCV();
+      this._ready = true;
+    })();
+    return this._initPromise;
+  },
+
+  // Verwerk een afbeelding-bestand: return Blob met gecropte/rechtgezette versie
+  async scan(file) {
+    await this.init();
+    const img = await this._fileToImage(file);
+    const scanner = new jscanify();
+    const tmp = document.createElement('canvas');
+    tmp.width = img.naturalWidth || img.width;
+    tmp.height = img.naturalHeight || img.height;
+    tmp.getContext('2d').drawImage(img, 0, 0);
+
+    let result;
+    try {
+      // Bepaal output-grootte op basis van langste kant — max ~1800 px
+      const maxDim = 1800;
+      const ratio = Math.min(maxDim / tmp.width, maxDim / tmp.height, 1);
+      const outW = Math.round(tmp.width * ratio);
+      const outH = Math.round(tmp.height * ratio);
+      result = scanner.extractPaper(tmp, outW, outH);
+    } catch (e) {
+      throw new Error('Geen document gedetecteerd. Probeer met meer contrast en zorg dat de hele rand zichtbaar is.');
+    }
+
+    return new Promise((resolve, reject) => {
+      result.toBlob(b => {
+        if (!b) return reject(new Error('Conversie naar afbeelding mislukt'));
+        resolve(new File([b], (file.name || 'scan').replace(/\.\w+$/, '') + '-scan.jpg', { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.9);
+    });
+  },
+
+  async _fileToImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      return await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+      });
+    } finally {
+      // URL.revokeObjectURL kan, maar de browser ruimt het op
+    }
+  },
+};
+
 // ─── SignaturePad: digitale handtekening op een canvas ─────────────────────
 class SignaturePad {
   constructor(canvas) {

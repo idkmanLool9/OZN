@@ -226,9 +226,14 @@ function renderDossierDetail(params) {
             <option value="verlof tot begraven">Verlof tot begraven</option>
             <option value="overig">Overig</option>
           </select>
-          <input type="file" name="bestand" accept="image/*,application/pdf" capture="environment" required>
+          <input type="file" name="bestand" id="add-doc-file" accept="image/*,application/pdf" capture="environment" required>
+          <label class="btn btn-ghost" title="Document/ID-kaart scannen met automatische uitsnijding en correctie" style="cursor:pointer;">
+            📸 Scan ID
+            <input type="file" id="scan-doc-file" accept="image/*" capture="environment" hidden>
+          </label>
           <button type="submit" class="btn">+ Uploaden</button>
         </form>
+        <p class="muted small" style="margin-top:.35rem;">Tip: <strong>📸 Scan ID</strong> snijdt automatisch het document uit, zet het recht en corrigeert het perspectief — zoals een professionele scan-app.</p>
       </section>
 
       <section id="notities" class="card">
@@ -619,6 +624,46 @@ function bindDetailEvents(id) {
       renderDossierDetail({ id });
     } catch (_) {}
   });
+
+  // Scan-knop: foto maken → auto-crop → in het bestandskeuze-veld zetten
+  const scanInput = $('#scan-doc-file');
+  if (scanInput) {
+    scanInput.addEventListener('change', async e => {
+      const file = e.target.files[0]; if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        Modal.show({ type: 'error', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen kunnen gescand worden.' });
+        return;
+      }
+      // Toon laad-modal terwijl OpenCV inlaadt en scan loopt
+      const loadingPromise = Modal.show({
+        type: 'info',
+        title: 'Bezig met scannen...',
+        message: 'De scan-bibliotheek wordt geladen en je foto wordt automatisch uitgesneden, rechtgezet en gecorrigeerd. Dit kan een paar seconden duren bij de eerste keer.',
+        confirmText: 'Annuleren',
+      });
+      try {
+        const scanned = await DocumentScanner.scan(file);
+        // Vervang het bestand in de upload-input
+        const dt = new DataTransfer();
+        dt.items.add(scanned);
+        const fileInp = $('#add-doc-file');
+        fileInp.files = dt.files;
+        // Stel automatisch type in op identiteitsbewijs als nog niet ingevuld
+        const typeSel = $('#add-doc select[name="type"]');
+        if (typeSel && !typeSel.value) typeSel.value = 'identiteitsbewijs';
+        // Sluit loading-modal automatisch (door ander modal te tonen)
+        Modal.show({
+          type: 'success',
+          title: 'Scan gelukt',
+          message: 'De foto is uitgesneden en rechtgezet. Klik op "+ Uploaden" om hem op te slaan.',
+        });
+      } catch (err) {
+        Modal.show({ type: 'error', title: 'Scannen mislukt', message: err.message || String(err) });
+      } finally {
+        scanInput.value = ''; // reset zodat hetzelfde bestand opnieuw te kiezen is
+      }
+    });
+  }
 
   $('#add-doc').addEventListener('submit', async e => {
     e.preventDefault();
