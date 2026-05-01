@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v19'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v20'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -370,6 +370,64 @@ if ('serviceWorker' in navigator) {
       console.warn('Service worker registratie mislukt:', err));
   });
 }
+
+// ─── Update-check (handmatig vanuit Account) ────────────────────────────────
+const Updater = {
+  async check() {
+    let remoteVersion = null;
+    try {
+      // Vraag app.js opnieuw op met cache-bypass om de versie te lezen
+      const r = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
+      const text = await r.text();
+      const m = text.match(/APP_VERSION\s*=\s*['"](v\d+)['"]/);
+      if (m) remoteVersion = m[1];
+    } catch (e) {
+      throw new Error('Kon servergegevens niet ophalen (offline?)');
+    }
+
+    let swUpdated = false;
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update();
+          if (reg.waiting) {
+            // Nieuwe SW staat te wachten — activeer 'm
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            swUpdated = true;
+          } else if (reg.installing) {
+            // Wordt nog geïnstalleerd — wacht totdat hij waiting wordt
+            await new Promise(resolve => {
+              const sw = reg.installing;
+              sw.addEventListener('statechange', () => {
+                if (sw.state === 'installed' && reg.waiting) {
+                  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  swUpdated = true;
+                  resolve();
+                } else if (sw.state === 'activated') {
+                  swUpdated = true;
+                  resolve();
+                }
+              });
+              setTimeout(resolve, 4000); // safety timeout
+            });
+          }
+        }
+      } catch (_) {}
+    }
+
+    return {
+      currentVersion: APP_VERSION,
+      remoteVersion,
+      hasUpdate: remoteVersion && remoteVersion !== APP_VERSION,
+      swUpdated,
+    };
+  },
+  reloadHard() {
+    // Pagina forceren te verversen (browser-cache laat al door network-first SW gaan)
+    location.reload();
+  },
+};
 
 function updateOfflineUI() {
   const offline = !navigator.onLine || !!Cloud.offline;

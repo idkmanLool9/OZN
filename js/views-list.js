@@ -66,6 +66,19 @@ function renderAccount(msg) {
     <div class="page">
       <div class="page-head"><h1>Mijn account</h1></div>
       <section class="card narrow">
+        <h2>App-versie &amp; updates</h2>
+        <dl class="dl">
+          <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
+          <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
+        </dl>
+        <div id="update-result"></div>
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button type="button" class="btn btn-primary" id="btn-check-update">Check op updates</button>
+        </div>
+        <p class="muted small" style="margin-top:.5rem;">Forceert een controle op een nieuwere versie en herlaadt de service-worker. Daarna automatisch verversen.</p>
+      </section>
+
+      <section class="card narrow">
         <h2>Gegevens</h2>
         <dl class="dl">
           <div><dt>E-mailadres</dt><dd>${esc(u.email)}</dd></div>
@@ -447,6 +460,33 @@ function renderAccount(msg) {
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
+    });
+  }
+
+  // Update-check
+  const updBtn = $('#btn-check-update');
+  if (updBtn) {
+    updBtn.addEventListener('click', async () => {
+      const result = $('#update-result');
+      updBtn.disabled = true; const orig = updBtn.textContent;
+      updBtn.textContent = 'Bezig met controleren...';
+      result.innerHTML = '';
+      try {
+        const r = await Updater.check();
+        if (r.hasUpdate) {
+          result.innerHTML = `<div class="alert alert-info">Nieuwe versie beschikbaar: <strong>${esc(r.remoteVersion)}</strong> (jij draait ${esc(r.currentVersion)}). De pagina wordt over enkele seconden ververst.</div>`;
+          setTimeout(() => Updater.reloadHard(), 1800);
+        } else if (r.swUpdated) {
+          result.innerHTML = `<div class="alert alert-success">Service-worker bijgewerkt naar de laatste versie. Pagina wordt ververst...</div>`;
+          setTimeout(() => Updater.reloadHard(), 1200);
+        } else {
+          result.innerHTML = `<div class="alert alert-success">Je draait al de laatste versie (<strong>${esc(r.currentVersion)}</strong>).</div>`;
+          updBtn.disabled = false; updBtn.textContent = orig;
+        }
+      } catch (e) {
+        result.innerHTML = `<div class="alert alert-error">Update-check mislukt: ${esc(e.message || e)}</div>`;
+        updBtn.disabled = false; updBtn.textContent = orig;
+      }
     });
   }
 

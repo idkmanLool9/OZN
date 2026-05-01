@@ -4,7 +4,7 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v19';
+const CACHE_VERSION = 'sok-uitvaart-v20';
 const SHELL = [
   './',
   './index.html',
@@ -43,6 +43,13 @@ self.addEventListener('activate', e => {
       keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k))
     )).then(() => self.clients.claim())
   );
+});
+
+// Vanuit de app SKIP_WAITING-bericht ontvangen om meteen te activeren
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', e => {
