@@ -32,6 +32,7 @@ function renderDossierDetail(params) {
         <div class="page-actions">
           <button type="button" class="btn btn-ghost" id="btn-print" title="Printen of opslaan als PDF">🖨️ Print</button>
           <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Factuur openen">📄 Factuur</a>
+          <a href="#/dossiers/${d.id}/rouwkaart" class="btn btn-ghost" title="Rouwkaart maken">🪦 Rouwkaart</a>
           <button type="button" class="btn btn-ghost" id="btn-email-dossier" title="Stuur dossier per e-mail">📧 E-mail dossier</button>
           <button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>
           <button type="button" class="btn btn-ghost" id="btn-copy-nr" title="Kopieer dossiernummer">⧉ Kopieer nr</button>
@@ -53,6 +54,7 @@ function renderDossierDetail(params) {
           <div class="meta"><p><strong>${esc(d.dossier_nummer)}</strong></p><p>Status: ${esc((d.status||'').replace('_',' '))}</p><p>Afgedrukt: ${new Date().toLocaleString('nl-NL')}</p></div>
         </div>
         <h2>Overzicht</h2>
+        ${d.foto_overledene_pad ? `<div class="dossier-foto"><img src="${esc(FotoOverledene.urlVoor(d.foto_overledene_pad))}" alt="Foto"></div>` : ''}
         <h3>Overledene</h3>
         <dl class="dl">
           ${dlRow('Naam', fullName(d))}
@@ -224,7 +226,7 @@ function renderDossierDetail(params) {
             <option value="verlof tot begraven">Verlof tot begraven</option>
             <option value="overig">Overig</option>
           </select>
-          <input type="file" name="bestand" required>
+          <input type="file" name="bestand" accept="image/*,application/pdf" capture="environment" required>
           <button type="submit" class="btn">+ Uploaden</button>
         </form>
       </section>

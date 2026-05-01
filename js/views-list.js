@@ -8,10 +8,16 @@ function renderDossierList(params, path) {
   let dossiers = DB.list(KEYS.DOSSIERS);
   if (q) {
     const ql = q.toLowerCase();
-    dossiers = dossiers.filter(d =>
-      [d.voornaam, d.achternaam, d.dossier_nummer, d.contact_naam, d.gezinsnummer]
-      .filter(Boolean).some(v => String(v).toLowerCase().includes(ql))
-    );
+    dossiers = dossiers.filter(d => {
+      // Zoek over alle tekstuele velden van het dossier
+      for (const k in d) {
+        const v = d[k];
+        if (v == null) continue;
+        if (typeof v === 'string' && v.toLowerCase().includes(ql)) return true;
+        if (typeof v === 'number' && String(v).includes(ql)) return true;
+      }
+      return false;
+    });
   }
   if (status) dossiers = dossiers.filter(d => d.status === status);
   dossiers.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));

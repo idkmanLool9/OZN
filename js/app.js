@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v29'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v30'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -474,6 +474,7 @@ Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
+Router.add('/dossiers/:id/rouwkaart', p => renderRouwkaart(p));
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
 Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
@@ -510,6 +511,18 @@ Router.add('/account', () => renderAccount());
     } catch (e) { console.warn('Settings laden faalde:', e.message || e); }
   }
   updateOfflineUI();
+
+  // Auto-keepalive: voorkomt dat het gratis Supabase-project pauzeert
+  // bij inactiviteit. Doet elke 5+ dagen een mini-query.
+  try {
+    const lastPing = parseInt(localStorage.getItem('sok_last_ping') || '0', 10);
+    const ageMs = Date.now() - lastPing;
+    if (sess && navigator.onLine && ageMs > 5 * 24 * 3600 * 1000) {
+      sb.from('app_instellingen').select('id').limit(1)
+        .then(() => localStorage.setItem('sok_last_ping', String(Date.now())))
+        .catch(() => {});
+    }
+  } catch (_) {}
 
   // Online: automatisch wegfaden na de ingestelde duur.
   // Offline: blijft staan tot de gebruiker op "Verder" klikt.

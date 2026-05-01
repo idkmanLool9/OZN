@@ -78,6 +78,29 @@ ALTER TABLE public.dossiers
 ALTER TABLE public.kosten
   ADD COLUMN IF NOT EXISTS gedekt BOOLEAN DEFAULT false;
 
+-- Foto van de overledene (optioneel) — voor rouwkaart en dossier-overzicht
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS foto_overledene_pad TEXT;
+
+-- Storage-bucket 'overledenen' (publiek) voor foto's gebruikt op rouwkaarten
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('overledenen', 'overledenen', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "auth_overledenen_insert" ON storage.objects;
+CREATE POLICY "auth_overledenen_insert" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'overledenen');
+
+DROP POLICY IF EXISTS "auth_overledenen_update" ON storage.objects;
+CREATE POLICY "auth_overledenen_update" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'overledenen')
+  WITH CHECK (bucket_id = 'overledenen');
+
+DROP POLICY IF EXISTS "auth_overledenen_delete" ON storage.objects;
+CREATE POLICY "auth_overledenen_delete" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'overledenen');
+
 CREATE TABLE IF NOT EXISTS public.taken (
   id BIGSERIAL PRIMARY KEY,
   dossier_id BIGINT NOT NULL REFERENCES public.dossiers(id) ON DELETE CASCADE,

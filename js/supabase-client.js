@@ -382,6 +382,37 @@ const BloemenFotos = {
   },
 };
 
+// ─── Foto van overledene (publieke bucket 'documenten' — privé via signed URLs zou ook kunnen, maar voor weergave op rouwkaart maken we een aparte bucket) ───
+const FotoOverledene = {
+  publicUrl(path) {
+    if (!path) return null;
+    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
+    return data?.publicUrl || null;
+  },
+  urlVoor(path) {
+    if (!path) return null;
+    const base = FotoOverledene.publicUrl(path);
+    if (!base) return null;
+    return base + '?v=' + Date.now();
+  },
+  async upload(dossierId, file) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = `${dossierId}/foto.${ext}`;
+    const { error } = await sb.storage.from('overledenen').upload(path, file, {
+      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
+    });
+    if (error) {
+      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
+      throw error;
+    }
+    return path;
+  },
+  async remove(path) {
+    if (!path) return;
+    await sb.storage.from('overledenen').remove([path]).catch(() => {});
+  },
+};
+
 // ─── Eten & drinken-catalogus + foto's (publieke bucket) ────────────────────
 const EtenDrinkenFotos = {
   slug(naam) {
