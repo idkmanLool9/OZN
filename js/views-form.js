@@ -517,19 +517,6 @@ function renderDossierForm(params) {
     try {
       if (isNew) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
-        // Kies juiste standaardtaken-lijst op basis van verzekering
-        let taken;
-        if (data.verzekering_status === 'met verzekering') taken = STANDAARD_TAKEN_MET_VERZEKERING;
-        else if (data.verzekering_status === 'zonder verzekering') taken = STANDAARD_TAKEN_ZONDER_VERZEKERING;
-        else taken = STANDAARD_TAKEN;
-        for (let i = 0; i < taken.length; i++) {
-          await DB.insert(KEYS.TAKEN, {
-            dossier_id: created.id,
-            omschrijving: taken[i],
-            voltooid: false,
-            volgorde: i,
-          });
-        }
         localStorage.removeItem(draftKey);
         Router.go('/dossiers/' + created.id);
       } else {

@@ -310,6 +310,13 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .status-inline.status-voltooid { background-color: var(--green-soft); color: var(--green); }
 .status-inline.status-geannuleerd { background-color: var(--red-soft); color: var(--red); }
 
+/* Quick-contact knoppen onder Contactpersoon */
+.quick-contact {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+  margin: -.25rem 0 .85rem;
+}
+.quick-contact .btn { flex: 0 0 auto; }
+
 /* Definition list */
 .dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: .5rem 1.5rem; margin: 0 0 1rem; }
 .dl > div { display: flex; gap: .5rem; padding: .35rem 0; border-bottom: 1px dashed var(--border); }

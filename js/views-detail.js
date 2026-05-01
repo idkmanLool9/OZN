@@ -5,7 +5,6 @@ function renderDossierDetail(params) {
   const d = DB.byId(KEYS.DOSSIERS, id);
   if (!d) return render404();
 
-  const taken = DB.where(KEYS.TAKEN, t => t.dossier_id === id).sort((a, b) => (a.volgorde||0) - (b.volgorde||0) || a.id - b.id);
   const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
   const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const documenten = DB.where(KEYS.DOCUMENTEN, doc => doc.dossier_id === id).sort((a, b) => (b.geupload_op || '').localeCompare(a.geupload_op || ''));
@@ -31,7 +30,11 @@ function renderDossierDetail(params) {
           </p>
         </div>
         <div class="page-actions">
-          <button type="button" class="btn btn-ghost" id="btn-print">Print</button>
+          <button type="button" class="btn btn-ghost" id="btn-print" title="Printen of opslaan als PDF">🖨️ Print</button>
+          <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Factuur openen">📄 Factuur</a>
+          <button type="button" class="btn btn-ghost" id="btn-email-dossier" title="Stuur dossier per e-mail">📧 E-mail dossier</button>
+          <button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>
+          <button type="button" class="btn btn-ghost" id="btn-copy-nr" title="Kopieer dossiernummer">⧉ Kopieer nr</button>
           <a href="#/dossiers/${d.id}/bewerken" class="btn btn-primary">Bewerken</a>
           <button type="button" class="btn btn-danger" id="btn-delete">Verwijderen</button>
         </div>
@@ -39,7 +42,6 @@ function renderDossierDetail(params) {
 
       <nav class="tabs">
         <a href="#/dossiers/${d.id}#overzicht">Overzicht</a>
-        <a href="#/dossiers/${d.id}#taken">Taken (${taken.filter(t=>!t.voltooid).length}/${taken.length})</a>
         <a href="#/dossiers/${d.id}#kosten">Kosten</a>
         <a href="#/dossiers/${d.id}#documenten">Documenten (${documenten.length})</a>
         <a href="#/dossiers/${d.id}#notities">Notities (${notities.length})</a>
@@ -74,6 +76,12 @@ function renderDossierDetail(params) {
           ${dlRow('E-mail', d.contact_email)}
           ${dlRow('Adres', [d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', '))}
         </dl>
+        ${(d.contact_telefoon || d.contact_email) ? `
+          <div class="quick-contact">
+            ${d.contact_telefoon ? `<a class="btn btn-sm" href="tel:${esc(d.contact_telefoon.replace(/\s/g,''))}">📞 Bel</a>` : ''}
+            ${d.contact_telefoon ? `<a class="btn btn-sm" href="https://wa.me/${esc(toWaNumber(d.contact_telefoon))}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
+            ${d.contact_email ? `<a class="btn btn-sm" href="mailto:${esc(d.contact_email)}">✉️ E-mail</a>` : ''}
+          </div>` : ''}
         <h3>Kerkelijk</h3>
         <dl class="dl">
           ${dlRow('Parochie', d.parochie)}
@@ -144,24 +152,6 @@ function renderDossierDetail(params) {
               }).join('')}
             </div>`;
         })()}
-      </section>
-
-      <section id="taken" class="card">
-        <h2>Taken / checklist</h2>
-        ${taken.length === 0 ? '<p class="muted">Nog geen taken.</p>' :
-          '<ul class="taken-list">' + taken.map(t => `
-            <li class="${t.voltooid ? 'voltooid' : ''}" data-id="${t.id}">
-              <button type="button" class="check" data-action="toggle-taak" data-id="${t.id}">${t.voltooid ? '✓' : '○'}</button>
-              <span class="taak-tekst">${esc(t.omschrijving)}</span>
-              ${t.deadline ? `<span class="badge badge-amber">${esc(fmtDate(t.deadline))}</span>` : ''}
-              ${t.voltooid && t.voltooid_op ? `<span class="muted small">voltooid ${esc(fmtDate(t.voltooid_op))}</span>` : ''}
-              <button type="button" class="btn-icon right" data-action="del-taak" data-id="${t.id}" title="verwijderen">×</button>
-            </li>`).join('') + '</ul>'}
-        <form id="add-taak" class="row-form">
-          <input type="text" name="omschrijving" placeholder="Nieuwe taak..." required>
-          <input type="date" name="deadline">
-          <button type="submit" class="btn">+ Toevoegen</button>
-        </form>
       </section>
 
       <section id="kosten" class="card">
@@ -261,6 +251,95 @@ function renderDossierDetail(params) {
   bindDetailEvents(id);
 }
 
+function toWaNumber(tel) {
+  let num = String(tel || '').replace(/\D/g, '');
+  if (num.startsWith('00')) num = num.slice(2);
+  else if (num.startsWith('0')) num = '31' + num.slice(1);
+  return num;
+}
+
+function buildDossierEmail(d) {
+  const L = [];
+  L.push('Beste,', '');
+  L.push('Hierbij de gegevens van het uitvaartdossier.', '');
+  L.push(`Dossiernummer: ${d.dossier_nummer || ''}`);
+  if (d.status) L.push(`Status: ${(d.status||'').replace('_', ' ')}`);
+  L.push('');
+  L.push('— OVERLEDENE —');
+  L.push(`Naam: ${fullName(d) || '—'}`);
+  if (d.doopnaam) L.push(`Doopnaam: ${d.doopnaam}`);
+  if (d.geboortedatum) L.push(`Geboren: ${fmtDate(d.geboortedatum)}${d.geboorteplaats ? ' te ' + d.geboorteplaats : ''}`);
+  if (d.overlijdensdatum) L.push(`Overleden: ${fmtDate(d.overlijdensdatum)}${d.overlijdenstijd ? ' om ' + d.overlijdenstijd : ''}${d.overlijdensplaats ? ' te ' + d.overlijdensplaats : ''}`);
+  const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
+  if (adresO) L.push(`Adres: ${adresO}`);
+  if (d.bsn) L.push(`BSN: ${d.bsn}`);
+  L.push('');
+  L.push('— CONTACTPERSOON —');
+  L.push(`Naam: ${[d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') || '—'}${d.contact_relatie ? ' (' + d.contact_relatie + ')' : ''}`);
+  if (d.contact_telefoon) L.push(`Telefoon: ${d.contact_telefoon}`);
+  if (d.contact_email)    L.push(`E-mail: ${d.contact_email}`);
+  L.push('');
+  L.push('— KERKELIJK —');
+  if (d.parochie) L.push(`Parochie: ${d.parochie}`);
+  if (d.priester) L.push(`Priester: ${d.priester}`);
+  L.push('');
+  L.push('— UITVAART —');
+  if (d.uitvaart_type)   L.push(`Type: ${d.uitvaart_type}`);
+  if (d.uitvaart_datum)  L.push(`Datum: ${fmtDate(d.uitvaart_datum)}${d.uitvaart_tijd ? ' om ' + d.uitvaart_tijd : ''}`);
+  if (d.kerk_locatie)    L.push(`Kerk: ${d.kerk_locatie}`);
+  if (d.begraafplaats)   L.push(`Begraafplaats: ${d.begraafplaats}${d.grafnummer ? ' — graf ' + d.grafnummer : ''}`);
+  L.push('');
+  if (d.bijzonderheden) { L.push('— BIJZONDERHEDEN —'); L.push(d.bijzonderheden); L.push(''); }
+  L.push('Met vriendelijke groet,');
+  const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+  L.push(s.app_name || 'Uitvaartleider');
+  if (s.app_tagline) L.push(s.app_tagline);
+  return L.join('\n');
+}
+
+function buildFactuurEmail(d, kosten) {
+  const verzekerd = d.verzekering_status === 'met verzekering';
+  const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag)||0), 0);
+  const gedekt = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag)||0), 0);
+  const familie = totaal - gedekt;
+  const aanbet = Number(d.aanbetaling_bedrag) || 0;
+  const teBetalen = familie - aanbet;
+  const L = [];
+  L.push('Beste,', '');
+  L.push(`Hierbij de factuur voor uitvaartdossier ${d.dossier_nummer || ''}.`, '');
+  L.push(`Betreft: ${fullName(d) || '—'}`);
+  if (d.uitvaart_datum) L.push(`Uitvaart: ${fmtDate(d.uitvaart_datum)}`);
+  L.push('');
+  L.push('— KOSTEN —');
+  kosten.forEach(k => {
+    L.push(`${k.omschrijving}${verzekerd && k.gedekt ? ' (gedekt door verzekering)' : ''}: ${fmtEUR(k.bedrag)}`);
+  });
+  L.push('');
+  L.push(`Totaal: ${fmtEUR(totaal)}`);
+  if (verzekerd) {
+    L.push(`Gedekt door verzekering: ${fmtEUR(gedekt)}`);
+    L.push(`Door familie te betalen: ${fmtEUR(familie)}`);
+  }
+  if (aanbet > 0) {
+    L.push(`Aanbetaling${d.aanbetaling_datum ? ' ('+fmtDate(d.aanbetaling_datum)+')' : ''}: ${fmtEUR(aanbet)}`);
+    L.push(`Nog te voldoen: ${fmtEUR(teBetalen)}`);
+  }
+  L.push('');
+  if (d.betalingstermijn) L.push(`Betalingstermijn: ${d.betalingstermijn}`);
+  if (d.eindafrekening_status) L.push(`Status: ${d.eindafrekening_status}`);
+  L.push('');
+  L.push('Met vriendelijke groet,');
+  const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+  L.push(s.app_name || 'Uitvaartleider');
+  if (s.app_tagline) L.push(s.app_tagline);
+  return L.join('\n');
+}
+
+function openMailto(to, subject, body) {
+  const url = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = url;
+}
+
 function dlRow(label, value) {
   const v = value && String(value).trim() ? value : '—';
   // value mag al HTML zijn als 'ie van kistRowValue komt; anders escapen
@@ -307,7 +386,39 @@ function edRowValue(naam) {
 }
 
 function bindDetailEvents(id) {
+  const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
+
+  const emailDosBtn = $('#btn-email-dossier');
+  if (emailDosBtn) {
+    emailDosBtn.addEventListener('click', () => {
+      const d = DB.byId(KEYS.DOSSIERS, id); if (!d) return;
+      const subj = `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim();
+      const body = buildDossierEmail(d);
+      openMailto(d.contact_email, subj, body);
+    });
+  }
+  const emailFactBtn = $('#btn-email-factuur');
+  if (emailFactBtn) {
+    emailFactBtn.addEventListener('click', () => {
+      const d = DB.byId(KEYS.DOSSIERS, id); if (!d) return;
+      const ks = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
+      const subj = `Factuur uitvaart ${d.dossier_nummer} — ${fullName(d) || ''}`.trim();
+      const body = buildFactuurEmail(d, ks);
+      openMailto(d.contact_email, subj, body);
+    });
+  }
+  const copyBtn = $('#btn-copy-nr');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(dRow.dossier_nummer);
+        Modal.show({ type: 'success', title: 'Gekopieerd', message: `Dossiernummer ${dRow.dossier_nummer} staat op het klembord.` });
+      } catch (_) {
+        Modal.show({ type: 'error', title: 'Kopiëren mislukt', message: 'Je browser staat klembord-toegang niet toe.' });
+      }
+    });
+  }
 
   const statusSel = $('#status-select');
   if (statusSel) {
@@ -333,18 +444,6 @@ function bindDetailEvents(id) {
         Cloud.cache[t] = Cloud.cache[t].filter(x => x.dossier_id !== id));
       Router.go('/dossiers');
     } catch (e) {}
-  });
-
-  $('#add-taak').addEventListener('submit', async e => {
-    e.preventDefault();
-    const f = e.target;
-    const omsch = f.omschrijving.value.trim(); if (!omsch) return;
-    const max = DB.where(KEYS.TAKEN, t => t.dossier_id === id).reduce((m, t) => Math.max(m, t.volgorde || 0), 0);
-    try {
-      await DB.insert(KEYS.TAKEN, { dossier_id: id, omschrijving: omsch, deadline: f.deadline.value || null, voltooid: false, volgorde: max + 1 });
-      await DB.touchDossier(id);
-      renderDossierDetail({ id });
-    } catch (_) {}
   });
 
   $('#add-kosten').addEventListener('submit', async e => {
@@ -397,14 +496,7 @@ function bindDetailEvents(id) {
     const action = btn.getAttribute('data-action');
     const tid = parseInt(btn.getAttribute('data-id'), 10);
     try {
-      if (action === 'toggle-taak') {
-        const t = DB.byId(KEYS.TAKEN, tid); if (!t) return;
-        await DB.update(KEYS.TAKEN, tid, { voltooid: !t.voltooid, voltooid_op: !t.voltooid ? new Date().toISOString() : null });
-        await DB.touchDossier(id); renderDossierDetail({ id });
-      } else if (action === 'del-taak') {
-        if (!confirm('Taak verwijderen?')) return;
-        await DB.remove(KEYS.TAKEN, tid); await DB.touchDossier(id); renderDossierDetail({ id });
-      } else if (action === 'toggle-kosten') {
+      if (action === 'toggle-kosten') {
         const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
         await DB.update(KEYS.KOSTEN, tid, { betaald: !k.betaald });
         await DB.touchDossier(id); renderDossierDetail({ id });
