@@ -39,6 +39,7 @@ function bloemSVG() {
 
 function renderBloemenBeheer(msg) {
   const items = DB.list(KEYS.BLOEMEN).slice().sort((a, b) => a.naam.localeCompare(b.naam));
+  const adminMode = !!Settings.get('catalog_admin_mode');
 
   const editing = _bloemEditing === 'new' ? { naam: '', omschrijving: '', bedrag: '' }
                 : (_bloemEditing != null ? items.find(x => x.id === _bloemEditing) : null);
@@ -50,7 +51,7 @@ function renderBloemenBeheer(msg) {
           <h1>Bloemenbeheer</h1>
           <p class="muted">Eigen catalogus van bloemstukken. Verschijnen automatisch in het intake-formulier en het dossieroverzicht.</p>
         </div>
-        ${editing ? '' : '<button type="button" class="btn btn-primary" id="btn-nieuw-bloem">+ Nieuw bloemstuk</button>'}
+        ${editing ? '' : (adminMode ? '<button type="button" class="btn btn-primary" id="btn-nieuw-bloem">+ Nieuw bloemstuk</button>' : '')}
       </div>
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
@@ -71,30 +72,32 @@ function renderBloemenBeheer(msg) {
         </section>` : ''}
 
       ${items.length === 0
-        ? '<div class="card"><p class="muted">Nog geen bloemstukken. Klik rechtsboven op "+ Nieuw bloemstuk" om er een toe te voegen.</p></div>'
+        ? `<div class="card"><p class="muted">Nog geen bloemstukken. ${adminMode ? 'Klik rechtsboven op "+ Nieuw bloemstuk" om er een toe te voegen.' : 'Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a> om bloemstukken toe te voegen.'}</p></div>`
         : `<div class="kist-grid">
             ${items.map(b => {
               const url = BloemenFotos.urlVoor(b.naam);
               return `
                 <div class="kist-card" data-id="${b.id}">
-                  <div class="kist-card-img">
+                  <button type="button" class="kist-card-img kist-card-img-btn" data-action="zoom" data-id="${b.id}" aria-label="Vergroot ${esc(b.naam)}">
                     ${url
                       ? `<img src="${esc(url)}" alt="${esc(b.naam)}" loading="lazy">`
                       : `<div class="kist-card-svg">${bloemSVG()}</div>
                          <div class="kist-card-no-img">geen foto</div>`}
-                  </div>
+                  </button>
                   <div class="kist-card-meta">
                     <strong>${esc(b.naam)}</strong>
                     ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
                     <span class="kist-price">${fmtEUR(b.bedrag)}</span>
                   </div>
-                  <div class="kist-card-actions">
-                    <button type="button" class="btn btn-sm" data-edit="${b.id}">Bewerken</button>
-                    <button type="button" class="btn btn-sm btn-ghost" data-delete="${b.id}">Verwijderen</button>
-                  </div>
+                  ${adminMode ? `
+                    <div class="kist-card-actions">
+                      <button type="button" class="btn btn-sm" data-edit="${b.id}">Bewerken</button>
+                      <button type="button" class="btn btn-sm btn-ghost" data-delete="${b.id}">Verwijderen</button>
+                    </div>` : ''}
                 </div>`;
             }).join('')}
-          </div>`}
+          </div>
+          ${adminMode ? '' : `<p class="muted small center" style="margin-top:1.5rem;">Toevoegen of bewerken? Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a>.</p>`}`}
     </div>`;
 
   const newBtn = $('#btn-nieuw-bloem');
@@ -137,6 +140,19 @@ function renderBloemenBeheer(msg) {
   }
 
   $('#view').addEventListener('click', async e => {
+    const zoom = e.target.closest('button[data-action="zoom"]');
+    if (zoom) {
+      const id = parseInt(zoom.getAttribute('data-id'), 10);
+      const b = DB.byId(KEYS.BLOEMEN, id); if (!b) return;
+      Lightbox.show({
+        src: BloemenFotos.urlVoor(b.naam) || null,
+        svgFallback: bloemSVG(),
+        title: b.naam,
+        subtitle: b.omschrijving || '',
+        price: b.bedrag ? fmtEUR(b.bedrag) : '',
+      });
+      return;
+    }
     const ed = e.target.closest('button[data-edit]');
     const del = e.target.closest('button[data-delete]');
     if (ed) {

@@ -161,6 +161,10 @@ function renderAccount(msg) {
               <input type="checkbox" name="rounded_cards" ${s.rounded_cards ? 'checked' : ''}>
               Afgeronde hoeken (uit = strakke vierkante stijl)
             </label>
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''}>
+              Beheermodus voor catalogi (toont knoppen om foto's te vervangen, bloemen/eten-producten toe te voegen of te verwijderen)
+            </label>
             <div class="form-actions" style="justify-content:flex-end;">
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
@@ -399,6 +403,7 @@ function renderAccount(msg) {
         compact_mode: f.compact_mode.checked,
         rounded_cards: f.rounded_cards.checked,
         font_id: f.font_id.value,
+        catalog_admin_mode: f.catalog_admin_mode.checked,
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });

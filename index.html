@@ -56,6 +56,20 @@
     </div>
   </div>
 
+  <!-- Lightbox (grotere afbeelding-preview) -->
+  <div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true">
+    <div class="lightbox-backdrop"></div>
+    <div class="lightbox-card">
+      <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Sluiten">×</button>
+      <div class="lightbox-img-wrap"><img id="lightbox-img" alt=""></div>
+      <div class="lightbox-meta">
+        <strong id="lightbox-title"></strong>
+        <span id="lightbox-sub" class="muted small"></span>
+        <span id="lightbox-price" class="kist-price"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- Login -->
   <section id="login-screen" class="login-body" hidden>
     <div class="login-card">

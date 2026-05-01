@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v16'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v17'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -26,6 +26,9 @@ const Settings = {
     compact_mode: false,
     rounded_cards: true,
     font_id: 'default',
+    // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
+    // catalogi (kisten, bloemen, eten & drinken)
+    catalog_admin_mode: false,
     // Handtekeningen-velden in het intake-formulier
     signature_fields: [
       { id: 'opdrachtgever',   label: 'Handtekening opdrachtgever',   required: true },

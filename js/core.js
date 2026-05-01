@@ -128,6 +128,58 @@ const Modal = {
   },
 };
 
+// ─── Lightbox: grotere preview van een afbeelding ───────────────────────────
+const Lightbox = {
+  show({ src, title = '', subtitle = '', price = '', svgFallback = '' } = {}) {
+    const el = document.getElementById('lightbox');
+    if (!el) return;
+    const img = document.getElementById('lightbox-img');
+    const wrap = el.querySelector('.lightbox-img-wrap');
+    const titleEl = document.getElementById('lightbox-title');
+    const subEl = document.getElementById('lightbox-sub');
+    const priceEl = document.getElementById('lightbox-price');
+
+    titleEl.textContent = title;
+    subEl.textContent = subtitle;
+    priceEl.textContent = price;
+    if (src) {
+      img.src = src;
+      img.hidden = false;
+      // SVG-fallback weghalen
+      const oldSvg = wrap.querySelector('.lightbox-svg');
+      if (oldSvg) oldSvg.remove();
+    } else if (svgFallback) {
+      img.removeAttribute('src');
+      img.hidden = true;
+      const oldSvg = wrap.querySelector('.lightbox-svg');
+      if (oldSvg) oldSvg.remove();
+      const div = document.createElement('div');
+      div.className = 'lightbox-svg';
+      div.innerHTML = svgFallback;
+      wrap.appendChild(div);
+    }
+
+    el.hidden = false;
+    requestAnimationFrame(() => el.classList.add('shown'));
+
+    const close = () => {
+      el.classList.remove('shown');
+      el.classList.add('fading');
+      setTimeout(() => {
+        el.hidden = true;
+        el.classList.remove('fading');
+      }, 280);
+      document.getElementById('lightbox-close').removeEventListener('click', close);
+      el.querySelector('.lightbox-backdrop').removeEventListener('click', close);
+      document.removeEventListener('keydown', keyHandler);
+    };
+    const keyHandler = e => { if (e.key === 'Escape') close(); };
+    document.getElementById('lightbox-close').addEventListener('click', close);
+    el.querySelector('.lightbox-backdrop').addEventListener('click', close);
+    document.addEventListener('keydown', keyHandler);
+  },
+};
+
 // Hash router
 const Router = {
   routes: [],
