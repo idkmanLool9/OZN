@@ -157,9 +157,8 @@ const Router = {
         $$('#topnav a').forEach(a => {
           const route = a.getAttribute('data-route');
           let active = false;
-          if (route === '/') active = path === '/';
-          else if (route === '/dossiers/nieuw') active = path === '/dossiers/nieuw';
-          else if (route === '/dossiers') active = path.startsWith('/dossiers') && path !== '/dossiers/nieuw';
+          if (route === '/dossiers/nieuw') active = path === '/dossiers/nieuw';
+          else if (route === '/dossiers') active = path === '/' || (path.startsWith('/dossiers') && path !== '/dossiers/nieuw');
           else active = path === route;
           a.classList.toggle('active', active);
         });

@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v15'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v16'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -369,7 +369,7 @@ window.addEventListener('online', () => {
 });
 window.addEventListener('offline', updateOfflineUI);
 
-Router.add('/', () => renderDashboard());
+Router.add('/', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
