@@ -1,5 +1,35 @@
 // Dossier detail: overzicht + taken + kosten + notities + print
 
+function isImageDoc(doc) {
+  if (!doc) return false;
+  const src = (doc.naam || '') + ' ' + (doc.storage_pad || '');
+  return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)(\?|$)/i.test(src);
+}
+
+// Cache van signed-URLs binnen één render-tick zodat we ze niet dubbel ophalen
+const _docUrlCache = new Map();
+
+async function loadDocThumbnails(documenten) {
+  const imgs = documenten.filter(isImageDoc);
+  await Promise.all(imgs.map(async doc => {
+    const el = document.querySelector(`img.doc-thumb[data-doc-id="${doc.id}"]`);
+    if (!el) return;
+    try {
+      let url = _docUrlCache.get(doc.storage_pad);
+      if (!url) {
+        url = await Storage.signedUrl(doc.storage_pad, 600); // 10 min
+        _docUrlCache.set(doc.storage_pad, url);
+      }
+      el.src = url;
+      el.alt = doc.naam || 'document';
+    } catch (_) {
+      // val terug op icoon
+      const wrap = el.closest('.doc-thumb-btn');
+      if (wrap) wrap.outerHTML = '<div class="doc-icon" aria-hidden="true">📄</div>';
+    }
+  }));
+}
+
 function renderDossierDetail(params) {
   const id = parseInt(params.id, 10);
   const d = DB.byId(KEYS.DOSSIERS, id);
@@ -206,13 +236,23 @@ function renderDossierDetail(params) {
       <section id="documenten" class="card">
         <h2>Documenten</h2>
         ${documenten.length === 0 ? '<p class="muted">Nog geen documenten geüpload.</p>' :
-          '<ul class="doc-list">' + documenten.map(doc => `
-            <li>
-              <button type="button" class="link-btn" data-action="download-doc" data-id="${doc.id}">${esc(doc.naam)}</button>
-              ${doc.type ? `<span class="badge">${esc(doc.type)}</span>` : ''}
-              <span class="muted small">${doc.grootte ? Math.round(doc.grootte/1024) + ' KB · ' : ''}${esc(fmtDate(doc.geupload_op))}</span>
-              <button type="button" class="btn-icon right" data-action="del-doc" data-id="${doc.id}">×</button>
-            </li>`).join('') + '</ul>'}
+          '<ul class="doc-list">' + documenten.map(doc => {
+            const isImg = isImageDoc(doc);
+            return `
+            <li class="doc-item">
+              ${isImg
+                ? `<button type="button" class="doc-thumb-btn" data-action="zoom-doc" data-id="${doc.id}" title="Klik om te vergroten">
+                     <img class="doc-thumb" data-doc-id="${doc.id}" alt="">
+                   </button>`
+                : `<div class="doc-icon" aria-hidden="true">📄</div>`}
+              <div class="doc-info">
+                <button type="button" class="link-btn" data-action="download-doc" data-id="${doc.id}">${esc(doc.naam)}</button>
+                ${doc.type ? `<span class="badge">${esc(doc.type)}</span>` : ''}
+                <span class="muted small">${doc.grootte ? Math.round(doc.grootte/1024) + ' KB · ' : ''}${esc(fmtDate(doc.geupload_op))}</span>
+              </div>
+              <button type="button" class="btn-icon" data-action="del-doc" data-id="${doc.id}" title="Verwijderen">×</button>
+            </li>`;
+          }).join('') + '</ul>'}
         <form id="add-doc" class="row-form">
           <input type="text" name="naam" placeholder="Documentnaam (optioneel)">
           <select name="type">
@@ -265,6 +305,7 @@ function renderDossierDetail(params) {
     </div>`;
 
   bindDetailEvents(id);
+  loadDocThumbnails(documenten);
 }
 
 function toWaNumber(tel) {
@@ -754,6 +795,18 @@ function bindDetailEvents(id) {
         const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
         const url = await Storage.signedUrl(doc.storage_pad, 60);
         window.open(url, '_blank');
+      } else if (action === 'zoom-doc') {
+        const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
+        let url = _docUrlCache.get(doc.storage_pad);
+        if (!url) {
+          url = await Storage.signedUrl(doc.storage_pad, 600);
+          _docUrlCache.set(doc.storage_pad, url);
+        }
+        Lightbox.show({
+          src: url,
+          title: doc.naam || '',
+          subtitle: [doc.type, doc.grootte ? Math.round(doc.grootte/1024) + ' KB' : '', fmtDate(doc.geupload_op)].filter(Boolean).join(' · '),
+        });
       } else if (action === 'del-doc') {
         if (!confirm('Document verwijderen?')) return;
         const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;

@@ -445,9 +445,22 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .right { margin-left: auto; }
 
 .doc-list { list-style: none; padding: 0; margin: 0; }
-.doc-list li { padding: .55rem 0; display: flex; align-items: center; gap: .5rem; border-bottom: 1px dashed var(--border); }
+.doc-list li { padding: .55rem 0; display: flex; align-items: center; gap: .65rem; border-bottom: 1px dashed var(--border); }
 .doc-list a, .doc-list .link-btn { font-weight: 500; color: var(--primary); background: none; border: none; padding: 0; font-size: inherit; cursor: pointer; text-align: left; }
 .doc-list .link-btn:hover { text-decoration: underline; }
+.doc-list .doc-info { display: flex; flex-direction: column; gap: .15rem; flex: 1 1 auto; min-width: 0; }
+.doc-list .doc-info > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.doc-list .doc-thumb-btn {
+  flex: 0 0 auto; width: 56px; height: 56px; padding: 0; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--bg); overflow: hidden; cursor: zoom-in;
+  display: flex; align-items: center; justify-content: center;
+}
+.doc-list .doc-thumb-btn:hover { border-color: var(--primary); }
+.doc-list .doc-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.doc-list .doc-icon {
+  flex: 0 0 auto; width: 56px; height: 56px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+}
 
 .notitie-list { list-style: none; padding: 0; margin: 1rem 0 0; }
 .notitie-list li { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: .75rem 1rem; margin-bottom: .5rem; }
