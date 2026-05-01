@@ -41,6 +41,16 @@ const Auth = {
     const { error } = await sb.auth.updateUser({ password: newPw });
     return error ? error.message : null;
   },
+  async updateDisplayName(fullName) {
+    const { data, error } = await sb.auth.updateUser({ data: { full_name: fullName } });
+    if (error) return error.message;
+    if (data && data.user) _session = Object.assign({}, _session || {}, { user: data.user });
+    return null;
+  },
+  async updateEmail(newEmail) {
+    const { error } = await sb.auth.updateUser({ email: newEmail });
+    return error ? error.message : null;
+  },
 };
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────

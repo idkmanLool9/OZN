@@ -79,12 +79,25 @@ function renderAccount(msg) {
       </section>
 
       <section class="card narrow">
-        <h2>Gegevens</h2>
-        <dl class="dl">
-          <div><dt>E-mailadres</dt><dd>${esc(u.email)}</dd></div>
-          <div><dt>Naam</dt><dd>${esc(u.fullName || '—')}</dd></div>
-          <div><dt>Rol</dt><dd>${esc(u.role || '—')}</dd></div>
-        </dl>
+        <h2>Mijn gegevens</h2>
+        <form id="profile-form" class="form" autocomplete="off">
+          <label>
+            <span>Naam (verschijnt in de topbalk)</span>
+            <input type="text" name="full_name" value="${esc(u.fullName === u.email ? '' : (u.fullName || ''))}" placeholder="bv. Kevin Aydin" maxlength="60">
+          </label>
+          <label>
+            <span>E-mailadres (login)</span>
+            <input type="email" name="email" value="${esc(u.email)}" placeholder="">
+            <span class="muted small">Wijzigen vereist verificatie via een e-mail naar zowel het oude als nieuwe adres.</span>
+          </label>
+          <label>
+            <span>Rol</span>
+            <input type="text" value="${esc(u.role || '—')}" disabled>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
       </section>
       <section class="card narrow">
         <h2>Wachtwoord wijzigen</h2>
@@ -693,6 +706,53 @@ function renderAccount(msg) {
         splash_subtitle: f.splash_subtitle.value.trim() || Settings.defaults.splash_subtitle,
       });
       Splash.preview('offline');
+    });
+  }
+
+  const profileForm = $('#profile-form');
+  if (profileForm) {
+    profileForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const newName = f.full_name.value.trim();
+      const newEmail = f.email.value.trim();
+      const cur = Auth.current();
+      const messages = [];
+      let hadError = null;
+
+      // Naam wijzigen indien anders
+      const curName = (cur.fullName === cur.email) ? '' : (cur.fullName || '');
+      if (newName !== curName) {
+        const err = await Auth.updateDisplayName(newName);
+        if (err) hadError = 'Naam wijzigen mislukt: ' + err;
+        else messages.push('Naam bijgewerkt.');
+      }
+
+      // E-mail wijzigen indien anders
+      if (!hadError && newEmail && newEmail !== cur.email) {
+        const ok = await Modal.confirm({
+          type: 'warning',
+          title: 'E-mailadres wijzigen?',
+          message: `Je krijgt een verificatielink in ${newEmail}. Pas nadat je daarop klikt is het nieuwe adres actief. Doorgaan?`,
+          confirmText: 'Ja, verstuur',
+          cancelText: 'Annuleren',
+        });
+        if (ok) {
+          const err = await Auth.updateEmail(newEmail);
+          if (err) hadError = 'E-mailwijziging mislukt: ' + err;
+          else messages.push(`Verificatielink verzonden naar ${newEmail}.`);
+        }
+      }
+
+      if (hadError) renderAccount({ error: hadError });
+      else if (messages.length > 0) {
+        // Topbar bijwerken
+        const cur2 = Auth.current();
+        if (cur2) document.getElementById('user-name').textContent = cur2.fullName || cur2.email;
+        renderAccount({ success: messages.join(' ') });
+      } else {
+        renderAccount(); // niets veranderd
+      }
     });
   }
 
