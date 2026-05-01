@@ -149,6 +149,17 @@ function renderAccount(msg) {
               </select>
               <span class="muted small">Niet-systeemfonts worden geladen via Google Fonts en daarna lokaal gecached (werken ook offline na de eerste keer).</span>
             </label>
+
+            <label>
+              <span>Formulier-dichtheid</span>
+              <select name="form_density">
+                <option value="compact"    ${s.form_density==='compact'?'selected':''}>Compact (kleinere velden, dichter op elkaar)</option>
+                <option value="normaal"    ${(s.form_density||'normaal')==='normaal'?'selected':''}>Normaal — aanbevolen</option>
+                <option value="ruim"       ${s.form_density==='ruim'?'selected':''}>Ruim (grotere velden, meer ruimte tussen rijen)</option>
+                <option value="extraruim"  ${s.form_density==='extraruim'?'selected':''}>Extra ruim (max grote velden, voor tablets en touchscreens)</option>
+              </select>
+              <span class="muted small">Past de grootte van invulvelden en spacing in formulieren aan.</span>
+            </label>
             <div class="font-preview" id="font-preview">
               <h3 style="margin:0 0 .25rem;">In den naam van de Vader</h3>
               <p style="margin:0;">De familie nodigt u uit voor de uitvaart van een geliefde. <em>Mor Severios</em> · 14:00 uur · Hengelo. Aansluitend condoleance met koffie en simit.</p>
@@ -417,6 +428,13 @@ function renderAccount(msg) {
     if (fontSel) {
       fontSel.addEventListener('change', () => applyFont(fontSel.value));
     }
+    const densSel = uiForm.querySelector('select[name="form_density"]');
+    if (densSel) {
+      densSel.addEventListener('change', () => {
+        document.body.classList.remove('density-compact','density-normaal','density-ruim','density-extraruim');
+        document.body.classList.add('density-' + densSel.value);
+      });
+    }
     uiForm.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
@@ -424,6 +442,7 @@ function renderAccount(msg) {
         compact_mode: f.compact_mode.checked,
         rounded_cards: f.rounded_cards.checked,
         font_id: f.font_id.value,
+        form_density: f.form_density.value,
         catalog_admin_mode: f.catalog_admin_mode.checked,
       });
       Branding.apply();

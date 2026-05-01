@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v18'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v19'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-04-30';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -26,6 +26,7 @@ const Settings = {
     compact_mode: false,
     rounded_cards: true,
     font_id: 'default',
+    form_density: 'normaal', // 'compact' | 'normaal' | 'ruim' | 'extraruim'
     // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
     // catalogi (kisten, bloemen, eten & drinken)
     catalog_admin_mode: false,
@@ -194,6 +195,10 @@ const Branding = {
     // Compact / afgeronde hoeken
     document.body.classList.toggle('ui-compact', !!s.compact_mode);
     document.body.classList.toggle('ui-square', !s.rounded_cards);
+
+    // Form-dichtheid
+    document.body.classList.remove('density-compact','density-normaal','density-ruim','density-extraruim');
+    document.body.classList.add('density-' + (s.form_density || 'normaal'));
 
     // Lettertype
     applyFont(s.font_id);
