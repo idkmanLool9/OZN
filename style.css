@@ -467,22 +467,25 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .notitie-meta { display: flex; align-items: center; gap: .75rem; margin-bottom: .35rem; }
 .prewrap { white-space: pre-wrap; word-wrap: break-word; }
 
-/* Login — split-screen */
+/* Login — split-screen, vast op het scherm (geen scroll) */
 .login-screen {
-  min-height: 100vh; display: flex; align-items: stretch;
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: stretch;
   background: var(--bg);
+  overflow: hidden;
 }
+body:has(#login-screen:not([hidden])) { overflow: hidden; }
 .login-brand {
   flex: 1 1 50%;
   position: relative; overflow: hidden;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: #fff;
-  padding: 3.5rem 4rem;
+  padding: clamp(1.5rem, 4vh, 3rem) clamp(1.5rem, 4vw, 3.5rem);
   display: flex; align-items: stretch;
 }
 .login-brand-inner {
   position: relative; z-index: 2;
-  display: flex; flex-direction: column; gap: 2.5rem;
+  display: flex; flex-direction: column; gap: clamp(1rem, 3vh, 2rem);
   width: 100%; max-width: 540px;
 }
 .login-brand-head { display: flex; align-items: center; gap: 1rem; }
@@ -498,16 +501,16 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 
 .login-brand-body { margin-top: auto; }
 .login-brand-body h1 {
-  margin: 0 0 .85rem; font-size: clamp(2rem, 4vw, 2.6rem);
+  margin: 0 0 .65rem; font-size: clamp(1.6rem, 3.4vw, 2.4rem);
   font-weight: 700; line-height: 1.15; color: #fff;
 }
 .login-brand-body p {
-  margin: 0 0 1.75rem; font-size: 1rem; line-height: 1.55;
+  margin: 0 0 1.25rem; font-size: clamp(.9rem, 1.1vw, 1rem); line-height: 1.5;
   opacity: .9; max-width: 32em;
 }
 .login-brand-features {
   list-style: none; padding: 0; margin: 0;
-  display: flex; flex-direction: column; gap: .75rem;
+  display: flex; flex-direction: column; gap: .55rem;
 }
 .login-brand-features li {
   display: flex; align-items: flex-start; gap: .75rem;
@@ -523,7 +526,7 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
   margin-top: .05rem;
 }
 .login-brand-foot {
-  margin: 2.5rem 0 0; font-size: .8rem; opacity: .65;
+  margin: clamp(1rem, 3vh, 2rem) 0 0; font-size: .8rem; opacity: .65;
 }
 .login-brand-orb {
   position: absolute; border-radius: 50%;
@@ -535,14 +538,16 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .login-form-pane {
   flex: 1 1 50%;
   display: flex; align-items: center; justify-content: center;
-  padding: 3rem 2rem; background: #fff;
+  padding: clamp(1.5rem, 3vh, 2.5rem) clamp(1.25rem, 3vw, 2rem);
+  background: #fff;
+  overflow-y: auto; /* alleen het form-paneel mag intern scrollen als 't echt te krap is */
 }
 .login-form-wrap { width: 100%; max-width: 420px; }
 .login-form-wrap h2 {
-  margin: 0 0 .35rem; padding: 0; border: none;
-  font-size: 1.6rem; font-weight: 700; color: var(--text);
+  margin: 0 0 .3rem; padding: 0; border: none;
+  font-size: 1.5rem; font-weight: 700; color: var(--text);
 }
-.login-form-sub { margin: 0 0 1.75rem; color: var(--muted); font-size: .95rem; }
+.login-form-sub { margin: 0 0 1.25rem; color: var(--muted); font-size: .95rem; }
 .login-form-wrap .form label > span { font-size: .9rem; font-weight: 600; color: var(--text); }
 .login-form-wrap .form input { padding: .75rem .9rem; font-size: 1rem; }
 .login-actions { display: flex; gap: .5rem; margin-top: .25rem; }
@@ -557,18 +562,25 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .login-form-foot a { font-weight: 600; }
 
 @media (max-width: 880px) {
-  .login-screen { flex-direction: column; min-height: 100vh; }
+  .login-screen { flex-direction: column; }
   .login-brand {
-    flex: 0 0 auto; padding: 2rem 1.5rem;
+    flex: 0 0 auto; padding: 1.25rem 1.25rem;
   }
-  .login-brand-inner { gap: 1.25rem; max-width: none; }
-  .login-brand-body h1 { font-size: 1.6rem; margin-bottom: .5rem; }
-  .login-brand-body p { font-size: .92rem; margin-bottom: 1rem; }
-  .login-brand-features { gap: .5rem; }
-  .login-brand-features li { font-size: .88rem; }
+  .login-brand-inner { gap: .85rem; max-width: none; }
+  .login-brand-body h1 { font-size: 1.45rem; margin-bottom: .35rem; }
+  .login-brand-body p { font-size: .9rem; margin-bottom: .65rem; }
+  .login-brand-features { gap: .35rem; }
+  .login-brand-features li { font-size: .85rem; }
   .login-brand-foot, .login-brand-orb { display: none; }
-  .login-form-pane { flex: 1 1 auto; padding: 2rem 1.25rem; }
+  .login-form-pane {
+    flex: 1 1 auto; padding: 1.25rem 1.25rem;
+  }
   .login-form-wrap { max-width: 460px; }
+}
+/* Echt korte schermen: bullets/onderschrift verbergen om alles passend te houden */
+@media (max-width: 880px) and (max-height: 600px) {
+  .login-brand-body p,
+  .login-brand-features { display: none; }
 }
 
 /* Alerts */
