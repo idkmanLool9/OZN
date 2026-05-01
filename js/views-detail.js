@@ -651,7 +651,7 @@ function bindDetailEvents(id) {
     } catch (_) {}
   });
 
-  $('#view').addEventListener('click', async e => {
+  $('#view').onclick = async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.getAttribute('data-action');
@@ -688,5 +688,5 @@ function bindDetailEvents(id) {
         await DB.touchDossier(id); renderDossierDetail({ id });
       }
     } catch (_) {}
-  });
+  };
 }

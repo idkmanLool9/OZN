@@ -47,7 +47,7 @@ function renderKistenBeheer(msg) {
         </p>`}
     </div>`;
 
-  $('#view').addEventListener('change', async e => {
+  $('#view').onchange = async e => {
     const inp = e.target.closest('input[data-upload]');
     if (!inp) return;
     const naam = inp.getAttribute('data-upload');
@@ -69,9 +69,9 @@ function renderKistenBeheer(msg) {
     } catch (_) {
       if (card) card.classList.remove('is-uploading');
     }
-  });
+  };
 
-  $('#view').addEventListener('click', async e => {
+  $('#view').onclick = async e => {
     // Klik op afbeelding → lightbox
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
@@ -94,5 +94,5 @@ function renderKistenBeheer(msg) {
       await KistFotos.remove(naam);
       renderKistenBeheer({ success: 'Foto verwijderd.' });
     } catch (_) {}
-  });
+  };
 }

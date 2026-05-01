@@ -139,7 +139,7 @@ function renderBloemenBeheer(msg) {
     });
   }
 
-  $('#view').addEventListener('click', async e => {
+  $('#view').onclick = async e => {
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
       const id = parseInt(zoom.getAttribute('data-id'), 10);
@@ -171,5 +171,5 @@ function renderBloemenBeheer(msg) {
         renderBloemenBeheer({ success: 'Verwijderd.' });
       } catch (_) {}
     }
-  });
+  };
 }

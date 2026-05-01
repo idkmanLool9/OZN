@@ -147,7 +147,7 @@ function renderEtenDrinkenBeheer(msg) {
     });
   }
 
-  $('#view').addEventListener('click', async e => {
+  $('#view').onclick = async e => {
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
       const id = parseInt(zoom.getAttribute('data-id'), 10);
@@ -179,5 +179,5 @@ function renderEtenDrinkenBeheer(msg) {
         renderEtenDrinkenBeheer({ success: 'Verwijderd.' });
       } catch (_) {}
     }
-  });
+  };
 }
