@@ -162,6 +162,25 @@ const STANDAARD_TAKEN_ZONDER_VERZEKERING = [
   'Eindbetaling ontvangen / voldaan',
 ];
 
+// Velden die we als 'aangeraden in te vullen' beschouwen — bij opslaan
+// zonder deze waardes verschijnt een waarschuwingspop-up.
+const AANBEVOLEN_VELDEN = [
+  { name: 'voornaam',              label: 'Voornaam overledene' },
+  { name: 'achternaam',            label: 'Achternaam overledene' },
+  { name: 'geboortedatum',         label: 'Geboortedatum' },
+  { name: 'overlijdensdatum',      label: 'Overlijdensdatum' },
+  { name: 'adres_overledene',      label: 'Adres overledene' },
+  { name: 'woonplaats_overledene', label: 'Woonplaats overledene' },
+  { name: 'contact_naam',          label: 'Achternaam contactpersoon' },
+  { name: 'contact_telefoon',      label: 'Telefoon contactpersoon' },
+  { name: 'parochie',              label: 'Parochie' },
+  { name: 'uitvaart_type',         label: 'Type uitvaart' },
+  { name: 'uitvaart_datum',        label: 'Datum uitvaart' },
+  { name: 'kerk_locatie',          label: 'Kerk / dienstlocatie' },
+  { name: 'begraafplaats',         label: 'Begraafplaats' },
+  { name: 'verzekering_status',    label: 'Verzekering ja/nee' },
+];
+
 // Backwards compat: oude lijst gebruikt voor onbekende status (pre-bestaande dossiers)
 const STANDAARD_TAKEN = [
   ...STANDAARD_TAKEN_GEMEEN,

@@ -66,14 +66,24 @@ const Modal = {
     return Modal._present(opts);
   },
   _present(opts) {
-    const { type = 'info', title = '', message = '', confirmText = 'Begrepen' } = opts || {};
+    const { type = 'info', title = '', message = '', html = null,
+            confirmText = 'Begrepen', cancelText = null } = opts || {};
     const m = document.getElementById('modal');
-    if (!m) { alert((title ? title + ': ' : '') + message); return Promise.resolve(); }
+    if (!m) { alert((title ? title + ': ' : '') + message); return Promise.resolve(true); }
     Modal._busy = true;
     document.getElementById('modal-title').textContent = title;
-    document.getElementById('modal-message').textContent = message;
+    const msgEl = document.getElementById('modal-message');
+    if (html) msgEl.innerHTML = html;
+    else msgEl.textContent = message;
     const btn = document.getElementById('modal-confirm');
+    const btnCancel = document.getElementById('modal-cancel');
     btn.textContent = confirmText;
+    if (cancelText) {
+      btnCancel.textContent = cancelText;
+      btnCancel.hidden = false;
+    } else {
+      btnCancel.hidden = true;
+    }
     document.getElementById('modal-icon').innerHTML = Modal._iconFor(type);
     m.className = 'modal modal-' + type;
     m.hidden = false;
@@ -81,32 +91,44 @@ const Modal = {
     setTimeout(() => btn.focus(), 60);
 
     return new Promise(resolve => {
-      const dismiss = () => {
+      const close = (result) => {
         m.classList.remove('shown');
         m.classList.add('fading');
-        btn.removeEventListener('click', dismiss);
+        btn.removeEventListener('click', onConfirm);
+        btnCancel.removeEventListener('click', onCancel);
         document.removeEventListener('keydown', keyHandler);
-        backdrop && backdrop.removeEventListener('click', dismiss);
+        backdrop && backdrop.removeEventListener('click', onCancel);
         setTimeout(() => {
           m.hidden = true;
           m.classList.remove('fading');
           Modal._busy = false;
-          resolve();
-          // Volgende uit queue
+          resolve(result);
           if (Modal._queue.length) {
             const next = Modal._queue.shift();
             setTimeout(() => Modal._present(next), 60);
           }
         }, 280);
       };
+      const onConfirm = () => close(true);
+      const onCancel = () => close(false);
       const keyHandler = e => {
-        if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') { e.preventDefault(); dismiss(); }
+        if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
+        else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
       };
-      btn.addEventListener('click', dismiss);
+      btn.addEventListener('click', onConfirm);
+      btnCancel.addEventListener('click', onCancel);
       document.addEventListener('keydown', keyHandler);
       const backdrop = m.querySelector('.modal-backdrop');
-      if (backdrop) backdrop.addEventListener('click', dismiss);
+      if (backdrop) backdrop.addEventListener('click', onCancel);
     });
+  },
+  // Confirm-dialoog met twee knoppen — resolved met true (confirm) of false (cancel)
+  confirm(opts) {
+    return Modal.show(Object.assign({
+      type: 'warning',
+      confirmText: 'OK',
+      cancelText: 'Annuleren',
+    }, opts || {}));
   },
   _iconFor(type) {
     if (type === 'offline' || type === 'warning') {

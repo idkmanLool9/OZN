@@ -162,15 +162,15 @@ function renderDossierDetail(params) {
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' :
           `<table class="table"><thead><tr>
             <th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th>
-            ${verzekerd ? '<th>Gedekt</th>' : ''}
-            <th>Betaald</th><th></th>
+            ${verzekerd ? '<th class="center">Wie betaalt</th>' : ''}
+            <th class="center">Status</th><th></th>
           </tr></thead><tbody>
             ${kosten.map(k => `<tr>
               <td>${esc(k.omschrijving)}</td>
-              <td>${esc(k.categorie || '—')}</td>
+              <td><span class="muted small">${esc(k.categorie || '—')}</span></td>
               <td class="num">${fmtEUR(k.bedrag)}</td>
-              ${verzekerd ? `<td><button type="button" class="check small" data-action="toggle-gedekt" data-id="${k.id}" title="gedekt door verzekering">${k.gedekt ? '✓' : '○'}</button></td>` : ''}
-              <td><button type="button" class="check small" data-action="toggle-kosten" data-id="${k.id}">${k.betaald ? '✓' : '○'}</button></td>
+              ${verzekerd ? `<td class="center"><button type="button" class="kost-toggle ${k.gedekt ? 'on-gedekt' : 'off-gedekt'}" data-action="toggle-gedekt" data-id="${k.id}" title="Klik om te wisselen">${k.gedekt ? '🛡 Verzekering' : '👥 Familie'}</button></td>` : ''}
+              <td class="center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
               <td><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}">×</button></td>
             </tr>`).join('')}
             <tr class="total-row"><td colspan="2"><strong>Totaal</strong></td><td class="num"><strong>${fmtEUR(totaal)}</strong></td><td colspan="${verzekerd ? 3 : 2}" class="muted small">waarvan betaald: ${fmtEUR(betaald)}</td></tr>
