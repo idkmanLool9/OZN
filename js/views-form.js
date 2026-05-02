@@ -7,7 +7,9 @@ function snapshotDossierForm(formEl) {
   const data = {};
   DOSSIER_VELDEN.forEach(f => {
     const inp = formEl.elements[f];
-    if (inp) data[f] = inp.value;
+    if (!inp) return;
+    if (inp.type === 'checkbox') data[f] = inp.checked ? 'ja' : 'nee';
+    else data[f] = inp.value;
   });
   return data;
 }
@@ -15,7 +17,11 @@ function applyDossierDraft(formEl, data) {
   let changed = 0;
   for (const f in data) {
     const inp = formEl.elements[f];
-    if (inp && data[f] != null && inp.value !== data[f]) {
+    if (!inp || data[f] == null) continue;
+    if (inp.type === 'checkbox') {
+      const want = data[f] === 'ja' || data[f] === true || data[f] === 'true';
+      if (inp.checked !== want) { inp.checked = want; changed++; }
+    } else if (inp.value !== data[f]) {
       inp.value = data[f];
       changed++;
     }
@@ -86,11 +92,31 @@ function renderDossierForm(params) {
                 <option value="onbekend" ${sel('syrisch_orthodox_lid','onbekend')}>Onbekend</option>
               </select>
             </label>
+            <label class="span-3" id="partner-naam-row" hidden><span>Naam (ex)partner</span>
+              <input type="text" name="partner_naam" value="${v('partner_naam')}" placeholder="naam echtgeno(o)t(e), partner of ex-partner">
+            </label>
+            <label><span>Laat overledene kinderen na?</span>
+              <select name="kinderen_status" id="kinderen-status-select">
+                <option value="">—</option>
+                <option value="ja" ${sel('kinderen_status','ja')}>Ja</option>
+                <option value="nee" ${sel('kinderen_status','nee')}>Nee</option>
+              </select>
+            </label>
+            <label><span>Minderjarige kinderen?</span>
+              <select name="minderjarige_kinderen">
+                <option value="">—</option>
+                <option value="ja" ${sel('minderjarige_kinderen','ja')}>Ja</option>
+                <option value="nee" ${sel('minderjarige_kinderen','nee')}>Nee</option>
+              </select>
+            </label>
+            <label class="span-3" id="kinderen-namen-row" hidden><span>Namen kinderen (één per regel)</span>
+              <textarea name="kinderen_namen" rows="3" placeholder="bv.&#10;Sami (12)&#10;Maria (8)">${v('kinderen_namen')}</textarea>
+            </label>
           </div>
         </fieldset>
 
         <fieldset class="card">
-          <legend>Contactpersoon / aangever</legend>
+          <legend>Erfgenaam / contactpersoon</legend>
           <div class="grid-3">
             <label><span>Achternaam</span><input type="text" name="contact_naam" value="${v('contact_naam')}"></label>
             <label><span>Voornaam</span><input type="text" name="contact_voornaam" value="${v('contact_voornaam')}"></label>
@@ -100,7 +126,48 @@ function renderDossierForm(params) {
             <label class="span-2"><span>Adres</span><input type="text" name="contact_adres" value="${v('contact_adres')}"></label>
             <label><span>Postcode</span><input type="text" name="contact_postcode" value="${v('contact_postcode')}"></label>
             <label class="span-2"><span>Woonplaats</span><input type="text" name="contact_woonplaats" value="${v('contact_woonplaats')}"></label>
+            <label><span>BSN erfgenaam</span><input type="text" name="contact_bsn" value="${v('contact_bsn')}"></label>
+            <label><span>Geboortedatum erfgenaam</span><input type="date" name="contact_geboortedatum" value="${v('contact_geboortedatum')}"></label>
             <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="card">
+          <legend>Aangever &amp; aangifte van overlijden</legend>
+          <label class="checkbox-inline" style="margin-bottom:.75rem;">
+            <input type="checkbox" name="aangever_zelfde_als_contact" id="aangever-same"
+              ${(dossier.aangever_zelfde_als_contact !== 'nee') ? 'checked' : ''}>
+            Aangever is dezelfde persoon als de contactpersoon hierboven
+          </label>
+          <div class="grid-3" id="aangever-fields" hidden>
+            <label class="span-2"><span>Naam aangever (voor- en achternaam)</span>
+              <input type="text" name="aangever_naam" value="${v('aangever_naam')}">
+            </label>
+            <label><span>Geboortedatum aangever</span>
+              <input type="date" name="aangever_geboortedatum" value="${v('aangever_geboortedatum')}">
+            </label>
+            <label class="span-3"><span>Geboorteplaats aangever</span>
+              <input type="text" name="aangever_geboorteplaats" value="${v('aangever_geboorteplaats')}">
+            </label>
+          </div>
+          <div class="grid-3">
+            <label><span>Akte van overlijden ontvangen?</span>
+              <select name="akte_overlijden">
+                <option value="">—</option>
+                <option value="ja" ${sel('akte_overlijden','ja')}>Ja</option>
+                <option value="nee" ${sel('akte_overlijden','nee')}>Nee</option>
+              </select>
+            </label>
+            <label><span>Toestemming publicatie krant</span>
+              <select name="publicatie_krant">
+                <option value="">—</option>
+                <option value="wel" ${sel('publicatie_krant','wel')}>Wel toestemming</option>
+                <option value="geen" ${sel('publicatie_krant','geen')}>Geen toestemming</option>
+              </select>
+            </label>
+            <label><span>Datum aangifte</span>
+              <input type="date" name="aangifte_datum" value="${v('aangifte_datum')}">
+            </label>
           </div>
         </fieldset>
 
@@ -425,6 +492,41 @@ function renderDossierForm(params) {
   vsel.addEventListener('change', updateVerzekeringSections);
   updateVerzekeringSections();
 
+  // ─── Partner-naam tonen als burgerlijke staat dat impliceert ─────────
+  const bsSel = $('select[name="burgerlijke_staat"]');
+  const partnerRow = $('#partner-naam-row');
+  function updatePartnerVisibility() {
+    const v = (bsSel?.value || '').toLowerCase();
+    const show = ['gehuwd', 'geregistreerd partner', 'gescheiden', 'weduwe/weduwnaar'].includes(v);
+    if (partnerRow) partnerRow.hidden = !show;
+  }
+  if (bsSel) {
+    bsSel.addEventListener('change', updatePartnerVisibility);
+    updatePartnerVisibility();
+  }
+
+  // ─── Namen kinderen tonen als 'Laat kinderen na = ja' ────────────────
+  const kindSel = $('#kinderen-status-select');
+  const kindRow = $('#kinderen-namen-row');
+  function updateKinderenVisibility() {
+    if (kindRow) kindRow.hidden = (kindSel?.value !== 'ja');
+  }
+  if (kindSel) {
+    kindSel.addEventListener('change', updateKinderenVisibility);
+    updateKinderenVisibility();
+  }
+
+  // ─── Aangever-velden tonen als anders dan contactpersoon ─────────────
+  const aangeverSame = $('#aangever-same');
+  const aangeverFields = $('#aangever-fields');
+  function updateAangeverVisibility() {
+    if (aangeverFields) aangeverFields.hidden = !!aangeverSame?.checked;
+  }
+  if (aangeverSame) {
+    aangeverSame.addEventListener('change', updateAangeverVisibility);
+    updateAangeverVisibility();
+  }
+
   // ─── Postcode-autofill via PDOK Locatieserver ────────────────────────
   Postcode.bindAutofill({
     adresEl:      $('input[name="adres_overledene"]'),
@@ -525,7 +627,9 @@ function renderDossierForm(params) {
     const data = {};
     DOSSIER_VELDEN.forEach(f => {
       const inp = e.target.elements[f];
-      if (inp) data[f] = (inp.value || '').trim();
+      if (!inp) return;
+      if (inp.type === 'checkbox') data[f] = inp.checked ? 'ja' : 'nee';
+      else data[f] = (inp.value || '').trim();
     });
     if (!data.status) data.status = 'nieuw';
 

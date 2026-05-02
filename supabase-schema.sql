@@ -82,6 +82,26 @@ ALTER TABLE public.kosten
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS foto_overledene_pad TEXT;
 
+-- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
+ALTER TABLE public.dossiers
+  -- Overledene: partner + kinderen
+  ADD COLUMN IF NOT EXISTS partner_naam TEXT,
+  ADD COLUMN IF NOT EXISTS kinderen_status TEXT,         -- 'ja' / 'nee'
+  ADD COLUMN IF NOT EXISTS minderjarige_kinderen TEXT,   -- 'ja' / 'nee'
+  ADD COLUMN IF NOT EXISTS kinderen_namen TEXT,
+  -- Erfgenaam / contactpersoon: aanvullingen
+  ADD COLUMN IF NOT EXISTS contact_bsn TEXT,
+  ADD COLUMN IF NOT EXISTS contact_geboortedatum DATE,
+  -- Aangever (vaak zelfde als contactpersoon)
+  ADD COLUMN IF NOT EXISTS aangever_zelfde_als_contact TEXT, -- 'ja' / 'nee'
+  ADD COLUMN IF NOT EXISTS aangever_naam TEXT,
+  ADD COLUMN IF NOT EXISTS aangever_geboortedatum DATE,
+  ADD COLUMN IF NOT EXISTS aangever_geboorteplaats TEXT,
+  -- Aangifte: status + toestemming + datum
+  ADD COLUMN IF NOT EXISTS akte_overlijden TEXT,         -- 'ja' / 'nee'
+  ADD COLUMN IF NOT EXISTS publicatie_krant TEXT,        -- 'wel' / 'geen'
+  ADD COLUMN IF NOT EXISTS aangifte_datum DATE;
+
 -- Storage-bucket 'overledenen' (publiek) voor foto's gebruikt op rouwkaarten
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('overledenen', 'overledenen', true)

@@ -99,14 +99,33 @@ function renderDossierDetail(params) {
           ${dlRow('Lid SOK', d.syrisch_orthodox_lid)}
           ${dlRow('Gezinsnummer', d.gezinsnummer)}
           ${dlRow('Grafnummer', d.grafnummer)}
+          ${dlRow('(Ex)partner', d.partner_naam)}
+          ${dlRow('Kinderen', d.kinderen_status)}
+          ${dlRow('Minderjarige kinderen', d.minderjarige_kinderen)}
+          ${d.kinderen_namen ? `<div><dt>Namen kinderen</dt><dd class="prewrap">${esc(d.kinderen_namen)}</dd></div>` : ''}
         </dl>
-        <h3>Contactpersoon</h3>
+        <h3>Erfgenaam / contactpersoon</h3>
         <dl class="dl">
           ${dlRow('Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') + (d.contact_relatie ? ' (' + d.contact_relatie + ')' : ''))}
           ${dlRow('Telefoon', d.contact_telefoon)}
           ${dlRow('E-mail', d.contact_email)}
           ${dlRow('Adres', [d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', '))}
+          ${dlRow('BSN', d.contact_bsn)}
+          ${dlRow('Geboortedatum', fmtDate(d.contact_geboortedatum))}
         </dl>
+        ${(d.aangever_zelfde_als_contact === 'nee' && (d.aangever_naam || d.aangever_geboortedatum || d.aangever_geboorteplaats)) ? `
+        <h3>Aangever</h3>
+        <dl class="dl">
+          ${dlRow('Naam', d.aangever_naam)}
+          ${dlRow('Geboren', [fmtDate(d.aangever_geboortedatum), d.aangever_geboorteplaats && 'te ' + d.aangever_geboorteplaats].filter(Boolean).join(' '))}
+        </dl>` : ''}
+        ${(d.akte_overlijden || d.publicatie_krant || d.aangifte_datum) ? `
+        <h3>Aangifte van overlijden</h3>
+        <dl class="dl">
+          ${dlRow('Akte ontvangen', d.akte_overlijden)}
+          ${dlRow('Publicatie krant', d.publicatie_krant && (d.publicatie_krant + ' toestemming'))}
+          ${dlRow('Datum aangifte', fmtDate(d.aangifte_datum))}
+        </dl>` : ''}
         ${(d.contact_telefoon || d.contact_email) ? `
           <div class="quick-contact">
             ${d.contact_telefoon ? `<a class="btn btn-sm" href="tel:${esc(d.contact_telefoon.replace(/\s/g,''))}">📞 Bel</a>` : ''}
@@ -352,19 +371,42 @@ function buildDossierEmail(d) {
     ['Adres', adresO],
     ['BSN', d.bsn],
     ['Burgerlijke staat', d.burgerlijke_staat],
+    ['(Ex)partner', d.partner_naam],
+    ['Kinderen', d.kinderen_status],
+    ['Minderjarige kinderen', d.minderjarige_kinderen],
+    ['Namen kinderen', d.kinderen_namen],
     ['Nationaliteit', d.nationaliteit],
     ['Beroep', d.beroep],
     ['Lid SOK', d.syrisch_orthodox_lid],
     ['Gezinsnummer', d.gezinsnummer],
   ]));
 
-  parts.push(emH3('Contactpersoon'));
+  parts.push(emH3('Erfgenaam / contactpersoon'));
   parts.push(emTable([
     ['Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') + (d.contact_relatie ? ' (' + d.contact_relatie + ')' : '')],
     ['Telefoon', d.contact_telefoon],
     ['E-mail', d.contact_email],
     ['Adres', adresC],
+    ['BSN', d.contact_bsn],
+    ['Geboortedatum', fmtDate(d.contact_geboortedatum)],
   ]));
+
+  if (d.aangever_zelfde_als_contact === 'nee' && (d.aangever_naam || d.aangever_geboortedatum)) {
+    parts.push(emH3('Aangever'));
+    parts.push(emTable([
+      ['Naam', d.aangever_naam],
+      ['Geboren', [fmtDate(d.aangever_geboortedatum), d.aangever_geboorteplaats && 'te ' + d.aangever_geboorteplaats].filter(Boolean).join(' ')],
+    ]));
+  }
+
+  if (d.akte_overlijden || d.publicatie_krant || d.aangifte_datum) {
+    parts.push(emH3('Aangifte van overlijden'));
+    parts.push(emTable([
+      ['Akte ontvangen', d.akte_overlijden],
+      ['Publicatie krant', d.publicatie_krant && (d.publicatie_krant + ' toestemming')],
+      ['Datum aangifte', fmtDate(d.aangifte_datum)],
+    ]));
+  }
 
   parts.push(emH3('Kerkelijk'));
   parts.push(emTable([
