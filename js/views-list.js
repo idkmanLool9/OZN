@@ -305,6 +305,38 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="parochies">
+        <h2>Parochies &amp; priesters</h2>
+        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Aboona) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
+        ${(() => {
+          const lijst = Settings.get('parochies') || [];
+          return `
+          <form id="parochie-form" class="form" autocomplete="off">
+            <div id="parochie-rows" class="parochie-rows">
+              ${lijst.map((p, i) => `
+                <div class="parochie-row" data-idx="${i}">
+                  <input type="text" class="parochie-naam" value="${esc(p.naam || '')}" placeholder="bv. Mor Severios — Hengelo">
+                  <input type="text" class="parochie-priester" value="${esc(p.priester || '')}" placeholder="standaard-priester (optioneel)">
+                  <button type="button" class="btn-icon" data-action="del-parochie" title="verwijderen">×</button>
+                </div>`).join('')}
+            </div>
+            <div class="grid-3" style="margin-top:.85rem;gap:.75rem;">
+              <label class="span-2"><span>Standaard kerk / dienstlocatie</span>
+                <input type="text" name="default_kerk_locatie" value="${esc(Settings.get('default_kerk_locatie') || '')}" placeholder="bv. Maria kathedraal">
+                <span class="muted small">Wordt vooraf ingevuld bij elk nieuw dossier.</span>
+              </label>
+              <label><span>Standaard begraafplaats</span>
+                <input type="text" name="default_begraafplaats" value="${esc(Settings.get('default_begraafplaats') || '')}" placeholder="bv. St. Ephrem">
+              </label>
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-parochie">+ Parochie toevoegen</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="verzekeringen">
         <h2>Verzekeringsmaatschappijen &amp; pakketten</h2>
         <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is.</p>
@@ -673,6 +705,46 @@ function renderAccount(msg) {
         result.innerHTML = `<div class="alert alert-error">Update-check mislukt: ${esc(e.message || e)}</div>`;
         updBtn.disabled = false; updBtn.textContent = orig;
       }
+    });
+  }
+
+  // Parochies + priesters beheer
+  const parochieForm = $('#parochie-form');
+  if (parochieForm) {
+    function makeParochieRow(naam = '', priester = '') {
+      const div = document.createElement('div');
+      div.className = 'parochie-row';
+      div.innerHTML = `
+        <input type="text" class="parochie-naam" value="${esc(naam)}" placeholder="bv. Mor Severios — Hengelo">
+        <input type="text" class="parochie-priester" value="${esc(priester)}" placeholder="standaard-priester (optioneel)">
+        <button type="button" class="btn-icon" data-action="del-parochie" title="verwijderen">×</button>`;
+      return div;
+    }
+    $('#btn-add-parochie').addEventListener('click', () => {
+      const rows = $('#parochie-rows');
+      const row = makeParochieRow();
+      rows.appendChild(row);
+      row.querySelector('.parochie-naam').focus();
+    });
+    parochieForm.addEventListener('click', e => {
+      const del = e.target.closest('button[data-action="del-parochie"]');
+      if (!del) return;
+      const row = del.closest('.parochie-row');
+      if (row) row.remove();
+    });
+    parochieForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const lijst = $$('#parochie-rows .parochie-row').map(row => ({
+        naam: (row.querySelector('.parochie-naam').value || '').trim(),
+        priester: (row.querySelector('.parochie-priester').value || '').trim(),
+      })).filter(p => p.naam);
+      Settings.set({
+        parochies: lijst,
+        default_kerk_locatie: f.default_kerk_locatie.value.trim() || Settings.defaults.default_kerk_locatie,
+        default_begraafplaats: f.default_begraafplaats.value.trim() || Settings.defaults.default_begraafplaats,
+      });
+      renderAccount({ success: 'Parochies opgeslagen.' });
     });
   }
 

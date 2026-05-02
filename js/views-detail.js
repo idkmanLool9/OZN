@@ -87,62 +87,44 @@ function renderDossierDetail(params) {
         <h3>Overledene</h3>
         <dl class="dl">
           ${dlRow('Naam', fullName(d))}
-          ${dlRow('Doopnaam', d.doopnaam)}
           ${dlRow('Geslacht', d.geslacht)}
           ${dlRow('Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' '))}
           ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdenstijd && 'om ' + d.overlijdenstijd, d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' '))}
           ${dlRow('Adres', [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', '))}
           ${dlRow('BSN', d.bsn)}
-          ${dlRow('Burgerlijke staat', d.burgerlijke_staat)}
           ${dlRow('Nationaliteit', d.nationaliteit)}
-          ${dlRow('Beroep', d.beroep)}
           ${dlRow('Lid SOK', d.syrisch_orthodox_lid)}
           ${dlRow('Gezinsnummer', d.gezinsnummer)}
           ${dlRow('Grafnummer', d.grafnummer)}
           ${dlRow('(Ex)partner', d.partner_naam)}
           ${dlRow('Kinderen', d.kinderen_status)}
           ${dlRow('Minderjarige kinderen', d.minderjarige_kinderen)}
-          ${d.kinderen_namen ? `<div><dt>Namen kinderen</dt><dd class="prewrap">${esc(d.kinderen_namen)}</dd></div>` : ''}
+          ${(d.minderjarige_kinderen === 'ja' && d.kinderen_namen) ? `<div><dt>Namen kinderen</dt><dd class="prewrap">${esc(d.kinderen_namen)}</dd></div>` : ''}
         </dl>
-        <h3>Erfgenaam / contactpersoon</h3>
+        <h3>Contactpersoon</h3>
         <dl class="dl">
-          ${dlRow('Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') + (d.contact_relatie ? ' (' + d.contact_relatie + ')' : ''))}
+          ${dlRow('BSN', d.contact_bsn)}
+          ${dlRow('Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' '))}
+          ${dlRow('Adres', [d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '))}
+          ${dlRow('Postcode / woonplaats', [d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(' '))}
+          ${dlRow('Geboortedatum', fmtDate(d.contact_geboortedatum))}
           ${dlRow('Telefoon', d.contact_telefoon)}
           ${dlRow('E-mail', d.contact_email)}
-          ${dlRow('Adres', [d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', '))}
-          ${dlRow('BSN', d.contact_bsn)}
-          ${dlRow('Geboortedatum', fmtDate(d.contact_geboortedatum))}
+          ${dlRow('Relatie tot overledene', d.contact_relatie)}
         </dl>
-        ${(d.aangever_zelfde_als_contact === 'nee' && (d.aangever_naam || d.aangever_geboortedatum || d.aangever_geboorteplaats)) ? `
-        <h3>Aangever</h3>
-        <dl class="dl">
-          ${dlRow('Naam', d.aangever_naam)}
-          ${dlRow('Geboren', [fmtDate(d.aangever_geboortedatum), d.aangever_geboorteplaats && 'te ' + d.aangever_geboorteplaats].filter(Boolean).join(' '))}
-        </dl>` : ''}
-        ${(d.akte_overlijden || d.publicatie_krant || d.aangifte_datum) ? `
-        <h3>Aangifte van overlijden</h3>
-        <dl class="dl">
-          ${dlRow('Akte ontvangen', d.akte_overlijden)}
-          ${dlRow('Publicatie krant', d.publicatie_krant && (d.publicatie_krant + ' toestemming'))}
-          ${dlRow('Datum aangifte', fmtDate(d.aangifte_datum))}
-        </dl>` : ''}
         ${(d.contact_telefoon || d.contact_email) ? `
           <div class="quick-contact">
             ${d.contact_telefoon ? `<a class="btn btn-sm" href="tel:${esc(d.contact_telefoon.replace(/\s/g,''))}">📞 Bel</a>` : ''}
             ${d.contact_telefoon ? `<a class="btn btn-sm" href="https://wa.me/${esc(toWaNumber(d.contact_telefoon))}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
             ${d.contact_email ? `<a class="btn btn-sm" href="mailto:${esc(d.contact_email)}">✉️ E-mail</a>` : ''}
           </div>` : ''}
-        <h3>Kerkelijk</h3>
+        <h3>Kerkelijk &amp; uitvaartdienst</h3>
         <dl class="dl">
           ${dlRow('Parochie', d.parochie)}
           ${dlRow('Priester', d.priester)}
           ${dlRow('Huisbezoek', [fmtDate(d.huisbezoek_datum), d.huisbezoek_tijd].filter(Boolean).join(' '))}
-          ${dlRow('Avondwake', [fmtDate(d.avondwake_datum), d.avondwake_tijd, d.avondwake_locatie && '— ' + d.avondwake_locatie].filter(Boolean).join(' '))}
-        </dl>
-        <h3>Uitvaartdienst</h3>
-        <dl class="dl">
-          ${dlRow('Type', d.uitvaart_type)}
-          ${dlRow('Datum & tijd', [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' '))}
+          ${dlRow('Type uitvaart', d.uitvaart_type)}
+          ${dlRow('Datum & tijdstip', [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' '))}
           ${dlRow('Kerk', d.kerk_locatie)}
           ${dlRow('Begraafplaats', [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — '))}
         </dl>
@@ -351,9 +333,8 @@ function emH3(t) {
 
 function buildDossierEmail(d) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
-  const adresC = [d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
+  const adresC = [[d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '), d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
   const huis = [fmtDate(d.huisbezoek_datum), d.huisbezoek_tijd].filter(Boolean).join(' ');
-  const avond = [fmtDate(d.avondwake_datum), d.avondwake_tijd, d.avondwake_locatie && '— ' + d.avondwake_locatie].filter(Boolean).join(' ');
   const uitv = [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' ');
   const grafstuk = [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — ');
 
@@ -364,62 +345,38 @@ function buildDossierEmail(d) {
   parts.push(emH3('Overledene'));
   parts.push(emTable([
     ['Naam', fullName(d)],
-    ['Doopnaam', d.doopnaam],
     ['Geslacht', d.geslacht],
     ['Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
     ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdenstijd && 'om ' + d.overlijdenstijd, d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
     ['Adres', adresO],
     ['BSN', d.bsn],
-    ['Burgerlijke staat', d.burgerlijke_staat],
     ['(Ex)partner', d.partner_naam],
     ['Kinderen', d.kinderen_status],
     ['Minderjarige kinderen', d.minderjarige_kinderen],
-    ['Namen kinderen', d.kinderen_namen],
+    ...(d.minderjarige_kinderen === 'ja' ? [['Namen kinderen', d.kinderen_namen]] : []),
     ['Nationaliteit', d.nationaliteit],
-    ['Beroep', d.beroep],
     ['Lid SOK', d.syrisch_orthodox_lid],
     ['Gezinsnummer', d.gezinsnummer],
   ]));
 
-  parts.push(emH3('Erfgenaam / contactpersoon'));
+  parts.push(emH3('Contactpersoon'));
   parts.push(emTable([
-    ['Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') + (d.contact_relatie ? ' (' + d.contact_relatie + ')' : '')],
+    ['BSN', d.contact_bsn],
+    ['Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ')],
+    ['Adres', adresC],
+    ['Geboortedatum', fmtDate(d.contact_geboortedatum)],
     ['Telefoon', d.contact_telefoon],
     ['E-mail', d.contact_email],
-    ['Adres', adresC],
-    ['BSN', d.contact_bsn],
-    ['Geboortedatum', fmtDate(d.contact_geboortedatum)],
+    ['Relatie tot overledene', d.contact_relatie],
   ]));
 
-  if (d.aangever_zelfde_als_contact === 'nee' && (d.aangever_naam || d.aangever_geboortedatum)) {
-    parts.push(emH3('Aangever'));
-    parts.push(emTable([
-      ['Naam', d.aangever_naam],
-      ['Geboren', [fmtDate(d.aangever_geboortedatum), d.aangever_geboorteplaats && 'te ' + d.aangever_geboorteplaats].filter(Boolean).join(' ')],
-    ]));
-  }
-
-  if (d.akte_overlijden || d.publicatie_krant || d.aangifte_datum) {
-    parts.push(emH3('Aangifte van overlijden'));
-    parts.push(emTable([
-      ['Akte ontvangen', d.akte_overlijden],
-      ['Publicatie krant', d.publicatie_krant && (d.publicatie_krant + ' toestemming')],
-      ['Datum aangifte', fmtDate(d.aangifte_datum)],
-    ]));
-  }
-
-  parts.push(emH3('Kerkelijk'));
+  parts.push(emH3('Kerkelijk & uitvaartdienst'));
   parts.push(emTable([
     ['Parochie', d.parochie],
     ['Priester', d.priester],
     ['Huisbezoek', huis],
-    ['Avondwake', avond],
-  ]));
-
-  parts.push(emH3('Uitvaartdienst & ter aardebestelling'));
-  parts.push(emTable([
-    ['Type', d.uitvaart_type],
-    ['Datum & tijd', uitv],
+    ['Type uitvaart', d.uitvaart_type],
+    ['Datum & tijdstip', uitv],
     ['Kerk', d.kerk_locatie],
     ['Begraafplaats', grafstuk],
   ]));

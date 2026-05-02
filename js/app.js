@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v36'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v37'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -60,6 +60,21 @@ const Settings = {
     verzekering_pakketten: [
       'Standaard pakket', 'Uitgebreid pakket', 'Vrije keuze', 'Maatwerk',
     ],
+    // Parochies + bijbehorende standaard-priester (Aboona).
+    // Wordt automatisch ingevuld in het intake-formulier wanneer een
+    // parochie wordt gekozen.
+    parochies: [
+      { naam: 'St. Ephrem de Syriër Klooster — Glane/Losser', priester: '' },
+      { naam: 'Mor Ephrem — Glanerbrug',                       priester: '' },
+      { naam: 'Mor Severios — Hengelo',                        priester: '' },
+      { naam: 'Mor Kuryakos — Enschede',                       priester: '' },
+      { naam: 'Mor Aday — Rijssen',                            priester: '' },
+      { naam: 'Sint Maria — Amsterdam',                        priester: '' },
+      { naam: 'Mor Gabriël — Holland',                         priester: '' },
+    ],
+    // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
+    default_kerk_locatie: 'Maria kathedraal',
+    default_begraafplaats: 'St. Ephrem',
   },
   // Synchrone read uit cache + lokale spiegel
   _localOverrides() {

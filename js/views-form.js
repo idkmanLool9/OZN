@@ -59,7 +59,6 @@ function renderDossierForm(params) {
           <div class="grid-3">
             <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}"></label>
             <label><span>Achternaam</span><input type="text" name="achternaam" value="${v('achternaam')}"></label>
-            <label><span>Doopnaam (Syrisch)</span><input type="text" name="doopnaam" value="${v('doopnaam')}"></label>
             <label><span>Geslacht</span>
               <select name="geslacht">
                 <option value="">—</option>
@@ -76,14 +75,7 @@ function renderDossierForm(params) {
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
             <label><span>BSN</span><input type="text" name="bsn" value="${v('bsn')}"></label>
-            <label><span>Burgerlijke staat</span>
-              <select name="burgerlijke_staat">
-                ${['','ongehuwd','gehuwd','geregistreerd partner','gescheiden','weduwe/weduwnaar'].map(x =>
-                  `<option value="${esc(x)}" ${sel('burgerlijke_staat', x)}>${esc(x||'—')}</option>`).join('')}
-              </select>
-            </label>
             <label><span>Nationaliteit</span><input type="text" name="nationaliteit" value="${v('nationaliteit')}"></label>
-            <label><span>Beroep</span><input type="text" name="beroep" value="${v('beroep')}"></label>
             <label><span>Lid Syrisch-Orthodoxe Kerk</span>
               <select name="syrisch_orthodox_lid">
                 <option value="">—</option>
@@ -92,8 +84,8 @@ function renderDossierForm(params) {
                 <option value="onbekend" ${sel('syrisch_orthodox_lid','onbekend')}>Onbekend</option>
               </select>
             </label>
-            <label class="span-3" id="partner-naam-row" hidden><span>Naam (ex)partner</span>
-              <input type="text" name="partner_naam" value="${v('partner_naam')}" placeholder="naam echtgeno(o)t(e), partner of ex-partner">
+            <label class="span-3"><span>Naam (ex)partner</span>
+              <input type="text" name="partner_naam" value="${v('partner_naam')}" placeholder="naam echtgeno(o)t(e), partner of ex-partner (optioneel)">
             </label>
             <label><span>Laat overledene kinderen na?</span>
               <select name="kinderen_status" id="kinderen-status-select">
@@ -103,95 +95,48 @@ function renderDossierForm(params) {
               </select>
             </label>
             <label><span>Minderjarige kinderen?</span>
-              <select name="minderjarige_kinderen">
+              <select name="minderjarige_kinderen" id="minderjarige-kinderen-select">
                 <option value="">—</option>
                 <option value="ja" ${sel('minderjarige_kinderen','ja')}>Ja</option>
                 <option value="nee" ${sel('minderjarige_kinderen','nee')}>Nee</option>
               </select>
             </label>
-            <label class="span-3" id="kinderen-namen-row" hidden><span>Namen kinderen (één per regel)</span>
+            <label class="span-3" id="kinderen-namen-row" hidden><span>Namen minderjarige kinderen (één per regel)</span>
               <textarea name="kinderen_namen" rows="3" placeholder="bv.&#10;Sami (12)&#10;Maria (8)">${v('kinderen_namen')}</textarea>
             </label>
           </div>
         </fieldset>
 
         <fieldset class="card">
-          <legend>Erfgenaam / contactpersoon</legend>
+          <legend>Contactpersoon</legend>
           <div class="grid-3">
+            <label><span>BSN</span><input type="text" name="contact_bsn" value="${v('contact_bsn')}"></label>
             <label><span>Achternaam</span><input type="text" name="contact_naam" value="${v('contact_naam')}"></label>
             <label><span>Voornaam</span><input type="text" name="contact_voornaam" value="${v('contact_voornaam')}"></label>
-            <label><span>Relatie tot overledene</span><input type="text" name="contact_relatie" value="${v('contact_relatie')}" placeholder="echtgenoot, zoon, dochter..."></label>
-            <label><span>Telefoon</span><input type="tel" name="contact_telefoon" value="${v('contact_telefoon')}"></label>
-            <label class="span-2"><span>E-mail</span><input type="email" name="contact_email" value="${v('contact_email')}"></label>
-            <label class="span-2"><span>Adres</span><input type="text" name="contact_adres" value="${v('contact_adres')}"></label>
+            <label class="span-2"><span>Adres (straatnaam)</span><input type="text" name="contact_adres" value="${v('contact_adres')}"></label>
+            <label><span>Huisnummer</span><input type="text" name="contact_huisnummer" value="${v('contact_huisnummer')}" placeholder="bv. 12 of 12a"></label>
             <label><span>Postcode</span><input type="text" name="contact_postcode" value="${v('contact_postcode')}"></label>
             <label class="span-2"><span>Woonplaats</span><input type="text" name="contact_woonplaats" value="${v('contact_woonplaats')}"></label>
-            <label><span>BSN erfgenaam</span><input type="text" name="contact_bsn" value="${v('contact_bsn')}"></label>
-            <label><span>Geboortedatum erfgenaam</span><input type="date" name="contact_geboortedatum" value="${v('contact_geboortedatum')}"></label>
+            <label><span>Geboortedatum</span><input type="date" name="contact_geboortedatum" value="${v('contact_geboortedatum')}"></label>
+            <label><span>Telefoon</span><input type="tel" name="contact_telefoon" value="${v('contact_telefoon')}"></label>
+            <label class="span-2"><span>E-mail</span><input type="email" name="contact_email" value="${v('contact_email')}"></label>
+            <label><span>Relatie tot overledene</span><input type="text" name="contact_relatie" value="${v('contact_relatie')}" placeholder="echtgenoot, zoon, dochter..."></label>
             <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
           </div>
         </fieldset>
 
         <fieldset class="card">
-          <legend>Aangever &amp; aangifte van overlijden</legend>
-          <label class="checkbox-inline" style="margin-bottom:.75rem;">
-            <input type="checkbox" name="aangever_zelfde_als_contact" id="aangever-same"
-              ${(dossier.aangever_zelfde_als_contact !== 'nee') ? 'checked' : ''}>
-            Aangever is dezelfde persoon als de contactpersoon hierboven
-          </label>
-          <div class="grid-3" id="aangever-fields" hidden>
-            <label class="span-2"><span>Naam aangever (voor- en achternaam)</span>
-              <input type="text" name="aangever_naam" value="${v('aangever_naam')}">
-            </label>
-            <label><span>Geboortedatum aangever</span>
-              <input type="date" name="aangever_geboortedatum" value="${v('aangever_geboortedatum')}">
-            </label>
-            <label class="span-3"><span>Geboorteplaats aangever</span>
-              <input type="text" name="aangever_geboorteplaats" value="${v('aangever_geboorteplaats')}">
-            </label>
-          </div>
-          <div class="grid-3">
-            <label><span>Akte van overlijden ontvangen?</span>
-              <select name="akte_overlijden">
-                <option value="">—</option>
-                <option value="ja" ${sel('akte_overlijden','ja')}>Ja</option>
-                <option value="nee" ${sel('akte_overlijden','nee')}>Nee</option>
-              </select>
-            </label>
-            <label><span>Toestemming publicatie krant</span>
-              <select name="publicatie_krant">
-                <option value="">—</option>
-                <option value="wel" ${sel('publicatie_krant','wel')}>Wel toestemming</option>
-                <option value="geen" ${sel('publicatie_krant','geen')}>Geen toestemming</option>
-              </select>
-            </label>
-            <label><span>Datum aangifte</span>
-              <input type="date" name="aangifte_datum" value="${v('aangifte_datum')}">
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset class="card">
-          <legend>Kerkelijk</legend>
+          <legend>Kerkelijk &amp; uitvaartdienst</legend>
           <div class="grid-3">
             <label><span>Parochie</span>
-              <input type="text" name="parochie" value="${v('parochie')}" list="parochie-list" placeholder="bijv. St. Ephrem de Syriër Klooster">
+              <input type="text" name="parochie" id="parochie-input" value="${v('parochie')}" list="parochie-list" placeholder="kies of typ een parochie">
               <datalist id="parochie-list">
-                ${PAROCHIES.map(p => `<option value="${esc(p)}">`).join('')}
+                ${(Settings.get('parochies') || []).map(p => `<option value="${esc(p.naam || p)}">`).join('')}
               </datalist>
             </label>
-            <label><span>Priester / Aboono</span><input type="text" name="priester" value="${v('priester')}"></label>
+            <label><span>Priester / Aboona</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
             <label><span>Huisbezoek datum</span><input type="date" name="huisbezoek_datum" value="${v('huisbezoek_datum')}"></label>
             <label><span>Huisbezoek tijd</span><input type="time" name="huisbezoek_tijd" value="${v('huisbezoek_tijd')}"></label>
-            <label><span>Avondwake datum</span><input type="date" name="avondwake_datum" value="${v('avondwake_datum')}"></label>
-            <label><span>Avondwake tijd</span><input type="time" name="avondwake_tijd" value="${v('avondwake_tijd')}"></label>
-            <label class="span-3"><span>Locatie avondwake</span><input type="text" name="avondwake_locatie" value="${v('avondwake_locatie')}"></label>
-          </div>
-        </fieldset>
-
-        <fieldset class="card">
-          <legend>Uitvaartdienst & ter aardebestelling</legend>
-          <div class="grid-3">
             <label><span>Type uitvaart</span>
               <select name="uitvaart_type">
                 <option value="">—</option>
@@ -201,14 +146,18 @@ function renderDossierForm(params) {
               </select>
             </label>
             <label><span>Datum uitvaart</span><input type="date" name="uitvaart_datum" value="${v('uitvaart_datum')}"></label>
-            <label><span>Tijd uitvaart</span><input type="time" name="uitvaart_tijd" value="${v('uitvaart_tijd')}"></label>
-            <label class="span-3"><span>Kerk / dienstlocatie</span><input type="text" name="kerk_locatie" value="${v('kerk_locatie')}" placeholder="bijv. Kerk en Dolabani Zaal"></label>
-            <label class="span-2"><span>Begraafplaats</span><input type="text" name="begraafplaats" value="${v('begraafplaats')}"></label>
+            <label><span>Tijdstip uitvaart</span><input type="time" name="uitvaart_tijd" value="${v('uitvaart_tijd')}"></label>
+            <label class="span-3"><span>Kerk / dienstlocatie</span>
+              <input type="text" name="kerk_locatie" value="${esc(v('kerk_locatie') || (isNew ? (Settings.get('default_kerk_locatie') || 'Maria kathedraal') : ''))}" placeholder="bv. Maria kathedraal">
+            </label>
+            <label class="span-2"><span>Begraafplaats</span>
+              <input type="text" name="begraafplaats" value="${esc(v('begraafplaats') || (isNew ? (Settings.get('default_begraafplaats') || 'St. Ephrem') : ''))}">
+            </label>
             <label><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
             <label class="span-3"><span>Type graf</span>
               <select name="graf_type">
                 <option value="">—</option>
-                ${['eigen graf','algemeen graf','familiegraf','urnenruimte'].map(x =>
+                ${['eigen graf','algemeen graf','familiegraf'].map(x =>
                   `<option value="${esc(x)}" ${sel('graf_type', x)}>${esc(x)}</option>`).join('')}
               </select>
             </label>
@@ -492,39 +441,45 @@ function renderDossierForm(params) {
   vsel.addEventListener('change', updateVerzekeringSections);
   updateVerzekeringSections();
 
-  // ─── Partner-naam tonen als burgerlijke staat dat impliceert ─────────
-  const bsSel = $('select[name="burgerlijke_staat"]');
-  const partnerRow = $('#partner-naam-row');
-  function updatePartnerVisibility() {
-    const v = (bsSel?.value || '').toLowerCase();
-    const show = ['gehuwd', 'geregistreerd partner', 'gescheiden', 'weduwe/weduwnaar'].includes(v);
-    if (partnerRow) partnerRow.hidden = !show;
-  }
-  if (bsSel) {
-    bsSel.addEventListener('change', updatePartnerVisibility);
-    updatePartnerVisibility();
-  }
-
-  // ─── Namen kinderen tonen als 'Laat kinderen na = ja' ────────────────
-  const kindSel = $('#kinderen-status-select');
+  // ─── Namen kinderen tonen + popup bij minderjarig=ja ─────────────────
+  const minderjarigSel = $('#minderjarige-kinderen-select');
   const kindRow = $('#kinderen-namen-row');
-  function updateKinderenVisibility() {
-    if (kindRow) kindRow.hidden = (kindSel?.value !== 'ja');
+  let minderjarigPopupShown = (dossier.minderjarige_kinderen === 'ja'); // niet opnieuw tonen voor bestaand dossier
+  function updateMinderjarigVisibility() {
+    const isJa = minderjarigSel?.value === 'ja';
+    if (kindRow) kindRow.hidden = !isJa;
   }
-  if (kindSel) {
-    kindSel.addEventListener('change', updateKinderenVisibility);
-    updateKinderenVisibility();
+  if (minderjarigSel) {
+    minderjarigSel.addEventListener('change', () => {
+      updateMinderjarigVisibility();
+      if (minderjarigSel.value === 'ja' && !minderjarigPopupShown) {
+        minderjarigPopupShown = true;
+        Modal.show({
+          type: 'info',
+          title: 'Minderjarige kinderen',
+          message: 'Vergeet niet de namen (en leeftijden) van de minderjarige kinderen op de achterzijde van het aangifte-formulier in te vullen.',
+        });
+      }
+    });
+    updateMinderjarigVisibility();
   }
 
-  // ─── Aangever-velden tonen als anders dan contactpersoon ─────────────
-  const aangeverSame = $('#aangever-same');
-  const aangeverFields = $('#aangever-fields');
-  function updateAangeverVisibility() {
-    if (aangeverFields) aangeverFields.hidden = !!aangeverSame?.checked;
+  // ─── Parochie kiezen → priester (aboona) automatisch invullen ────────
+  const parochieInp = $('#parochie-input');
+  const priesterInp = $('#priester-input');
+  function autofillPriester() {
+    if (!parochieInp || !priesterInp) return;
+    const naam = parochieInp.value.trim();
+    if (!naam) return;
+    const lijst = Settings.get('parochies') || [];
+    const match = lijst.find(p => (p.naam || p) === naam);
+    if (match && match.priester && !priesterInp.value.trim()) {
+      priesterInp.value = match.priester;
+    }
   }
-  if (aangeverSame) {
-    aangeverSame.addEventListener('change', updateAangeverVisibility);
-    updateAangeverVisibility();
+  if (parochieInp) {
+    parochieInp.addEventListener('change', autofillPriester);
+    parochieInp.addEventListener('input', autofillPriester);
   }
 
   // ─── Postcode-autofill via PDOK Locatieserver ────────────────────────
@@ -534,9 +489,10 @@ function renderDossierForm(params) {
     woonplaatsEl: $('input[name="woonplaats_overledene"]'),
   });
   Postcode.bindAutofill({
-    adresEl:      $('input[name="contact_adres"]'),
-    postcodeEl:   $('input[name="contact_postcode"]'),
-    woonplaatsEl: $('input[name="contact_woonplaats"]'),
+    adresEl:        $('input[name="contact_adres"]'),
+    huisnummerEl:   $('input[name="contact_huisnummer"]'),
+    postcodeEl:     $('input[name="contact_postcode"]'),
+    woonplaatsEl:   $('input[name="contact_woonplaats"]'),
   });
 
   // ─── #3 Auto-fill contactpersoon-gegevens uit eerder dossier ──────────

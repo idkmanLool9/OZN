@@ -776,6 +776,21 @@ button.kist-card-img-btn:focus { outline: 2px solid var(--primary); outline-offs
 .sig-row .sig-label { flex: 1; }
 .sig-row .btn-icon { font-size: 1.3rem; }
 
+/* Parochies-beheer in instellingen */
+.parochie-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr auto;
+  gap: .5rem; align-items: center;
+  padding: .35rem 0;
+  border-bottom: 1px dashed var(--border);
+}
+.parochie-row:last-child { border-bottom: none; }
+.parochie-row .btn-icon { font-size: 1.3rem; }
+@media (max-width: 540px) {
+  .parochie-row { grid-template-columns: 1fr auto; }
+  .parochie-row .parochie-priester { grid-column: 1 / 2; }
+}
+
 /* Pop-up modal (waarschuwing / fout / succes / info) */
 .modal {
   position: fixed; inset: 0; z-index: 300;

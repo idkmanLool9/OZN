@@ -89,9 +89,10 @@ ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS kinderen_status TEXT,         -- 'ja' / 'nee'
   ADD COLUMN IF NOT EXISTS minderjarige_kinderen TEXT,   -- 'ja' / 'nee'
   ADD COLUMN IF NOT EXISTS kinderen_namen TEXT,
-  -- Erfgenaam / contactpersoon: aanvullingen
+  -- Contactpersoon: aanvullingen
   ADD COLUMN IF NOT EXISTS contact_bsn TEXT,
   ADD COLUMN IF NOT EXISTS contact_geboortedatum DATE,
+  ADD COLUMN IF NOT EXISTS contact_huisnummer TEXT,
   -- Aangever (vaak zelfde als contactpersoon)
   ADD COLUMN IF NOT EXISTS aangever_zelfde_als_contact TEXT, -- 'ja' / 'nee'
   ADD COLUMN IF NOT EXISTS aangever_naam TEXT,

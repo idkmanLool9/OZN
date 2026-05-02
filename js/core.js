@@ -241,9 +241,11 @@ const Postcode = {
       };
     } catch (_) { return null; }
   },
-  // Bind een (adres, postcode, woonplaats)-trio aan auto-aanvullen.
+  // Bind een (adres, [huisnummer,] postcode, woonplaats)-set aan auto-aanvullen.
   // Vult alleen lege velden in én toont een vluchtige "✓ aangevuld"-hint.
-  bindAutofill({ adresEl, postcodeEl, woonplaatsEl }) {
+  // Als huisnummerEl is meegegeven, wordt het huisnummer daaruit gelezen
+  // en blijft de straat in adresEl staan (zonder huisnr).
+  bindAutofill({ adresEl, huisnummerEl, postcodeEl, woonplaatsEl }) {
     if (!postcodeEl) return;
 
     const showHint = (el, text) => {
@@ -267,8 +269,14 @@ const Postcode = {
       // Normaliseer postcode-veld zelf (1234ab → 1234 AB)
       const norm = Postcode.normalize(pc);
       postcodeEl.value = norm.replace(/^(\d{4})/, '$1 ');
-      const adres = adresEl ? adresEl.value : '';
-      const { nr, toev } = Postcode.parseHuisnummer(adres);
+      // Huisnummer ophalen: liever uit eigen veld, anders uit adres
+      let nr = '', toev = '';
+      if (huisnummerEl && huisnummerEl.value.trim()) {
+        const m = huisnummerEl.value.match(/(\d+)\s*([A-Za-z]?\d?[A-Za-z]?)/);
+        if (m) { nr = m[1]; toev = (m[2] || '').trim(); }
+      } else if (adresEl) {
+        ({ nr, toev } = Postcode.parseHuisnummer(adresEl.value));
+      }
       const data = await Postcode.lookup(pc, nr);
       if (!data) return;
       let filled = [];
@@ -278,9 +286,19 @@ const Postcode = {
       }
       if (adresEl && data.straat) {
         const cur = adresEl.value.trim();
-        // Alleen overschrijven als er nog geen straatnaam staat (bijv. alleen "33")
-        if (!cur || /^\d/.test(cur)) {
-          const huis = (data.huis || nr + toev).trim();
+        const adresIsLeeg = !cur || /^\d/.test(cur);
+        if (huisnummerEl) {
+          // Apart huisnummer-veld: zet alleen straatnaam in adres
+          if (adresIsLeeg) {
+            adresEl.value = data.straat;
+            filled.push('straat');
+          }
+          if (!huisnummerEl.value.trim() && (data.huis || nr)) {
+            huisnummerEl.value = (data.huis || (nr + toev)).trim();
+            filled.push('huisnr');
+          }
+        } else if (adresIsLeeg) {
+          const huis = (data.huis || (nr + toev)).trim();
           adresEl.value = (data.straat + (huis ? ' ' + huis : '')).trim();
           filled.push('adres');
         }
@@ -290,9 +308,12 @@ const Postcode = {
 
     postcodeEl.addEventListener('change', run);
     postcodeEl.addEventListener('blur', run);
+    if (huisnummerEl) {
+      huisnummerEl.addEventListener('blur', () => {
+        if (Postcode.isValid(postcodeEl.value)) run();
+      });
+    }
     if (adresEl) {
-      // Als de gebruiker eerst het huisnummer typt en dan postcode al ingevuld was,
-      // ook proberen aan te vullen
       adresEl.addEventListener('blur', () => {
         if (Postcode.isValid(postcodeEl.value) && !woonplaatsEl?.value.trim()) run();
       });
