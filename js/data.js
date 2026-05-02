@@ -12,6 +12,32 @@ const PAROCHIES = [
 ];
 
 // Vaste tarieven uit het intake-formulier
+// Categorieën voor kostenposten — volgorde + nette labels worden gebruikt
+// in het kosten-overzicht (gegroepeerd per categorie) en in de invul-dropdown.
+const KOSTEN_CATEGORIEEN = [
+  { id: 'aannametarief', label: 'Aanname & uitvoering', icon: '📋' },
+  { id: 'vervoer',       label: 'Vervoer',              icon: '🚐' },
+  { id: 'verzorging',    label: 'Verzorging',           icon: '🧴' },
+  { id: 'kist',          label: 'Kist',                 icon: '⚰️' },
+  { id: 'aula',          label: 'Aula',                 icon: '🏛️' },
+  { id: 'kerk',          label: 'Kerk',                 icon: '✝️' },
+  { id: 'begraafplaats', label: 'Begraafplaats & graf', icon: '🪦' },
+  { id: 'bloemen',       label: 'Bloemen',              icon: '💐' },
+  { id: 'rouwkaarten',   label: 'Rouwkaarten',          icon: '✉️' },
+  { id: 'catering',      label: 'Catering',             icon: '🍽️' },
+  { id: 'schoonmaak',    label: 'Schoonmaak',           icon: '🧹' },
+  { id: 'administratie', label: 'Administratie',        icon: '📝' },
+  { id: 'overig',        label: 'Overig',               icon: '•'   },
+];
+function categorieLabel(id) {
+  const c = KOSTEN_CATEGORIEEN.find(x => x.id === id);
+  return c ? c.label : (id ? (id.charAt(0).toUpperCase() + id.slice(1)) : 'Overig');
+}
+function categorieIcon(id) {
+  const c = KOSTEN_CATEGORIEEN.find(x => x.id === id);
+  return c ? c.icon : '•';
+}
+
 const KOSTEN_PRESETS = [
   // Aanname & uitvoering
   { categorie: 'aannametarief', omschrijving: 'Aannametarief — benodigd personeel en uitvoering', bedrag: 622.00 },

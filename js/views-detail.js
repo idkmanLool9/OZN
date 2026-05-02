@@ -191,26 +191,65 @@ function renderDossierDetail(params) {
           <h2 style="border:none;padding:0;margin:0;">Kosten</h2>
           ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm">📄 Factuur openen</a>` : ''}
         </div>
-        ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' :
-          `<table class="table"><thead><tr>
-            <th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th>
-            ${verzekerd ? '<th class="center">Wie betaalt</th>' : ''}
-            <th class="center">Status</th><th></th>
-          </tr></thead><tbody>
-            ${kosten.map(k => `<tr>
-              <td>${esc(k.omschrijving)}</td>
-              <td><span class="muted small">${esc(k.categorie || '—')}</span></td>
-              <td class="num">${fmtEUR(k.bedrag)}</td>
-              ${verzekerd ? `<td class="center"><button type="button" class="kost-toggle ${k.gedekt ? 'on-gedekt' : 'off-gedekt'}" data-action="toggle-gedekt" data-id="${k.id}" title="Klik om te wisselen">${k.gedekt ? '🛡 Verzekering' : '👥 Familie'}</button></td>` : ''}
-              <td class="center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
-              <td><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}">×</button></td>
-            </tr>`).join('')}
-            <tr class="total-row"><td colspan="2"><strong>Totaal</strong></td><td class="num"><strong>${fmtEUR(totaal)}</strong></td><td colspan="${verzekerd ? 3 : 2}" class="muted small">waarvan betaald: ${fmtEUR(betaald)}</td></tr>
+        ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' : (() => {
+          // Groepeer per categorie in vaste volgorde
+          const buckets = {};
+          kosten.forEach(k => {
+            const cat = k.categorie || 'overig';
+            (buckets[cat] = buckets[cat] || []).push(k);
+          });
+          const orderIds = KOSTEN_CATEGORIEEN.map(c => c.id);
+          const orderedCats = orderIds.filter(id => buckets[id])
+            .concat(Object.keys(buckets).filter(id => !orderIds.includes(id)));
+
+          const colspanFront = 1; // omschrijving
+          const colspanBack  = (verzekerd ? 1 : 0) + 1 + 1; // wie + status + delete
+          return `
+          <div class="kosten-groups">
+            ${orderedCats.map(cat => {
+              const items = buckets[cat];
+              const sub = items.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+              return `
+              <div class="kosten-group">
+                <div class="kosten-group-head">
+                  <span class="kosten-group-title">${categorieIcon(cat)} ${esc(categorieLabel(cat))}</span>
+                  <span class="kosten-group-sub muted small">${items.length} ${items.length === 1 ? 'post' : 'posten'} · ${fmtEUR(sub)}</span>
+                </div>
+                <table class="table kosten-table">
+                  <tbody>
+                    ${items.map(k => `<tr>
+                      <td>${esc(k.omschrijving)}</td>
+                      <td class="num">${fmtEUR(k.bedrag)}</td>
+                      ${verzekerd ? `<td class="center"><button type="button" class="kost-toggle ${k.gedekt ? 'on-gedekt' : 'off-gedekt'}" data-action="toggle-gedekt" data-id="${k.id}" title="Klik om te wisselen">${k.gedekt ? '🛡 Verzekering' : '👥 Familie'}</button></td>` : ''}
+                      <td class="center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
+                      <td class="num"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
+                    </tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="kosten-totals">
+            <div class="kosten-total-row">
+              <span>Totaal</span>
+              <strong class="num">${fmtEUR(totaal)}</strong>
+            </div>
+            <div class="kosten-total-row muted small">
+              <span>Waarvan betaald</span>
+              <span class="num">${fmtEUR(betaald)}</span>
+            </div>
             ${verzekerd ? `
-              <tr><td colspan="2" class="muted small">Gedekt door verzekering</td><td class="num muted small">${fmtEUR(gedektTotaal)}</td><td colspan="3"></td></tr>
-              <tr><td colspan="2"><strong>Door familie te betalen</strong></td><td class="num"><strong style="color:var(--primary);">${fmtEUR(familieTotaal)}</strong></td><td colspan="3"></td></tr>
+              <div class="kosten-total-row muted small">
+                <span>Gedekt door verzekering</span>
+                <span class="num">${fmtEUR(gedektTotaal)}</span>
+              </div>
+              <div class="kosten-total-row total-familie">
+                <span>Door familie te betalen</span>
+                <strong class="num">${fmtEUR(familieTotaal)}</strong>
+              </div>
             ` : ''}
-          </tbody></table>`}
+          </div>`;
+        })()}
         <h3 style="margin-top:1rem;">Snel toevoegen uit catalogus</h3>
         <p class="muted small">Klik om een vast tarief direct toe te voegen.</p>
         <div class="preset-grid">
@@ -225,8 +264,8 @@ function renderDossierDetail(params) {
           <input type="text" name="omschrijving" placeholder="Omschrijving..." required>
           <select name="categorie">
             <option value="">Categorie</option>
-            ${['aannametarief','vervoer','kist','aula','verzorging','kerk','begraafplaats','bloemen','rouwkaarten','catering','overig'].map(c =>
-              `<option value="${c}">${c}</option>`).join('')}
+            ${KOSTEN_CATEGORIEEN.map(c =>
+              `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
           </select>
           <input type="text" name="bedrag" placeholder="0,00" inputmode="decimal">
           <label class="checkbox-inline"><input type="checkbox" name="betaald"> betaald</label>
