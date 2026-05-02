@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v44'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v45'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -56,9 +56,14 @@ const Settings = {
     verzekering_maatschappijen: [
       'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema', 'Klooster eigen polis',
     ],
-    // Pakket-uitvoeringen
+    // Pakket-uitvoeringen — per pakket optioneel een standaard-dekkingsbedrag
+    // dat in het dossier-formulier automatisch wordt voorgesteld bij de
+    // dekkingsbedrag-input. Lege string = geen suggestie.
     verzekering_pakketten: [
-      'Standaard pakket', 'Uitgebreid pakket', 'Vrije keuze', 'Maatwerk',
+      { naam: 'Standaard pakket',  dekking: '' },
+      { naam: 'Uitgebreid pakket', dekking: '' },
+      { naam: 'Vrije keuze',       dekking: '' },
+      { naam: 'Maatwerk',          dekking: '' },
     ],
     // Parochies + bijbehorende standaard-priester (Aboona).
     // Wordt automatisch ingevuld in het intake-formulier wanneer een

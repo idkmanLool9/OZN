@@ -339,19 +339,29 @@ function renderAccount(msg) {
 
       <section class="card narrow" id="verzekeringen">
         <h2>Verzekeringsmaatschappijen &amp; pakketten</h2>
-        <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is.</p>
+        <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is. Vul per pakket een standaard-dekkingsbedrag in — dat wordt automatisch overgenomen in het dossier zodra het pakket is gekozen.</p>
         ${(() => {
           const ms = Settings.get('verzekering_maatschappijen') || [];
-          const pk = Settings.get('verzekering_pakketten') || [];
+          const pk = (Settings.get('verzekering_pakketten') || []).map(p =>
+            typeof p === 'string' ? { naam: p, dekking: '' } : p);
           return `
           <form id="verz-form" class="form" autocomplete="off">
             <label><span>Maatschappijen (één per regel)</span>
               <textarea name="maatschappijen" rows="6" placeholder="DELA&#10;Monuta&#10;...">${esc(ms.join('\n'))}</textarea>
             </label>
-            <label><span>Pakket-uitvoeringen (één per regel)</span>
-              <textarea name="pakketten" rows="4" placeholder="Standaard pakket&#10;Vrije keuze&#10;...">${esc(pk.join('\n'))}</textarea>
-            </label>
-            <div class="form-actions" style="justify-content:flex-end;">
+            <div>
+              <span class="muted small" style="display:block;margin-bottom:.35rem;">Pakketten + standaard-dekking</span>
+              <div id="pakket-rows" class="parochie-rows">
+                ${pk.map(p => `
+                  <div class="parochie-row">
+                    <input type="text" class="pakket-naam" value="${esc(p.naam || '')}" placeholder="bv. Uitgebreid pakket">
+                    <input type="text" class="pakket-dekking" value="${esc(p.dekking || '')}" inputmode="decimal" placeholder="standaard-dekking €">
+                    <button type="button" class="btn-icon" data-action="del-pakket" title="verwijderen">×</button>
+                  </div>`).join('')}
+              </div>
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-pakket">+ Pakket toevoegen</button>
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
           </form>`;
@@ -751,13 +761,38 @@ function renderAccount(msg) {
   // Verzekeringsmaatschappijen + pakketten beheer
   const verzForm = $('#verz-form');
   if (verzForm) {
+    function makePakketRow(naam = '', dekking = '') {
+      const div = document.createElement('div');
+      div.className = 'parochie-row';
+      div.innerHTML = `
+        <input type="text" class="pakket-naam" value="${esc(naam)}" placeholder="bv. Uitgebreid pakket">
+        <input type="text" class="pakket-dekking" value="${esc(dekking)}" inputmode="decimal" placeholder="standaard-dekking €">
+        <button type="button" class="btn-icon" data-action="del-pakket" title="verwijderen">×</button>`;
+      return div;
+    }
+    $('#btn-add-pakket').addEventListener('click', () => {
+      const rows = $('#pakket-rows');
+      const row = makePakketRow();
+      rows.appendChild(row);
+      row.querySelector('.pakket-naam').focus();
+    });
+    verzForm.addEventListener('click', e => {
+      const del = e.target.closest('button[data-action="del-pakket"]');
+      if (!del) return;
+      const row = del.closest('.parochie-row');
+      if (row) row.remove();
+    });
     verzForm.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
       const parseList = txt => txt.split('\n').map(s => s.trim()).filter(Boolean);
+      const pakketten = $$('#pakket-rows .parochie-row').map(row => ({
+        naam: (row.querySelector('.pakket-naam').value || '').trim(),
+        dekking: (row.querySelector('.pakket-dekking').value || '').trim(),
+      })).filter(p => p.naam);
       Settings.set({
         verzekering_maatschappijen: parseList(f.maatschappijen.value),
-        verzekering_pakketten: parseList(f.pakketten.value),
+        verzekering_pakketten: pakketten,
       });
       renderAccount({ success: 'Verzekeringslijsten opgeslagen.' });
     });

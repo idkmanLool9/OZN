@@ -41,19 +41,21 @@ function renderDossierDetail(params) {
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzekerd = d.verzekering_status === 'met verzekering';
-  // Verzekeringsdekking: gebruik per-kost 'gedekt'-vlaggen als die er zijn,
-  // anders fallback op het dekkingsbedrag uit de polis (verzekering_dekking).
+  // Verzekeringsdekking: volledig automatisch op basis van het polisbedrag
+  // dat in het dossier staat (verzekering_dekking). Geen handmatige
+  // markering per kostenpost meer nodig. Voor oude dossiers waar items
+  // wel handmatig als gedekt waren aangevinkt, vallen we daar netjes
+  // op terug zolang er nog geen polisbedrag is ingevuld.
   const gedektTotaal = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzDekking  = Number(d.verzekering_dekking) || 0;
   const dekking      = !verzekerd ? 0
-                       : (gedektTotaal > 0 ? gedektTotaal : Math.min(verzDekking, totaal));
-  const familieTotaal = Math.max(0, totaal - dekking);
-  // Wat is er door de familie zelf al betaald, en wat moet er nog?
-  const familieBetaald = (gedektTotaal > 0)
-    ? kosten.filter(k => !k.gedekt && k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0)
-    : betaald; // benadering: bij polis-gebaseerde dekking nemen we aan dat 'betaald' van familie-kant is
-  const moetNogBetalen   = Math.max(0, totaal - betaald);
-  const familieMoetNog   = Math.max(0, familieTotaal - familieBetaald);
+                       : (verzDekking > 0 ? Math.min(verzDekking, totaal) : gedektTotaal);
+  const familieTotaal  = Math.max(0, totaal - dekking);
+  const moetNogBetalen = Math.max(0, totaal - betaald);
+  // Aannamen: het polisbedrag wordt door de verzekeraar betaald, alle
+  // 'betaald'-flags zijn van familie-kant. (Mocht er meer betaald zijn
+  // dan de familie verschuldigd is, dan klemmen we naar 0.)
+  const familieMoetNog = Math.max(0, familieTotaal - betaald);
 
   $('#view').innerHTML = `
     <div class="page">
@@ -230,7 +232,6 @@ function renderDossierDetail(params) {
                   <colgroup>
                     <col class="kc-col-omschrijving">
                     <col class="kc-col-bedrag">
-                    ${verzekerd ? '<col class="kc-col-wie">' : ''}
                     <col class="kc-col-status">
                     <col class="kc-col-del">
                   </colgroup>
@@ -238,7 +239,6 @@ function renderDossierDetail(params) {
                     ${items.map(k => `<tr>
                       <td class="kc-omschrijving">${esc(k.omschrijving)}</td>
                       <td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>
-                      ${verzekerd ? `<td class="kc-wie center"><button type="button" class="kost-toggle ${k.gedekt ? 'on-gedekt' : 'off-gedekt'}" data-action="toggle-gedekt" data-id="${k.id}" title="Klik om te wisselen">${k.gedekt ? '🛡 Verzekering' : '👥 Familie'}</button></td>` : ''}
                       <td class="kc-status center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
                       <td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
                     </tr>`).join('')}
@@ -262,22 +262,26 @@ function renderDossierDetail(params) {
             </div>
             ${verzekerd ? `
               <div class="kosten-totals-divider"></div>
-              <div class="kosten-total-row muted small">
-                <span>Verzekering dekt${verzDekking > 0 && gedektTotaal === 0 ? ' (volgens polis)' : ''}</span>
-                <span class="num">${fmtEUR(dekking)}</span>
-              </div>
-              <div class="kosten-total-row muted small">
-                <span>Door familie te betalen</span>
-                <span class="num">${fmtEUR(familieTotaal)}</span>
-              </div>
-              <div class="kosten-total-row muted small">
-                <span>Familie heeft al betaald</span>
-                <span class="num">${fmtEUR(familieBetaald)}</span>
-              </div>
-              <div class="kosten-total-row total-familie">
-                <span>Familie moet nog betalen</span>
-                <strong class="num">${fmtEUR(familieMoetNog)}</strong>
-              </div>
+              ${verzDekking === 0 && gedektTotaal === 0 ? `
+                <div class="alert alert-info" style="margin:.25rem 0 .5rem;font-size:.85rem;">
+                  Vul het <a href="#/dossiers/${d.id}/bewerken#verzekering-met-fields"><strong>dekkingsbedrag</strong></a>
+                  in bij Verzekering &amp; betaling — dan wordt automatisch berekend wat de
+                  verzekering dekt en wat de familie nog moet betalen.
+                </div>
+              ` : `
+                <div class="kosten-total-row muted small">
+                  <span>Verzekering dekt${verzDekking > 0 ? ' (uit polis)' : ' (handmatig gemarkeerd)'}</span>
+                  <span class="num">${fmtEUR(dekking)}</span>
+                </div>
+                <div class="kosten-total-row muted small">
+                  <span>Door familie te betalen</span>
+                  <span class="num">${fmtEUR(familieTotaal)}</span>
+                </div>
+                <div class="kosten-total-row total-familie">
+                  <span>Familie moet nog betalen</span>
+                  <strong class="num">${fmtEUR(familieMoetNog)}</strong>
+                </div>
+              `}
             ` : ''}
           </div>`;
         })()}
@@ -505,8 +509,11 @@ function buildDossierEmail(d) {
 function buildFactuurEmail(d, kosten) {
   const verzekerd = d.verzekering_status === 'met verzekering';
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag)||0), 0);
-  const gedekt = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag)||0), 0);
-  const familie = totaal - gedekt;
+  const gedektFlag = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag)||0), 0);
+  const verzDek = Number(d.verzekering_dekking) || 0;
+  const gedekt = !verzekerd ? 0
+                 : (verzDek > 0 ? Math.min(verzDek, totaal) : gedektFlag);
+  const familie = Math.max(0, totaal - gedekt);
   const aanbet = Number(d.aanbetaling_bedrag) || 0;
   const teBetalen = familie - aanbet;
   const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
@@ -537,7 +544,6 @@ function buildFactuurEmail(d, kosten) {
         <tr style="background:#f6f4ef;">
           <th align="left" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Omschrijving</th>
           <th align="left" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Categorie</th>
-          ${verzekerd ? '<th align="center" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Gedekt</th>' : ''}
           <th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Bedrag</th>
         </tr>
       </thead>
@@ -546,31 +552,30 @@ function buildFactuurEmail(d, kosten) {
           <tr>
             <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${esc(k.omschrijving)}</td>
             <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;color:#6f6a62;">${esc(k.categorie || '')}</td>
-            ${verzekerd ? `<td align="center" style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${k.gedekt ? '✓' : ''}</td>` : ''}
             <td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${esc(fmtEUR(k.bedrag))}</td>
           </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="${verzekerd ? 3 : 2}" align="right" style="padding:8px 10px;font-weight:600;">Totaal</td>
+          <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;">Totaal</td>
           <td align="right" style="padding:8px 10px;font-weight:600;font-variant-numeric:tabular-nums;">${esc(fmtEUR(totaal))}</td>
         </tr>
-        ${verzekerd ? `
+        ${verzekerd && gedekt > 0 ? `
           <tr>
-            <td colspan="3" align="right" style="padding:6px 10px;color:#6f6a62;">Gedekt door verzekering</td>
+            <td colspan="2" align="right" style="padding:6px 10px;color:#6f6a62;">Gedekt door verzekering</td>
             <td align="right" style="padding:6px 10px;color:#6f6a62;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(gedekt))}</td>
           </tr>
           <tr style="background:#f5e8ea;">
-            <td colspan="3" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Door familie te betalen</td>
+            <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Door familie te betalen</td>
             <td align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;font-variant-numeric:tabular-nums;">${esc(fmtEUR(familie))}</td>
           </tr>` : ''}
         ${aanbet > 0 ? `
           <tr>
-            <td colspan="${verzekerd ? 3 : 2}" align="right" style="padding:6px 10px;color:#6f6a62;">Aanbetaling${d.aanbetaling_datum ? ' (' + fmtDate(d.aanbetaling_datum) + ')' : ''}</td>
+            <td colspan="2" align="right" style="padding:6px 10px;color:#6f6a62;">Aanbetaling${d.aanbetaling_datum ? ' (' + fmtDate(d.aanbetaling_datum) + ')' : ''}</td>
             <td align="right" style="padding:6px 10px;color:#6f6a62;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(aanbet))}</td>
           </tr>
           <tr style="background:#f5e8ea;">
-            <td colspan="${verzekerd ? 3 : 2}" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Nog te voldoen</td>
+            <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Nog te voldoen</td>
             <td align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;font-variant-numeric:tabular-nums;">${esc(fmtEUR(teBetalen))}</td>
           </tr>` : ''}
       </tfoot>

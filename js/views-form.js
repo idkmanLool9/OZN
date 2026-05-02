@@ -253,11 +253,11 @@ function renderDossierForm(params) {
               </label>
               <label><span>Polisnummer</span><input type="text" name="polisnummer" value="${v('polisnummer')}"></label>
               <label><span>Polishouder</span><input type="text" name="verzekering_polishouder" value="${v('verzekering_polishouder')}" placeholder="indien anders dan overledene"></label>
-              <label><span>Dekkingsbedrag (€)</span><input type="text" name="verzekering_dekking" value="${v('verzekering_dekking')}" inputmode="decimal" placeholder="0,00"></label>
+              <label><span>Dekkingsbedrag (€)</span><input type="text" name="verzekering_dekking" id="verzekering-dekking-input" value="${v('verzekering_dekking')}" inputmode="decimal" placeholder="0,00"></label>
               <label><span>Pakket / uitvoering</span>
-                <input type="text" name="verzekering_pakket" value="${v('verzekering_pakket')}" list="pakket-list" autocomplete="off">
+                <input type="text" name="verzekering_pakket" id="verzekering-pakket-input" value="${v('verzekering_pakket')}" list="pakket-list" autocomplete="off">
                 <datalist id="pakket-list">
-                  ${(Settings.get('verzekering_pakketten') || []).map(p => `<option value="${esc(p)}">`).join('')}
+                  ${(Settings.get('verzekering_pakketten') || []).map(p => `<option value="${esc(p.naam || p)}">`).join('')}
                 </datalist>
               </label>
               <label><span>Aanmelding-status</span>
@@ -496,6 +496,26 @@ function renderDossierForm(params) {
       const nieuw = (match && match.priester) ? match.priester : '';
       if (nieuw && nieuw !== had) priesterInp.value = nieuw;
     });
+  }
+
+  // ─── Pakket kiezen → standaard-dekkingsbedrag automatisch invullen ────
+  const pakketInp = $('#verzekering-pakket-input');
+  const dekkingInp = $('#verzekering-dekking-input');
+  if (pakketInp && dekkingInp) {
+    const tryFillDekking = () => {
+      const naam = (pakketInp.value || '').trim();
+      if (!naam) return;
+      const lijst = Settings.get('verzekering_pakketten') || [];
+      const match = lijst.find(p => (typeof p === 'string' ? p : p.naam) === naam);
+      if (!match || typeof match === 'string') return;
+      const def = String(match.dekking || '').trim();
+      if (!def) return;
+      // Alleen invullen als het veld leeg is — overschrijf nooit een
+      // handmatig getypt bedrag
+      if (!dekkingInp.value.trim()) dekkingInp.value = def;
+    };
+    pakketInp.addEventListener('change', tryFillDekking);
+    pakketInp.addEventListener('input',  tryFillDekking);
   }
 
   // ─── Postcode-autofill via PDOK Locatieserver ────────────────────────
