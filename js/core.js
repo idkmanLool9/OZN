@@ -472,34 +472,85 @@ const WheelDate = {
     });
   },
 
+  // ISO (YYYY-MM-DD) → "2 mei 2026"
+  formatLong(iso) {
+    if (!iso) return '';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return iso;
+    const [, y, mm, d] = m;
+    const idx = parseInt(mm, 10) - 1;
+    if (idx < 0 || idx > 11) return iso;
+    return `${parseInt(d, 10)} ${WheelDate.MONTHS[idx].toLowerCase()} ${y}`;
+  },
+
   // Bind alle <input type="date"> aan de wiel-picker. Idempotent.
+  // We vervangen het type door 'text' + maken een hidden zustertje dat
+  // de naam (en dus de form-submit-waarde) overneemt. Zo opent iOS Safari
+  // nooit meer zijn eigen datum-picker.
   bindAll(root = document) {
-    root.querySelectorAll('input[type="date"]').forEach(inp => {
-      if (inp.dataset.wheelBound === '1') return;
-      inp.dataset.wheelBound = '1';
-      inp.readOnly = true;          // voorkomt native picker op iOS / Android
-      inp.style.cursor = 'pointer';
+    root.querySelectorAll('input[type="date"]').forEach(orig => {
+      if (orig.dataset.wheelBound === '1') return;
+      orig.dataset.wheelBound = '1';
+
+      const isoVal = orig.value || '';
+      const name   = orig.getAttribute('name') || '';
+      const minA   = orig.getAttribute('min');
+      const maxA   = orig.getAttribute('max');
+
+      // Hidden veld (formulier-submit gaat hier doorheen)
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      if (name) hidden.name = name;
+      hidden.value = isoVal;
+      orig.parentNode.insertBefore(hidden, orig);
+
+      // Origineel veld wordt zichtbare tekst-display
+      orig.removeAttribute('name');
+      orig.setAttribute('readonly', 'readonly');
+      orig.setAttribute('autocomplete', 'off');
+      orig.setAttribute('inputmode', 'none');
+      orig.type = 'text';
+      orig.placeholder = 'dd-mm-jjjj';
+      orig.value = WheelDate.formatLong(isoVal);
+      orig.dataset.wheelDisplayFor = name;
+      orig.style.cursor = 'pointer';
+
       const openPicker = () => {
         WheelDate.open({
-          value: inp.value,
-          min:   inp.getAttribute('min'),
-          max:   inp.getAttribute('max'),
+          value: hidden.value,
+          min: minA, max: maxA,
           onConfirm: iso => {
-            inp.value = iso;
-            inp.dispatchEvent(new Event('input',  { bubbles: true }));
-            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            hidden.value = iso;
+            orig.value   = WheelDate.formatLong(iso);
+            hidden.dispatchEvent(new Event('input',  { bubbles: true }));
+            hidden.dispatchEvent(new Event('change', { bubbles: true }));
           },
           onClear: () => {
-            inp.value = '';
-            inp.dispatchEvent(new Event('input',  { bubbles: true }));
-            inp.dispatchEvent(new Event('change', { bubbles: true }));
+            hidden.value = '';
+            orig.value   = '';
+            hidden.dispatchEvent(new Event('input',  { bubbles: true }));
+            hidden.dispatchEvent(new Event('change', { bubbles: true }));
           },
         });
       };
-      inp.addEventListener('click', e => { e.preventDefault(); openPicker(); });
-      inp.addEventListener('keydown', e => {
+
+      orig.addEventListener('mousedown', e => { e.preventDefault(); });
+      orig.addEventListener('click',     e => { e.preventDefault(); openPicker(); });
+      orig.addEventListener('keydown',   e => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
       });
+    });
+  },
+
+  // Synchroniseer alle zichtbare displays met hun hidden ISO-waarde —
+  // nodig na een autosave-restore die rechtstreeks de hidden-velden
+  // overschrijft.
+  syncDisplays(root = document) {
+    root.querySelectorAll('input[data-wheel-display-for]').forEach(disp => {
+      const name = disp.dataset.wheelDisplayFor;
+      if (!name) return;
+      const hidden = root.querySelector(`input[type="hidden"][name="${CSS.escape(name)}"]`);
+      if (hidden) disp.value = WheelDate.formatLong(hidden.value);
     });
   },
 };

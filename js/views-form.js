@@ -26,6 +26,8 @@ function applyDossierDraft(formEl, data) {
       changed++;
     }
   }
+  // Datum-displays bijwerken na restore (hidden value is gezet, visible niet)
+  if (typeof WheelDate !== 'undefined') WheelDate.syncDisplays(formEl);
   return changed;
 }
 
