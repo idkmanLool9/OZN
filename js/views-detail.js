@@ -900,7 +900,21 @@ function bindDetailEvents(id) {
       } else if (action === 'add-preset') {
         const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
         if (!p) return;
-        await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
+        // Bestaat al een rij met dezelfde omschrijving + categorie?
+        // Dan aantal ophogen en bedrag bijtellen (geen dubbele rij).
+        const existing = DB.where(KEYS.KOSTEN, k =>
+          k.dossier_id === id &&
+          k.omschrijving === p.omschrijving &&
+          (k.categorie || null) === (p.categorie || null)
+        );
+        if (existing.length > 0) {
+          const e = existing[0];
+          const newAantal = (Number(e.aantal) || 1) + 1;
+          const newBedrag = +((Number(e.bedrag) || 0) + (Number(p.bedrag) || 0)).toFixed(2);
+          await DB.update(KEYS.KOSTEN, e.id, { aantal: newAantal, bedrag: newBedrag });
+        } else {
+          await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
+        }
         await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'download-doc') {
         const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
