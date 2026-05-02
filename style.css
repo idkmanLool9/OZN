@@ -583,6 +583,91 @@ body:has(#login-screen:not([hidden])) { overflow: hidden; }
   .login-brand-features { display: none; }
 }
 
+/* WheelDate — eigen dag/maand/jaar wiel-picker (overal i.p.v. native) */
+.wheeldate-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0;
+  transition: opacity .2s ease;
+}
+.wheeldate-overlay.shown { pointer-events: auto; opacity: 1; }
+.wheeldate-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+.wheeldate-card {
+  position: relative;
+  background: #2c2c2e; color: #fff;
+  border-radius: 16px;
+  padding: 1rem 1rem 1.1rem;
+  width: 360px; max-width: calc(100vw - 1.5rem);
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  transform: scale(.96);
+  transition: transform .2s ease;
+}
+.wheeldate-overlay.shown .wheeldate-card { transform: scale(1); }
+.wheeldate-title {
+  text-align: center; font-size: .9rem; font-weight: 500;
+  color: rgba(255,255,255,.55);
+  margin-bottom: .5rem; letter-spacing: .02em;
+}
+.wheeldate-wheels {
+  position: relative;
+  display: flex; gap: .25rem;
+  height: 220px;            /* 5 × 44 px */
+  overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255,255,255,.03);
+}
+.wheeldate-band {
+  position: absolute;
+  top: 50%; left: .25rem; right: .25rem;
+  transform: translateY(-50%);
+  height: 44px;
+  background: rgba(255,255,255,.10);
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 0;
+}
+.wheeldate-wheel {
+  flex: 1 1 0; height: 100%;
+  list-style: none; margin: 0; padding: 0;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  position: relative; z-index: 1;
+}
+.wheeldate-wheel::-webkit-scrollbar { display: none; }
+.wheeldate-wheel-month { flex: 1.4 1 0; }
+.wheeldate-item {
+  height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  scroll-snap-align: center;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255,255,255,.4);
+  transition: color .15s ease, transform .15s ease;
+  cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+}
+.wheeldate-item.selected {
+  color: #fff; font-weight: 600;
+  transform: scale(1.04);
+}
+.wheeldate-spacer { pointer-events: none; }
+.wheeldate-actions {
+  display: flex; gap: .5rem; margin-top: .85rem;
+}
+.wheeldate-actions .btn { flex: 1 1 auto; padding: .65rem .9rem; }
+.wheeldate-actions .wd-clear { flex: 0 0 auto; min-width: 64px; }
+.wheeldate-actions .btn-ghost {
+  background: rgba(255,255,255,.08); color: #fff; border-color: transparent;
+}
+.wheeldate-actions .btn-ghost:hover { background: rgba(255,255,255,.14); }
+
+/* readonly-datums laten als gewone inputs ogen, niet als 'gedimd' */
+input[type="date"][readonly] {
+  background: #fff; cursor: pointer; opacity: 1;
+}
+
 /* Postcode-autofill hint */
 .pcode-hint {
   display: block; margin-top: .25rem;

@@ -321,6 +321,199 @@ const Postcode = {
   },
 };
 
+// ─── WheelDate: dag/maand/jaar wiel-picker (iOS-stijl) ──────────────────────
+// Vervangt de native datum-picker overal in de app zodat het overal hetzelfde
+// uitziet en altijd de drie wielen toont (dag, maand, jaar).
+const WheelDate = {
+  MONTHS: ['Januari','Februari','Maart','April','Mei','Juni','Juli','Augustus','September','Oktober','November','December'],
+  ITEM_H: 44,
+  VISIBLE: 5, // oneven, zodat er een midden-rij is
+
+  daysInMonth(year, month1) { return new Date(year, month1, 0).getDate(); },
+
+  open({ value, min, max, onConfirm, onClear } = {}) {
+    const today = new Date();
+    const parse = s => {
+      if (!s) return null;
+      const [y, m, d] = String(s).split('-').map(n => parseInt(n, 10));
+      if (!y || !m || !d) return null;
+      return { y, m, d };
+    };
+    const cur = parse(value) || { y: today.getFullYear(), m: today.getMonth() + 1, d: today.getDate() };
+    const minP = parse(min);
+    const maxP = parse(max);
+    const minYear = minP ? minP.y : 1900;
+    const maxYear = maxP ? maxP.y : (today.getFullYear() + 10);
+
+    let selDay = cur.d, selMonth = cur.m, selYear = cur.y;
+
+    const padH = WheelDate.ITEM_H * Math.floor(WheelDate.VISIBLE / 2);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'wheeldate-overlay';
+    overlay.innerHTML = `
+      <div class="wheeldate-backdrop"></div>
+      <div class="wheeldate-card" role="dialog" aria-modal="true" aria-label="Datum kiezen">
+        <div class="wheeldate-title">Kies een datum</div>
+        <div class="wheeldate-wheels">
+          <div class="wheeldate-band" aria-hidden="true"></div>
+          <ul class="wheeldate-wheel" data-axis="day"></ul>
+          <ul class="wheeldate-wheel wheeldate-wheel-month" data-axis="month"></ul>
+          <ul class="wheeldate-wheel" data-axis="year"></ul>
+        </div>
+        <div class="wheeldate-actions">
+          <button type="button" class="btn btn-ghost wd-clear">Wis</button>
+          <button type="button" class="btn btn-ghost wd-cancel">Annuleren</button>
+          <button type="button" class="btn btn-primary wd-ok">Klaar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const dayWheel   = overlay.querySelector('[data-axis="day"]');
+    const monthWheel = overlay.querySelector('[data-axis="month"]');
+    const yearWheel  = overlay.querySelector('[data-axis="year"]');
+
+    function fillWheel(wheel, items, selectedValue) {
+      const itemsHtml = items.map(it =>
+        `<li class="wheeldate-item" data-value="${it.value}">${esc(it.label)}</li>`
+      ).join('');
+      wheel.innerHTML =
+        `<li class="wheeldate-spacer" style="height:${padH}px"></li>` +
+        itemsHtml +
+        `<li class="wheeldate-spacer" style="height:${padH}px"></li>`;
+      const idx = items.findIndex(it => String(it.value) === String(selectedValue));
+      const target = idx >= 0 ? idx : 0;
+      wheel.scrollTop = target * WheelDate.ITEM_H;
+      markSelected(wheel);
+    }
+
+    function markSelected(wheel) {
+      const idx = Math.round(wheel.scrollTop / WheelDate.ITEM_H);
+      wheel.querySelectorAll('.wheeldate-item').forEach((el, i) =>
+        el.classList.toggle('selected', i === idx));
+    }
+    function snappedValue(wheel) {
+      const idx = Math.round(wheel.scrollTop / WheelDate.ITEM_H);
+      const items = wheel.querySelectorAll('.wheeldate-item');
+      return items[idx] ? items[idx].dataset.value : null;
+    }
+
+    function buildDays() {
+      const dim = WheelDate.daysInMonth(selYear, selMonth);
+      if (selDay > dim) selDay = dim;
+      const days = Array.from({ length: dim }, (_, i) => ({ value: i + 1, label: String(i + 1) }));
+      fillWheel(dayWheel, days, selDay);
+    }
+    function buildMonths() {
+      const months = WheelDate.MONTHS.map((m, i) => ({ value: i + 1, label: m }));
+      fillWheel(monthWheel, months, selMonth);
+    }
+    function buildYears() {
+      const years = [];
+      for (let y = minYear; y <= maxYear; y++) years.push({ value: y, label: String(y) });
+      fillWheel(yearWheel, years, selYear);
+    }
+
+    buildMonths(); buildYears(); buildDays();
+
+    function bindScroll(wheel, onSnap) {
+      let t;
+      wheel.addEventListener('scroll', () => {
+        markSelected(wheel);
+        clearTimeout(t);
+        t = setTimeout(() => {
+          const v = snappedValue(wheel);
+          if (v != null) onSnap(parseInt(v, 10));
+        }, 110);
+      });
+    }
+    bindScroll(dayWheel,   v => { selDay = v; });
+    bindScroll(monthWheel, v => { selMonth = v; buildDays(); });
+    bindScroll(yearWheel,  v => { selYear  = v; buildDays(); });
+
+    // Klik op item → scrol er heen
+    [dayWheel, monthWheel, yearWheel].forEach(wheel => {
+      wheel.addEventListener('click', e => {
+        const li = e.target.closest('.wheeldate-item');
+        if (!li) return;
+        const items = Array.from(wheel.querySelectorAll('.wheeldate-item'));
+        const idx = items.indexOf(li);
+        wheel.scrollTo({ top: idx * WheelDate.ITEM_H, behavior: 'smooth' });
+      });
+    });
+
+    requestAnimationFrame(() => overlay.classList.add('shown'));
+
+    function close() {
+      overlay.classList.remove('shown');
+      setTimeout(() => overlay.remove(), 200);
+      document.removeEventListener('keydown', keyHandler);
+    }
+    function keyHandler(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', keyHandler);
+
+    overlay.querySelector('.wheeldate-backdrop').addEventListener('click', close);
+    overlay.querySelector('.wd-cancel').addEventListener('click', close);
+    overlay.querySelector('.wd-clear').addEventListener('click', () => {
+      if (onClear) onClear();
+      close();
+    });
+    overlay.querySelector('.wd-ok').addEventListener('click', () => {
+      // Forceer eind-snap-waarden (voor het geval een wheel nog niet 'snapped' was)
+      const d = parseInt(snappedValue(dayWheel)   || selDay,   10);
+      const m = parseInt(snappedValue(monthWheel) || selMonth, 10);
+      const y = parseInt(snappedValue(yearWheel)  || selYear,  10);
+      const dim = WheelDate.daysInMonth(y, m);
+      const dd = Math.min(d, dim);
+      const iso = `${y}-${String(m).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+      if (onConfirm) onConfirm(iso);
+      close();
+    });
+  },
+
+  // Bind alle <input type="date"> aan de wiel-picker. Idempotent.
+  bindAll(root = document) {
+    root.querySelectorAll('input[type="date"]').forEach(inp => {
+      if (inp.dataset.wheelBound === '1') return;
+      inp.dataset.wheelBound = '1';
+      inp.readOnly = true;          // voorkomt native picker op iOS / Android
+      inp.style.cursor = 'pointer';
+      const openPicker = () => {
+        WheelDate.open({
+          value: inp.value,
+          min:   inp.getAttribute('min'),
+          max:   inp.getAttribute('max'),
+          onConfirm: iso => {
+            inp.value = iso;
+            inp.dispatchEvent(new Event('input',  { bubbles: true }));
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+          },
+          onClear: () => {
+            inp.value = '';
+            inp.dispatchEvent(new Event('input',  { bubbles: true }));
+            inp.dispatchEvent(new Event('change', { bubbles: true }));
+          },
+        });
+      };
+      inp.addEventListener('click', e => { e.preventDefault(); openPicker(); });
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(); }
+      });
+    });
+  },
+};
+
+// Auto-bind nieuwe datum-inputs zodra ze in #view verschijnen
+document.addEventListener('DOMContentLoaded', () => {
+  WheelDate.bindAll(document);
+  const view = document.getElementById('view');
+  if (view) {
+    new MutationObserver(() => WheelDate.bindAll(view))
+      .observe(view, { childList: true, subtree: true });
+  }
+});
+
 // Hash router
 const Router = {
   routes: [],
