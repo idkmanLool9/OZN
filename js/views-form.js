@@ -131,10 +131,24 @@ function renderDossierForm(params) {
           <legend>Kerkelijk &amp; uitvaartdienst</legend>
           <div class="grid-3">
             <label><span>Parochie</span>
-              <input type="text" name="parochie" id="parochie-input" value="${v('parochie')}" list="parochie-list" placeholder="kies of typ een parochie">
-              <datalist id="parochie-list">
-                ${(Settings.get('parochies') || []).map(p => `<option value="${esc(p.naam || p)}">`).join('')}
-              </datalist>
+              ${(() => {
+                const lijst = Settings.get('parochies') || [];
+                const huidig = v('parochie');
+                const inLijst = lijst.some(p => (p.naam || p) === huidig);
+                return `
+                <select name="parochie" id="parochie-input">
+                  <option value="">— kies een parochie —</option>
+                  ${lijst.map(p => {
+                    const naam = p.naam || p;
+                    return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
+                  }).join('')}
+                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
+                </select>
+                ${lijst.length === 0
+                  ? '<span class="muted small">Nog geen parochies ingesteld — voeg toe in <a href="#/account#parochies">Account → Parochies &amp; priesters</a>.</span>'
+                  : '<span class="muted small">Beheren in <a href="#/account#parochies">Account</a>.</span>'}
+                `;
+              })()}
             </label>
             <label><span>Priester / Aboona</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
             <label><span>Huisbezoek datum</span><input type="date" name="huisbezoek_datum" value="${v('huisbezoek_datum')}"></label>
@@ -469,19 +483,19 @@ function renderDossierForm(params) {
   // ─── Parochie kiezen → priester (aboona) automatisch invullen ────────
   const parochieInp = $('#parochie-input');
   const priesterInp = $('#priester-input');
-  function autofillPriester() {
-    if (!parochieInp || !priesterInp) return;
-    const naam = parochieInp.value.trim();
-    if (!naam) return;
-    const lijst = Settings.get('parochies') || [];
-    const match = lijst.find(p => (p.naam || p) === naam);
-    if (match && match.priester && !priesterInp.value.trim()) {
-      priesterInp.value = match.priester;
-    }
-  }
   if (parochieInp) {
-    parochieInp.addEventListener('change', autofillPriester);
-    parochieInp.addEventListener('input', autofillPriester);
+    parochieInp.addEventListener('change', () => {
+      if (!priesterInp) return;
+      const naam = parochieInp.value;
+      if (!naam) return;
+      const lijst = Settings.get('parochies') || [];
+      const match = lijst.find(p => (p.naam || p) === naam);
+      // Bij een bewuste keuze altijd de standaard-priester overnemen.
+      // Was er nog een handmatig ingevulde priester? Vragen of die behouden moet blijven.
+      const had = priesterInp.value.trim();
+      const nieuw = (match && match.priester) ? match.priester : '';
+      if (nieuw && nieuw !== had) priesterInp.value = nieuw;
+    });
   }
 
   // ─── Postcode-autofill via PDOK Locatieserver ────────────────────────
