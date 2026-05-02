@@ -659,6 +659,20 @@ function renderDossierForm(params) {
     try {
       if (isNew) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
+        // Standaard-kostenposten meteen aan dit nieuwe dossier hangen,
+        // zodat het kosten-overzicht direct compleet is. Gebruiker kan
+        // ze in het dossier aanpassen of verwijderen.
+        try {
+          await Promise.all((KOSTEN_PRESETS || []).map(p => DB.insert(KEYS.KOSTEN, {
+            dossier_id: created.id,
+            omschrijving: p.omschrijving,
+            categorie: p.categorie,
+            bedrag: p.bedrag,
+            betaald: false,
+          })));
+        } catch (kErr) {
+          console.warn('Standaard-kostenposten toevoegen mislukt:', kErr);
+        }
         localStorage.removeItem(draftKey);
         Router.go('/dossiers/' + created.id);
       } else {

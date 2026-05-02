@@ -13,18 +13,36 @@ const PAROCHIES = [
 
 // Vaste tarieven uit het intake-formulier
 const KOSTEN_PRESETS = [
+  // Aanname & uitvoering
   { categorie: 'aannametarief', omschrijving: 'Aannametarief — benodigd personeel en uitvoering', bedrag: 622.00 },
+  // Vervoer
   { categorie: 'vervoer',       omschrijving: 'Ziekenhuismortuarium (Almelo / Enschede)',           bedrag: 146.00 },
   { categorie: 'vervoer',       omschrijving: 'Overbrengen overledene (0–40 km vanaf Oldenzaal)',   bedrag: 231.00 },
   { categorie: 'vervoer',       omschrijving: 'Rouwauto op de dag van de uitvaart',                  bedrag: 242.00 },
+  // Kist
   { categorie: 'kist',          omschrijving: 'Basismodel kist (incl. opbaardekentje)',              bedrag: 615.40 },
+  // Aula & verzorging
   { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                                bedrag: 446.00 },
   { categorie: 'verzorging',    omschrijving: 'Verzorging door extern bedrijf',                      bedrag: 111.00 },
   { categorie: 'verzorging',    omschrijving: 'Inkisten',                                            bedrag:  63.00 },
+  // Kerk
   { categorie: 'kerk',          omschrijving: 'Gebruik Kerk en Dolabani Zaal',                       bedrag: 500.00 },
+  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                            bedrag:  31.00 },
+  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud koper',                              bedrag:  31.00 },
+  // Begraafplaats / graf
+  { categorie: 'begraafplaats', omschrijving: 'Algemeen graf',                                       bedrag: 1250.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Grafmonument verwijderen en terugplaatsen incl. tekst + foto', bedrag: 1368.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Graf delven',                                         bedrag: 410.00 },
   { categorie: 'begraafplaats', omschrijving: 'Openen graf',                                         bedrag: 250.00 },
   { categorie: 'begraafplaats', omschrijving: 'Naamsteen',                                           bedrag: 295.00 },
   { categorie: 'begraafplaats', omschrijving: 'Onderhoudskosten',                                    bedrag: 600.00 },
+  // Administratie
+  { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                                 bedrag:  17.80 },
+  // Catering
+  { categorie: 'catering',      omschrijving: 'Smiet broodje per stuk',                              bedrag:   0.80 },
+  { categorie: 'catering',      omschrijving: 'Papier op tafels',                                    bedrag:  60.00 },
+  // Overig
+  { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                           bedrag: 100.00 },
 ];
 
 // Unigra kistencatalogus (adviesprijzen per nov 2025)
