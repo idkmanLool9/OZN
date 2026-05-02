@@ -216,13 +216,20 @@ function renderDossierDetail(params) {
                   <span class="kosten-group-sub muted small">${items.length} ${items.length === 1 ? 'post' : 'posten'} · ${fmtEUR(sub)}</span>
                 </div>
                 <table class="table kosten-table">
+                  <colgroup>
+                    <col class="kc-col-omschrijving">
+                    <col class="kc-col-bedrag">
+                    ${verzekerd ? '<col class="kc-col-wie">' : ''}
+                    <col class="kc-col-status">
+                    <col class="kc-col-del">
+                  </colgroup>
                   <tbody>
                     ${items.map(k => `<tr>
-                      <td>${esc(k.omschrijving)}</td>
-                      <td class="num">${fmtEUR(k.bedrag)}</td>
-                      ${verzekerd ? `<td class="center"><button type="button" class="kost-toggle ${k.gedekt ? 'on-gedekt' : 'off-gedekt'}" data-action="toggle-gedekt" data-id="${k.id}" title="Klik om te wisselen">${k.gedekt ? '🛡 Verzekering' : '👥 Familie'}</button></td>` : ''}
-                      <td class="center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
-                      <td class="num"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
+                      <td class="kc-omschrijving">${esc(k.omschrijving)}</td>
+                      <td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>
+                      ${verzekerd ? `<td class="kc-wie center"><button type="button" class="kost-toggle ${k.gedekt ? 'on-gedekt' : 'off-gedekt'}" data-action="toggle-gedekt" data-id="${k.id}" title="Klik om te wisselen">${k.gedekt ? '🛡 Verzekering' : '👥 Familie'}</button></td>` : ''}
+                      <td class="kc-status center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
+                      <td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
                     </tr>`).join('')}
                   </tbody>
                 </table>
