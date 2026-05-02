@@ -565,6 +565,84 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ─── Dekking-berekening: hoeveel dekt de verzekering, hoeveel familie? ─────
+// Werkt in twee modi:
+//  1) 'categorie' — als de verzekeraar DELA is én het gekozen pakket een
+//     categorieen-blok heeft (per categorie max-bedrag + gedekt-vlag) PLUS
+//     een Geldverzekering-bucket. Per kost wordt eerst geprobeerd binnen de
+//     categorie-max gedekt te worden; resterend kan via de Geldverzekering.
+//  2) 'flat' — fallback op één polisbedrag (verzekering_dekking) of, voor
+//     oude dossiers, op de som van handmatig 'gedekt'-aangevinkte posten.
+function computeDekking(kosten, dossier, settings) {
+  const verzekerd = dossier.verzekering_status === 'met verzekering';
+  const totaal = (kosten || []).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  if (!verzekerd) {
+    return { mode: 'geen', totaal, dekking: 0, perKost: {}, perCategorie: {}, geldRest: 0 };
+  }
+  const polis = Number(dossier.verzekering_dekking) || 0;
+  // Pakket-template opzoeken
+  const pakkettenLijst = (settings && settings.verzekering_pakketten) || [];
+  const pakket = pakkettenLijst.find(p =>
+    p && typeof p === 'object' && (p.naam || '') === (dossier.verzekering_pakket || ''));
+  const isDela = (dossier.verzekering_maatschappij || '').toLowerCase().includes('dela');
+  const useCat = !!(pakket && pakket.categorieen && isDela);
+
+  if (!useCat) {
+    // Flat-modus: polisbedrag (zo niet ingevuld → som van gedekt-aangevinkte posten)
+    const gedektFlag = (kosten || []).filter(k => k.gedekt)
+      .reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+    const dekking = polis > 0 ? Math.min(polis, totaal) : gedektFlag;
+    return { mode: 'flat', totaal, dekking, perKost: {}, perCategorie: {}, geldRest: 0 };
+  }
+
+  // Categorie-modus
+  const cats = pakket.categorieen;
+  const startGeld = polis > 0 ? polis : Number(pakket.geldverzekering_default) || 0;
+  let geldBucket = startGeld;
+  const catUsed = {};
+  const perKost = {};
+  const perCategorie = {};
+  let totaalDekking = 0;
+
+  // Sorteer kosten in een vaste volgorde zodat de verdeling deterministisch
+  // is (niet afhankelijk van invoervolgorde)
+  const sorted = [...(kosten || [])].sort((a, b) => (a.id || 0) - (b.id || 0));
+  for (const k of sorted) {
+    const bedrag = Number(k.bedrag) || 0;
+    const cat = k.categorie || 'overig';
+    const cfg = cats[cat] || cats.overig || { max: 0, gedekt: false };
+    let dekt = 0;
+    if (cfg.gedekt) {
+      const max = Number(cfg.max) || 0;
+      const used = catUsed[cat] || 0;
+      const room = Math.max(0, max - used);
+      dekt = Math.min(room, bedrag);
+      catUsed[cat] = used + dekt;
+    }
+    // Restbedrag via Geldverzekering
+    const rest = bedrag - dekt;
+    if (rest > 0 && geldBucket > 0) {
+      const fromGeld = Math.min(geldBucket, rest);
+      dekt += fromGeld;
+      geldBucket -= fromGeld;
+    }
+    perKost[k.id] = dekt;
+    perCategorie[cat] = (perCategorie[cat] || 0) + dekt;
+    totaalDekking += dekt;
+  }
+
+  return {
+    mode: 'categorie',
+    totaal,
+    dekking: totaalDekking,
+    perKost,
+    perCategorie,
+    geldStart: startGeld,
+    geldRest: geldBucket,
+    pakket,
+  };
+}
+
 // Hash router
 const Router = {
   routes: [],

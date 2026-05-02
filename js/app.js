@@ -1,6 +1,6 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v45'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_VERSION = 'v46'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
 const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -58,8 +58,45 @@ const Settings = {
     ],
     // Pakket-uitvoeringen — per pakket optioneel een standaard-dekkingsbedrag
     // dat in het dossier-formulier automatisch wordt voorgesteld bij de
-    // dekkingsbedrag-input. Lege string = geen suggestie.
+    // dekkingsbedrag-input. Voor DELA-pakketten is er een 'categorieen'-blok
+    // met max-bedragen per kostencategorie; die worden automatisch gedekt
+    // wanneer maatschappij = DELA én dit pakket is gekozen. De rest gaat uit
+    // de Geldverzekering-bucket (geldverzekering_default of polisbedrag).
     verzekering_pakketten: [
+      {
+        naam: 'DELA UitvaartPlan in Diensten — externe uitvaartleider',
+        verzekeraar: 'DELA',
+        dekking: '3957',
+        geldverzekering_default: 800,
+        categorieen: {
+          aannametarief: { max: 600, gedekt: true  },
+          vervoer:       { max: 500, gedekt: true  },
+          verzorging:    { max: 200, gedekt: true  },
+          kist:          { max: 600, gedekt: true  },
+          aula:          { max: 300, gedekt: true  },
+          kerk:          { max:   0, gedekt: false },  // niet-DELA-locatie
+          begraafplaats: { max: 800, gedekt: true  },  // alleen algemeen graf
+          bloemen:       { max:   0, gedekt: false },  // via Geldverzekering
+          rouwkaarten:   { max: 250, gedekt: true  },
+          catering:      { max:   0, gedekt: false },  // via Geldverzekering
+          schoonmaak:    { max:   0, gedekt: false },
+          administratie: { max:  50, gedekt: true  },
+          overig:        { max: 657, gedekt: true  },
+        },
+        opmerking: 'Vergoeding bij niet-DELA-uitvaartleider: €3.157 dienstendeel + min. €800 Geldverzekering. Familie betaalt het verschil.',
+      },
+      {
+        naam: 'DELA UitvaartPlan in Geld',
+        verzekeraar: 'DELA',
+        dekking: '',
+        opmerking: 'Vrij te besteden bedrag — vul polisbedrag in als dekking.',
+      },
+      {
+        naam: 'DELA UitvaartPlan in Diensten — DELA verzorgt zelf',
+        verzekeraar: 'DELA',
+        dekking: '8800',
+        opmerking: 'Alleen relevant als DELA de uitvaart zelf verzorgt — zelden van toepassing in onze parochie.',
+      },
       { naam: 'Standaard pakket',  dekking: '' },
       { naam: 'Uitgebreid pakket', dekking: '' },
       { naam: 'Vrije keuze',       dekking: '' },

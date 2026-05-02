@@ -9,12 +9,9 @@ function renderFactuur(params) {
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzekerd = d.verzekering_status === 'met verzekering';
-  // Polisbedrag is bron-van-waarheid voor verzekeringsdekking; gedekt-flags
-  // zijn alleen nog fallback voor oude dossiers zonder dekkingsbedrag.
-  const gedektFlag    = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const dekkingInfo   = computeDekking(kosten, d, Settings.all());
   const verzDekking   = Number(d.verzekering_dekking) || 0;
-  const gedektTotaal  = !verzekerd ? 0
-                        : (verzDekking > 0 ? Math.min(verzDekking, totaal) : gedektFlag);
+  const gedektTotaal  = dekkingInfo.dekking;
   const familieTotaal = Math.max(0, totaal - gedektTotaal);
   const aanbetaling   = Number(d.aanbetaling_bedrag) || 0;
   const teBetalen     = Math.max(0, familieTotaal - aanbetaling);

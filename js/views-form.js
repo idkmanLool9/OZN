@@ -688,6 +688,7 @@ function renderDossierForm(params) {
             omschrijving: p.omschrijving,
             categorie: p.categorie,
             bedrag: p.bedrag,
+            aantal: 1,
             betaald: false,
           })));
         } catch (kErr) {

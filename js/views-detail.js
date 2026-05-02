@@ -41,20 +41,13 @@ function renderDossierDetail(params) {
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzekerd = d.verzekering_status === 'met verzekering';
-  // Verzekeringsdekking: volledig automatisch op basis van het polisbedrag
-  // dat in het dossier staat (verzekering_dekking). Geen handmatige
-  // markering per kostenpost meer nodig. Voor oude dossiers waar items
-  // wel handmatig als gedekt waren aangevinkt, vallen we daar netjes
-  // op terug zolang er nog geen polisbedrag is ingevuld.
-  const gedektTotaal = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  // Verzekeringsdekking via centrale helper: 'categorie'-modus voor DELA
+  // wanneer een pakket-template met categorieen is gekozen, anders 'flat'.
+  const dekkingInfo  = computeDekking(kosten, d, Settings.all());
   const verzDekking  = Number(d.verzekering_dekking) || 0;
-  const dekking      = !verzekerd ? 0
-                       : (verzDekking > 0 ? Math.min(verzDekking, totaal) : gedektTotaal);
+  const dekking      = dekkingInfo.dekking;
   const familieTotaal  = Math.max(0, totaal - dekking);
   const moetNogBetalen = Math.max(0, totaal - betaald);
-  // Aannamen: het polisbedrag wordt door de verzekeraar betaald, alle
-  // 'betaald'-flags zijn van familie-kant. (Mocht er meer betaald zijn
-  // dan de familie verschuldigd is, dan klemmen we naar 0.)
   const familieMoetNog = Math.max(0, familieTotaal - betaald);
 
   $('#view').innerHTML = `
@@ -231,17 +224,27 @@ function renderDossierDetail(params) {
                 <table class="table kosten-table">
                   <colgroup>
                     <col class="kc-col-omschrijving">
+                    <col class="kc-col-aantal">
                     <col class="kc-col-bedrag">
+                    ${dekkingInfo.mode === 'categorie' ? '<col class="kc-col-dekking">' : ''}
                     <col class="kc-col-status">
                     <col class="kc-col-del">
                   </colgroup>
                   <tbody>
-                    ${items.map(k => `<tr>
-                      <td class="kc-omschrijving">${esc(k.omschrijving)}</td>
+                    ${items.map(k => {
+                      const aantal = Number(k.aantal) || 1;
+                      const stuk   = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
+                      const dekt   = (dekkingInfo.perKost && dekkingInfo.perKost[k.id]) || 0;
+                      const familieDeel = Math.max(0, (Number(k.bedrag) || 0) - dekt);
+                      return `<tr>
+                      <td class="kc-omschrijving">${esc(k.omschrijving)}${aantal !== 1 ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}</td>
+                      <td class="kc-aantal"><input type="number" class="kc-aantal-input" data-id="${k.id}" data-stuk="${stuk}" value="${esc(aantal)}" min="0" step="1" inputmode="numeric"></td>
                       <td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>
+                      ${dekkingInfo.mode === 'categorie' ? `<td class="kc-dekking num small">${dekt > 0 ? `<span class="dekking-deel">🛡 ${fmtEUR(dekt)}</span>${familieDeel > 0 ? `<br><span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>` : ''}` : `<span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>`}</td>` : ''}
                       <td class="kc-status center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
                       <td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
-                    </tr>`).join('')}
+                    </tr>`;
+                    }).join('')}
                   </tbody>
                 </table>
               </div>`;
@@ -262,16 +265,32 @@ function renderDossierDetail(params) {
             </div>
             ${verzekerd ? `
               <div class="kosten-totals-divider"></div>
-              ${verzDekking === 0 && gedektTotaal === 0 ? `
+              ${dekking === 0 && verzDekking === 0 ? `
                 <div class="alert alert-info" style="margin:.25rem 0 .5rem;font-size:.85rem;">
-                  Vul het <a href="#/dossiers/${d.id}/bewerken#verzekering-met-fields"><strong>dekkingsbedrag</strong></a>
-                  in bij Verzekering &amp; betaling — dan wordt automatisch berekend wat de
-                  verzekering dekt en wat de familie nog moet betalen.
+                  Vul de <a href="#/dossiers/${d.id}/bewerken#verzekering-met-fields"><strong>maatschappij + pakket + dekkingsbedrag</strong></a>
+                  in bij Verzekering &amp; betaling — voor DELA wordt dan
+                  automatisch per categorie berekend wat verzekerd is.
                 </div>
               ` : `
-                <div class="kosten-total-row muted small">
-                  <span>Verzekering dekt${verzDekking > 0 ? ' (uit polis)' : ' (handmatig gemarkeerd)'}</span>
-                  <span class="num">${fmtEUR(dekking)}</span>
+                ${dekkingInfo.mode === 'categorie' ? `
+                  <div class="kosten-total-row muted small" style="font-weight:600;">
+                    <span>${esc((dekkingInfo.pakket && dekkingInfo.pakket.naam) || 'Verzekering')}</span>
+                    <span></span>
+                  </div>
+                  ${Object.entries(dekkingInfo.perCategorie).filter(([,v]) => v > 0).map(([cat, v]) => `
+                    <div class="kosten-total-row muted small" style="padding-left:1rem;">
+                      <span>· ${esc(categorieLabel(cat))}</span>
+                      <span class="num">${fmtEUR(v)}</span>
+                    </div>`).join('')}
+                  ${dekkingInfo.geldStart > 0 ? `
+                    <div class="kosten-total-row muted small" style="padding-left:1rem;">
+                      <span>· Geldverzekering benut</span>
+                      <span class="num">${fmtEUR(dekkingInfo.geldStart - dekkingInfo.geldRest)}${dekkingInfo.geldRest > 0 ? ` <span class="muted">(rest ${fmtEUR(dekkingInfo.geldRest)} aan familie)</span>` : ''}</span>
+                    </div>` : ''}
+                ` : ''}
+                <div class="kosten-total-row">
+                  <span>Verzekering dekt totaal${dekkingInfo.mode === 'categorie' ? '' : (verzDekking > 0 ? ' (uit polis)' : '')}</span>
+                  <strong class="num">${fmtEUR(dekking)}</strong>
                 </div>
                 <div class="kosten-total-row muted small">
                   <span>Door familie te betalen</span>
@@ -743,10 +762,28 @@ function bindDetailEvents(id) {
     const f = e.target;
     const omsch = f.omschrijving.value.trim(); if (!omsch) return;
     try {
-      await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag: parseEUR(f.bedrag.value), betaald: f.betaald.checked });
+      await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag: parseEUR(f.bedrag.value), aantal: 1, betaald: f.betaald.checked });
       await DB.touchDossier(id);
       renderDossierDetail({ id });
     } catch (_) {}
+  });
+
+  // Aantal aanpassen → bedrag herberekenen op basis van stukprijs en opslaan
+  let _aantalSaveTimer = null;
+  $$('input.kc-aantal-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const tid = parseInt(inp.dataset.id, 10);
+      const stuk = Number(inp.dataset.stuk) || 0;
+      let nieuw = Math.max(0, parseInt(inp.value, 10) || 0);
+      inp.value = String(nieuw);
+      const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
+      const newBedrag = +(stuk * nieuw).toFixed(2);
+      try {
+        await DB.update(KEYS.KOSTEN, tid, { aantal: nieuw, bedrag: newBedrag });
+        await DB.touchDossier(id);
+        renderDossierDetail({ id });
+      } catch (_) {}
+    });
   });
 
   // Scan-knop: foto maken → auto-crop → in het bestandskeuze-veld zetten
@@ -863,7 +900,7 @@ function bindDetailEvents(id) {
       } else if (action === 'add-preset') {
         const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
         if (!p) return;
-        await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, betaald: false });
+        await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
         await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'download-doc') {
         const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;

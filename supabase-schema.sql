@@ -78,6 +78,11 @@ ALTER TABLE public.dossiers
 ALTER TABLE public.kosten
   ADD COLUMN IF NOT EXISTS gedekt BOOLEAN DEFAULT false;
 
+-- Kosten: aantal (voor per-stuk-posten zoals 'Smiet broodje per stuk')
+-- Stukprijs wordt afgeleid uit bedrag/aantal; bedrag blijft het totaal.
+ALTER TABLE public.kosten
+  ADD COLUMN IF NOT EXISTS aantal NUMERIC(10,2) DEFAULT 1;
+
 -- Foto van de overledene (optioneel) — voor rouwkaart en dossier-overzicht
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS foto_overledene_pad TEXT;

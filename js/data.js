@@ -65,8 +65,13 @@ const KOSTEN_PRESETS = [
   // Administratie
   { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                                 bedrag:  17.80 },
   // Catering
-  { categorie: 'catering',      omschrijving: 'Smiet broodje per stuk',                              bedrag:   0.80 },
-  { categorie: 'catering',      omschrijving: 'Papier op tafels',                                    bedrag:  60.00 },
+  { categorie: 'catering',      omschrijving: 'Smiet broodje',          bedrag:   0.80, perStuk: true },
+  { categorie: 'catering',      omschrijving: 'Duitse broodje wit incl. kaas', bedrag:   0,    perStuk: true },
+  { categorie: 'catering',      omschrijving: 'Duits broodje bruin incl. kaas', bedrag:   0,    perStuk: true },
+  { categorie: 'catering',      omschrijving: 'Warme maaltijd: rijst met kipfilet & kebab + koolsalade', bedrag: 0, perStuk: true },
+  { categorie: 'catering',      omschrijving: 'Warme maaltijd: rijst met visfilet + koolsalade', bedrag: 0, perStuk: true },
+  { categorie: 'catering',      omschrijving: 'Koffie / thee / water',  bedrag:   0,    perStuk: true },
+  { categorie: 'catering',      omschrijving: 'Papier op tafels',       bedrag:  60.00 },
   // Overig
   { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                           bedrag: 100.00 },
 ];
