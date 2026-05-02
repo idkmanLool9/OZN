@@ -1273,9 +1273,17 @@ body.is-offline .topbar { box-shadow: inset 0 -2px 0 var(--amber); }
   gap: 1rem; font-size: .95rem;
 }
 .kosten-total-row .num { font-variant-numeric: tabular-nums; }
-.kosten-total-row.total-familie {
+.kosten-total-row.total-open {
   margin-top: .35rem; padding-top: .55rem;
   border-top: 1px solid var(--border);
+  font-size: 1.05rem;
+}
+.kosten-total-row.total-open strong { color: var(--amber); }
+.kosten-totals-divider {
+  height: 1px; background: var(--border); margin: .5rem 0 .15rem;
+}
+.kosten-total-row.total-familie {
+  margin-top: .25rem;
   font-size: 1.05rem;
 }
 .kosten-total-row.total-familie strong { color: var(--primary); }

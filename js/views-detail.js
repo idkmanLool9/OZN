@@ -41,8 +41,19 @@ function renderDossierDetail(params) {
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzekerd = d.verzekering_status === 'met verzekering';
+  // Verzekeringsdekking: gebruik per-kost 'gedekt'-vlaggen als die er zijn,
+  // anders fallback op het dekkingsbedrag uit de polis (verzekering_dekking).
   const gedektTotaal = kosten.filter(k => k.gedekt).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
-  const familieTotaal = totaal - gedektTotaal;
+  const verzDekking  = Number(d.verzekering_dekking) || 0;
+  const dekking      = !verzekerd ? 0
+                       : (gedektTotaal > 0 ? gedektTotaal : Math.min(verzDekking, totaal));
+  const familieTotaal = Math.max(0, totaal - dekking);
+  // Wat is er door de familie zelf al betaald, en wat moet er nog?
+  const familieBetaald = (gedektTotaal > 0)
+    ? kosten.filter(k => !k.gedekt && k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0)
+    : betaald; // benadering: bij polis-gebaseerde dekking nemen we aan dat 'betaald' van familie-kant is
+  const moetNogBetalen   = Math.max(0, totaal - betaald);
+  const familieMoetNog   = Math.max(0, familieTotaal - familieBetaald);
 
   $('#view').innerHTML = `
     <div class="page">
@@ -238,21 +249,34 @@ function renderDossierDetail(params) {
           </div>
           <div class="kosten-totals">
             <div class="kosten-total-row">
-              <span>Totaal</span>
+              <span>Totaal kosten</span>
               <strong class="num">${fmtEUR(totaal)}</strong>
             </div>
             <div class="kosten-total-row muted small">
-              <span>Waarvan betaald</span>
+              <span>Waarvan al betaald</span>
               <span class="num">${fmtEUR(betaald)}</span>
             </div>
+            <div class="kosten-total-row total-open">
+              <span>Moet nog betaald worden</span>
+              <strong class="num">${fmtEUR(moetNogBetalen)}</strong>
+            </div>
             ${verzekerd ? `
+              <div class="kosten-totals-divider"></div>
               <div class="kosten-total-row muted small">
-                <span>Gedekt door verzekering</span>
-                <span class="num">${fmtEUR(gedektTotaal)}</span>
+                <span>Verzekering dekt${verzDekking > 0 && gedektTotaal === 0 ? ' (volgens polis)' : ''}</span>
+                <span class="num">${fmtEUR(dekking)}</span>
+              </div>
+              <div class="kosten-total-row muted small">
+                <span>Door familie te betalen</span>
+                <span class="num">${fmtEUR(familieTotaal)}</span>
+              </div>
+              <div class="kosten-total-row muted small">
+                <span>Familie heeft al betaald</span>
+                <span class="num">${fmtEUR(familieBetaald)}</span>
               </div>
               <div class="kosten-total-row total-familie">
-                <span>Door familie te betalen</span>
-                <strong class="num">${fmtEUR(familieTotaal)}</strong>
+                <span>Familie moet nog betalen</span>
+                <strong class="num">${fmtEUR(familieMoetNog)}</strong>
               </div>
             ` : ''}
           </div>`;
