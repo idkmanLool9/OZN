@@ -202,6 +202,104 @@ const Lightbox = {
   },
 };
 
+// ─── Postcode-API: gratis PDOK Locatieserver (geen sleutel nodig) ──────────
+const Postcode = {
+  // Normaliseer "1234 ab" → "1234AB"
+  normalize(pc) {
+    return String(pc || '').replace(/\s+/g, '').toUpperCase();
+  },
+  isValid(pc) { return /^\d{4}[A-Z]{2}$/.test(Postcode.normalize(pc)); },
+  // Pak het huisnummer (digits) en eventuele toevoeging uit een adres-string
+  parseHuisnummer(adres) {
+    const m = String(adres || '').match(/(\d+)\s*([A-Za-z]?\d?[A-Za-z]?)\s*$/);
+    if (!m) return { nr: '', toev: '' };
+    return { nr: m[1], toev: (m[2] || '').trim() };
+  },
+  // Bouw een "Straatnaam 12a" string uit PDOK-resultaat
+  formatAdres(doc, huisToev) {
+    const huisVoor = doc.huis_nlt || ((doc.huisnummer || '') + (huisToev || ''));
+    return [doc.straatnaam, huisVoor].filter(Boolean).join(' ').trim();
+  },
+  async lookup(postcode, huisnummer) {
+    const pc = Postcode.normalize(postcode);
+    if (!Postcode.isValid(pc)) return null;
+    const hnr = String(huisnummer || '').match(/\d+/)?.[0] || '';
+    const q = hnr ? `postcode:${pc} and huisnummer:${hnr}` : `postcode:${pc}`;
+    const url = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?' +
+      'fl=straatnaam,woonplaatsnaam,huisnummer,huis_nlt&fq=type:adres&rows=1&q=' +
+      encodeURIComponent(q);
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const j = await r.json();
+      const doc = j && j.response && j.response.docs && j.response.docs[0];
+      if (!doc) return null;
+      return {
+        straat: doc.straatnaam || '',
+        woonplaats: doc.woonplaatsnaam || '',
+        huis: doc.huis_nlt || doc.huisnummer || '',
+      };
+    } catch (_) { return null; }
+  },
+  // Bind een (adres, postcode, woonplaats)-trio aan auto-aanvullen.
+  // Vult alleen lege velden in én toont een vluchtige "✓ aangevuld"-hint.
+  bindAutofill({ adresEl, postcodeEl, woonplaatsEl }) {
+    if (!postcodeEl) return;
+
+    const showHint = (el, text) => {
+      const wrap = el.closest('label') || el.parentElement;
+      if (!wrap) return;
+      let h = wrap.querySelector('.pcode-hint');
+      if (!h) {
+        h = document.createElement('span');
+        h.className = 'pcode-hint muted small';
+        wrap.appendChild(h);
+      }
+      h.textContent = text;
+      h.classList.add('pcode-hint-show');
+      clearTimeout(h._t);
+      h._t = setTimeout(() => h.classList.remove('pcode-hint-show'), 2400);
+    };
+
+    const run = async () => {
+      const pc = postcodeEl.value;
+      if (!Postcode.isValid(pc)) return;
+      // Normaliseer postcode-veld zelf (1234ab → 1234 AB)
+      const norm = Postcode.normalize(pc);
+      postcodeEl.value = norm.replace(/^(\d{4})/, '$1 ');
+      const adres = adresEl ? adresEl.value : '';
+      const { nr, toev } = Postcode.parseHuisnummer(adres);
+      const data = await Postcode.lookup(pc, nr);
+      if (!data) return;
+      let filled = [];
+      if (woonplaatsEl && !woonplaatsEl.value.trim() && data.woonplaats) {
+        woonplaatsEl.value = data.woonplaats;
+        filled.push('woonplaats');
+      }
+      if (adresEl && data.straat) {
+        const cur = adresEl.value.trim();
+        // Alleen overschrijven als er nog geen straatnaam staat (bijv. alleen "33")
+        if (!cur || /^\d/.test(cur)) {
+          const huis = (data.huis || nr + toev).trim();
+          adresEl.value = (data.straat + (huis ? ' ' + huis : '')).trim();
+          filled.push('adres');
+        }
+      }
+      if (filled.length) showHint(postcodeEl, '✓ ' + filled.join(' + ') + ' aangevuld');
+    };
+
+    postcodeEl.addEventListener('change', run);
+    postcodeEl.addEventListener('blur', run);
+    if (adresEl) {
+      // Als de gebruiker eerst het huisnummer typt en dan postcode al ingevuld was,
+      // ook proberen aan te vullen
+      adresEl.addEventListener('blur', () => {
+        if (Postcode.isValid(postcodeEl.value) && !woonplaatsEl?.value.trim()) run();
+      });
+    }
+  },
+};
+
 // Hash router
 const Router = {
   routes: [],

@@ -583,6 +583,16 @@ body:has(#login-screen:not([hidden])) { overflow: hidden; }
   .login-brand-features { display: none; }
 }
 
+/* Postcode-autofill hint */
+.pcode-hint {
+  display: block; margin-top: .25rem;
+  color: var(--green); opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity .25s ease, transform .25s ease;
+  pointer-events: none;
+}
+.pcode-hint.pcode-hint-show { opacity: 1; transform: translateY(0); }
+
 /* Alerts */
 .alert { padding: .75rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: .9rem; border: 1px solid; }
 .alert-error { background: var(--red-soft); border-color: var(--red); color: var(--red); }

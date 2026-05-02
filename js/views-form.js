@@ -425,6 +425,18 @@ function renderDossierForm(params) {
   vsel.addEventListener('change', updateVerzekeringSections);
   updateVerzekeringSections();
 
+  // ─── Postcode-autofill via PDOK Locatieserver ────────────────────────
+  Postcode.bindAutofill({
+    adresEl:      $('input[name="adres_overledene"]'),
+    postcodeEl:   $('input[name="postcode_overledene"]'),
+    woonplaatsEl: $('input[name="woonplaats_overledene"]'),
+  });
+  Postcode.bindAutofill({
+    adresEl:      $('input[name="contact_adres"]'),
+    postcodeEl:   $('input[name="contact_postcode"]'),
+    woonplaatsEl: $('input[name="contact_woonplaats"]'),
+  });
+
   // ─── #3 Auto-fill contactpersoon-gegevens uit eerder dossier ──────────
   const contactNaamInp = $('input[name="contact_naam"]');
   if (contactNaamInp) {

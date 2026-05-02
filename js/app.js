@@ -1,7 +1,7 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v34'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
-const APP_BUILD_DATE = '2026-05-01';
+const APP_VERSION = 'v35'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
