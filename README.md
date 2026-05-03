@@ -88,6 +88,47 @@ js/
 - Documenten in Storage zijn private (niet via publieke URL bereikbaar);
   downloads gaan via tijdelijke "signed URLs" van 60 seconden
 
+## Mobiele app (iOS via Capacitor + Codemagic)
+
+De app is met **Capacitor** ingepakt zodat 'ie als echte iOS-app gedraaid kan
+worden via TestFlight. De build draait in de cloud op een macOS-machine —
+geen Mac op je eigen bureau nodig.
+
+### Eenmalige setup vanaf Windows
+
+1. **Apple Developer Program** — aanmaken op
+   [developer.apple.com](https://developer.apple.com) (€99/jaar). 1-2 dagen
+   wachten op verificatie.
+2. **App-ID registreren** —
+   [Identifiers](https://developer.apple.com/account/resources/identifiers/list)
+   → "+" → App IDs → bundle: `nl.sok.uitvaartbeheer`.
+3. **App in App Store Connect** —
+   [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → My Apps
+   → "+" → "Uitvaartbeheer" met bovenstaande bundle-id. Onthoud het App ID.
+4. **Codemagic koppelen** — [codemagic.io](https://codemagic.io) →
+   *Add application* → kies deze GitHub-repo. De `codemagic.yaml` wordt
+   automatisch herkend.
+5. In **Codemagic → Teams → Integrations → Developer Portal** een API-key
+   aanmaken met App Store Connect en koppelen aan de workflow.
+6. In `codemagic.yaml` het echte `APP_STORE_APP_ID` invullen (uit ASC).
+7. **TestFlight-app** op iPad/iPhone installeren uit de App Store.
+
+### Bouwen + uitrollen
+
+Bij elke push naar de actieve branch start Codemagic vanzelf een build,
+signs de app, en stuurt 'm naar TestFlight onder de groep
+"Internal Testers". Testers krijgen een pushmelding "Update beschikbaar".
+
+### Lokaal Capacitor-commando's (optioneel, op een Mac)
+
+```bash
+npm install
+npm run build         # genereert ./www
+npx cap add ios       # eenmaal: maakt ios/-map (vereist macOS)
+npx cap sync ios      # na elke wijziging
+npx cap open ios      # opent Xcode
+```
+
 ## Lokaal testen
 
 ```bash

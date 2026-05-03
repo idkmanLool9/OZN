@@ -1,3 +1,9 @@
 .DS_Store
 *.log
 node_modules/
+
+# Capacitor (gegenereerd door cloud-build)
+www/
+ios/
+android/
+.capacitor/

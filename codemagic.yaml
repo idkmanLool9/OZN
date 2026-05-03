@@ -1,0 +1,73 @@
+# Codemagic CI/CD voor de iOS-build van Uitvaartbeheer.
+# Codemagic draait dit op een macOS-cloud-machine; jij hoeft Xcode nooit
+# zelf te openen vanaf je Windows-PC.
+#
+# Setup-stappen:
+# 1. codemagic.io account aanmaken en deze repo (idkmanLool9/uitvaart) koppelen
+# 2. Apple Developer-account integratie configureren onder
+#    Codemagic → Teams → Integrations → Developer Portal (App Store Connect API)
+# 3. Een App-ID 'nl.sok.uitvaartbeheer' aanmaken in
+#    https://developer.apple.com/account/resources/identifiers/list
+# 4. In App Store Connect een nieuwe app 'Uitvaartbeheer' aanmaken met dit
+#    Bundle-ID
+# 5. Build starten — Codemagic verzorgt provisioning, signing en upload
+#    naar TestFlight automatisch.
+
+workflows:
+  ios-testflight:
+    name: iOS — TestFlight build
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: nl.sok.uitvaartbeheer
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+        APP_STORE_APP_ID: 0000000000  # vervangen door echt App ID na aanmaken in ASC
+      node: 20.x
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: claude/funeral-director-website-raXTm
+          include: true
+          source: true
+    scripts:
+      - name: Install npm-deps + bouw www-map
+        script: |
+          npm ci
+          npm run build
+      - name: Capacitor — iOS-platform toevoegen indien afwezig
+        script: |
+          if [ ! -d "ios/App" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+      - name: Pods installeren
+        script: |
+          cd ios/App && pod install
+      - name: Versie + buildnummer ophogen
+        script: |
+          cd ios/App
+          agvtool new-version -all $(($BUILD_NUMBER + 100))
+      - name: iOS-build (signing via Codemagic)
+        script: |
+          xcode-project use-profiles
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers

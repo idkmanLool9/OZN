@@ -1,0 +1,14 @@
+{
+  "appId": "nl.sok.uitvaartbeheer",
+  "appName": "Uitvaartbeheer",
+  "webDir": "www",
+  "ios": {
+    "scheme": "Uitvaartbeheer",
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile"
+  },
+  "server": {
+    "iosScheme": "uitvaartbeheer",
+    "androidScheme": "https"
+  }
+}

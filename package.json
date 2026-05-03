@@ -1,0 +1,19 @@
+{
+  "name": "uitvaartbeheer-sok",
+  "version": "1.0.0",
+  "description": "Uitvaartbeheer voor de Syrisch-Orthodoxe parochies — mobile-app wrapper via Capacitor.",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-www.js",
+    "cap:sync": "npm run build && npx cap sync ios",
+    "cap:add-ios": "npm run build && npx cap add ios",
+    "cap:open-ios": "npx cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.2"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.1.2",
+    "@capacitor/ios": "^6.1.2"
+  }
+}
