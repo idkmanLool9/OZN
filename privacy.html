@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#6b1e2a">
+  <title>Privacybeleid · Uitvaartbeheer SOK</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #fafaf6; }
+    .privacy-page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .privacy-page h1 { font-family: Georgia, serif; color: var(--primary); margin: 0 0 .25rem; }
+    .privacy-page h2 { border: none; padding: 0; margin: 1.75rem 0 .5rem; font-size: 1.15rem; }
+    .privacy-page h3 { color: var(--primary); margin: 1rem 0 .25rem; font-size: 1rem; }
+    .privacy-page p, .privacy-page li { line-height: 1.6; color: var(--text); }
+    .privacy-page ul { padding-left: 1.25rem; }
+    .privacy-page .updated { color: var(--muted); font-size: .85rem; margin-bottom: 2rem; }
+    .privacy-page .lang-toggle { float: right; }
+    .privacy-page .lang-toggle a { padding: .25rem .65rem; border: 1px solid var(--border); border-radius: 4px; margin-left: .25rem; background: #fff; }
+    .privacy-page .lang-toggle a.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    [lang="en"] { display: none; }
+    body.lang-en [lang="nl"] { display: none; }
+    body.lang-en [lang="en"] { display: block; }
+  </style>
+</head>
+<body>
+  <div class="privacy-page">
+    <div class="lang-toggle">
+      <a href="#" data-lang="nl" class="active">NL</a>
+      <a href="#" data-lang="en">EN</a>
+    </div>
+
+    <article lang="nl">
+      <h1>Privacybeleid</h1>
+      <p class="updated">Laatst bijgewerkt: 2 mei 2026</p>
+
+      <p>Uitvaartbeheer (de "App") is een interne administratie-applicatie
+      voor uitvaartleiders binnen de Syrisch-Orthodoxe Kerk van Antiochië.
+      Dit privacybeleid legt uit hoe de App persoonsgegevens verzamelt,
+      gebruikt en beschermt, in overeenstemming met de Algemene Verordening
+      Gegevensbescherming (AVG / GDPR).</p>
+
+      <h2>1. Verwerkingsverantwoordelijke</h2>
+      <p><strong>St. Ephrem de Syriër Klooster</strong><br>
+      Glanerbrugstraat 33<br>
+      7585 PK Glane / Losser<br>
+      Nederland</p>
+
+      <h2>2. Welke gegevens worden verwerkt?</h2>
+      <h3>2.1 Gegevens van gebruikers (uitvaartleider, secretariaat)</h3>
+      <ul>
+        <li>E-mailadres en versleuteld wachtwoord (voor inloggen)</li>
+        <li>Naam (zelf in te vullen, optioneel)</li>
+        <li>Aanmaak- en wijzigingstijdstippen</li>
+      </ul>
+
+      <h3>2.2 Gegevens van overledenen en nabestaanden (in dossiers)</h3>
+      <ul>
+        <li>NAW-gegevens, geboortedatum, overlijdensdatum, BSN</li>
+        <li>Burgerlijke staat, partner, kinderen</li>
+        <li>Contactgegevens van nabestaanden (telefoon, e-mail, adres)</li>
+        <li>Documenten (overlijdensakte, identiteitsbewijs, polis enz.)</li>
+        <li>Verzekeringsgegevens en kostenposten</li>
+        <li>Notities van de uitvaartleider</li>
+      </ul>
+
+      <h2>3. Doel van de verwerking</h2>
+      <ul>
+        <li>Het regelen van uitvaarten in opdracht van nabestaanden</li>
+        <li>Communicatie met familie en derden (kerk, begraafplaats, verzekeraars)</li>
+        <li>Het opstellen van facturen en eindafrekeningen</li>
+        <li>Het bewaren van een dossier per uitvaart voor administratieve verplichtingen</li>
+      </ul>
+
+      <h2>4. Rechtsgrond</h2>
+      <p>De verwerking is gebaseerd op:</p>
+      <ul>
+        <li>Uitvoering van een overeenkomst met de opdrachtgever (Art. 6 lid 1 sub b AVG)</li>
+        <li>Wettelijke verplichting tot administratie van uitvaartdiensten</li>
+        <li>Gerechtvaardigd belang voor pastorale begeleiding binnen de kerkgemeente</li>
+      </ul>
+
+      <h2>5. Opslag en beveiliging</h2>
+      <p>Gegevens worden opgeslagen op servers van <strong>Supabase</strong>
+      (datacenter binnen de Europese Unie). De verbinding is versleuteld via
+      TLS/HTTPS. Toegang is beperkt tot geauthenticeerde gebruikers via
+      Row-Level-Security. Documenten in cloud-opslag zijn privé en alleen
+      via tijdelijke beveiligde links toegankelijk.</p>
+      <p>Wachtwoorden worden niet leesbaar opgeslagen — alleen een
+      cryptografische hash via bcrypt.</p>
+
+      <h2>6. Bewaartermijn</h2>
+      <p>Dossiergegevens worden bewaard zolang dat noodzakelijk is voor
+      administratieve, juridische of pastorale doeleinden, maar maximaal
+      <strong>10 jaar</strong> na de uitvaart. Daarna worden de gegevens
+      verwijderd, tenzij wettelijke bewaarplichten anders vereisen.</p>
+
+      <h2>7. Delen met derden</h2>
+      <p>Gegevens worden niet verkocht of gedeeld met derden, behalve:</p>
+      <ul>
+        <li>Met verzekeraars in opdracht van de nabestaanden bij claims</li>
+        <li>Met de gemeente / Burgerlijke Stand bij aangifte van overlijden</li>
+        <li>Met dienstverleners (Supabase, EmailJS) als verwerkers onder strikte AVG-overeenkomsten</li>
+      </ul>
+
+      <h2>8. Rechten van betrokkenen</h2>
+      <p>Op grond van de AVG heb je recht op inzage, correctie, verwijdering,
+      beperking, overdracht en bezwaar tegen verwerking. Verzoeken kun je
+      richten aan het secretariaat van het klooster. Je hebt het recht
+      een klacht in te dienen bij de
+      <a href="https://autoriteitpersoonsgegevens.nl">Autoriteit Persoonsgegevens</a>.</p>
+
+      <h2>9. Cookies en tracking</h2>
+      <p>De App gebruikt geen tracking-cookies, geen advertenties en geen
+      analytics-pixels van derden. Alleen technische opslag in localStorage
+      voor offline-modus.</p>
+
+      <h2>10. Wijzigingen</h2>
+      <p>Dit beleid kan worden aangepast bij belangrijke wijzigingen aan de
+      App. De datum bovenaan deze pagina toont de laatste versie.</p>
+
+      <h2>11. Contact</h2>
+      <p>Vragen of verzoeken: secretariaat@stephremklooster.nl</p>
+    </article>
+
+    <article lang="en">
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: May 2, 2026</p>
+
+      <p>Uitvaartbeheer (the "App") is an internal administrative
+      application for funeral directors within the Syriac Orthodox Church
+      of Antioch. This privacy policy explains how the App collects, uses
+      and protects personal data, in accordance with the EU General Data
+      Protection Regulation (GDPR).</p>
+
+      <h2>1. Data controller</h2>
+      <p><strong>St. Ephrem the Syrian Monastery</strong><br>
+      Glanerbrugstraat 33<br>
+      7585 PK Glane / Losser<br>
+      The Netherlands</p>
+
+      <h2>2. What data is processed?</h2>
+      <h3>2.1 User data (funeral director, secretary)</h3>
+      <ul>
+        <li>Email address and encrypted password (for login)</li>
+        <li>Name (self-entered, optional)</li>
+        <li>Creation and modification timestamps</li>
+      </ul>
+
+      <h3>2.2 Data on deceased and next of kin (in case files)</h3>
+      <ul>
+        <li>Name, address, date of birth, date of death, citizen service number (BSN)</li>
+        <li>Marital status, partner, children</li>
+        <li>Contact details of next of kin</li>
+        <li>Documents (death certificate, ID, insurance policy)</li>
+        <li>Insurance information and cost items</li>
+        <li>Notes from the funeral director</li>
+      </ul>
+
+      <h2>3. Purpose of processing</h2>
+      <ul>
+        <li>Arranging funerals on behalf of next of kin</li>
+        <li>Communication with family and third parties</li>
+        <li>Drafting invoices and final settlements</li>
+        <li>Maintaining a file per funeral for administrative obligations</li>
+      </ul>
+
+      <h2>4. Legal basis</h2>
+      <ul>
+        <li>Performance of contract with client (GDPR Art. 6(1)(b))</li>
+        <li>Legal obligations regarding funeral services administration</li>
+        <li>Legitimate interest for pastoral care within the church community</li>
+      </ul>
+
+      <h2>5. Storage and security</h2>
+      <p>Data is stored on <strong>Supabase</strong> servers (EU data
+      centers). Connections are encrypted via TLS/HTTPS. Access is
+      restricted to authenticated users via Row-Level Security. Cloud
+      storage documents are private and accessible only via temporary
+      signed links. Passwords are never stored in readable form — only as
+      a bcrypt cryptographic hash.</p>
+
+      <h2>6. Retention period</h2>
+      <p>Case data is retained as long as necessary for administrative,
+      legal or pastoral purposes, with a maximum of <strong>10 years</strong>
+      after the funeral. After that data is deleted, unless statutory
+      retention obligations require otherwise.</p>
+
+      <h2>7. Sharing with third parties</h2>
+      <ul>
+        <li>With insurance providers, on instruction of next of kin</li>
+        <li>With the municipality / civil registry for death notification</li>
+        <li>With service providers (Supabase, EmailJS) as processors under strict GDPR agreements</li>
+      </ul>
+
+      <h2>8. Your rights</h2>
+      <p>Under the GDPR you have the right to access, correction, erasure,
+      restriction, portability and objection. Requests can be sent to the
+      monastery's secretariat. You also have the right to lodge a
+      complaint with the
+      <a href="https://autoriteitpersoonsgegevens.nl/en">Dutch Data Protection Authority</a>.</p>
+
+      <h2>9. Cookies and tracking</h2>
+      <p>The App uses no tracking cookies, no advertising, and no
+      third-party analytics. Only local technical storage for offline mode.</p>
+
+      <h2>10. Changes</h2>
+      <p>This policy may be updated when material changes are made to the
+      App. The date at the top reflects the latest version.</p>
+
+      <h2>11. Contact</h2>
+      <p>Questions or requests: secretariaat@stephremklooster.nl</p>
+    </article>
+  </div>
+
+  <script>
+    document.querySelectorAll('.lang-toggle a').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const lang = a.dataset.lang;
+        document.body.classList.toggle('lang-en', lang === 'en');
+        document.querySelectorAll('.lang-toggle a').forEach(x =>
+          x.classList.toggle('active', x.dataset.lang === lang));
+        document.documentElement.lang = lang;
+      });
+    });
+  </script>
+</body>
+</html>
