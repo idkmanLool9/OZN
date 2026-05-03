@@ -1,19 +1,80 @@
 # Codemagic CI/CD voor de iOS-build van Uitvaartbeheer.
-# Codemagic draait dit op een macOS-cloud-machine; jij hoeft Xcode nooit
-# zelf te openen vanaf je Windows-PC.
+# Codemagic draait op een macOS-cloud-machine; geen eigen Mac nodig.
 #
-# Setup-stappen:
-# 1. codemagic.io account aanmaken en deze repo (idkmanLool9/uitvaart) koppelen
-# 2. Apple Developer-account integratie configureren onder
-#    Codemagic → Teams → Integrations → Developer Portal (App Store Connect API)
-# 3. Een App-ID 'nl.sok.uitvaartbeheer' aanmaken in
-#    https://developer.apple.com/account/resources/identifiers/list
-# 4. In App Store Connect een nieuwe app 'Uitvaartbeheer' aanmaken met dit
-#    Bundle-ID
-# 5. Build starten — Codemagic verzorgt provisioning, signing en upload
-#    naar TestFlight automatisch.
+# TWEE WORKFLOWS:
+#   1. ios-unsigned    — bouwt een unsigned .ipa, gratis, geen Apple Developer
+#                         account nodig. Voor sideloaden via AltStore op
+#                         Windows + gratis Apple ID. App vervalt elke 7 dagen.
+#   2. ios-testflight  — bouwt ondertekend en pusht naar TestFlight. Vereist
+#                         €99/jaar Apple Developer + ASC API-key. App blijft
+#                         permanent staan, geen verloop.
+#
+# Begin met workflow #1; schakel over op #2 zodra je het Developer-account
+# hebt geactiveerd.
 
 workflows:
+  # ════════════════════════════════════════════════════════════════════════
+  # Workflow 1: gratis unsigned build voor AltStore-sideload
+  # ════════════════════════════════════════════════════════════════════════
+  ios-unsigned:
+    name: iOS — Unsigned IPA (voor AltStore)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 20.x
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: claude/funeral-director-website-raXTm
+          include: true
+          source: true
+    scripts:
+      - name: npm-deps + www-map bouwen
+        script: |
+          npm install
+          npm run build
+      - name: Capacitor — iOS-platform toevoegen + sync
+        script: |
+          if [ ! -d "ios/App" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+      - name: CocoaPods
+        script: |
+          cd ios/App && pod install
+      - name: Unsigned .ipa bouwen
+        script: |
+          cd ios/App
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -derivedDataPath build \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            PROVISIONING_PROFILE="" \
+            build
+
+          # Verpak .app als .ipa (zip onder Payload/ map)
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -r Uitvaartbeheer-unsigned.ipa Payload
+          ls -lh Uitvaartbeheer-unsigned.ipa
+    artifacts:
+      - ios/App/Uitvaartbeheer-unsigned.ipa
+
+  # ════════════════════════════════════════════════════════════════════════
+  # Workflow 2: signed build naar TestFlight (vereist Apple Developer €99/jr)
+  # ════════════════════════════════════════════════════════════════════════
   ios-testflight:
     name: iOS — TestFlight build
     instance_type: mac_mini_m2
@@ -27,36 +88,29 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        APP_STORE_APP_ID: 0000000000  # vervangen door echt App ID na aanmaken in ASC
+        APP_STORE_APP_ID: 0000000000  # vervangen na aanmaken in App Store Connect
       node: 20.x
       xcode: latest
       cocoapods: default
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: claude/funeral-director-website-raXTm
-          include: true
-          source: true
     scripts:
-      - name: Install npm-deps + bouw www-map
+      - name: npm-deps + www-map bouwen
         script: |
-          npm ci
+          npm install
           npm run build
-      - name: Capacitor — iOS-platform toevoegen indien afwezig
+      - name: Capacitor — iOS-platform toevoegen + sync
         script: |
           if [ ! -d "ios/App" ]; then
             npx cap add ios
           fi
           npx cap sync ios
-      - name: Pods installeren
+      - name: CocoaPods
         script: |
           cd ios/App && pod install
-      - name: Versie + buildnummer ophogen
+      - name: Versie + buildnummer
         script: |
           cd ios/App
           agvtool new-version -all $(($BUILD_NUMBER + 100))
-      - name: iOS-build (signing via Codemagic)
+      - name: Signed .ipa bouwen
         script: |
           xcode-project use-profiles
           xcode-project build-ipa \
