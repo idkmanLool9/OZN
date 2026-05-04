@@ -13,11 +13,14 @@ const DEST = path.join(SRC, 'www');
 
 const FILES = [
   'index.html',
+  'privacy.html',
   'style.css',
   'print.css',
   'icon.svg',
   'manifest.webmanifest',
   'service-worker.js',
+  '.nojekyll',
+  '_headers',  // Cloudflare Pages cache-control + veiligheidsheaders
 ];
 const DIRS = ['js'];
 

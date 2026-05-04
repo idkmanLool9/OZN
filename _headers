@@ -1,0 +1,35 @@
+# Cloudflare Pages — header-overrides
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# Service-worker en manifest: nooit cachen, anders krijgen gebruikers
+# nieuwe versies pas na een handmatige refresh.
+/service-worker.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/manifest.webmanifest
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# index.html: korte cache, zodat een nieuwe deploy snel zichtbaar wordt
+/index.html
+  Cache-Control: public, max-age=300, must-revalidate
+
+# Statische assets met versie-suffix: lang cachen, ze veranderen toch niet
+# (CSS/JS vernieuwen zichzelf via service-worker bij nieuw buildnummer)
+/js/*
+  Cache-Control: public, max-age=3600
+
+/style.css
+  Cache-Control: public, max-age=3600
+
+/print.css
+  Cache-Control: public, max-age=3600
+
+/icon.svg
+  Cache-Control: public, max-age=86400
+
+# Globale veiligheidsheaders
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
