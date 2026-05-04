@@ -74,7 +74,7 @@ function renderAccount(msg) {
       <section class="card narrow">
         <h2>App-versie &amp; updates</h2>
         <dl class="dl">
-          <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> <span class="muted small">(build ${APP_BUILD})</span> — ${esc(APP_BUILD_DATE)}</dd></div>
+          <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
         </dl>
         <div id="update-result"></div>

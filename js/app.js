@@ -594,7 +594,7 @@ Router.add('/account', () => renderAccount());
   Branding.apply();
 
   // Versie-indicator overal injecteren
-  const verLabel = `Versie ${APP_VERSION} (build ${APP_BUILD}) · ${APP_BUILD_DATE}`;
+  const verLabel = `Versie ${APP_VERSION} · ${APP_BUILD_DATE}`;
   const fv = document.getElementById('footer-version');
   if (fv) fv.textContent = ' · ' + verLabel;
   const sv = document.getElementById('splash-version');
