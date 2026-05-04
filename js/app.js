@@ -1,16 +1,23 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-// Versie-schema (semver: MAJOR.MINOR.PATCH)
-//  · APP_VERSION = wat de gebruiker ziet in footer / welkomscherm.
-//    Bump bij betekenisvolle wijzigingen:
-//      - PATCH  (5.0.0 → 5.0.1) bij kleine fixes
-//      - MINOR  (5.0.x → 5.1.0) bij nieuwe features
-//      - MAJOR  (5.x.x → 6.0.0) bij grote vernieuwingen of breaking changes
-//  · APP_BUILD = monotoon groeiend nummer dat bij élke release omhoog gaat.
-//    Wordt gebruikt voor service-worker cache-invalidatie en als
-//    CFBundleVersion in de iOS-app (Apple eist unieke buildnummers).
-const APP_VERSION    = '5.0.0';
+// Versie-schema (gekoppeld aan buildnummer)
+//  · APP_BUILD   — monotoon groeiend nummer, +1 bij elke release.
+//                  Wordt gebruikt voor service-worker cache-invalidatie
+//                  en als CFBundleVersion in de iOS-app.
+//  · APP_VERSION — semver-weergave (MAJOR.MINOR.PATCH), afgeleid van het
+//                  buildnummer:
+//                    MAJOR = floor(build / 10)
+//                    MINOR = build mod 10
+//                    PATCH = klein fix-cijfer binnen dezelfde build
+//                            (meestal 0; ophogen bij hot-fix zonder nieuw
+//                             buildnummer)
+//                  Voorbeelden:
+//                    build 47 → 4.7.0
+//                    build 48 → 4.8.0
+//                    build 50 → 5.0.0
+//                    build 60 → 6.0.0
 const APP_BUILD      = 47;
+const APP_VERSION    = '4.7.0';
 const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
