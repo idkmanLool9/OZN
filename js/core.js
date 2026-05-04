@@ -643,6 +643,34 @@ function computeDekking(kosten, dossier, settings) {
   };
 }
 
+// ─── Cloudflare Web Analytics — beacon laden + SPA-routes tracken ──────────
+// Privacy-vriendelijk, geen cookies, AVG-conform. Token komt uit config.js.
+// Als CLOUDFLARE_BEACON_TOKEN leeg is gebeurt er niets.
+(function () {
+  if (typeof CLOUDFLARE_BEACON_TOKEN === 'undefined' || !CLOUDFLARE_BEACON_TOKEN) return;
+  // Eén keer de beacon-script laden
+  function loadBeacon() {
+    if (document.getElementById('cf-beacon')) return;
+    const s = document.createElement('script');
+    s.id = 'cf-beacon';
+    s.defer = true;
+    s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+    s.setAttribute('data-cf-beacon', JSON.stringify({ token: CLOUDFLARE_BEACON_TOKEN, spa: true }));
+    document.head.appendChild(s);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadBeacon);
+  } else {
+    loadBeacon();
+  }
+  // Hash-router-wijzigingen handmatig melden zodat elke 'pagina' geteld wordt
+  window.addEventListener('hashchange', function () {
+    if (window.__cfBeacon && typeof window.__cfBeacon.load === 'function') {
+      try { window.__cfBeacon.load(window.location.href); } catch (_) {}
+    }
+  });
+})();
+
 // Hash router
 const Router = {
   routes: [],
