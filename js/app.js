@@ -1,6 +1,16 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-const APP_VERSION = 'v47'; // wordt getoond in footer + welkomscherm zodat je ziet welke versie draait
+// Versie-schema (semver: MAJOR.MINOR.PATCH)
+//  · APP_VERSION = wat de gebruiker ziet in footer / welkomscherm.
+//    Bump bij betekenisvolle wijzigingen:
+//      - PATCH  (5.0.0 → 5.0.1) bij kleine fixes
+//      - MINOR  (5.0.x → 5.1.0) bij nieuwe features
+//      - MAJOR  (5.x.x → 6.0.0) bij grote vernieuwingen of breaking changes
+//  · APP_BUILD = monotoon groeiend nummer dat bij élke release omhoog gaat.
+//    Wordt gebruikt voor service-worker cache-invalidatie en als
+//    CFBundleVersion in de iOS-app (Apple eist unieke buildnummers).
+const APP_VERSION    = '5.0.0';
+const APP_BUILD      = 47;
 const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -491,8 +501,12 @@ const Updater = {
       // Vraag app.js opnieuw op met cache-bypass om de versie te lezen
       const r = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
       const text = await r.text();
-      const m = text.match(/APP_VERSION\s*=\s*['"](v\d+)['"]/);
-      if (m) remoteVersion = m[1];
+      // Pak APP_BUILD (monotoon nummer) — ondubbelzinnig voor update-detectie.
+      // APP_VERSION (semver) is voor weergave; voor cache-vergelijking gebruiken
+      // we het buildnummer.
+      const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
+      const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
+      if (mb) remoteVersion = `${mv ? mv[1] : '?'} (build ${mb[1]})`;
     } catch (e) {
       throw new Error('Kon servergegevens niet ophalen (offline?)');
     }
@@ -528,10 +542,11 @@ const Updater = {
       } catch (_) {}
     }
 
+    const currentLabel = `${APP_VERSION} (build ${APP_BUILD})`;
     return {
-      currentVersion: APP_VERSION,
+      currentVersion: currentLabel,
       remoteVersion,
-      hasUpdate: remoteVersion && remoteVersion !== APP_VERSION,
+      hasUpdate: remoteVersion && remoteVersion !== currentLabel,
       swUpdated,
     };
   },
@@ -572,7 +587,7 @@ Router.add('/account', () => renderAccount());
   Branding.apply();
 
   // Versie-indicator overal injecteren
-  const verLabel = `Versie ${APP_VERSION} · ${APP_BUILD_DATE}`;
+  const verLabel = `Versie ${APP_VERSION} (build ${APP_BUILD}) · ${APP_BUILD_DATE}`;
   const fv = document.getElementById('footer-version');
   if (fv) fv.textContent = ' · ' + verLabel;
   const sv = document.getElementById('splash-version');

@@ -4,7 +4,9 @@
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
 //  - Externe libraries (jsdelivr Supabase SDK): stale-while-revalidate
 
-const CACHE_VERSION = 'sok-uitvaart-v47';
+// Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
+// wordt de oude cache automatisch opgeruimd in het 'activate'-event.
+const CACHE_VERSION = 'sok-uitvaart-build-47';
 const SHELL = [
   './',
   './index.html',
