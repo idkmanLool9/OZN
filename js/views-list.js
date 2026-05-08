@@ -26,7 +26,10 @@ function renderDossierList(params, path) {
     <div class="page">
       <div class="page-head">
         <h1>Dossiers</h1>
-        <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
+        <div class="page-actions">
+          <button type="button" class="btn btn-ghost" id="btn-scan-intake" title="Scan een ingevuld papieren intake-formulier en maak er automatisch een dossier van">📷 Scan intake</button>
+          <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
+        </div>
       </div>
       <form class="filter-bar" id="filter-form">
         <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon..." />
@@ -55,6 +58,18 @@ function renderDossierList(params, path) {
         </tr>`).join('')}
       </tbody></table>`}
     </div>`;
+
+  // Scan intake — papieren formulier inscannen → OCR → dossier voorgevuld
+  const scanBtn = $('#btn-scan-intake');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', async () => {
+      try { await IntakeScan.start(); }
+      catch (e) {
+        Modal.show({ type: 'error', title: 'Scan mislukt',
+          message: e.message || String(e) });
+      }
+    });
+  }
 
   $('#filter-form').addEventListener('submit', e => {
     e.preventDefault();

@@ -36,6 +36,20 @@ function renderDossierForm(params) {
   const dossier = isNew ? { dossier_nummer: '(wordt automatisch toegekend)', status: 'nieuw' } : DB.byId(KEYS.DOSSIERS, parseInt(params.id, 10));
   if (!isNew && !dossier) return render404();
 
+  // Scan-intake prefill: bij nieuw dossier de uit OCR herkende velden
+  // overnemen (eenmalig, daarna verwijderen uit localStorage)
+  let _scannedFields = null;
+  if (isNew) {
+    try {
+      const raw = localStorage.getItem('sok_scan_prefill');
+      if (raw) {
+        _scannedFields = JSON.parse(raw);
+        Object.assign(dossier, _scannedFields);
+        localStorage.removeItem('sok_scan_prefill');
+      }
+    } catch (_) {}
+  }
+
   const v = (k) => esc(dossier[k] || '');
   const sel = (k, val) => dossier[k] === val ? 'selected' : '';
 

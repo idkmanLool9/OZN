@@ -671,6 +671,28 @@ input[data-wheel-display-for]:focus {
   outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary);
 }
 
+/* Scan-intake bevestigingsmodal */
+.scan-confirm-card { max-width: 540px; }
+.scan-confirm-rows { display: flex; flex-direction: column; gap: .55rem; margin: .85rem 0; }
+.scan-confirm-row { display: grid; grid-template-columns: 140px 1fr; gap: .65rem; align-items: center; }
+.scan-confirm-label { font-size: .82rem; color: var(--muted); }
+.scan-confirm-input {
+  width: 100%; padding: .45rem .6rem; font-size: .95rem;
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.scan-confirm-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary); }
+.scan-confirm-raw { margin: .75rem 0; }
+.scan-confirm-raw summary { cursor: pointer; font-size: .85rem; color: var(--muted); }
+.scan-confirm-text {
+  margin: .5rem 0 0; padding: .65rem; max-height: 220px; overflow: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .78rem; white-space: pre-wrap; color: var(--text);
+}
+@media (max-width: 540px) {
+  .scan-confirm-row { grid-template-columns: 1fr; gap: .15rem; }
+}
+
 /* Postcode-autofill hint */
 .pcode-hint {
   display: block; margin-top: .25rem;
