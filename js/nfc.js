@@ -34,17 +34,27 @@ const NFC = {
       try {
         await reader.scan({ signal: ctrl.signal });
         return await new Promise((resolve, reject) => {
-          reader.addEventListener('reading', ev => {
+          // Eén-keer-vlag voorkomt dat de abort-handler de promise alsnog
+          // afwijst nadat 'reading' al heeft geresolved.
+          let settled = false;
+          const finish = (fn, val) => {
+            if (settled) return;
+            settled = true;
             clearTimeout(timeout);
-            ctrl.abort();
-            resolve((ev.serialNumber || '').toLowerCase());
+            fn(val);
+            // Stop de NFC-radio NA het settle, zodat de daaropvolgende
+            // abort-event geen onterechte 'afgebroken'-reject veroorzaakt.
+            setTimeout(() => { try { ctrl.abort(); } catch (_) {} }, 0);
+          };
+          reader.addEventListener('reading', ev => {
+            finish(resolve, (ev.serialNumber || '').toLowerCase());
           }, { once: true });
           reader.addEventListener('readingerror', () => {
-            clearTimeout(timeout);
-            ctrl.abort();
-            reject(new Error('Kon de tag niet lezen'));
+            finish(reject, new Error('Kon de tag niet lezen'));
           }, { once: true });
           ctrl.signal.addEventListener('abort', () => {
+            if (settled) return;
+            settled = true;
             clearTimeout(timeout);
             reject(new Error('Wachten op NFC-tag afgebroken'));
           });
