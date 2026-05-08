@@ -27,6 +27,7 @@ function renderDossierList(params, path) {
       <div class="page-head">
         <h1>Dossiers</h1>
         <div class="page-actions">
+          <button type="button" class="btn btn-ghost" id="btn-scan-nfc" title="Scan een NFC-tag om het bijbehorende dossier te openen">🏷️ Scan NFC</button>
           <button type="button" class="btn btn-ghost" id="btn-scan-intake" title="Scan een ingevuld papieren intake-formulier en maak er automatisch een dossier van">📷 Scan intake</button>
           <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
         </div>
@@ -45,16 +46,20 @@ function renderDossierList(params, path) {
       </form>
       ${dossiers.length === 0 ? '<div class="card"><p class="muted">Geen dossiers gevonden.</p></div>' :
       `<table class="table"><thead><tr>
-        <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th>
+        <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th>
       </tr></thead><tbody>
         ${dossiers.map(d => `<tr>
-          <td><a href="#/dossiers/${d.id}">${esc(d.dossier_nummer)}</a></td>
+          <td>
+            <a href="#/dossiers/${d.id}">${esc(d.dossier_nummer)}</a>
+            ${d.nfc_tag_id ? '<span class="dossier-nfc-mark" title="NFC-tag gekoppeld">🏷️</span>' : ''}
+          </td>
           <td><strong>${esc(fullName(d) || '—')}</strong></td>
           <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
           <td>${esc(d.gezinsnummer || '—')}</td>
           <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
           <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
           <td><span class="status status-${esc(d.status||'nieuw')}">${esc((d.status||'nieuw').replace('_',' '))}</span></td>
+          <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}</span></td>
         </tr>`).join('')}
       </tbody></table>`}
     </div>`;
@@ -67,6 +72,26 @@ function renderDossierList(params, path) {
       catch (e) {
         Modal.show({ type: 'error', title: 'Scan mislukt',
           message: e.message || String(e) });
+      }
+    });
+  }
+
+  // Scan NFC — tag scannen, gekoppeld dossier opzoeken en openen
+  const nfcBtn = $('#btn-scan-nfc');
+  if (nfcBtn) {
+    nfcBtn.addEventListener('click', async () => {
+      const serial = await NFC.promptKoppel();
+      if (!serial) return;
+      const match = DB.list(KEYS.DOSSIERS).find(d =>
+        (d.nfc_tag_id || '').toLowerCase() === serial.toLowerCase());
+      if (match) {
+        Router.go('/dossiers/' + match.id);
+      } else {
+        Modal.show({
+          type: 'warning',
+          title: 'Geen dossier gevonden',
+          message: `Tag ${serial} is nog niet gekoppeld aan een dossier. Open het bijbehorende dossier en klik op '🏷️ NFC-tag koppelen' om dit eenmalig in te stellen.`,
+        });
       }
     });
   }

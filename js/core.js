@@ -16,6 +16,18 @@ function fmtDate(iso) {
   if (typeof iso === 'string' && iso.length === 10) return iso.split('-').reverse().join('-');
   const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('nl-NL');
 }
+// Relatieve tijd: 'zojuist', '5 min geleden', '3 uur geleden',
+// '2 dagen geleden', of een volledige datum bij ouder dan een week.
+function fmtRelative(iso) {
+  if (!iso) return '';
+  const d = new Date(iso); if (isNaN(d)) return '';
+  const diff = Date.now() - d.getTime();
+  if (diff < 60_000)        return 'zojuist';
+  if (diff < 3_600_000)     return Math.floor(diff / 60_000) + ' min geleden';
+  if (diff < 86_400_000)    return Math.floor(diff / 3_600_000) + ' uur geleden';
+  if (diff < 7 * 86_400_000) return Math.floor(diff / 86_400_000) + ' dagen geleden';
+  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 function fullName(d) { return [d.voornaam, d.achternaam].filter(Boolean).join(' '); }
 
 // Foto-compressie vóór upload: verkleint grote afbeeldingen naar maxDim px

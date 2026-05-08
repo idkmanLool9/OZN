@@ -259,5 +259,6 @@ const DOSSIER_VELDEN = [
   'eindafrekening_bedrag','eindafrekening_status','betalingstermijn',
   'verantwoordelijke_persoon',
   'opdrachtgever_naam','opdrachtgever_telefoon',
+  'nfc_tag_id',
   'bijzonderheden','status'
 ];

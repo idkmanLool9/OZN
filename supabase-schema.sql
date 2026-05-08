@@ -87,6 +87,12 @@ ALTER TABLE public.kosten
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS foto_overledene_pad TEXT;
 
+-- NFC-tag-koppeling: serieel-nummer van een fysieke tag/kaart die aan
+-- dit dossier gekoppeld is. Geïndexeerd voor snelle lookups.
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS nfc_tag_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_dossiers_nfc_tag ON public.dossiers (nfc_tag_id);
+
 -- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
 ALTER TABLE public.dossiers
   -- Overledene: partner + kinderen

@@ -64,6 +64,11 @@ function renderDossierDetail(params) {
             </select>
             ${d.gezinsnummer ? ' · gezinsnr. ' + esc(d.gezinsnummer) : ''}
           </p>
+          <p class="muted small dossier-timestamps">
+            Aangemaakt: <strong title="${esc(d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.created_at) || '—')}</strong>
+            · Laatst opgeslagen: <strong title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at) || '—')}</strong>
+            ${d.nfc_tag_id ? ` · 🏷️ NFC-tag: <code>${esc(d.nfc_tag_id)}</code>` : ''}
+          </p>
         </div>
         <div class="page-actions">
           <button type="button" class="btn btn-ghost" id="btn-print" title="Printen of opslaan als PDF">🖨️ Print</button>
@@ -71,6 +76,7 @@ function renderDossierDetail(params) {
           <a href="#/dossiers/${d.id}/rouwkaart" class="btn btn-ghost" title="Rouwkaart maken">🪦 Rouwkaart</a>
           <button type="button" class="btn btn-ghost" id="btn-email-dossier" title="Stuur dossier per e-mail">📧 E-mail dossier</button>
           <button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>
+          <button type="button" class="btn btn-ghost" id="btn-nfc" title="Koppel een NFC-tag/kaart aan dit dossier">🏷️ ${d.nfc_tag_id ? 'NFC-tag' : 'Koppel NFC'}</button>
           <button type="button" class="btn btn-ghost" id="btn-copy-nr" title="Kopieer dossiernummer">⧉ Kopieer nr</button>
           <a href="#/dossiers/${d.id}/bewerken" class="btn btn-primary">Bewerken</a>
           <button type="button" class="btn btn-danger" id="btn-delete">Verwijderen</button>
@@ -727,6 +733,58 @@ function bindDetailEvents(id) {
         Modal.show({ type: 'success', title: 'Gekopieerd', message: `Dossiernummer ${dRow.dossier_nummer} staat op het klembord.` });
       } catch (_) {
         Modal.show({ type: 'error', title: 'Kopiëren mislukt', message: 'Je browser staat klembord-toegang niet toe.' });
+      }
+    });
+  }
+
+  // NFC-tag koppelen / wijzigen / verwijderen
+  const nfcBtn = $('#btn-nfc');
+  if (nfcBtn) {
+    nfcBtn.addEventListener('click', async () => {
+      const cur = dRow.nfc_tag_id;
+      if (cur) {
+        // Bestaande tag — keuze: wijzigen of verwijderen
+        const action = await Modal.confirm({
+          type: 'info',
+          title: 'NFC-tag gekoppeld',
+          html: `Aan dit dossier is de tag <code>${esc(cur)}</code> gekoppeld.<br>Wil je een andere tag koppelen?`,
+          confirmText: 'Andere tag koppelen',
+          cancelText: 'Verwijder koppeling',
+        });
+        if (action) {
+          // wijzigen → opnieuw scannen
+          const newId = await NFC.promptKoppel();
+          if (!newId) return;
+          await DB.update(KEYS.DOSSIERS, id, { nfc_tag_id: newId });
+          await DB.touchDossier(id);
+          renderDossierDetail({ id });
+        } else {
+          // koppeling verwijderen
+          await DB.update(KEYS.DOSSIERS, id, { nfc_tag_id: null });
+          await DB.touchDossier(id);
+          renderDossierDetail({ id });
+        }
+      } else {
+        // Nog geen tag — eerste keer koppelen
+        const newId = await NFC.promptKoppel();
+        if (!newId) return;
+        // Conflict-check: is deze tag al gekoppeld aan een ander dossier?
+        const clash = DB.list(KEYS.DOSSIERS).find(x =>
+          x.id !== id && (x.nfc_tag_id || '').toLowerCase() === newId.toLowerCase());
+        if (clash) {
+          const ok = await Modal.confirm({
+            type: 'warning',
+            title: 'Tag is al gekoppeld',
+            message: `Deze tag (${newId}) is al gekoppeld aan dossier ${clash.dossier_nummer} — ${fullName(clash) || 'naam onbekend'}. Doorgaan loskoppelt 'm daar.`,
+            confirmText: 'Toch koppelen',
+            cancelText: 'Annuleren',
+          });
+          if (!ok) return;
+          await DB.update(KEYS.DOSSIERS, clash.id, { nfc_tag_id: null });
+        }
+        await DB.update(KEYS.DOSSIERS, id, { nfc_tag_id: newId });
+        await DB.touchDossier(id);
+        renderDossierDetail({ id });
       }
     });
   }

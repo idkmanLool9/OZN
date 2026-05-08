@@ -671,6 +671,44 @@ input[data-wheel-display-for]:focus {
   outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary);
 }
 
+/* NFC-koppel-modal */
+.nfc-prompt-card { max-width: 440px; text-align: center; }
+.nfc-prompt-card h2 { border: none; padding: 0; margin: .25rem 0 .35rem; }
+.nfc-prompt-card .nfc-icon {
+  margin: .25rem auto 0;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--primary-soft); color: var(--primary);
+}
+.nfc-prompt-card .nfc-status {
+  margin: .55rem 0;
+  padding: .55rem .75rem;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.nfc-prompt-card label.full { text-align: left; margin-top: .35rem; }
+.nfc-prompt-card label.full input { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+/* NFC-indicator naast dossiernummer in lijst */
+.dossier-nfc-mark {
+  margin-left: .35rem;
+  font-size: .85rem;
+  opacity: .8;
+  cursor: help;
+}
+
+/* Tijdstempels onder dossier-titel */
+.dossier-timestamps { margin: .35rem 0 0; font-size: .8rem; }
+.dossier-timestamps strong { color: var(--text); font-weight: 500; }
+.dossier-timestamps code {
+  font-size: .9em;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
 /* Scan-intake bevestigingsmodal */
 .scan-confirm-card { max-width: 540px; }
 .scan-confirm-rows { display: flex; flex-direction: column; gap: .55rem; margin: .85rem 0; }
