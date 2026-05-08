@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-50';
+const CACHE_VERSION = 'sok-uitvaart-build-51';
 const SHELL = [
   './',
   './index.html',
@@ -95,9 +95,11 @@ self.addEventListener('fetch', e => {
       e.respondWith(networkFirst(req));
       return;
     }
-    // Overige assets (CSS/JS/icon): stale-while-revalidate
-    // (snelle render uit cache, vers op de achtergrond ophalen)
-    e.respondWith(staleWhileRevalidate(req));
+    // Eigen JS/CSS/icons: ook network-first met cache-fallback. Zo krijgen
+    // gebruikers na een hard-reload meteen de nieuwste versies, ipv eerst
+    // de oude uit cache (stale-while-revalidate gaf 1-build-achter gedrag
+    // bij sneltoets-updates).
+    e.respondWith(networkFirst(req));
     return;
   }
 });

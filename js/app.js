@@ -16,8 +16,8 @@
 //                    build 48 → 4.8.0
 //                    build 50 → 5.0.0
 //                    build 60 → 6.0.0
-const APP_BUILD      = 50;
-const APP_VERSION    = '5.0.0';
+const APP_BUILD      = 51;
+const APP_VERSION    = '5.1.0';
 const APP_BUILD_DATE = '2026-05-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -504,6 +504,7 @@ const EmailService = {
 const Updater = {
   async check() {
     let remoteVersion = null;
+    let remoteBuild = null;
     try {
       // Vraag app.js opnieuw op met cache-bypass om de versie te lezen
       const r = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
@@ -513,37 +514,40 @@ const Updater = {
       // we het buildnummer.
       const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
       const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
-      if (mb) remoteVersion = `${mv ? mv[1] : '?'} (build ${mb[1]})`;
+      if (mb) {
+        remoteBuild = parseInt(mb[1], 10);
+        remoteVersion = `${mv ? mv[1] : '?'} (build ${mb[1]})`;
+      }
     } catch (e) {
       throw new Error('Kon servergegevens niet ophalen (offline?)');
     }
 
-    let swUpdated = false;
-    if ('serviceWorker' in navigator) {
+    const hasUpdate = !!(remoteBuild && remoteBuild > APP_BUILD);
+
+    // Niet de moeite om de SW te triggeren als er sowieso geen update is
+    let swReady = false;
+    if (hasUpdate && 'serviceWorker' in navigator) {
       try {
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
           await reg.update();
-          if (reg.waiting) {
-            // Nieuwe SW staat te wachten — activeer 'm
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            swUpdated = true;
-          } else if (reg.installing) {
-            // Wordt nog geïnstalleerd — wacht totdat hij waiting wordt
+          // Wacht eerst tot een eventueel installerende SW de installed-fase haalt
+          if (reg.installing) {
             await new Promise(resolve => {
               const sw = reg.installing;
-              sw.addEventListener('statechange', () => {
-                if (sw.state === 'installed' && reg.waiting) {
-                  reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                  swUpdated = true;
-                  resolve();
-                } else if (sw.state === 'activated') {
-                  swUpdated = true;
+              const onchange = () => {
+                if (sw.state === 'installed' || sw.state === 'activated' || sw.state === 'redundant') {
+                  sw.removeEventListener('statechange', onchange);
                   resolve();
                 }
-              });
-              setTimeout(resolve, 4000); // safety timeout
+              };
+              sw.addEventListener('statechange', onchange);
+              setTimeout(resolve, 5000); // safety timeout
             });
+          }
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            swReady = true;
           }
         }
       } catch (_) {}
@@ -553,13 +557,34 @@ const Updater = {
     return {
       currentVersion: currentLabel,
       remoteVersion,
-      hasUpdate: remoteVersion && remoteVersion !== currentLabel,
-      swUpdated,
+      hasUpdate,
+      swUpdated: swReady,
     };
   },
-  reloadHard() {
-    // Pagina forceren te verversen (browser-cache laat al door network-first SW gaan)
-    location.reload();
+
+  // Reload pas wanneer de NIEUWE service-worker daadwerkelijk de pagina
+  // overneemt (controllerchange). Voorkomt de "1 build per klik"-bug
+  // waarbij de oude SW nog reload-requests serveert vanuit zijn oude cache.
+  async reloadHard() {
+    const doReload = () => {
+      // Cache-buster query param zodat eventuele edge/CDN-caches deze
+      // ene navigatie ook overslaan
+      const u = new URL(location.href);
+      u.searchParams.set('_v', Date.now());
+      location.replace(u.toString());
+    };
+
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+      doReload();
+      return;
+    }
+
+    let reloaded = false;
+    const reloadOnce = () => { if (!reloaded) { reloaded = true; doReload(); } };
+
+    navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
+    // Safety: als controllerchange te lang uitblijft, gewoon reloaden
+    setTimeout(reloadOnce, 3500);
   },
 };
 
