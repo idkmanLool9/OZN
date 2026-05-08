@@ -92,6 +92,7 @@ const Modal = {
 
     return new Promise(resolve => {
       const close = (result) => {
+        Modal._currentClose = null;
         m.classList.remove('shown');
         m.classList.add('fading');
         btn.removeEventListener('click', onConfirm);
@@ -109,6 +110,7 @@ const Modal = {
           }
         }, 280);
       };
+      Modal._currentClose = close;
       const onConfirm = () => close(true);
       const onCancel = () => close(false);
       const keyHandler = e => {
@@ -121,6 +123,13 @@ const Modal = {
       const backdrop = m.querySelector('.modal-backdrop');
       if (backdrop) backdrop.addEventListener('click', onCancel);
     });
+  },
+  // Programmatic sluiten — handig voor "Bezig met..."-loading-modals.
+  // Result wordt doorgegeven aan eventuele wachtende .then-handlers.
+  close(result) {
+    if (typeof Modal._currentClose === 'function') {
+      Modal._currentClose(result);
+    }
   },
   // Confirm-dialoog met twee knoppen — resolved met true (confirm) of false (cancel)
   confirm(opts) {

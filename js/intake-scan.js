@@ -24,33 +24,38 @@ const IntakeScan = {
     const file = await IntakeScan._pickImage();
     if (!file) return;
 
-    // 2. Auto-crop + perspective-correctie via bestaande DocumentScanner
-    const loading = Modal.show({
+    // 2. Niet-blokkerende loading-modal. Sluiten we straks zelf via
+    //    Modal.close(). Als de gebruiker Annuleren tikt, breken we af.
+    let userCancelled = false;
+    let programmaticClose = false;
+    Modal.show({
       type: 'info',
       title: 'Bezig met scannen...',
       message: 'Het document wordt eerst uitgesneden en rechtgezet, daarna leest de app de tekst uit. Dit kan een paar seconden duren bij de eerste keer.',
       confirmText: 'Annuleren',
-    });
+    }).then(() => { if (!programmaticClose) userCancelled = true; });
 
+    // Auto-crop via bestaande DocumentScanner; lukt niet → gewoon origineel
     let scanned;
     try {
       scanned = await DocumentScanner.scan(file);
     } catch (e) {
-      // Lukt de auto-crop niet, gebruik dan gewoon het origineel
       scanned = file;
     }
+    if (userCancelled) return;
 
     // 3. OCR via Tesseract — Nederlands
     let text = '';
     try {
       const Tesseract = await IntakeScan._loadTesseract();
+      if (userCancelled) return;
       const blobUrl = URL.createObjectURL(scanned);
-      const result = await Tesseract.recognize(blobUrl, 'nld', {
-        // Geen logger — Modal.show is non-blocking en sluit straks vanzelf
-      });
+      const result = await Tesseract.recognize(blobUrl, 'nld');
       text = (result && result.data && result.data.text) || '';
       URL.revokeObjectURL(blobUrl);
     } catch (e) {
+      programmaticClose = true;
+      Modal.close();
       Modal.show({
         type: 'error',
         title: 'Tekst herkennen mislukt',
@@ -58,6 +63,11 @@ const IntakeScan = {
       });
       return;
     }
+    if (userCancelled) return;
+
+    // Loading-modal nu wegklikken — werk is klaar
+    programmaticClose = true;
+    Modal.close();
 
     // 4. Velden uit de tekst halen
     const fields = IntakeScan._parse(text);

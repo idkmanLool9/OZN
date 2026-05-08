@@ -795,15 +795,18 @@ function bindDetailEvents(id) {
         Modal.show({ type: 'error', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen kunnen gescand worden.' });
         return;
       }
-      // Toon laad-modal terwijl OpenCV inlaadt en scan loopt
-      const loadingPromise = Modal.show({
+      // Toon niet-blokkerende laad-modal; sluiten we straks zelf via Modal.close()
+      let userCancelled = false;
+      let programmaticClose = false;
+      Modal.show({
         type: 'info',
         title: 'Bezig met scannen...',
         message: 'De scan-bibliotheek wordt geladen en je foto wordt automatisch uitgesneden, rechtgezet en gecorrigeerd. Dit kan een paar seconden duren bij de eerste keer.',
         confirmText: 'Annuleren',
-      });
+      }).then(() => { if (!programmaticClose) userCancelled = true; });
       try {
         const scanned = await DocumentScanner.scan(file);
+        if (userCancelled) return;
         // Vervang het bestand in de upload-input
         const dt = new DataTransfer();
         dt.items.add(scanned);
@@ -822,8 +825,12 @@ function bindDetailEvents(id) {
         img.src = url;
         info.textContent = `${(scanned.size/1024).toFixed(0)} KB · klaar om te uploaden`;
         prev.hidden = false;
-        // Geen success-modal; preview spreekt voor zich
+        // Loading-modal nu wegklikken — werk is klaar
+        programmaticClose = true;
+        Modal.close();
       } catch (err) {
+        programmaticClose = true;
+        Modal.close();
         Modal.show({ type: 'error', title: 'Scannen mislukt', message: err.message || String(err) });
       } finally {
         scanInput.value = ''; // reset zodat hetzelfde bestand opnieuw te kiezen is
