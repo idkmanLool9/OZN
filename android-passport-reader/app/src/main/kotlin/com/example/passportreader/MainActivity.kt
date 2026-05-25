@@ -1,5 +1,6 @@
 package com.example.passportreader
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -45,13 +46,8 @@ class MainActivity : AppCompatActivity() {
         binding.btnScan.setOnClickListener {
             scanLauncher.launch(Intent(this, ScanMrzActivity::class.java))
         }
-        binding.btnLoginAction.setOnClickListener {
-            if (cloud.isLoggedIn) {
-                cloud.logout()
-                updateLoginCard()
-            } else {
-                loginLauncher.launch(Intent(this, LoginActivity::class.java))
-            }
+        binding.loginCard.setOnClickListener {
+            if (cloud.isLoggedIn) confirmLogout() else openLogin()
         }
     }
 
@@ -60,14 +56,30 @@ class MainActivity : AppCompatActivity() {
         updateLoginCard()
     }
 
+    private fun openLogin() {
+        loginLauncher.launch(Intent(this, LoginActivity::class.java))
+    }
+
+    private fun confirmLogout() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.main_logout_confirm_title)
+            .setMessage(getString(R.string.main_logged_in_as, cloud.email ?: "—"))
+            .setNegativeButton(R.string.main_logout_confirm_cancel, null)
+            .setPositiveButton(R.string.main_logout_confirm_yes) { _, _ ->
+                cloud.logout()
+                updateLoginCard()
+            }
+            .show()
+    }
+
     private fun updateLoginCard() {
         if (cloud.isLoggedIn) {
             binding.loginStatus.text = getString(R.string.main_logged_in_as, cloud.email ?: "—")
-            binding.btnLoginAction.text = getString(R.string.main_logout)
+            binding.loginAction.text = getString(R.string.main_logout)
             binding.loginDot.setBackgroundResource(R.drawable.bg_status_dot_online)
         } else {
             binding.loginStatus.text = getString(R.string.main_logged_out)
-            binding.btnLoginAction.text = getString(R.string.main_login)
+            binding.loginAction.text = getString(R.string.main_login)
             binding.loginDot.setBackgroundResource(R.drawable.bg_status_dot_offline)
         }
     }
