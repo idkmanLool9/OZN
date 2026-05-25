@@ -89,7 +89,12 @@ dependencies {
     implementation("com.google.mlkit:text-recognition:16.0.1")
 
     // ── jMRTD + SCUBA voor ICAO 9303 / BAC / PACE / DG1 / DG2 ───
-    implementation("org.jmrtd:jmrtd:0.7.42")
+    //  scuba-smartcards uitsluiten uit jMRTD's transitive deps: scuba-sc-android
+    //  bevat dezelfde klassen (Android-variant) en zou anders een
+    //  "Duplicate class"-fout geven in checkDebugDuplicateClasses.
+    implementation("org.jmrtd:jmrtd:0.7.42") {
+        exclude(group = "net.sf.scuba", module = "scuba-smartcards")
+    }
     implementation("net.sf.scuba:scuba-sc-android:0.0.23")
 
     // ── BouncyCastle (PACE-crypto). jdk15to18 = niet-botsende variant

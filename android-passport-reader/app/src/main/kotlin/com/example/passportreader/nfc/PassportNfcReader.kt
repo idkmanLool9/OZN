@@ -13,6 +13,7 @@ import org.jmrtd.PACEKeySpec
 import org.jmrtd.PassportService
 import org.jmrtd.lds.CardAccessFile
 import org.jmrtd.lds.LDSFileUtil
+import org.jmrtd.lds.PACEInfo
 import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
 import java.security.Security
@@ -68,11 +69,17 @@ class PassportNfcReader {
         var paceSucceeded = false
         try {
             val cardAccess = CardAccessFile(service.getInputStream(PassportService.EF_CARD_ACCESS))
+            // Eerste PACEInfo uit EF.CardAccess pakken: chip publiceert daarin
+            // welk PACE-algoritme (OID + curve/group-parameters) hij gebruikt.
+            val paceInfo = cardAccess.securityInfos
+                .filterIsInstance<PACEInfo>()
+                .firstOrNull()
+                ?: throw IllegalStateException("Geen PACEInfo in EF.CardAccess")
             service.doPACE(
                 paceKey,
-                null,
-                cardAccess.securityInfos,
-                null
+                paceInfo.objectIdentifier,
+                PACEInfo.toParameterSpec(paceInfo.parameterId),
+                paceInfo.parameterId
             )
             paceSucceeded = true
         } catch (e: Exception) {
