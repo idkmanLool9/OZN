@@ -2,9 +2,13 @@
 <resources>
     <string name="app_name">Passport Reader</string>
 
-    <string name="main_title">Biometric Passport Reader</string>
-    <string name="main_subtitle">Scan de MRZ en lees de chip uit via NFC. Alle scan-data blijft lokaal — pas wanneer je het zelf wilt kun je de gegevens aan een dossier koppelen.</string>
-    <string name="main_button_scan">Start scan</string>
+    <string name="main_title">ID-Scanner</string>
+    <string name="main_subtitle">Lees paspoort of ID-kaart uit via camera en NFC. Gegevens blijven lokaal, totdat je ze zelf aan een dossier koppelt.</string>
+    <string name="main_button_scan">Scan ID</string>
+    <string name="main_caption">100% lokaal · privacyvriendelijk</string>
+    <string name="main_logout_confirm_title">Uitloggen?</string>
+    <string name="main_logout_confirm_yes">Uitloggen</string>
+    <string name="main_logout_confirm_cancel">Annuleer</string>
 
     <string name="scan_title">Scan de MRZ</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het kader — de regels worden automatisch herkend en gevalideerd.</string>
@@ -41,10 +45,10 @@
     <string name="perm_camera_needed">Camera-toegang nodig om de MRZ te scannen.</string>
 
     <!-- Login + Supabase-koppeling -->
-    <string name="main_logged_in_as">Ingelogd als %1$s · scan-resultaten kunnen direct aan een dossier worden gekoppeld.</string>
-    <string name="main_logged_out">Niet ingelogd · scan-resultaten blijven lokaal op dit toestel.</string>
-    <string name="main_login">Inloggen</string>
-    <string name="main_logout">Uitloggen</string>
+    <string name="main_logged_in_as">Ingelogd als %1$s</string>
+    <string name="main_logged_out">Niet ingelogd</string>
+    <string name="main_login">Tik om in te loggen</string>
+    <string name="main_logout">Tik om uit te loggen</string>
 
     <string name="login_title">Inloggen bij Uitvaartbeheer</string>
     <string name="login_subtitle">Gebruik dezelfde inloggegevens als in de webapp. Alleen nodig om scan-resultaten aan een dossier te koppelen.</string>
