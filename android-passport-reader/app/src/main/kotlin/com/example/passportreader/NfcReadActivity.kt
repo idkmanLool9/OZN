@@ -1,5 +1,7 @@
 package com.example.passportreader
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -11,12 +13,14 @@ import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.passportreader.cloud.SupabaseClient
 import com.example.passportreader.databinding.ActivityNfcReadBinding
+import com.example.passportreader.databinding.ItemStepBinding
 import com.example.passportreader.model.PassportData
 import com.example.passportreader.mrz.MrzInfo
 import com.example.passportreader.nfc.PassportNfcReader
@@ -31,6 +35,13 @@ class NfcReadActivity : AppCompatActivity() {
     private lateinit var mrz: MrzInfo
     private val reader = PassportNfcReader()
 
+    private lateinit var stepConnect: ItemStepBinding
+    private lateinit var stepCrypto:  ItemStepBinding
+    private lateinit var stepDg1:     ItemStepBinding
+    private lateinit var stepDg2:     ItemStepBinding
+
+    private var pulseAnimator: AnimatorSet? = null
+
     @Volatile private var processing = false
     private var lastTag: Tag? = null
 
@@ -38,6 +49,15 @@ class NfcReadActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityNfcReadBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        stepConnect = binding.stepConnect
+        stepCrypto  = binding.stepCrypto
+        stepDg1     = binding.stepDg1
+        stepDg2     = binding.stepDg2
+        stepConnect.stepLabel.setText(R.string.step_connect)
+        stepCrypto.stepLabel.setText(R.string.step_crypto)
+        stepDg1.stepLabel.setText(R.string.step_dg1)
+        stepDg2.stepLabel.setText(R.string.step_dg2)
 
         val parsed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(MrzInfo.EXTRA_KEY, MrzInfo::class.java)
@@ -49,30 +69,34 @@ class NfcReadActivity : AppCompatActivity() {
         mrz = parsed
 
         val docLabel = if (mrz.documentType == "ID") "ID-kaart" else "Paspoort"
-        binding.status.text = "$docLabel · ${mrz.documentNumber}\n" +
-            "Geboren: ${formatYYMMDD(mrz.birthDateYYMMDD)}\n" +
-            "Verloopt: ${formatYYMMDD(mrz.expiryDateYYMMDD)}"
+        binding.docInfo.text = "$docLabel · ${mrz.documentNumber}\n" +
+            "Geboren ${formatYYMMDD(mrz.birthDateYYMMDD)} · " +
+            "verloopt ${formatYYMMDD(mrz.expiryDateYYMMDD)}"
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         if (nfcAdapter == null) {
             binding.title.text = "Dit toestel heeft geen NFC"
-            binding.progress.visibility = View.GONE
+            stopPulse()
             return
         }
         if (!nfcAdapter!!.isEnabled) {
             binding.title.text = "Zet NFC aan in instellingen"
-            binding.progress.visibility = View.GONE
+            stopPulse()
         }
 
         binding.btnDone.setOnClickListener { finish() }
         binding.btnCouple.setOnClickListener { onCoupleClicked() }
         binding.btnRetry.setOnClickListener {
             binding.btnRetry.visibility = View.GONE
-            binding.progress.visibility = View.VISIBLE
-            binding.status.text = getString(R.string.nfc_retry_prompt)
+            binding.errorMsg.visibility = View.GONE
+            resetSteps()
+            binding.stepsCard.visibility = View.GONE
+            startPulse()
             val tag = lastTag
             if (tag != null) startReading(tag)
         }
+
+        startPulse()
     }
 
     override fun onResume() {
@@ -88,6 +112,12 @@ class NfcReadActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         nfcAdapter?.disableForegroundDispatch(this)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        pulseAnimator?.cancel()
+        pulseAnimator = null
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -108,38 +138,110 @@ class NfcReadActivity : AppCompatActivity() {
     private fun startReading(tag: Tag) {
         processing = true
         binding.btnRetry.visibility = View.GONE
-        binding.btnDone.visibility = View.GONE
-        binding.btnCouple.visibility = View.GONE
-        binding.details.visibility = View.GONE
-        binding.photo.visibility = View.GONE
-        binding.status.text = getString(R.string.nfc_step_connecting)
-        binding.progress.visibility = View.VISIBLE
+        binding.errorMsg.visibility = View.GONE
+        resetSteps()
+        binding.stepsCard.visibility = View.VISIBLE
+        setStepState(stepConnect, StepState.ACTIVE)
 
         lifecycleScope.launch {
             try {
                 val data = withContext(Dispatchers.IO) {
                     reader.read(tag, mrz) { stage ->
-                        lifecycleScope.launch { binding.status.text = stageLabel(stage) }
+                        lifecycleScope.launch { onStage(stage) }
                     }
                 }
                 showResult(data)
             } catch (e: Exception) {
                 e.printStackTrace()
-                binding.status.text = "${getString(R.string.nfc_error_prefix)}: " +
+                binding.errorMsg.text = "${getString(R.string.nfc_error_prefix)}: " +
                     (e.message ?: "onbekende fout")
-                binding.progress.visibility = View.GONE
+                binding.errorMsg.visibility = View.VISIBLE
                 binding.btnRetry.visibility = View.VISIBLE
+                stopPulse()
                 processing = false
             }
         }
     }
 
-    private fun stageLabel(stage: PassportNfcReader.Stage): String = when (stage) {
-        PassportNfcReader.Stage.CONNECTING -> getString(R.string.nfc_step_connecting)
-        PassportNfcReader.Stage.PACE       -> getString(R.string.nfc_step_pace)
-        PassportNfcReader.Stage.BAC        -> getString(R.string.nfc_step_bac)
-        PassportNfcReader.Stage.DG1        -> getString(R.string.nfc_step_dg1)
-        PassportNfcReader.Stage.DG2        -> getString(R.string.nfc_step_dg2)
+    private fun onStage(stage: PassportNfcReader.Stage) {
+        when (stage) {
+            PassportNfcReader.Stage.CONNECTING -> {
+                setStepState(stepConnect, StepState.ACTIVE)
+            }
+            PassportNfcReader.Stage.PACE -> {
+                setStepState(stepConnect, StepState.DONE)
+                stepCrypto.stepLabel.setText(R.string.step_crypto_pace)
+                setStepState(stepCrypto, StepState.ACTIVE)
+            }
+            PassportNfcReader.Stage.BAC -> {
+                setStepState(stepConnect, StepState.DONE)
+                stepCrypto.stepLabel.setText(R.string.step_crypto_bac)
+                setStepState(stepCrypto, StepState.ACTIVE)
+            }
+            PassportNfcReader.Stage.DG1 -> {
+                setStepState(stepCrypto, StepState.DONE)
+                setStepState(stepDg1, StepState.ACTIVE)
+            }
+            PassportNfcReader.Stage.DG2 -> {
+                setStepState(stepDg1, StepState.DONE)
+                setStepState(stepDg2, StepState.ACTIVE)
+            }
+        }
+    }
+
+    private enum class StepState { PENDING, ACTIVE, DONE }
+
+    private fun setStepState(step: ItemStepBinding, state: StepState) {
+        when (state) {
+            StepState.PENDING -> {
+                step.stepIcon.setImageResource(R.drawable.ic_step_pending)
+                step.stepLabel.setTextColor(Color.parseColor("#6B7280"))
+            }
+            StepState.ACTIVE -> {
+                step.stepIcon.setImageResource(R.drawable.ic_step_active)
+                step.stepLabel.setTextColor(Color.parseColor("#0B1220"))
+            }
+            StepState.DONE -> {
+                step.stepIcon.setImageResource(R.drawable.ic_step_done)
+                step.stepLabel.setTextColor(Color.parseColor("#0B1220"))
+            }
+        }
+    }
+
+    private fun resetSteps() {
+        setStepState(stepConnect, StepState.PENDING)
+        setStepState(stepCrypto,  StepState.PENDING)
+        setStepState(stepDg1,     StepState.PENDING)
+        setStepState(stepDg2,     StepState.PENDING)
+        stepCrypto.stepLabel.setText(R.string.step_crypto)
+    }
+
+    private fun startPulse() {
+        if (pulseAnimator != null) return
+        val ring = binding.pulseRing
+        ring.visibility = View.VISIBLE
+        val scaleX = ObjectAnimator.ofFloat(ring, "scaleX", 1f, 1.25f)
+        val scaleY = ObjectAnimator.ofFloat(ring, "scaleY", 1f, 1.25f)
+        val alpha  = ObjectAnimator.ofFloat(ring, "alpha", 0.6f, 0f)
+        val set = AnimatorSet().apply {
+            playTogether(scaleX, scaleY, alpha)
+            duration = 1400
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        set.addListener(object : android.animation.AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: android.animation.Animator) {
+                ring.scaleX = 1f; ring.scaleY = 1f; ring.alpha = 0.6f
+                if (pulseAnimator != null) set.start()
+            }
+        })
+        pulseAnimator = set
+        set.start()
+    }
+
+    private fun stopPulse() {
+        pulseAnimator?.cancel()
+        pulseAnimator = null
+        binding.pulseRing.visibility = View.GONE
     }
 
     private var lastResult: PassportData? = null
@@ -158,17 +260,12 @@ class NfcReadActivity : AppCompatActivity() {
 
     private fun showResult(d: PassportData) {
         lastResult = d
-        binding.progress.visibility = View.GONE
-        binding.title.text = getString(R.string.result_title)
-        binding.status.text = getString(R.string.nfc_done)
-        binding.btnDone.visibility = View.VISIBLE
-        binding.btnRetry.visibility = View.GONE
-        binding.details.visibility = View.VISIBLE
+        stopPulse()
+        binding.readingState.visibility = View.GONE
+        binding.resultState.visibility = View.VISIBLE
         binding.details.removeAllViews()
 
-        // Koppel-knop tonen — label hangt af van login-state.
         val cloud = SupabaseClient.get(this)
-        binding.btnCouple.visibility = View.VISIBLE
         binding.btnCouple.text = if (cloud.isLoggedIn)
             getString(R.string.nfc_couple_button)
         else
@@ -176,10 +273,7 @@ class NfcReadActivity : AppCompatActivity() {
 
         d.faceImageJpeg?.let { bytes ->
             val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            if (bmp != null) {
-                binding.photo.setImageBitmap(bmp)
-                binding.photo.visibility = View.VISIBLE
-            }
+            if (bmp != null) binding.photo.setImageBitmap(bmp)
         }
 
         addRow("Voornaam", d.givenNames)
@@ -199,7 +293,7 @@ class NfcReadActivity : AppCompatActivity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 12, 0, 12)
+            setPadding(0, 14, 0, 14)
         }
         val lblTv = TextView(this).apply {
             text = label
@@ -224,8 +318,6 @@ class NfcReadActivity : AppCompatActivity() {
         val yy = raw.substring(0, 2).toIntOrNull() ?: return raw
         val mm = raw.substring(2, 4)
         val dd = raw.substring(4, 6)
-        // ICAO 9303 conventie: dob in verleden, expiry in (nabije) toekomst.
-        // YY > (huidigeYY + 10) → 19xx, anders 20xx.
         val thisYY = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) % 100
         val century = if (yy > thisYY + 10) "19" else "20"
         return "$dd-$mm-$century${"%02d".format(yy)}"

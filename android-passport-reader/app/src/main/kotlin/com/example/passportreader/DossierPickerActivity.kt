@@ -184,12 +184,21 @@ class DossierPickerActivity : AppCompatActivity() {
         class VH(val b: ItemDossierBinding) : RecyclerView.ViewHolder(b.root) {
             fun bind(d: SupabaseClient.DossierSummary, onClick: (SupabaseClient.DossierSummary) -> Unit) {
                 b.name.text = d.displayName
+                b.avatar.text = initials(d.displayName)
                 val parts = mutableListOf<String>()
                 d.dossierNummer?.let { parts += "#$it" }
                 d.gezinsnummer?.let { parts += "gezin $it" }
                 d.status?.let { parts += it.replace('_', ' ') }
                 b.meta.text = parts.joinToString(" · ").ifBlank { "—" }
                 b.root.setOnClickListener { onClick(d) }
+            }
+
+            private fun initials(name: String): String {
+                val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+                if (words.isEmpty()) return "?"
+                val first = words.first().firstOrNull()?.uppercase() ?: ""
+                val last  = if (words.size > 1) words.last().firstOrNull()?.uppercase() ?: "" else ""
+                return (first + last).ifBlank { "?" }
             }
         }
     }

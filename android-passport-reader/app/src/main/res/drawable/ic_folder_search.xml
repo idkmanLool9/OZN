@@ -1,0 +1,21 @@
+<!-- Lege-state icoon: map met vergrootglas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:fillColor="#E5E7EB"
+        android:pathData="M8,18 L24,18 L28,22 L56,22 C57.1,22 58,22.9 58,24 L58,52 C58,53.1 57.1,54 56,54 L8,54 C6.9,54 6,53.1 6,52 L6,20 C6,18.9 6.9,18 8,18 Z"/>
+    <path
+        android:strokeColor="#6B7280"
+        android:strokeWidth="2.5"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M34,36 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"/>
+    <path
+        android:strokeColor="#6B7280"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M39,41 L44,46"/>
+</vector>
