@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
+    <!-- Base styles: de dot-notatie hieronder (iOSButton.Primary, iOSText.Body
+         etc.) zoekt impliciet een parent met dezelfde voor-dot-naam. AAPT
+         eist dat die bestaat, dus hier de lege "houders". -->
+    <style name="iOSButton" parent="android:Widget"/>
+    <style name="iOSText" parent="android:Widget"/>
+
     <!-- ─── iOS-stijl knoppen ───────────────────────────────────────── -->
 
     <style name="iOSButton.Primary" parent="Widget.Material3.Button">
