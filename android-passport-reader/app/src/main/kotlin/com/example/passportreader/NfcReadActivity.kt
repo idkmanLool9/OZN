@@ -282,6 +282,7 @@ class NfcReadActivity : AppCompatActivity() {
         addRow("Achternaam", d.surname)
         addRow("Nationaliteit", d.nationality)
         addRow("Documentnummer", d.documentNumber, mono = true)
+        if (d.bsn != null) addRow("BSN", d.bsn, mono = true)
         addRow("Geboortedatum", formatYYMMDD(d.dateOfBirth), mono = true)
         addRow("Verloopdatum", formatYYMMDD(d.dateOfExpiry), mono = true)
         addRow("Geslacht", when (d.gender) {

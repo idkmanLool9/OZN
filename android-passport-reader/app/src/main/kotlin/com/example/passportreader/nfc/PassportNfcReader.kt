@@ -130,6 +130,17 @@ class PassportNfcReader {
             null
         }
 
+        // BSN: NL paspoorten/ID-kaarten kunnen het BSN-nummer in het MRZ
+        // optionele-data-veld coderen. Probeer in volgorde: TD3 personal
+        // number, TD1 optional data 1 + 2. Validatie via 11-proef voor-
+        // komt false positives uit willekeurige cijfers in andere velden.
+        val bsn = sequenceOf(
+            tryRead { info.personalNumber },
+            tryRead { info.optionalData1 },
+            tryRead { info.optionalData2 },
+        ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
+        if (bsn != null) Log.d(TAG, "BSN gevonden in MRZ-optionele-data")
+
         PassportData(
             surname        = info.primaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
             givenNames     = info.secondaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
@@ -138,7 +149,11 @@ class PassportNfcReader {
             dateOfBirth    = info.dateOfBirth,
             dateOfExpiry   = info.dateOfExpiry,
             gender         = info.gender?.toString(),
+            bsn            = bsn,
             faceImageJpeg  = faceBytes
         )
     }
+
+    /** Wrap jMRTD-accessors die voor het verkeerde MRZ-type kunnen throwen. */
+    private inline fun tryRead(block: () -> String?): String? = try { block() } catch (_: Throwable) { null }
 }
