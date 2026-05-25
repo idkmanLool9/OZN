@@ -31,6 +31,18 @@ data class PassportData(
 
     // DG7 — handtekening
     val signatureImageJpeg: ByteArray? = null,
+
+    // DG16 — personen om te waarschuwen in noodgeval (alleen op sommige
+    //        buitenlandse paspoorten; NL vult dit zelden)
+    val emergencyContacts: List<String> = emptyList(),
+
+    // DG13 — land-specifieke optionele data (rauwe grootte voor diagnose)
+    val dg13Bytes: Int = 0,
+
+    // DG3/DG4 — vingerafdrukken/iris zijn EAC-versleuteld; we noteren of de
+    // chip ze claimt te hebben zodat de UI dat kan tonen ("vergrendeld")
+    val fingerprintsLocked: Boolean = false,
+    val irisLocked: Boolean = false,
 ) : Parcelable {
     companion object {
         const val EXTRA_KEY = "com.example.passportreader.PASSPORT_DATA"
