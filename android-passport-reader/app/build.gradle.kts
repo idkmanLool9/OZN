@@ -16,6 +16,13 @@ android {
         versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // OpenCV bevat native .so's voor 4 ABI's; alleen de twee ARM-
+        // varianten houden bespaart ~25 MB APK-grootte. Echte telefoons
+        // gebruiken altijd ARM, x86 alleen op emulators.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+
         // Supabase-koppeling (zelfde project als de webapp). Anon key is
         // publiek veilig — RLS regelt de toegang. Override met
         // -PsupabaseUrl=... -PsupabaseAnonKey=... als nodig.
@@ -114,10 +121,12 @@ dependencies {
     //    voor Android (i.t.t. jdk15on)
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.78.1")
-    // JPEG2000-decoder: zowel "1.0.3" als "master-SNAPSHOT" van
-    // com.github.Gemalto:JP2ForAndroid faalden op JitPack. Voorlopig
-    // geen J2K-decoder; pasfoto's in J2K-formaat tonen een silhouet-
-    // placeholder. Mogelijke route: vendoring of een andere fork.
+
+    // ── OpenCV: decoder voor JPEG2000 (NL ID-kaarten gebruiken vaak J2K
+    //    voor de DG2-pasfoto, en BitmapFactory snapt dat niet). Officiële
+    //    Maven Central release sinds OpenCV 4.6.0.
+    //    Gebruikt: Imgcodecs.imdecode(...)
+    implementation("org.opencv:opencv:4.10.0")
 
     // ── Supabase REST-koppeling (login + dossier-update + foto-upload) ──
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

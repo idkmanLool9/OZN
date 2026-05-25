@@ -306,18 +306,36 @@ class NfcReadActivity : AppCompatActivity() {
         }
     }
 
-    /** Probeer BitmapFactory; bij J2K of corrupte bytes log magic + size
-     *  voor diagnose in logcat. (Geen JP2-decoder beschikbaar momenteel —
-     *  JitPack-builds van JP2ForAndroid faalden.) */
+    /** Probeer BitmapFactory eerst (JPEG/PNG); val terug op OpenCV's
+     *  imdecode() voor JPEG2000 — NL ID-kaarten gebruiken vaak J2K. */
     private fun decodeFace(bytes: ByteArray): Bitmap? {
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { return it }
+
+        try {
+            if (!org.opencv.android.OpenCVLoader.initLocal()) {
+                Log.w("NfcReadActivity", "OpenCV niet geïnitialiseerd")
+                return null
+            }
+            val mat = org.opencv.core.MatOfByte(*bytes)
+            val decoded = org.opencv.imgcodecs.Imgcodecs.imdecode(
+                mat, org.opencv.imgcodecs.Imgcodecs.IMREAD_COLOR
+            )
+            if (decoded.empty()) return null
+            // OpenCV werkt in BGR — converteer naar RGBA voor Android
+            val rgba = org.opencv.core.Mat()
+            org.opencv.imgproc.Imgproc.cvtColor(
+                decoded, rgba, org.opencv.imgproc.Imgproc.COLOR_BGR2RGBA
+            )
+            val bmp = Bitmap.createBitmap(rgba.width(), rgba.height(), Bitmap.Config.ARGB_8888)
+            org.opencv.android.Utils.matToBitmap(rgba, bmp)
+            return bmp
+        } catch (e: Throwable) {
+            Log.w("NfcReadActivity", "OpenCV-decode mislukt", e)
+        }
+
         val magic = bytes.take(12).joinToString("") { "%02X".format(it) }
-        val isJ2k = bytes.size > 12 && (
-            (bytes[4] == 'j'.code.toByte() && bytes[5] == 'P'.code.toByte()) ||
-            (bytes[0] == 0xFF.toByte() && bytes[1] == 0x4F.toByte())
-        )
         Log.w("NfcReadActivity",
-            "DG2-decode mislukt (size=${bytes.size}, magic=$magic, JPEG2000=$isJ2k)")
+            "DG2-decode mislukt (size=${bytes.size}, magic=$magic)")
         return null
     }
 
