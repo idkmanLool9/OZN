@@ -1,54 +1,37 @@
-// Verifi — state-machine die alle schermen aan elkaar knoopt.
+// Verifi — state-machine + screen-orchestratie.
 //
 // Flow:
-//   loading → (geen sessie) → login → picker
-//                                       ↓
-//                                   target (overledene/contact)
-//                                       ↓
-//                                   doc-select (ID/paspoort/rijbewijs)
-//                                       ↓
-//                                   scan (camera/upload)
-//                                       ↓
-//                                   progress (OCR)
-//                                       ↓
-//                                   ocr (review + bewerken)
-//                                       ↓
-//                                   success → picker (terug)
+//   loading → login → picker → target → doc-select → scan
+//          → progress (kwaliteitscontroles) → review (foto bevestigen)
+//          → ocr (velden bewerken) → success → terug naar picker
 
 function App() {
   const [screen, setScreen] = React.useState('loading');
   const [session, setSession] = React.useState(null);
   const [dossier, setDossier] = React.useState(null);
-  const [target, setTarget] = React.useState(null); // 'overledene' | 'contact'
+  const [target, setTarget] = React.useState(null);
   const [docType, setDocType] = React.useState(null);
   const [scanFile, setScanFile] = React.useState(null);
   const [ocrFields, setOcrFields] = React.useState({});
+  const [savedFields, setSavedFields] = React.useState({});
   const [errMsg, setErrMsg] = React.useState('');
 
-  // Check sessie bij start
   React.useEffect(() => {
     (async () => {
       const sess = await SBAuth.session();
-      if (sess) {
-        setSession(sess);
-        setScreen('picker');
-      } else {
-        setScreen('login');
-      }
+      if (sess) { setSession(sess); setScreen('picker'); }
+      else { setScreen('login'); }
     })();
   }, []);
 
-  // ─── Handlers ────────────────────────────────────────────────────
   const onLoggedIn = async () => {
     const sess = await SBAuth.session();
-    setSession(sess);
-    setScreen('picker');
+    setSession(sess); setScreen('picker');
   };
   const onSignOut = async () => {
     await SBAuth.signOut();
-    setSession(null);
-    setDossier(null); setTarget(null); setDocType(null);
-    setScanFile(null); setOcrFields({});
+    setSession(null); setDossier(null); setTarget(null); setDocType(null);
+    setScanFile(null); setOcrFields({}); setSavedFields({});
     setScreen('login');
   };
   const onPickDossier = (d) => { setDossier(d); setScreen('target'); };
@@ -58,24 +41,21 @@ function App() {
   const onProgressDone = ({ file, fields }) => {
     setScanFile(file);
     setOcrFields(fields || {});
-    setScreen('ocr');
+    setScreen('review');
   };
+  const onReviewUse = () => { setScreen('ocr'); };
+  const onReviewRetake = () => { setScanFile(null); setScreen('scan'); };
 
   const onConfirm = async (patch, file) => {
     try {
-      // 1) Patch op het dossier (BSN, namen, geboortedatum etc.)
       if (Object.keys(patch).length > 0) {
         await updateDossier(dossier.id, patch);
       }
-      // 2) Document-bestand opslaan in Supabase storage als 'documenten'
       if (file) {
         const naam = `${docType.label} — ${target === 'overledene' ? 'overledene' : 'contactpersoon'}`;
-        await uploadDocument(dossier.id, file, {
-          naam,
-          type: docType.type === 'passport' ? 'identiteitsbewijs' :
-                docType.type === 'licence'  ? 'identiteitsbewijs' : 'identiteitsbewijs',
-        });
+        await uploadDocument(dossier.id, file, { naam, type: 'identiteitsbewijs' });
       }
+      setSavedFields(patch);
       setScreen('success');
     } catch (e) {
       setErrMsg(e.message || String(e));
@@ -84,20 +64,14 @@ function App() {
   };
 
   const onContinue = () => {
-    // Reset flow-state en terug naar picker
     setDossier(null); setTarget(null); setDocType(null);
-    setScanFile(null); setOcrFields({});
+    setScanFile(null); setOcrFields({}); setSavedFields({});
     setScreen('picker');
   };
 
-  // ─── Rendering ───────────────────────────────────────────────────
   let content = null;
   if (screen === 'loading') {
-    content = (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <Icon.Spinner size={28} c={T.blue}/>
-      </div>
-    );
+    content = <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><Icon.Spinner size={28} c={T.blue}/></div>;
   } else if (screen === 'login') {
     content = <LoginScreen onSuccess={onLoggedIn}/>;
   } else if (screen === 'picker') {
@@ -110,10 +84,12 @@ function App() {
     content = <ScanScreen dossier={dossier} target={target} docType={docType} onScanned={onScanned} onBack={() => setScreen('doc-select')}/>;
   } else if (screen === 'progress') {
     content = <ProgressScreen file={scanFile} docType={docType} onDone={onProgressDone} onBack={() => setScreen('scan')}/>;
+  } else if (screen === 'review') {
+    content = <ReviewScreen file={scanFile} docType={docType} onUse={onReviewUse} onRetake={onReviewRetake}/>;
   } else if (screen === 'ocr') {
-    content = <OCRScreen dossier={dossier} target={target} docType={docType} file={scanFile} fields={ocrFields} onConfirm={onConfirm} onBack={() => setScreen('scan')}/>;
+    content = <OCRScreen dossier={dossier} target={target} docType={docType} file={scanFile} fields={ocrFields} onConfirm={onConfirm} onBack={() => setScreen('review')}/>;
   } else if (screen === 'success') {
-    content = <SuccessScreen dossier={dossier} target={target} docType={docType} onContinue={onContinue}/>;
+    content = <SuccessScreen dossier={dossier} target={target} docType={docType} savedFields={savedFields} file={scanFile} onContinue={onContinue}/>;
   } else if (screen === 'error') {
     content = (
       <ScreenShell>
@@ -129,7 +105,12 @@ function App() {
     );
   }
 
-  return <div className="verifi-shell">{content}</div>;
+  return (
+    <>
+      <div className="verifi-shell">{content}</div>
+      <InstallPrompt/>
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
