@@ -25,7 +25,17 @@
     <string name="nfc_step_dg2">Pasfoto lezen (DG2)…</string>
 
     <string name="result_title">Gegevens uit chip</string>
+    <string name="result_subtitle">Succesvol uitgelezen en geverifieerd.</string>
+    <string name="result_photo_alt">Pasfoto uit chip</string>
     <string name="result_done">Klaar</string>
+
+    <!-- Stap-labels in de NFC-checklist -->
+    <string name="step_connect">Verbinden met chip</string>
+    <string name="step_crypto">Beveiligde sleutelwissel</string>
+    <string name="step_crypto_pace">Beveiligde sleutelwissel (PACE)</string>
+    <string name="step_crypto_bac">Beveiligde sleutelwissel (BAC-fallback)</string>
+    <string name="step_dg1">Persoonsgegevens uitlezen</string>
+    <string name="step_dg2">Pasfoto uitlezen</string>
 
     <string name="perm_camera_needed">Camera-toegang nodig om de MRZ te scannen.</string>
 

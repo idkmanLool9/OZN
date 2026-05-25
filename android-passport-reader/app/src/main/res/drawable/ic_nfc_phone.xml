@@ -1,0 +1,42 @@
+<!-- Telefoon met NFC-golven, hoort op het NFC-leesscherm. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Telefoon-body (rechtopstaand) -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M40,18 L80,18 C82.2,18 84,19.8 84,22 L84,98 C84,100.2 82.2,102 80,102 L40,102 C37.8,102 36,100.2 36,98 L36,22 C36,19.8 37.8,18 40,18 Z"/>
+
+    <!-- Scherm -->
+    <path
+        android:fillColor="#EFF6FF"
+        android:pathData="M40,28 L80,28 L80,90 L40,90 Z"/>
+
+    <!-- Home-indicator -->
+    <path
+        android:fillColor="#1D4ED8"
+        android:pathData="M54,94 L66,94 L66,96 L54,96 Z"/>
+
+    <!-- NFC-symbool op het scherm -->
+    <path
+        android:strokeColor="#2563EB"
+        android:strokeWidth="1.6"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M50,52 a4,4 0 0 1 0,8"/>
+    <path
+        android:strokeColor="#2563EB"
+        android:strokeWidth="1.6"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M50,46 a10,10 0 0 1 0,20"/>
+    <path
+        android:strokeColor="#2563EB"
+        android:strokeWidth="1.6"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M50,40 a16,16 0 0 1 0,32"/>
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M48,56 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0"/>
+</vector>
