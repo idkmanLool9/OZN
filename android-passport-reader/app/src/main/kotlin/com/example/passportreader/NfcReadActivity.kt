@@ -311,6 +311,19 @@ class NfcReadActivity : AppCompatActivity() {
         if (d.city != null) addRow("Woonplaats", d.city)
         if (d.issuingAuthority != null) addRow("Uitgegeven door", d.issuingAuthority)
         if (d.dateOfIssue != null) addRow("Uitgiftedatum", formatYYYYMMDD(d.dateOfIssue), mono = true)
+
+        // DG16 — noodgeval-contacten (1 rij per persoon)
+        d.emergencyContacts.forEachIndexed { i, c ->
+            addRow(if (d.emergencyContacts.size > 1) "Contact ${i + 1}" else "Noodcontact", c)
+        }
+
+        // DG3/DG4 — alleen vermelden als de chip ze claimt; lezen kan niet
+        // zonder overheids-EAC-sleutel.
+        if (d.fingerprintsLocked) addRow("Vingerafdrukken", "🔒 vergrendeld (EAC)")
+        if (d.irisLocked) addRow("Iris-scan", "🔒 vergrendeld (EAC)")
+
+        // DG13 — land-specifiek; alleen aanwezigheid melden
+        if (d.dg13Bytes > 0) addRow("Extra nationale data", "${d.dg13Bytes} bytes")
     }
 
     private fun renderPhoto(bytes: ByteArray?) {

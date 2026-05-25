@@ -19,6 +19,8 @@ import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
 import org.jmrtd.lds.icao.DG11File
 import org.jmrtd.lds.icao.DG12File
+import org.jmrtd.lds.icao.DG13File
+import org.jmrtd.lds.icao.DG16File
 import org.jmrtd.lds.icao.DG7File
 import java.security.Security
 
@@ -144,13 +146,21 @@ class PassportNfcReader {
         ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
         if (bsn != null) Log.d(TAG, "BSN gevonden in MRZ-optionele-data")
 
-        // 5) Aanvullende data — DG11 (persoonsdata), DG12 (uitgifte), DG7
-        //    (handtekening). Niet alle landen vullen deze; per-DG try/catch
-        //    zodat één missende DG niet de hele scan blokkeert.
+        // 5) Aanvullende data — DG7 (handtekening), DG11 (persoonsdata),
+        //    DG12 (uitgifte), DG13 (land-specifiek), DG16 (noodgeval-
+        //    contacten). DG3 (vingerafdrukken) en DG4 (iris) zijn EAC-
+        //    versleuteld; we proberen ze maar het zal vrijwel zeker falen.
+        //    Per-DG try/catch zodat één missende DG de scan niet blokkeert.
         onStage?.invoke(Stage.EXTRA)
         val dg11 = readDg(service, PassportService.EF_DG11, "DG11") as? DG11File
         val dg12 = readDg(service, PassportService.EF_DG12, "DG12") as? DG12File
         val dg7  = readDg(service, PassportService.EF_DG7,  "DG7")  as? DG7File
+        val dg13 = readDg(service, PassportService.EF_DG13, "DG13") as? DG13File
+        val dg16 = readDg(service, PassportService.EF_DG16, "DG16") as? DG16File
+
+        // DG3/DG4 zonder EAC-sleutel — registreer alleen of de chip ze claimt
+        val fingerprintsLocked = probeLockedDg(service, PassportService.EF_DG3, "DG3")
+        val irisLocked = probeLockedDg(service, PassportService.EF_DG4, "DG4")
 
         val (street, postcode, city) = PassportData.parseAddress(
             tryRead { dg11?.permanentAddress } ?: emptyList()
@@ -162,6 +172,21 @@ class PassportNfcReader {
         val signatureBytes = dg7?.images?.firstOrNull()?.let { img ->
             try { img.imageInputStream.readBytes() } catch (_: Throwable) { null }
         }
+
+        // DG16: pak per persoon naam + telefoon + adres, op één regel samen
+        val emergencyContacts: List<String> = tryRead {
+            dg16?.personsToNotify?.mapNotNull { p ->
+                listOfNotNull(
+                    tryRead { p.name }?.cleanMrzText(),
+                    tryRead { p.telephone }?.cleanMrzText(),
+                    tryRead { p.address }?.cleanMrzText(),
+                ).filter { it.isNotEmpty() }.joinToString(" · ").takeIf { it.isNotEmpty() }
+            }
+        } ?: emptyList()
+
+        // DG13: land-specifiek; we slaan alleen de grootte op zodat de UI
+        // kan tonen dat er extra (niet-geparseerde) data was.
+        val dg13Size = tryRead { dg13?.encoded?.size } ?: 0
 
         PassportData(
             surname          = info.primaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
@@ -187,7 +212,38 @@ class PassportNfcReader {
             issuingAuthority = tryRead { dg12?.issuingAuthority }?.cleanMrzText(),
 
             signatureImageJpeg = signatureBytes,
+
+            emergencyContacts  = emergencyContacts,
+            dg13Bytes          = dg13Size,
+            fingerprintsLocked = fingerprintsLocked,
+            irisLocked         = irisLocked,
         )
+    }
+
+    /** Probeert een DG te openen; als de chip 'm claimt maar weigert wegens
+     *  EAC/beveiliging geven we true terug (= "vergrendeld aanwezig"). Bij
+     *  een echte 'file not found' geeft jMRTD een andere exception en hier
+     *  komen we false uit. Niet perfect maar bruikbaar in de praktijk. */
+    private fun probeLockedDg(service: PassportService, ef: Short, name: String): Boolean = try {
+        service.getInputStream(ef).use { /* alleen openen, niet parsen */ }
+        // Als we hier komen is de file leesbaar zonder EAC — onverwacht,
+        // maar dan is hij in elk geval beschikbaar; markeer als 'aanwezig'.
+        Log.d(TAG, "$name onverwacht leesbaar zonder EAC")
+        true
+    } catch (e: Throwable) {
+        val msg = e.message ?: ""
+        val isAccessDenied = msg.contains("denied", ignoreCase = true) ||
+            msg.contains("security", ignoreCase = true) ||
+            msg.contains("EAC", ignoreCase = true) ||
+            msg.contains("6982") ||  // SW: security status not satisfied
+            msg.contains("6985")     // SW: conditions of use not satisfied
+        if (isAccessDenied) {
+            Log.d(TAG, "$name aanwezig maar vergrendeld (EAC vereist)")
+            true
+        } else {
+            Log.d(TAG, "$name niet aanwezig op chip: $msg")
+            false
+        }
     }
 
     /** Lees een optionele Data Group; null als ie ontbreekt op de chip. */
