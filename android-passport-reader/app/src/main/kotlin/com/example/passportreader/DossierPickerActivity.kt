@@ -104,16 +104,24 @@ class DossierPickerActivity : AppCompatActivity() {
     private fun applyToDossier(d: SupabaseClient.DossierSummary) {
         binding.progress.visibility = View.VISIBLE
         lifecycleScope.launch {
+            // Twee aparte foutmeldingen zodat je in de toast kan zien
+            // welke stap precies struikelt: foto-upload of dossier-update.
             try {
                 val patch = passportToPatch(passport).toMutableMap()
-                // Foto uploaden vóór de patch — als de upload faalt blokkeert dat
-                // de hele actie, anders worden velden bijgewerkt zonder foto.
                 val faceBytes = passport.faceImageJpeg
                 if (faceBytes != null && faceBytes.isNotEmpty()) {
-                    val path = cloud.uploadOverledeneFoto(d.id, faceBytes)
+                    val path = try {
+                        cloud.uploadOverledeneFoto(d.id, faceBytes)
+                    } catch (e: Exception) {
+                        throw SupabaseClient.SupabaseException("Pasfoto opslaan mislukt: ${e.message}")
+                    }
                     patch["foto_overledene_pad"] = path
                 }
-                cloud.updateDossier(d.id, patch)
+                try {
+                    cloud.updateDossier(d.id, patch)
+                } catch (e: Exception) {
+                    throw SupabaseClient.SupabaseException("Dossier bijwerken mislukt: ${e.message}")
+                }
                 Toast.makeText(this@DossierPickerActivity,
                     getString(R.string.picker_success, d.displayName),
                     Toast.LENGTH_LONG).show()
@@ -121,7 +129,7 @@ class DossierPickerActivity : AppCompatActivity() {
                 finish()
             } catch (e: Exception) {
                 Toast.makeText(this@DossierPickerActivity,
-                    "Bijwerken mislukt: ${e.message}", Toast.LENGTH_LONG).show()
+                    e.message ?: "Onbekende fout", Toast.LENGTH_LONG).show()
             } finally {
                 binding.progress.visibility = View.GONE
             }

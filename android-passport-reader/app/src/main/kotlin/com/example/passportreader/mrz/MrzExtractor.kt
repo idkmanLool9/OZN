@@ -64,8 +64,15 @@ class MrzExtractor {
             }
         }
 
-        // Debug-snapshot voor de UI
-        lastDebug = candidates.joinToString(" / ") { it.take(20) + if (it.length > 20) "…" else "" }
+        // Debug-snapshot voor de UI: alleen overschrijven als deze frame
+        // minstens één herkenbare lange MRZ-kandidaat (30+ chars) bevat.
+        // Zo blijft de laatste goede herkenning rustig staan i.p.v. te
+        // flikkeren tussen "44 chars MRZ" en "3 chars ruis".
+        if (candidates.any { it.length >= 30 }) {
+            lastDebug = candidates.joinToString(" / ") {
+                it.take(20) + if (it.length > 20) "…" else ""
+            }
+        }
 
         if (candidates.size < 2) return null
 

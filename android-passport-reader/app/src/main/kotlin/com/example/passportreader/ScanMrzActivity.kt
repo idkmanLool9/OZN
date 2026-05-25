@@ -114,11 +114,13 @@ class ScanMrzActivity : AppCompatActivity() {
                         setResult(RESULT_OK, result)
                         finish()
                     } else if (!done) {
-                        // Live feedback: laat zien wát we momenteel zien zodat
-                        // de gebruiker kan inschatten of de camera de MRZ vindt.
+                        // Live feedback: alleen tonen als er ooit een echte
+                        // MRZ-kandidaat gezien is. lastDebug wordt door
+                        // MrzExtractor pas overschreven bij 30+ chars, dus
+                        // het flikkert niet meer tussen MRZ en losse ruis.
                         val snap = extractor.lastDebug
-                        runOnUiThread {
-                            binding.debugLine.text = if (snap.isNotEmpty()) snap else "…"
+                        if (snap.isNotEmpty()) {
+                            runOnUiThread { binding.debugLine.text = snap }
                         }
                     }
                 } catch (_: Exception) {
