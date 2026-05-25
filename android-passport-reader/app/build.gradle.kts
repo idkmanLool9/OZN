@@ -114,10 +114,13 @@ dependencies {
     //    voor Android (i.t.t. jdk15on)
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.78.1")
-    //  Opmerking: NL paspoorten/ID-kaarten >= 2014 gebruiken JPEG, dat
-    //  BitmapFactory zelf kan decoderen. Voor oudere paspoorten met
-    //  JPEG2000 (J2K) zou je een aparte decoder moeten toevoegen
-    //  (com.gemalto.jp2:jp2-android stond op JCenter, sinds 2022 dood).
+
+    // ── JPEG2000-decoder voor DG2-pasfoto. Sommige NL ID-kaarten
+    //    bewaren de foto als J2K i.p.v. JPEG; BitmapFactory snapt dat
+    //    niet. Gemalto's wrapper rond OpenJPEG bouwen we via JitPack
+    //    omdat de oude JCenter-distributie dood is.
+    //    Package: com.gemalto.jp2.JP2Decoder
+    implementation("com.github.Gemalto:JP2ForAndroid:1.0.3")
 
     // ── Supabase REST-koppeling (login + dossier-update + foto-upload) ──
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
