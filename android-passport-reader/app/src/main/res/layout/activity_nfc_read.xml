@@ -116,6 +116,10 @@
                         <include
                             android:id="@+id/stepDg2"
                             layout="@layout/item_step"/>
+
+                        <include
+                            android:id="@+id/stepExtra"
+                            layout="@layout/item_step"/>
                     </LinearLayout>
 
                     <TextView

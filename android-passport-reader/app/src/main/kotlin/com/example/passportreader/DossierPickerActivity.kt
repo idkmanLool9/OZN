@@ -155,6 +155,12 @@ class DossierPickerActivity : AppCompatActivity() {
             "geslacht" to geslacht,
             "nationaliteit" to nat,
             "bsn" to bsn,
+            // DG11-velden — alleen patchen als gevuld
+            "geboorteplaats" to p.placeOfBirth,
+            "adres_overledene" to p.address,
+            "postcode_overledene" to p.postcode,
+            "woonplaats_overledene" to p.city,
+            "beroep" to p.profession,
         )
     }
 

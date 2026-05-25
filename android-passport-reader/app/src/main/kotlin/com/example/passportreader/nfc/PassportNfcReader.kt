@@ -17,6 +17,9 @@ import org.jmrtd.lds.LDSFileUtil
 import org.jmrtd.lds.PACEInfo
 import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
+import org.jmrtd.lds.icao.DG11File
+import org.jmrtd.lds.icao.DG12File
+import org.jmrtd.lds.icao.DG7File
 import java.security.Security
 
 /**
@@ -29,7 +32,7 @@ class PassportNfcReader {
 
     companion object { private const val TAG = "PassportNfcReader" }
 
-    enum class Stage { CONNECTING, PACE, BAC, DG1, DG2 }
+    enum class Stage { CONNECTING, PACE, BAC, DG1, DG2, EXTRA }
 
     init {
         // BouncyCastle expliciet vooraan zetten — vermijdt botsing met
@@ -141,19 +144,68 @@ class PassportNfcReader {
         ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
         if (bsn != null) Log.d(TAG, "BSN gevonden in MRZ-optionele-data")
 
+        // 5) Aanvullende data — DG11 (persoonsdata), DG12 (uitgifte), DG7
+        //    (handtekening). Niet alle landen vullen deze; per-DG try/catch
+        //    zodat één missende DG niet de hele scan blokkeert.
+        onStage?.invoke(Stage.EXTRA)
+        val dg11 = readDg(service, PassportService.EF_DG11, "DG11") as? DG11File
+        val dg12 = readDg(service, PassportService.EF_DG12, "DG12") as? DG12File
+        val dg7  = readDg(service, PassportService.EF_DG7,  "DG7")  as? DG7File
+
+        val (street, postcode, city) = PassportData.parseAddress(
+            tryRead { dg11?.permanentAddress } ?: emptyList()
+        )
+        val placeOfBirth = tryRead { dg11?.placeOfBirth }
+            ?.joinToString(", ")?.cleanMrzText()
+        val otherNames = tryRead { dg11?.otherNames }
+            ?.joinToString(", ")?.cleanMrzText()
+        val signatureBytes = dg7?.images?.firstOrNull()?.let { img ->
+            try { img.imageInputStream.readBytes() } catch (_: Throwable) { null }
+        }
+
         PassportData(
-            surname        = info.primaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
-            givenNames     = info.secondaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
-            nationality    = info.nationality,
-            documentNumber = info.documentNumber,
-            dateOfBirth    = info.dateOfBirth,
-            dateOfExpiry   = info.dateOfExpiry,
-            gender         = info.gender?.toString(),
-            bsn            = bsn,
-            faceImageJpeg  = faceBytes
+            surname          = info.primaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
+            givenNames       = info.secondaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
+            nationality      = info.nationality,
+            documentNumber   = info.documentNumber,
+            dateOfBirth      = info.dateOfBirth,
+            dateOfExpiry     = info.dateOfExpiry,
+            gender           = info.gender?.toString(),
+            bsn              = bsn,
+            faceImageJpeg    = faceBytes,
+
+            placeOfBirth     = placeOfBirth,
+            address          = street,
+            postcode         = postcode,
+            city             = city,
+            profession       = tryRead { dg11?.profession }?.cleanMrzText(),
+            title            = tryRead { dg11?.title }?.cleanMrzText(),
+            telephone        = tryRead { dg11?.telephone }?.cleanMrzText(),
+            otherNames       = otherNames,
+
+            dateOfIssue      = tryRead { dg12?.dateOfIssue },
+            issuingAuthority = tryRead { dg12?.issuingAuthority }?.cleanMrzText(),
+
+            signatureImageJpeg = signatureBytes,
         )
     }
 
+    /** Lees een optionele Data Group; null als ie ontbreekt op de chip. */
+    private fun readDg(service: PassportService, ef: Short, name: String): Any? = try {
+        val stream = service.getInputStream(ef)
+        LDSFileUtil.getLDSFile(ef, stream)
+    } catch (e: Throwable) {
+        Log.d(TAG, "$name niet beschikbaar: ${e.message}")
+        null
+    }
+
     /** Wrap jMRTD-accessors die voor het verkeerde MRZ-type kunnen throwen. */
-    private inline fun tryRead(block: () -> String?): String? = try { block() } catch (_: Throwable) { null }
+    private inline fun <T> tryRead(block: () -> T?): T? = try { block() } catch (_: Throwable) { null }
+
+    /** Filler-chevrons + extra whitespace uit MRZ-strings halen. */
+    private fun String.cleanMrzText(): String? = this
+        .replace(Regex("<+"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .takeIf { it.isNotEmpty() }
 }

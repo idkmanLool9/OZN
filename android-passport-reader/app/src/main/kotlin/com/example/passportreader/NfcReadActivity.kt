@@ -41,6 +41,7 @@ class NfcReadActivity : AppCompatActivity() {
     private lateinit var stepCrypto:  ItemStepBinding
     private lateinit var stepDg1:     ItemStepBinding
     private lateinit var stepDg2:     ItemStepBinding
+    private lateinit var stepExtra:   ItemStepBinding
 
     private var pulseAnimator: AnimatorSet? = null
 
@@ -56,10 +57,12 @@ class NfcReadActivity : AppCompatActivity() {
         stepCrypto  = binding.stepCrypto
         stepDg1     = binding.stepDg1
         stepDg2     = binding.stepDg2
+        stepExtra   = binding.stepExtra
         stepConnect.stepLabel.setText(R.string.step_connect)
         stepCrypto.stepLabel.setText(R.string.step_crypto)
         stepDg1.stepLabel.setText(R.string.step_dg1)
         stepDg2.stepLabel.setText(R.string.step_dg2)
+        stepExtra.stepLabel.setText(R.string.step_extra)
 
         val parsed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(MrzInfo.EXTRA_KEY, MrzInfo::class.java)
@@ -189,6 +192,10 @@ class NfcReadActivity : AppCompatActivity() {
                 setStepState(stepDg1, StepState.DONE)
                 setStepState(stepDg2, StepState.ACTIVE)
             }
+            PassportNfcReader.Stage.EXTRA -> {
+                setStepState(stepDg2, StepState.DONE)
+                setStepState(stepExtra, StepState.ACTIVE)
+            }
         }
     }
 
@@ -218,6 +225,7 @@ class NfcReadActivity : AppCompatActivity() {
         setStepState(stepCrypto,  StepState.PENDING)
         setStepState(stepDg1,     StepState.PENDING)
         setStepState(stepDg2,     StepState.PENDING)
+        setStepState(stepExtra,   StepState.PENDING)
         stepCrypto.stepLabel.setText(R.string.step_crypto)
     }
 
@@ -278,18 +286,31 @@ class NfcReadActivity : AppCompatActivity() {
 
         renderPhoto(d.faceImageJpeg)
 
+        // Markeer ook de laatste step als done in result-state
+        setStepState(stepExtra, StepState.DONE)
+
         addRow("Voornaam", d.givenNames)
         addRow("Achternaam", d.surname)
+        if (d.title != null) addRow("Titel", d.title)
+        if (d.otherNames != null) addRow("Andere namen", d.otherNames)
         addRow("Nationaliteit", d.nationality)
         addRow("Documentnummer", d.documentNumber, mono = true)
         if (d.bsn != null) addRow("BSN", d.bsn, mono = true)
         addRow("Geboortedatum", formatYYMMDD(d.dateOfBirth), mono = true)
+        if (d.placeOfBirth != null) addRow("Geboorteplaats", d.placeOfBirth)
         addRow("Verloopdatum", formatYYMMDD(d.dateOfExpiry), mono = true)
         addRow("Geslacht", when (d.gender) {
             "MALE" -> "M"
             "FEMALE" -> "V"
             else -> d.gender
         })
+        if (d.profession != null) addRow("Beroep", d.profession)
+        if (d.telephone != null) addRow("Telefoon", d.telephone, mono = true)
+        if (d.address != null) addRow("Adres", d.address)
+        if (d.postcode != null) addRow("Postcode", d.postcode, mono = true)
+        if (d.city != null) addRow("Woonplaats", d.city)
+        if (d.issuingAuthority != null) addRow("Uitgegeven door", d.issuingAuthority)
+        if (d.dateOfIssue != null) addRow("Uitgiftedatum", formatYYYYMMDD(d.dateOfIssue), mono = true)
     }
 
     private fun renderPhoto(bytes: ByteArray?) {
@@ -374,5 +395,10 @@ class NfcReadActivity : AppCompatActivity() {
         val thisYY = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) % 100
         val century = if (yy > thisYY + 10) "19" else "20"
         return "$dd-$mm-$century${"%02d".format(yy)}"
+    }
+
+    private fun formatYYYYMMDD(raw: String?): String? {
+        if (raw == null || raw.length != 8 || !raw.all { it.isDigit() }) return raw
+        return "${raw.substring(6, 8)}-${raw.substring(4, 6)}-${raw.substring(0, 4)}"
     }
 }
