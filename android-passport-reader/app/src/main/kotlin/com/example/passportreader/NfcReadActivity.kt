@@ -306,18 +306,18 @@ class NfcReadActivity : AppCompatActivity() {
         }
     }
 
-    /** Probeer BitmapFactory eerst (JPEG/PNG); val terug op JP2Decoder voor
-     *  JPEG2000 — NL ID-kaarten gebruiken vaak nog J2K. */
+    /** Probeer BitmapFactory; bij J2K of corrupte bytes log magic + size
+     *  voor diagnose in logcat. (Geen JP2-decoder beschikbaar momenteel —
+     *  JitPack-builds van JP2ForAndroid faalden.) */
     private fun decodeFace(bytes: ByteArray): Bitmap? {
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { return it }
-        try {
-            com.gemalto.jp2.JP2Decoder(bytes).decode()?.let { return it }
-        } catch (e: Throwable) {
-            Log.w("NfcReadActivity", "JP2-decode mislukt", e)
-        }
         val magic = bytes.take(12).joinToString("") { "%02X".format(it) }
+        val isJ2k = bytes.size > 12 && (
+            (bytes[4] == 'j'.code.toByte() && bytes[5] == 'P'.code.toByte()) ||
+            (bytes[0] == 0xFF.toByte() && bytes[1] == 0x4F.toByte())
+        )
         Log.w("NfcReadActivity",
-            "DG2-decode mislukt (size=${bytes.size}, magic=$magic)")
+            "DG2-decode mislukt (size=${bytes.size}, magic=$magic, JPEG2000=$isJ2k)")
         return null
     }
 

@@ -114,12 +114,10 @@ dependencies {
     //    voor Android (i.t.t. jdk15on)
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.78.1")
-
-    // ── JPEG2000-decoder voor DG2-pasfoto via JitPack. Tag 1.0.3 faalde
-    //    op JitPack ("Could not find"); master-SNAPSHOT forceert een
-    //    fresh build vanaf de huidige master-commit.
-    //    Package: com.gemalto.jp2.JP2Decoder
-    implementation("com.github.Gemalto:JP2ForAndroid:master-SNAPSHOT")
+    // JPEG2000-decoder: zowel "1.0.3" als "master-SNAPSHOT" van
+    // com.github.Gemalto:JP2ForAndroid faalden op JitPack. Voorlopig
+    // geen J2K-decoder; pasfoto's in J2K-formaat tonen een silhouet-
+    // placeholder. Mogelijke route: vendoring of een andere fork.
 
     // ── Supabase REST-koppeling (login + dossier-update + foto-upload) ──
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
