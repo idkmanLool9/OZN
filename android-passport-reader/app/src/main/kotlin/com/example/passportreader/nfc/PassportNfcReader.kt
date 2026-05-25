@@ -19,8 +19,6 @@ import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
 import org.jmrtd.lds.icao.DG11File
 import org.jmrtd.lds.icao.DG12File
-import org.jmrtd.lds.icao.DG13File
-import org.jmrtd.lds.icao.DG16File
 import org.jmrtd.lds.icao.DG7File
 import java.security.Security
 
@@ -135,28 +133,19 @@ class PassportNfcReader {
             null
         }
 
-        // BSN: NL paspoorten/ID-kaarten kunnen het BSN-nummer in het MRZ
-        // optionele-data-veld coderen. Probeer in volgorde: TD3 personal
-        // number, TD1 optional data 1 + 2. Validatie via 11-proef voor-
-        // komt false positives uit willekeurige cijfers in andere velden.
-        val bsn = sequenceOf(
-            tryRead { info.personalNumber },
-            tryRead { info.optionalData1 },
-            tryRead { info.optionalData2 },
-        ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
-        if (bsn != null) Log.d(TAG, "BSN gevonden in MRZ-optionele-data")
-
         // 5) Aanvullende data — DG7 (handtekening), DG11 (persoonsdata),
         //    DG12 (uitgifte), DG13 (land-specifiek), DG16 (noodgeval-
         //    contacten). DG3 (vingerafdrukken) en DG4 (iris) zijn EAC-
         //    versleuteld; we proberen ze maar het zal vrijwel zeker falen.
         //    Per-DG try/catch zodat één missende DG de scan niet blokkeert.
+        //    DG13/DG16 via reflection: niet alle jMRTD-versies exposeren
+        //    deze als concrete classes.
         onStage?.invoke(Stage.EXTRA)
         val dg11 = readDg(service, PassportService.EF_DG11, "DG11") as? DG11File
         val dg12 = readDg(service, PassportService.EF_DG12, "DG12") as? DG12File
         val dg7  = readDg(service, PassportService.EF_DG7,  "DG7")  as? DG7File
-        val dg13 = readDg(service, PassportService.EF_DG13, "DG13") as? DG13File
-        val dg16 = readDg(service, PassportService.EF_DG16, "DG16") as? DG16File
+        val dg13 = readDg(service, PassportService.EF_DG13, "DG13")
+        val dg16 = readDg(service, PassportService.EF_DG16, "DG16")
 
         // DG3/DG4 zonder EAC-sleutel — registreer alleen of de chip ze claimt
         val fingerprintsLocked = probeLockedDg(service, PassportService.EF_DG3, "DG3")
@@ -173,20 +162,43 @@ class PassportNfcReader {
             try { img.imageInputStream.readBytes() } catch (_: Throwable) { null }
         }
 
-        // DG16: pak per persoon naam + telefoon + adres, op één regel samen
+        // DG16 via reflection (DG16File / PersonToNotifyInfo zijn niet in
+        // elke jMRTD-versie publiek beschikbaar als concrete types).
         val emergencyContacts: List<String> = tryRead {
-            dg16?.personsToNotify?.mapNotNull { p ->
-                listOfNotNull(
-                    tryRead { p.name }?.cleanMrzText(),
-                    tryRead { p.telephone }?.cleanMrzText(),
-                    tryRead { p.address }?.cleanMrzText(),
-                ).filter { it.isNotEmpty() }.joinToString(" · ").takeIf { it.isNotEmpty() }
+            val getPersons = dg16?.javaClass?.methods?.firstOrNull { it.name == "getPersonsToNotify" }
+            @Suppress("UNCHECKED_CAST")
+            val persons = getPersons?.invoke(dg16) as? List<Any> ?: return@tryRead emptyList<String>()
+            persons.mapNotNull { p ->
+                val name  = invokeStr(p, "getName", "getNameOfHolder")
+                val phone = invokeStr(p, "getTelephone", "getPhone")
+                val addr  = invokeStr(p, "getAddress", "getAddressLines")
+                listOfNotNull(name, phone, addr)
+                    .filter { it.isNotEmpty() }
+                    .joinToString(" · ")
+                    .takeIf { it.isNotEmpty() }
             }
         } ?: emptyList()
 
         // DG13: land-specifiek; we slaan alleen de grootte op zodat de UI
         // kan tonen dat er extra (niet-geparseerde) data was.
-        val dg13Size = tryRead { dg13?.encoded?.size } ?: 0
+        val dg13Size = tryRead {
+            val getEncoded = dg13?.javaClass?.methods?.firstOrNull { it.name == "getEncoded" }
+            (getEncoded?.invoke(dg13) as? ByteArray)?.size
+        } ?: 0
+
+        // BSN: NL paspoorten/ID-kaarten kunnen het BSN-nummer in het MRZ
+        // optionele-data-veld of in DG11.personalNumber coderen. Validatie
+        // via 11-proef voorkomt false positives. Moderne NL ID-kaarten
+        // (>= 2014) laten dit veld meestal leeg vanwege privacy — dan staat
+        // het BSN alleen geprint op de achterkant.
+        val bsn = sequenceOf(
+            tryRead { info.personalNumber },
+            tryRead { info.optionalData1 },
+            tryRead { info.optionalData2 },
+            tryRead { dg11?.personalNumber },
+        ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
+        if (bsn != null) Log.d(TAG, "BSN gevonden")
+        else Log.d(TAG, "BSN niet in MRZ/DG11 — staat waarschijnlijk alleen op de achterkant")
 
         PassportData(
             surname          = info.primaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
@@ -257,6 +269,24 @@ class PassportNfcReader {
 
     /** Wrap jMRTD-accessors die voor het verkeerde MRZ-type kunnen throwen. */
     private inline fun <T> tryRead(block: () -> T?): T? = try { block() } catch (_: Throwable) { null }
+
+    /** Probeer meerdere getter-namen op een object; geef de eerste String-
+     *  resultaat (of joined List<String>) terug. Voor jMRTD-classes die per
+     *  versie verschillende method-namen exposeren. */
+    private fun invokeStr(target: Any, vararg names: String): String? {
+        for (name in names) {
+            val m = target.javaClass.methods.firstOrNull { it.name == name } ?: continue
+            return try {
+                when (val r = m.invoke(target)) {
+                    is String -> r.cleanMrzText()
+                    is List<*> -> r.filterIsInstance<String>().joinToString(", ").cleanMrzText()
+                    is Array<*> -> r.filterIsInstance<String>().joinToString(", ").cleanMrzText()
+                    else -> null
+                }
+            } catch (_: Throwable) { null }
+        }
+        return null
+    }
 
     /** Filler-chevrons + extra whitespace uit MRZ-strings halen. */
     private fun String.cleanMrzText(): String? = this
