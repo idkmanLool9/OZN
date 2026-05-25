@@ -1,0 +1,135 @@
+// Verifi — state-machine die alle schermen aan elkaar knoopt.
+//
+// Flow:
+//   loading → (geen sessie) → login → picker
+//                                       ↓
+//                                   target (overledene/contact)
+//                                       ↓
+//                                   doc-select (ID/paspoort/rijbewijs)
+//                                       ↓
+//                                   scan (camera/upload)
+//                                       ↓
+//                                   progress (OCR)
+//                                       ↓
+//                                   ocr (review + bewerken)
+//                                       ↓
+//                                   success → picker (terug)
+
+function App() {
+  const [screen, setScreen] = React.useState('loading');
+  const [session, setSession] = React.useState(null);
+  const [dossier, setDossier] = React.useState(null);
+  const [target, setTarget] = React.useState(null); // 'overledene' | 'contact'
+  const [docType, setDocType] = React.useState(null);
+  const [scanFile, setScanFile] = React.useState(null);
+  const [ocrFields, setOcrFields] = React.useState({});
+  const [errMsg, setErrMsg] = React.useState('');
+
+  // Check sessie bij start
+  React.useEffect(() => {
+    (async () => {
+      const sess = await SBAuth.session();
+      if (sess) {
+        setSession(sess);
+        setScreen('picker');
+      } else {
+        setScreen('login');
+      }
+    })();
+  }, []);
+
+  // ─── Handlers ────────────────────────────────────────────────────
+  const onLoggedIn = async () => {
+    const sess = await SBAuth.session();
+    setSession(sess);
+    setScreen('picker');
+  };
+  const onSignOut = async () => {
+    await SBAuth.signOut();
+    setSession(null);
+    setDossier(null); setTarget(null); setDocType(null);
+    setScanFile(null); setOcrFields({});
+    setScreen('login');
+  };
+  const onPickDossier = (d) => { setDossier(d); setScreen('target'); };
+  const onPickTarget  = (t) => { setTarget(t);  setScreen('doc-select'); };
+  const onPickDocType = (dt) => { setDocType(dt); setScreen('scan'); };
+  const onScanned     = (f) => { setScanFile(f); setScreen('progress'); };
+  const onProgressDone = ({ file, fields }) => {
+    setScanFile(file);
+    setOcrFields(fields || {});
+    setScreen('ocr');
+  };
+
+  const onConfirm = async (patch, file) => {
+    try {
+      // 1) Patch op het dossier (BSN, namen, geboortedatum etc.)
+      if (Object.keys(patch).length > 0) {
+        await updateDossier(dossier.id, patch);
+      }
+      // 2) Document-bestand opslaan in Supabase storage als 'documenten'
+      if (file) {
+        const naam = `${docType.label} — ${target === 'overledene' ? 'overledene' : 'contactpersoon'}`;
+        await uploadDocument(dossier.id, file, {
+          naam,
+          type: docType.type === 'passport' ? 'identiteitsbewijs' :
+                docType.type === 'licence'  ? 'identiteitsbewijs' : 'identiteitsbewijs',
+        });
+      }
+      setScreen('success');
+    } catch (e) {
+      setErrMsg(e.message || String(e));
+      setScreen('error');
+    }
+  };
+
+  const onContinue = () => {
+    // Reset flow-state en terug naar picker
+    setDossier(null); setTarget(null); setDocType(null);
+    setScanFile(null); setOcrFields({});
+    setScreen('picker');
+  };
+
+  // ─── Rendering ───────────────────────────────────────────────────
+  let content = null;
+  if (screen === 'loading') {
+    content = (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <Icon.Spinner size={28} c={T.blue}/>
+      </div>
+    );
+  } else if (screen === 'login') {
+    content = <LoginScreen onSuccess={onLoggedIn}/>;
+  } else if (screen === 'picker') {
+    content = <PickerScreen onPick={onPickDossier} onSignOut={onSignOut}/>;
+  } else if (screen === 'target') {
+    content = <TargetScreen dossier={dossier} onPick={onPickTarget} onBack={() => setScreen('picker')}/>;
+  } else if (screen === 'doc-select') {
+    content = <DocSelectScreen dossier={dossier} target={target} onPick={onPickDocType} onBack={() => setScreen('target')}/>;
+  } else if (screen === 'scan') {
+    content = <ScanScreen dossier={dossier} target={target} docType={docType} onScanned={onScanned} onBack={() => setScreen('doc-select')}/>;
+  } else if (screen === 'progress') {
+    content = <ProgressScreen file={scanFile} docType={docType} onDone={onProgressDone} onBack={() => setScreen('scan')}/>;
+  } else if (screen === 'ocr') {
+    content = <OCRScreen dossier={dossier} target={target} docType={docType} file={scanFile} fields={ocrFields} onConfirm={onConfirm} onBack={() => setScreen('scan')}/>;
+  } else if (screen === 'success') {
+    content = <SuccessScreen dossier={dossier} target={target} docType={docType} onContinue={onContinue}/>;
+  } else if (screen === 'error') {
+    content = (
+      <ScreenShell>
+        <StatusBar/>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: T.red, marginBottom: 10 }}>Opslaan mislukt</div>
+          <div style={{ fontSize: 14, color: T.muted, marginBottom: 24, maxWidth: 320, lineHeight: 1.5 }}>{errMsg}</div>
+          <div style={{ width: '100%', maxWidth: 320 }}>
+            <PrimaryButton onClick={() => setScreen('ocr')}>Opnieuw proberen</PrimaryButton>
+          </div>
+        </div>
+      </ScreenShell>
+    );
+  }
+
+  return <div className="verifi-shell">{content}</div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);

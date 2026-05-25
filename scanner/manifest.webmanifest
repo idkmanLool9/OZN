@@ -1,0 +1,13 @@
+{
+  "name": "Verifi · ID-scanner",
+  "short_name": "Verifi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B1220",
+  "theme_color": "#2563EB",
+  "lang": "nl",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "purpose": "any maskable" }
+  ]
+}
