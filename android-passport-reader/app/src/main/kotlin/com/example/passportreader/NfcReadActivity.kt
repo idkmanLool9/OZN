@@ -4,9 +4,11 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
+import android.util.Log
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Build
@@ -271,10 +273,7 @@ class NfcReadActivity : AppCompatActivity() {
         else
             getString(R.string.nfc_couple_login_first)
 
-        d.faceImageJpeg?.let { bytes ->
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            if (bmp != null) binding.photo.setImageBitmap(bmp)
-        }
+        renderPhoto(d.faceImageJpeg)
 
         addRow("Voornaam", d.givenNames)
         addRow("Achternaam", d.surname)
@@ -287,6 +286,35 @@ class NfcReadActivity : AppCompatActivity() {
             "FEMALE" -> "V"
             else -> d.gender
         })
+    }
+
+    private fun renderPhoto(bytes: ByteArray?) {
+        val bmp = bytes?.let { decodeFace(it) }
+        if (bmp != null) {
+            binding.photo.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            binding.photo.setImageBitmap(bmp)
+            binding.photo.imageTintList = null
+        } else {
+            // Silhouet-placeholder zodat duidelijk is dat er geen foto is
+            // (in plaats van een leeg wit vlak).
+            binding.photo.scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            binding.photo.setImageResource(R.drawable.ic_person_placeholder)
+            Log.w("NfcReadActivity", "Geen pasfoto te tonen (bytes=${bytes?.size ?: 0})")
+        }
+    }
+
+    /** Probeer JPEG (BitmapFactory) eerst; val terug op JPEG2000 (gemalto) als
+     *  de bytes geen geldige JPEG zijn. */
+    private fun decodeFace(bytes: ByteArray): Bitmap? {
+        // 1) Standaard JPEG/PNG/GIF/WebP via Android
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { return it }
+        // 2) JPEG2000 via gemalto's wrapper rond OpenJPEG
+        return try {
+            com.gemalto.jp2.JP2Decoder(bytes).decode()
+        } catch (e: Throwable) {
+            Log.w("NfcReadActivity", "JP2-decode mislukt", e)
+            null
+        }
     }
 
     private fun addRow(label: String, value: String?, mono: Boolean = false) {

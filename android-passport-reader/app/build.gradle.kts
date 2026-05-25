@@ -115,6 +115,10 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.78.1")
 
+    // ── JPEG2000-decoder voor DG2-pasfoto (oudere/EU paspoorten gebruiken
+    //    J2K i.p.v. JPEG; BitmapFactory begrijpt J2K niet uit zichzelf)
+    implementation("com.gemalto.jp2:jp2-android:1.0.3")
+
     // ── Supabase REST-koppeling (login + dossier-update + foto-upload) ──
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // EncryptedSharedPreferences voor het bewaren van de JWT-sessie
