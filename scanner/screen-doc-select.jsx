@@ -1,6 +1,10 @@
-// Screen — Documentkeuze (Verifi-design 1-op-1)
+// Screen — Documentkeuze met klikbare country picker
 
 function DocSelectScreen({ dossier, target, onPick, onBack }) {
+  const [country, setCountry] = React.useState('NL');
+  const [picker, setPicker] = React.useState(false);
+  const c = countryByCode(country);
+
   return (
     <ScreenShell style={{ background: T.bg2 }}>
       <StatusBar/>
@@ -22,50 +26,54 @@ function DocSelectScreen({ dossier, target, onPick, onBack }) {
         </div>
       </div>
 
-      {/* Country selector card */}
       <div style={{ padding: '20px 16px 0' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, letterSpacing: 1, textTransform: 'uppercase', padding: '0 4px 8px' }}>Land van afgifte</div>
-        <div style={{
+        <button onClick={() => setPicker(true)} style={{
           width: '100%', background: '#fff', border: '1px solid ' + T.hair, borderRadius: T.r,
           padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 14,
+          cursor: 'pointer', textAlign: 'left', fontFamily: T.font,
           boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
-        }}>
-          <Flag code="NL" size={28}/>
+          transition: 'border-color .12s ease, box-shadow .12s ease',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = T.blueTint; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = T.hair; }}
+        >
+          <Flag code={c.code} size={28}/>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: T.ink, letterSpacing: -0.2 }}>Nederland</div>
-            <div style={{ fontSize: 12, color: T.muted, fontWeight: 500, marginTop: 1 }}>NLD · EU/EER · MRZ-formaat ICAO 9303</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: T.ink, letterSpacing: -0.2 }}>{c.name}</div>
+            <div style={{ fontSize: 12, color: T.muted, fontWeight: 500, marginTop: 1 }}>{c.sub}</div>
           </div>
-        </div>
+          <span style={{ padding: '5px 10px', borderRadius: 999, background: T.blueSoft, color: T.blue, fontSize: 12, fontWeight: 600, letterSpacing: -0.1 }}>Wijzigen</span>
+          <Icon.Chevron size={14} c={T.muted}/>
+        </button>
       </div>
 
-      {/* Doc type tiles */}
       <div style={{ padding: '24px 16px 0' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: T.muted, letterSpacing: 1, textTransform: 'uppercase', padding: '0 4px 8px' }}>Documenttype</div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <DocTileRow
             icon={<Icon.IDCard c={T.blue}/>}
-            label="Nederlandse identiteitskaart"
+            label={`${c.code === 'NL' ? 'Nederlandse ' : ''}identiteitskaart`}
             sub="Voor- en achterkant · NFC-chip ondersteund"
             tag="Aanbevolen" tagColor={T.blue}
-            onClick={() => onPick({ type: 'id', label: 'ID-kaart' })}
+            onClick={() => onPick({ type: 'id', label: 'ID-kaart', country: c.code })}
           />
           <DocTileRow
             icon={<Icon.Passport c={T.blue}/>}
             label="Paspoort"
             sub="Met MRZ-zone op de fotopagina"
-            onClick={() => onPick({ type: 'passport', label: 'Paspoort' })}
+            onClick={() => onPick({ type: 'passport', label: 'Paspoort', country: c.code })}
           />
           <DocTileRow
             icon={<Icon.Licence c={T.blue}/>}
             label="Rijbewijs"
             sub="EU-formaat, model 2014 en later"
-            onClick={() => onPick({ type: 'licence', label: 'Rijbewijs' })}
+            onClick={() => onPick({ type: 'licence', label: 'Rijbewijs', country: c.code })}
           />
         </div>
       </div>
 
-      {/* Bottom privacy banner */}
       <div style={{ flex: 1 }}/>
       <div style={{ padding: '14px 16px 32px' }}>
         <div style={{
@@ -79,6 +87,13 @@ function DocSelectScreen({ dossier, target, onPick, onBack }) {
           </div>
         </div>
       </div>
+
+      <CountrySheet
+        open={picker}
+        current={country}
+        onPick={setCountry}
+        onClose={() => setPicker(false)}
+      />
     </ScreenShell>
   );
 }

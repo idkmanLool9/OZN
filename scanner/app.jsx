@@ -19,11 +19,14 @@ function App() {
   React.useEffect(() => {
     (async () => {
       const sess = await SBAuth.session();
-      if (sess) { setSession(sess); setScreen('picker'); }
-      else { setScreen('login'); }
+      setSession(sess);
+      setScreen('welcome');
     })();
   }, []);
 
+  const onWelcomeContinue = () => {
+    if (session) setScreen('picker'); else setScreen('login');
+  };
   const onLoggedIn = async () => {
     const sess = await SBAuth.session();
     setSession(sess); setScreen('picker');
@@ -72,8 +75,10 @@ function App() {
   let content = null;
   if (screen === 'loading') {
     content = <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><Icon.Spinner size={28} c={T.blue}/></div>;
+  } else if (screen === 'welcome') {
+    content = <WelcomeScreen session={session} onContinue={onWelcomeContinue}/>;
   } else if (screen === 'login') {
-    content = <LoginScreen onSuccess={onLoggedIn}/>;
+    content = <LoginScreen onSuccess={onLoggedIn} onBack={() => setScreen('welcome')}/>;
   } else if (screen === 'picker') {
     content = <PickerScreen onPick={onPickDossier} onSignOut={onSignOut}/>;
   } else if (screen === 'target') {
