@@ -10,11 +10,21 @@ android {
 
     defaultConfig {
         applicationId = "com.example.passportreader"
-        minSdk = 21
+        minSdk = 23                // EncryptedSharedPreferences vereist 23+
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Supabase-koppeling (zelfde project als de webapp). Anon key is
+        // publiek veilig — RLS regelt de toegang. Override met
+        // -PsupabaseUrl=... -PsupabaseAnonKey=... als nodig.
+        val sbUrl     = (project.findProperty("supabaseUrl")     as String?)
+            ?: "https://mpuejmkhmlbkaelqbnae.supabase.co"
+        val sbAnonKey = (project.findProperty("supabaseAnonKey") as String?)
+            ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wdWVqbWtobWxia2FlbHFibmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MjI2NzQsImV4cCI6MjA5MzA5ODY3NH0.pq6GJXqEdGNzarAw0lj8DWrtAguE3T7-MI439rlmemk"
+        buildConfigField("String", "SUPABASE_URL",      "\"$sbUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$sbAnonKey\"")
     }
 
     buildTypes {
@@ -30,7 +40,10 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { viewBinding = true }
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+    }
 
     sourceSets {
         getByName("main") {
@@ -83,4 +96,11 @@ dependencies {
     //    voor Android (i.t.t. jdk15on)
     implementation("org.bouncycastle:bcprov-jdk15to18:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk15to18:1.78.1")
+
+    // ── Supabase REST-koppeling (login + dossier-update + foto-upload) ──
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // EncryptedSharedPreferences voor het bewaren van de JWT-sessie
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // RecyclerView voor de dossier-picker-lijst
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 }

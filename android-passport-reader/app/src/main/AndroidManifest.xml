@@ -3,16 +3,23 @@
 
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.NFC"/>
+    <!-- INTERNET: nodig voor het koppelen van scan-resultaten aan een
+         dossier in Supabase (login, dossiers ophalen, update, foto-upload).
+         Alle MRZ- en NFC-uitlezing gebeurt nog steeds 100% lokaal — er gaat
+         pas verkeer over de lijn nadat de gebruiker zelf op 'Koppel aan
+         dossier' tikt. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <uses-feature android:name="android.hardware.camera" android:required="true"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <uses-feature android:name="android.hardware.nfc" android:required="true"/>
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@android:drawable/ic_menu_view"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.PassportReader">
@@ -43,5 +50,18 @@
                 android:name="android.nfc.action.TECH_DISCOVERED"
                 android:resource="@xml/nfc_tech_filter"/>
         </activity>
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false"
+            android:label="@string/login_title"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"/>
+
+        <activity
+            android:name=".DossierPickerActivity"
+            android:exported="false"
+            android:label="@string/picker_title"
+            android:screenOrientation="portrait"/>
     </application>
 </manifest>

@@ -25,6 +25,8 @@ import java.security.Security
  */
 class PassportNfcReader {
 
+    enum class Stage { CONNECTING, PACE, BAC, DG1, DG2 }
+
     init {
         // BouncyCastle expliciet vooraan zetten — vermijdt botsing met
         // Android's eigen (stripped) BC-versie
@@ -32,7 +34,13 @@ class PassportNfcReader {
         Security.insertProviderAt(BouncyCastleProvider(), 1)
     }
 
-    suspend fun read(tag: Tag, mrz: MrzInfo): PassportData = withContext(Dispatchers.IO) {
+    suspend fun read(
+        tag: Tag,
+        mrz: MrzInfo,
+        onStage: ((Stage) -> Unit)? = null,
+    ): PassportData = withContext(Dispatchers.IO) {
+        onStage?.invoke(Stage.CONNECTING)
+
         val isoDep = IsoDep.get(tag) ?: error("Tag is geen IsoDep — geen ePaspoort")
         isoDep.timeout = 10_000
 
@@ -56,6 +64,7 @@ class PassportNfcReader {
         )
         val paceKey = PACEKeySpec.createMRZKey(bacKey)
 
+        onStage?.invoke(Stage.PACE)
         var paceSucceeded = false
         try {
             val cardAccess = CardAccessFile(service.getInputStream(PassportService.EF_CARD_ACCESS))
@@ -67,22 +76,25 @@ class PassportNfcReader {
             )
             paceSucceeded = true
         } catch (e: Exception) {
-            // Niet erg — paspoort ondersteunt mogelijk alleen BAC
+            // PACE niet beschikbaar of mislukt — fall through naar BAC
         }
 
         service.sendSelectApplet(paceSucceeded)
 
         // 2) Fallback BAC
         if (!paceSucceeded) {
+            onStage?.invoke(Stage.BAC)
             service.doBAC(bacKey)
         }
 
         // 3) DG1 — persoonsgegevens (MRZ uit de chip, betrouwbaarder dan OCR)
+        onStage?.invoke(Stage.DG1)
         val dg1Stream = service.getInputStream(PassportService.EF_DG1)
         val dg1 = LDSFileUtil.getLDSFile(PassportService.EF_DG1, dg1Stream) as DG1File
         val info = dg1.mrzInfo
 
         // 4) DG2 — gezichtsfoto (JPEG of JPEG2000)
+        onStage?.invoke(Stage.DG2)
         val faceBytes: ByteArray? = try {
             val dg2Stream = service.getInputStream(PassportService.EF_DG2)
             val dg2 = LDSFileUtil.getLDSFile(PassportService.EF_DG2, dg2Stream) as DG2File

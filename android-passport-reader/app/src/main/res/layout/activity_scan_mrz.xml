@@ -9,12 +9,15 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
-    <!-- MRZ-frame-overlay onderaan -->
+    <!-- MRZ-frame: gecentreerd kader met afgeronde hoeken zodat de gebruiker
+         weet waar het document moet komen. -->
     <View
         android:layout_width="match_parent"
-        android:layout_height="80dp"
+        android:layout_height="120dp"
         android:layout_gravity="center"
-        android:background="#33FFFFFF"/>
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:background="@drawable/scan_frame"/>
 
     <LinearLayout
         android:layout_width="match_parent"
