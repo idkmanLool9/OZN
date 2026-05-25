@@ -41,6 +41,7 @@
     <string name="step_crypto_bac">Beveiligde sleutelwissel (BAC-fallback)</string>
     <string name="step_dg1">Persoonsgegevens uitlezen</string>
     <string name="step_dg2">Pasfoto uitlezen</string>
+    <string name="step_extra">Aanvullende gegevens</string>
 
     <string name="perm_camera_needed">Camera-toegang nodig om de MRZ te scannen.</string>
 
