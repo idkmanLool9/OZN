@@ -49,7 +49,8 @@ function FieldCard({ label, value, onChange, mono, confidence, last = false, typ
   );
 }
 
-function OCRScreen({ dossier, target, docType, file, fields, onConfirm, onBack }) {
+function OCRScreen({ dossier, target, docType, file, fields, rawText, onConfirm, onBack }) {
+  const [showRaw, setShowRaw] = React.useState(false);
   const [state, setState] = React.useState(() => ({
     voornaam: fields.voornaam || '',
     achternaam: fields.achternaam || '',
@@ -166,8 +167,29 @@ function OCRScreen({ dossier, target, docType, file, fields, onConfirm, onBack }
           }}>
             <Icon.Sparkle c={T.orange} size={12}/>
             <div style={{ fontSize: 12, color: '#9A3412', fontWeight: 600, letterSpacing: -0.05 }}>
-              Geen velden automatisch herkend — vul handmatig in.
+              Geen velden automatisch herkend — vul handmatig in of bekijk de ruwe scan-tekst hieronder.
             </div>
+          </div>
+        )}
+
+        {rawText && (
+          <div style={{ marginTop: 14 }}>
+            <button onClick={() => setShowRaw(s => !s)} style={{
+              background: 'transparent', border: 'none', padding: 0,
+              color: T.blue, fontFamily: T.font, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+              {showRaw ? '▾' : '▸'} Ruwe gescande tekst {showRaw ? 'verbergen' : 'tonen'}
+            </button>
+            {showRaw && (
+              <pre style={{
+                margin: '8px 0 0', padding: '12px 14px',
+                background: T.bg3, border: '1px solid ' + T.hair, borderRadius: 10,
+                fontFamily: T.mono, fontSize: 11.5, color: T.body,
+                lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                maxHeight: 200, overflow: 'auto',
+              }}>{rawText}</pre>
+            )}
           </div>
         )}
 

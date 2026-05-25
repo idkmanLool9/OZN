@@ -32,7 +32,7 @@ const VerifiOCR = {
 
     const url = URL.createObjectURL(file);
     try {
-      const result = await Tesseract.recognize(url, 'nld', {
+      const result = await Tesseract.recognize(url, 'nld+eng', {
         logger: m => {
           if (!onProgress) return;
           if (m.status === 'loading tesseract core') onProgress({ phase: 'loading', progress: 0.10 });
@@ -64,15 +64,20 @@ const VerifiOCR = {
     return out;
   },
 
-  // MRZ-parser — herkent zowel paspoort (2×44) als ID-kaart (3×30)
+  // MRZ-parser — herkent zowel paspoort (2×44) als ID-kaart (3×30).
+  // Soepel: OCR maakt vaak ruis (spaties, 0/O verwisseling, K/<-verwarring)
   _parseMRZ(text, docType) {
-    // Pak alle regels die op MRZ lijken (alleen [A-Z0-9<])
-    const lines = text.split(/[\r\n]+/)
-      .map(l => l.replace(/\s+/g, '').toUpperCase())
-      .filter(l => /^[A-Z0-9<]+$/.test(l) && l.length >= 28);
+    // Normalize: OCR-foutjes corrigeren die de structuur kapot maken
+    const norm = text
+      .replace(/[«»]/g, '<')           // soort guillemets → <
+      .replace(/[«»]/g, '<') // andere quotes
+      .replace(/\s+/g, '\n');          // alle whitespace naar newlines
+    const lines = norm.split('\n')
+      .map(l => l.toUpperCase())
+      .filter(l => /^[A-Z0-9<«]{20,}$/i.test(l));
 
-    // Paspoort: 2 regels van 44 (TD3-formaat)
-    const td3 = lines.filter(l => l.length >= 42 && l.length <= 46);
+    // Paspoort: 2 regels van 30-50 (we accepteren ruis)
+    const td3 = lines.filter(l => l.length >= 38 && l.length <= 50);
     if (td3.length >= 2) {
       const r1 = td3[0].padEnd(44, '<').slice(0, 44);
       const r2 = td3[1].padEnd(44, '<').slice(0, 44);
@@ -81,13 +86,13 @@ const VerifiOCR = {
       }
     }
 
-    // ID-kaart: 3 regels van 30 (TD1-formaat)
-    const td1 = lines.filter(l => l.length >= 28 && l.length <= 32);
+    // ID-kaart: 3 regels van 24-34 (soepel)
+    const td1 = lines.filter(l => l.length >= 24 && l.length <= 34);
     if (td1.length >= 3) {
       const r1 = td1[0].padEnd(30, '<').slice(0, 30);
       const r2 = td1[1].padEnd(30, '<').slice(0, 30);
       const r3 = td1[2].padEnd(30, '<').slice(0, 30);
-      if (r1.startsWith('I') || r1.startsWith('A') || r1.startsWith('C')) {
+      if (/^[IAC]/.test(r1)) {
         return VerifiOCR._fromMRZ_TD1(r1, r2, r3);
       }
     }
@@ -164,32 +169,76 @@ const VerifiOCR = {
     return `${yyyy}-${mm}-${dd}`;
   },
 
-  // Vrije-tekst-parser voor wanneer MRZ niet leesbaar is
+  // Vrije-tekst-parser — heel soepel. OCR maakt vaak rommel
+  // (extra spaties, opgesplitste woorden, mixed labels NL/EN).
   _parseFreeText(text) {
     const out = {};
-    const lines = text.split(/[\r\n]+/);
+    const lines = text.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
 
-    // BSN: 8 of 9 cijfers, vaak na 'BSN'/'Burgerservicenummer'
-    const bsnMatch = text.match(/B\s*S\s*N[:\s.]*([\d\s]{8,12})/i)
-                  || text.match(/Burgerservicenummer[:\s.]*([\d\s]{8,12})/i)
-                  || text.match(/\b(\d{9})\b/);
-    if (bsnMatch) out.bsn = bsnMatch[1].replace(/\s+/g, '');
+    // BSN: 8 of 9 cijfers ergens in de tekst, voorkeur na 'BSN'-label
+    const bsnLabel = text.match(/BSN[^\d]{0,8}(\d[\d\s]{7,11}\d)/i)
+                  || text.match(/Burgerservice[^\d]{0,8}(\d[\d\s]{7,11}\d)/i)
+                  || text.match(/Personal\s*number[^\d]{0,8}(\d[\d\s]{7,11}\d)/i);
+    if (bsnLabel) {
+      out.bsn = bsnLabel[1].replace(/\s+/g, '');
+    } else {
+      // Fallback: een los 9-cijferig getal (NL BSN heeft 9 digits, oud 8)
+      const loose = text.match(/(?:^|\s)(\d{9})(?:\s|$)/m);
+      if (loose) out.bsn = loose[1];
+    }
 
-    // Achternaam — na "Achternaam:" of "ACHTERNAAM"
-    const ach = text.match(/Achtername?[:\s]+([A-ZÀ-Ü][A-ZÀ-Ü\s\-']{1,40})/i);
+    // Achternaam — meerdere label-varianten (NL én EN)
+    const ach =
+         text.match(/Achterna[am]?e?n?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
+      || text.match(/Surname\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
+      || text.match(/Family\s*name\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
+      || text.match(/Nom\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i);
     if (ach) out.achternaam = VerifiOCR._cleanName(ach[1]);
 
     // Voornaam / Voornamen
-    const voor = text.match(/Voorna[ma]en?[:\s]+([A-ZÀ-Ü][A-ZÀ-Ü\s\-'a-z]{1,40})/i);
+    const voor =
+         text.match(/Voornam?e?n?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
+      || text.match(/Given\s*name[s]?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
+      || text.match(/Pr[ée]nom[s]?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i);
     if (voor) out.voornaam = VerifiOCR._cleanName(voor[1]);
 
-    // Geboortedatum — diverse formaten
-    const date = text.match(/Geb(?:oorte)?\s*dat(?:um)?[:\s]+(\d{1,2}[\s\-\/.]+\S+[\s\-\/.]+\d{2,4})/i);
-    if (date) out.geboortedatum = VerifiOCR._parseDate(date[1]);
+    // Geboortedatum — label gevolgd door datum (NL + EN)
+    const dt =
+         text.match(/(?:Geb(?:oorte)?\s*dat(?:um)?|Date\s*of\s*birth|Birth\s*date|Né[e]?\s*le)\s*[:\/]?\s*(\d{1,2}[\s\-\/.]+\S+[\s\-\/.]+\d{2,4})/i);
+    if (dt) {
+      const parsed = VerifiOCR._parseDate(dt[1]);
+      if (parsed) out.geboortedatum = parsed;
+    } else {
+      // Fallback: zoek een datum in DD MMM YYYY formaat (zoals op NL ID-kaart)
+      const looseDate = text.match(/\b(\d{1,2}\s+(?:JAN|FEB|MRT|MAR|APR|MEI|MAY|JUN|JUL|AUG|SEP|OKT|OCT|NOV|DEC)\s+\d{4})\b/i);
+      if (looseDate) {
+        const parsed = VerifiOCR._parseDate(looseDate[1]);
+        if (parsed) out.geboortedatum = parsed;
+      }
+    }
 
-    // Nationaliteit
-    const nat = text.match(/Nationaliteit[:\s]+([A-Za-zÀ-ü\-]+)/i);
-    if (nat) out.nationaliteit = nat[1];
+    // Geslacht
+    const sex = text.match(/(?:Geslacht|Sex|Sexe)\s*[:\/]?\s*([MFVmfv])(?!\w)/);
+    if (sex) {
+      const s = sex[1].toUpperCase();
+      out.geslacht = (s === 'M') ? 'Man' : 'Vrouw';
+    }
+
+    // Nationaliteit — NLD-code of label
+    const nat =
+         text.match(/Nationaliteit\s*[:\/]?\s*([A-Za-zÀ-ÿ\-]{4,20})/i)
+      || text.match(/Nationality\s*[:\/]?\s*([A-Za-zÀ-ÿ\-]{4,20})/i);
+    if (nat) {
+      const v = nat[1].toLowerCase();
+      if (/nederland|netherlands|nld/.test(v)) out.nationaliteit = 'Nederlandse';
+      else out.nationaliteit = nat[1];
+    } else if (/\bNLD\b/.test(text)) {
+      out.nationaliteit = 'Nederlandse';
+    }
+
+    // Document-nummer — NL ID is meestal 9 alfanumeriek
+    const docNr = text.match(/(?:Document(?:nummer)?|Documentnr|Number)\s*[:\/]?\s*([A-Z0-9]{6,12})/i);
+    if (docNr) out.document_nummer = docNr[1];
 
     return out;
   },

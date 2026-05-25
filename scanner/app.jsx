@@ -13,6 +13,7 @@ function App() {
   const [docType, setDocType] = React.useState(null);
   const [scanFile, setScanFile] = React.useState(null);
   const [ocrFields, setOcrFields] = React.useState({});
+  const [ocrRawText, setOcrRawText] = React.useState('');
   const [savedFields, setSavedFields] = React.useState({});
   const [errMsg, setErrMsg] = React.useState('');
 
@@ -41,9 +42,10 @@ function App() {
   const onPickTarget  = (t) => { setTarget(t);  setScreen('doc-select'); };
   const onPickDocType = (dt) => { setDocType(dt); setScreen('scan'); };
   const onScanned     = (f) => { setScanFile(f); setScreen('progress'); };
-  const onProgressDone = ({ file, fields }) => {
+  const onProgressDone = ({ file, fields, rawText }) => {
     setScanFile(file);
     setOcrFields(fields || {});
+    setOcrRawText(rawText || '');
     setScreen('review');
   };
   const onReviewUse = () => { setScreen('ocr'); };
@@ -92,7 +94,7 @@ function App() {
   } else if (screen === 'review') {
     content = <ReviewScreen file={scanFile} docType={docType} onUse={onReviewUse} onRetake={onReviewRetake}/>;
   } else if (screen === 'ocr') {
-    content = <OCRScreen dossier={dossier} target={target} docType={docType} file={scanFile} fields={ocrFields} onConfirm={onConfirm} onBack={() => setScreen('review')}/>;
+    content = <OCRScreen dossier={dossier} target={target} docType={docType} file={scanFile} fields={ocrFields} rawText={ocrRawText} onConfirm={onConfirm} onBack={() => setScreen('review')}/>;
   } else if (screen === 'success') {
     content = <SuccessScreen dossier={dossier} target={target} docType={docType} savedFields={savedFields} file={scanFile} onContinue={onContinue}/>;
   } else if (screen === 'error') {
