@@ -89,18 +89,12 @@ class MrzExtractor {
             //   [20]     geslacht
             //   [21..26] verloopdatum YYMMDD
             //   [27]     check-digit expiry
-            val docNumber = correctDocNum(l2.substring(0, 9))
-            val docCheck = correctDigit(l2[9])
-            val birthDate = correctDigits(l2.substring(13, 19))
-            val birthCheck = correctDigit(l2[19])
-            val expiryDate = correctDigits(l2.substring(21, 27))
-            val expiryCheck = correctDigit(l2[27])
+            val docNumber  = fuzzyFix(l2.substring(0, 9),   l2[9],  isNumeric = false) ?: continue
+            val birthDate  = fuzzyFix(l2.substring(13, 19), l2[19], isNumeric = true)  ?: continue
+            val expiryDate = fuzzyFix(l2.substring(21, 27), l2[27], isNumeric = true)  ?: continue
 
             if (!birthDate.matches("\\d{6}".toRegex())) continue
             if (!expiryDate.matches("\\d{6}".toRegex())) continue
-            if (!hasValidCheck(docNumber, docCheck)) continue
-            if (!hasValidCheck(birthDate, birthCheck)) continue
-            if (!hasValidCheck(expiryDate, expiryCheck)) continue
 
             return MrzInfo(
                 documentNumber = docNumber.replace("<", ""),
@@ -118,24 +112,17 @@ class MrzExtractor {
             val l1 = lines[i]
             val l2 = lines[i + 1]
             if (l1.length != 30 || l2.length != 30) continue
-            // L3 (namen) is optioneel hier: niet nodig voor BAC/PACE
             if (!(l1.startsWith("I") || l1.startsWith("A") || l1.startsWith("C"))) continue
 
             // TD1 line 1: [0..1] type, [2..4] issuer, [5..13] docnr, [14] doc-check
             // TD1 line 2: [0..5] dob, [6] dob-check, [7] sex, [8..13] expiry,
             //             [14] expiry-check, [15..17] nat
-            val docNumber = correctDocNum(l1.substring(5, 14))
-            val docCheck = correctDigit(l1[14])
-            val birthDate = correctDigits(l2.substring(0, 6))
-            val birthCheck = correctDigit(l2[6])
-            val expiryDate = correctDigits(l2.substring(8, 14))
-            val expiryCheck = correctDigit(l2[14])
+            val docNumber  = fuzzyFix(l1.substring(5, 14), l1[14], isNumeric = false) ?: continue
+            val birthDate  = fuzzyFix(l2.substring(0, 6),  l2[6],  isNumeric = true)  ?: continue
+            val expiryDate = fuzzyFix(l2.substring(8, 14), l2[14], isNumeric = true)  ?: continue
 
             if (!birthDate.matches("\\d{6}".toRegex())) continue
             if (!expiryDate.matches("\\d{6}".toRegex())) continue
-            if (!hasValidCheck(docNumber, docCheck)) continue
-            if (!hasValidCheck(birthDate, birthCheck)) continue
-            if (!hasValidCheck(expiryDate, expiryCheck)) continue
 
             return MrzInfo(
                 documentNumber = docNumber.replace("<", ""),
@@ -145,6 +132,49 @@ class MrzExtractor {
             )
         }
         return null
+    }
+
+    /** Vind een variant van `field` met geldige check-digit door één OCR-
+     *  vergissing tegelijk uit te proberen (O↔0, I↔1, Z↔2 etc.). Voorkomt
+     *  dat één misgelezen letter de hele scan blokkeert. Voor numerieke
+     *  velden (dob/expiry) eerst de standaard digit-correctie. */
+    private fun fuzzyFix(rawField: String, rawCheck: Char, isNumeric: Boolean): String? {
+        val field = if (isNumeric) correctDigits(rawField) else rawField
+        val check = if (rawCheck in '0'..'9' || rawCheck == '<') rawCheck else correctDigit(rawCheck)
+
+        if (hasValidCheck(field, check)) return field
+        if (check == '<') return field
+
+        // Brute-force per positie één teken vervangen door een OCR-alternatief
+        for (i in field.indices) {
+            val orig = field[i]
+            for (alt in ocrAlternatives(orig)) {
+                if (alt == orig) continue
+                if (isNumeric && alt !in '0'..'9') continue
+                val variant = field.substring(0, i) + alt + field.substring(i + 1)
+                if (hasValidCheck(variant, check)) return variant
+            }
+        }
+        return null
+    }
+
+    private fun ocrAlternatives(c: Char): List<Char> = when (c) {
+        '0' -> listOf('O', 'D', 'Q')
+        'O' -> listOf('0', 'D', 'Q')
+        'D' -> listOf('0', 'O', 'Q')
+        'Q' -> listOf('0', 'O', 'D')
+        '1' -> listOf('I', 'L')
+        'I' -> listOf('1', 'L')
+        'L' -> listOf('1', 'I')
+        '2' -> listOf('Z')
+        'Z' -> listOf('2')
+        '5' -> listOf('S')
+        'S' -> listOf('5')
+        '6' -> listOf('G')
+        'G' -> listOf('6')
+        '8' -> listOf('B')
+        'B' -> listOf('8')
+        else -> emptyList()
     }
 
     fun close() = recognizer.close()
