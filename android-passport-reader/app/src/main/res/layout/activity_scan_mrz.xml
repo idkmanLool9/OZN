@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/black">
@@ -9,47 +10,90 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
-    <!-- MRZ-frame: gecentreerd kader met afgeronde hoeken zodat de gebruiker
-         weet waar het document moet komen. -->
-    <View
+    <!-- Pill-vormige hint bovenaan -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="48dp"
+        android:background="@drawable/bg_hint_pill"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:text="@string/scan_title"
+        android:textColor="@color/white"
+        android:textSize="14sp"
+        android:textStyle="bold"/>
+
+    <!-- Scan-frame: 4 hoek-brackets in een vast formaat dat ongeveer
+         de MRZ-aspect-ratio benadert. -->
+    <FrameLayout
+        android:id="@+id/scanFrame"
         android:layout_width="match_parent"
-        android:layout_height="120dp"
+        android:layout_height="140dp"
         android:layout_gravity="center"
         android:layout_marginStart="24dp"
-        android:layout_marginEnd="24dp"
-        android:background="@drawable/scan_frame"/>
+        android:layout_marginEnd="24dp">
 
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|start"
+            android:contentDescription="@null"
+            android:src="@drawable/scan_corner"/>
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:contentDescription="@null"
+            android:rotation="90"
+            android:src="@drawable/scan_corner"/>
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="bottom|end"
+            android:contentDescription="@null"
+            android:rotation="180"
+            android:src="@drawable/scan_corner"/>
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="bottom|start"
+            android:contentDescription="@null"
+            android:rotation="270"
+            android:src="@drawable/scan_corner"/>
+    </FrameLayout>
+
+    <!-- Onderpaneel met hint + debug-regel -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:background="#CC000000"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="28dp">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="@string/scan_title"
-            android:textColor="@color/white"
-            android:textSize="17sp"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:gravity="center"
+            android:lineSpacingExtra="2dp"
             android:text="@string/scan_hint"
-            android:textColor="#B3FFFFFF"
+            android:textColor="#E5E7EB"
             android:textSize="13sp"/>
 
         <TextView
             android:id="@+id/debugLine"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="10dp"
             android:fontFamily="monospace"
             android:gravity="center"
             android:textColor="#80FFFFFF"
