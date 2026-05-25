@@ -1,9 +1,17 @@
 # Biometric Passport Reader (Android, Kotlin)
 
-Native Android-app die het MRZ-strookje van een paspoort scant via de
-camera (ML Kit) en daarna via NFC de chip uitleest (jMRTD / ICAO 9303
-BAC + PACE). Alles draait **lokaal** op het toestel — er gaat geen data
-naar een externe server.
+Native Android-app die het MRZ-strookje van een paspoort of Nederlandse
+ID-kaart scant via de camera (ML Kit, TD3 + TD1) en daarna via NFC de
+chip uitleest (jMRTD / ICAO 9303 BAC + PACE).
+
+**Privacy.** Het scannen en uitlezen van de chip gebeurt 100% lokaal op
+het toestel. Er is wél een optionele Supabase-koppeling: na een
+succesvolle scan kun je **zelf** op "Koppel aan dossier" tikken, waarna
+de app inlogt op het Uitvaartbeheer-Supabase-project en het gekozen
+dossier bijwerkt (voornaam, achternaam, geboortedatum, geslacht,
+nationaliteit + DG2-pasfoto naar de `overledenen`-bucket). Niet
+ingelogd = scan blijft lokaal en de `INTERNET`-permission wordt niet
+gebruikt.
 
 ## Stack
 - **Kotlin** + AndroidX + Material 3
@@ -14,43 +22,69 @@ naar een externe server.
 
 ## Bouwen
 
+### In Android Studio
 1. **Android Studio** installeren (Hedgehog 2023.1.1 of nieuwer)
 2. Open de map `android-passport-reader/` als bestaand project
 3. Wacht tot Gradle alle dependencies heeft binnengehaald (~5 min eerste keer)
 4. Sluit een Android-telefoon met **NFC** aan via USB (USB-debugging aan)
 5. Klik op **Run** ▶ — app installeert + start
 
+### Vanaf de command-line
+Met JDK 17+ in `$PATH` en de Android SDK (env-var `ANDROID_HOME`):
+```bash
+cd android-passport-reader
+./gradlew assembleDebug
+# debug-APK staat in app/build/outputs/apk/debug/app-debug.apk
+```
+
+Andere Supabase-instance gebruiken (i.p.v. de defaults uit `app/build.gradle.kts`):
+```bash
+./gradlew assembleDebug \
+  -PsupabaseUrl="https://jouw-project.supabase.co" \
+  -PsupabaseAnonKey="ey..."
+```
+
 ## Hoe het werkt
 
-1. **Startscherm** — knop "Start scan"
-2. **MRZ-scanner** — camera-preview, automatisch herkennen van de
-   onderste twee regels van het paspoort (TD3-formaat). Documentnummer,
-   geboortedatum en verloopdatum worden geëxtraheerd.
-3. **NFC-leescherm** — gebruiker houdt paspoort tegen de achterkant van
+1. **Startscherm** — knop "Start scan" + login-status (optioneel inloggen
+   bij Uitvaartbeheer-Supabase voor dossier-koppeling).
+2. **MRZ-scanner** — camera-preview, automatisch herkennen van een TD3
+   (paspoort, 2x44) óf TD1 (ID-kaart, 3x30). Alle drie mod-37-3
+   check-digits (doc, dob, expiry) worden gevalideerd vóór doorgaan,
+   zodat OCR-fouten niet leiden tot cryptische BAC/PACE-fouten.
+3. **NFC-leescherm** — gebruiker houdt document tegen de achterkant van
    de telefoon. App opent de chip via PACE (modern), met BAC als
-   fallback voor oudere paspoorten.
+   fallback voor oudere paspoorten. Per stap wordt de voortgang
+   getoond (PACE → DG1 → DG2). Bij fout: retry-knop zonder terug
+   naar de scan-stap.
 4. **Resultaat** — DG1 (persoonsgegevens) + DG2 (gezichtsfoto) worden
-   gelezen en getoond.
+   gelezen en getoond. Knop "Koppel aan dossier" (alleen als ingelogd):
+   pikt een dossier uit de Supabase-lijst, PATCHt de velden en upload
+   de pasfoto naar de `overledenen`-storage-bucket.
 
 ## Bestanden
 
 ```
 app/
- ├── build.gradle.kts              dependencies (jMRTD, ML Kit, CameraX)
+ ├── build.gradle.kts                  dependencies + BuildConfig-vars
  ├── src/main/
- │   ├── AndroidManifest.xml       permissies (CAMERA, NFC) + activities
+ │   ├── AndroidManifest.xml           permissies (CAMERA, NFC, INTERNET)
  │   ├── kotlin/com/example/passportreader/
- │   │   ├── MainActivity.kt       startscherm
- │   │   ├── ScanMrzActivity.kt    CameraX + ML Kit voor MRZ-detectie
- │   │   ├── NfcReadActivity.kt    NFC-dispatch + jMRTD-flow
+ │   │   ├── MainActivity.kt           startscherm + login-status
+ │   │   ├── ScanMrzActivity.kt        CameraX + ML Kit voor MRZ-detectie
+ │   │   ├── NfcReadActivity.kt        NFC-dispatch + jMRTD-flow + koppel-knop
+ │   │   ├── LoginActivity.kt          Supabase e-mail+wachtwoord-login
+ │   │   ├── DossierPickerActivity.kt  zoekbare lijst + bevestig + PATCH
  │   │   ├── mrz/
- │   │   │   ├── MrzInfo.kt        data-class voor de 3 sleutelvelden
- │   │   │   └── MrzExtractor.kt   ML Kit TD3-parser
+ │   │   │   ├── MrzInfo.kt            data-class incl. documenttype
+ │   │   │   └── MrzExtractor.kt       ML Kit TD3 + TD1 parser, check-digits
  │   │   ├── nfc/
- │   │   │   └── PassportNfcReader.kt   jMRTD PACE/BAC + DG1/DG2-uitlezen
+ │   │   │   └── PassportNfcReader.kt  jMRTD PACE/BAC + DG1/DG2 + Stage-callback
+ │   │   ├── cloud/
+ │   │   │   └── SupabaseClient.kt     lichte REST-client: auth/db/storage
  │   │   └── model/
- │   │       └── PassportData.kt   resultaat-data-class
- │   └── res/                      layouts, themes, strings
+ │   │       └── PassportData.kt       resultaat-data-class
+ │   └── res/                          layouts, themes, strings, launcher-icon
 ```
 
 ## Gotchas
@@ -64,17 +98,21 @@ app/
   ertegen houden, 5-10 seconden stil — chip-uitlezing is traag.
 - **DG2-foto**: NL-paspoorten gebruiken JPEG sinds 2014. Voor JPEG2000
   (oudere paspoorten) moet je `com.gemalto.jp2:jp2-android` toevoegen.
-- **Geen INTERNET-permission** — bewust niet toegevoegd; alles draait
-  lokaal, en de Manifest bewijst dat.
+- **INTERNET-permission** — staat in de Manifest, maar wordt alleen
+  aangesproken nadat de gebruiker handmatig op "Koppel aan dossier" of
+  "Inloggen" tikt. MRZ- en NFC-flows raken het netwerk nooit. Wil je
+  écht geen netwerk-permission? Verwijder dan de `INTERNET`-regel uit
+  het Manifest — de scan-flow blijft volledig werken, alleen de
+  Supabase-koppeling vervalt.
 - **NFC werkt niet in emulator** — testen vereist een fysieke telefoon.
 - **Eigen paspoort gebruiken** — je hebt een echt paspoort nodig om te
   testen. Vraag eventueel familie/collega's om mee te scannen.
 
 ## Vervolgstappen
 
-- ID-kaart (TD1-formaat, 3×30) ondersteunen: aparte `extract()`-variant
 - Gezichtsverificatie: vergelijk DG2-foto met live camera-frame
 - DG13/DG14: certificaat-validatie tegen de passive authentication trust
   store voor anti-tampering controle
-- Coupelen met de uitvaart-app: na succesvolle scan via Supabase REST
-  het dossier bijwerken
+- Foto-compressie (DG2 is soms 1-2 MB; verkleinen vóór upload)
+- ID-kaart-extended-docnummer (NL ID = 9 chars, maar sommige EU-landen
+  hebben langere nummers die doorlopen in optional data field)

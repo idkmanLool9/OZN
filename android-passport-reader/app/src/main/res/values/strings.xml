@@ -3,7 +3,7 @@
     <string name="app_name">Passport Reader</string>
 
     <string name="main_title">Biometric Passport Reader</string>
-    <string name="main_subtitle">Scan de MRZ en lees de chip uit via NFC. Alles gebeurt lokaal — geen data wordt naar buiten verstuurd.</string>
+    <string name="main_subtitle">Scan de MRZ en lees de chip uit via NFC. Alle scan-data blijft lokaal — pas wanneer je het zelf wilt kun je de gegevens aan een dossier koppelen.</string>
     <string name="main_button_scan">Start scan</string>
 
     <string name="scan_title">Scan de MRZ</string>
@@ -28,4 +28,30 @@
     <string name="result_done">Klaar</string>
 
     <string name="perm_camera_needed">Camera-toegang nodig om de MRZ te scannen.</string>
+
+    <!-- Login + Supabase-koppeling -->
+    <string name="main_logged_in_as">Ingelogd als %1$s · scan-resultaten kunnen direct aan een dossier worden gekoppeld.</string>
+    <string name="main_logged_out">Niet ingelogd · scan-resultaten blijven lokaal op dit toestel.</string>
+    <string name="main_login">Inloggen</string>
+    <string name="main_logout">Uitloggen</string>
+
+    <string name="login_title">Inloggen bij Uitvaartbeheer</string>
+    <string name="login_subtitle">Gebruik dezelfde inloggegevens als in de webapp. Alleen nodig om scan-resultaten aan een dossier te koppelen.</string>
+    <string name="login_email">E-mailadres</string>
+    <string name="login_password">Wachtwoord</string>
+    <string name="login_button">Inloggen</string>
+    <string name="login_hint">Je sessie wordt versleuteld bewaard. MRZ en NFC blijven 100% lokaal — er gaat pas verkeer over wanneer je zelf op \'Koppel aan dossier\' tikt.</string>
+
+    <string name="nfc_couple_button">Koppel aan dossier</string>
+    <string name="nfc_couple_login_first">Log in om aan dossier te koppelen</string>
+
+    <string name="picker_title">Kies een dossier</string>
+    <string name="picker_subtitle">Gegevens van %1$s worden in het gekozen dossier overgenomen.</string>
+    <string name="picker_search_hint">Zoek op naam, dossiernr. of gezinsnummer</string>
+    <string name="picker_empty">Geen dossiers gevonden.</string>
+    <string name="picker_confirm_title">Velden overnemen?</string>
+    <string name="picker_confirm_message">De volgende velden worden bijgewerkt voor %1$s:</string>
+    <string name="picker_confirm_apply">Bijwerken</string>
+    <string name="picker_confirm_cancel">Annuleren</string>
+    <string name="picker_success">Dossier %1$s bijgewerkt.</string>
 </resources>

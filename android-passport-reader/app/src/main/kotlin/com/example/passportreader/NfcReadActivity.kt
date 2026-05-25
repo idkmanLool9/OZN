@@ -15,6 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.passportreader.cloud.SupabaseClient
 import com.example.passportreader.databinding.ActivityNfcReadBinding
 import com.example.passportreader.model.PassportData
 import com.example.passportreader.mrz.MrzInfo
@@ -64,6 +65,7 @@ class NfcReadActivity : AppCompatActivity() {
         }
 
         binding.btnDone.setOnClickListener { finish() }
+        binding.btnCouple.setOnClickListener { onCoupleClicked() }
         binding.btnRetry.setOnClickListener {
             binding.btnRetry.visibility = View.GONE
             binding.progress.visibility = View.VISIBLE
@@ -107,6 +109,7 @@ class NfcReadActivity : AppCompatActivity() {
         processing = true
         binding.btnRetry.visibility = View.GONE
         binding.btnDone.visibility = View.GONE
+        binding.btnCouple.visibility = View.GONE
         binding.details.visibility = View.GONE
         binding.photo.visibility = View.GONE
         binding.status.text = getString(R.string.nfc_step_connecting)
@@ -139,7 +142,22 @@ class NfcReadActivity : AppCompatActivity() {
         PassportNfcReader.Stage.DG2        -> getString(R.string.nfc_step_dg2)
     }
 
+    private var lastResult: PassportData? = null
+
+    private fun onCoupleClicked() {
+        val data = lastResult ?: return
+        val cloud = SupabaseClient.get(this)
+        if (!cloud.isLoggedIn) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            return
+        }
+        val i = Intent(this, DossierPickerActivity::class.java)
+            .putExtra(PassportData.EXTRA_KEY, data)
+        startActivity(i)
+    }
+
     private fun showResult(d: PassportData) {
+        lastResult = d
         binding.progress.visibility = View.GONE
         binding.title.text = getString(R.string.result_title)
         binding.status.text = getString(R.string.nfc_done)
@@ -147,6 +165,14 @@ class NfcReadActivity : AppCompatActivity() {
         binding.btnRetry.visibility = View.GONE
         binding.details.visibility = View.VISIBLE
         binding.details.removeAllViews()
+
+        // Koppel-knop tonen — label hangt af van login-state.
+        val cloud = SupabaseClient.get(this)
+        binding.btnCouple.visibility = View.VISIBLE
+        binding.btnCouple.text = if (cloud.isLoggedIn)
+            getString(R.string.nfc_couple_button)
+        else
+            getString(R.string.nfc_couple_login_first)
 
         d.faceImageJpeg?.let { bytes ->
             val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
