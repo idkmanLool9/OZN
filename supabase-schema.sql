@@ -117,6 +117,10 @@ DROP POLICY IF EXISTS "auth_overledenen_insert" ON storage.objects;
 CREATE POLICY "auth_overledenen_insert" ON storage.objects
   FOR INSERT TO authenticated WITH CHECK (bucket_id = 'overledenen');
 
+DROP POLICY IF EXISTS "auth_overledenen_select" ON storage.objects;
+CREATE POLICY "auth_overledenen_select" ON storage.objects
+  FOR SELECT TO authenticated USING (bucket_id = 'overledenen');
+
 DROP POLICY IF EXISTS "auth_overledenen_update" ON storage.objects;
 CREATE POLICY "auth_overledenen_update" ON storage.objects
   FOR UPDATE TO authenticated
