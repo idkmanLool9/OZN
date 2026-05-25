@@ -65,8 +65,21 @@ android {
                 "META-INF/*.kotlin_module",
                 "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
             )
+            pickFirsts += setOf(
+                "org/bouncycastle/LICENSE"
+            )
         }
     }
+}
+
+configurations.all {
+    // BouncyCastle: jdk15to18 is bewust de gekozen variant (compatibel met
+    // Android's ingebakken BC). Sluit alle jdk18on-varianten uit die
+    // transitief via jMRTD/scuba binnenkomen, anders krijgen we
+    // "Duplicate class org.bouncycastle.*" in checkDebugDuplicateClasses.
+    exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+    exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+    exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
 }
 
 dependencies {
