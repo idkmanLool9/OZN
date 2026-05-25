@@ -1,4 +1,4 @@
-// Screen — Analyseren (Verifi-progress met glassmorphism-sheet)
+// Screen — Analyseren (echte OCR via Tesseract.js)
 
 function ProgressCheckItem({ label, state }) {
   const isDone = state === 'done';
@@ -28,16 +28,11 @@ function ProgressCheckItem({ label, state }) {
 }
 
 function ProgressScreen({ file, docType, onDone, onBack }) {
-  const [step, setStep] = React.useState(0);
-  const steps = [
-    'Randdetectie',
-    'Schittering & reflectie',
-    'Scherpte & bewegingsblur',
-    'OCR-tekstherkenning',
-    'MRZ-pariteitscontrole',
-  ];
-
+  const [pct, setPct] = React.useState(0);
+  const [phase, setPhase] = React.useState('loading'); // loading | ocr | parsing | done
+  const [err, setErr] = React.useState('');
   const [previewUrl, setPreviewUrl] = React.useState(null);
+
   React.useEffect(() => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -46,29 +41,48 @@ function ProgressScreen({ file, docType, onDone, onBack }) {
   }, [file]);
 
   React.useEffect(() => {
-    let i = 0;
-    const tick = () => {
-      i++;
-      if (i >= steps.length) {
-        // Volgende sessie: hier komt de echte Tesseract.js-OCR. Voor nu
-        // leveren we een lege fields-object door.
-        onDone({ file, fields: {} });
-        return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const text = await VerifiOCR.recognize(file, (p) => {
+          if (cancelled) return;
+          setPhase(p.phase);
+          setPct(Math.round((p.progress || 0) * 100));
+        });
+        if (cancelled) return;
+        const fields = VerifiOCR.parse(text, docType.type);
+        setPct(100); setPhase('done');
+        // Korte pauze zodat 100% even zichtbaar is
+        setTimeout(() => onDone({ file, fields, rawText: text }), 400);
+      } catch (e) {
+        if (cancelled) return;
+        setErr(e.message || String(e));
       }
-      setStep(i);
-      setTimeout(tick, 700);
-    };
-    setTimeout(tick, 700);
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pct = Math.round(((step + 1) / steps.length) * 100);
+  // 5 checks mappen op de phases
+  const checks = [
+    { label: 'Randdetectie',           done: phase !== 'loading' || pct > 5 },
+    { label: 'Schittering & reflectie', done: phase !== 'loading' || pct > 15 },
+    { label: 'Scherpte & bewegingsblur', done: phase !== 'loading' || pct > 25 },
+    { label: 'OCR-tekstherkenning',    done: phase === 'parsing' || phase === 'done', active: phase === 'ocr' },
+    { label: 'Velden uitlezen',         done: phase === 'done', active: phase === 'parsing' },
+  ];
+  // Markeer de eerste niet-done als active als er nog niets active is
+  let hasActive = checks.some(c => c.active);
+  if (!hasActive) {
+    for (const c of checks) {
+      if (!c.done) { c.active = true; break; }
+    }
+  }
 
   return (
     <div style={{ width: '100%', minHeight: '100%', position: 'relative', background: '#000', overflow: 'hidden', fontFamily: T.font }}>
       <CameraBg/>
 
-      {/* Soft green glow boven het opgenomen doc */}
       <div style={{
         position: 'absolute', top: 180, left: '50%', transform: 'translateX(-50%)',
         width: 380, height: 240,
@@ -77,9 +91,8 @@ function ProgressScreen({ file, docType, onDone, onBack }) {
       }}/>
 
       <StatusBar dark/>
-      <CameraTopBar docLabel={`${docType.label} · Opgenomen`} countryCode="NL" onClose={onBack}/>
+      <CameraTopBar docLabel={`${docType.label} · Opgenomen`} countryCode={docType.country || 'NL'} onClose={onBack}/>
 
-      {/* Success pill */}
       <div style={{ position: 'absolute', top: 116, left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 10 }}>
         <GlassPill dark style={{ paddingLeft: 10 }}>
           <span style={{ width: 18, height: 18, borderRadius: 9, background: T.green, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -89,7 +102,6 @@ function ProgressScreen({ file, docType, onDone, onBack }) {
         </GlassPill>
       </div>
 
-      {/* Werkelijke foto-preview, niet meer de fake ID-kaart-render */}
       <div style={{
         position: 'absolute', top: 180, left: '50%',
         transform: 'translateX(-50%) rotate(-0.4deg)',
@@ -104,7 +116,6 @@ function ProgressScreen({ file, docType, onDone, onBack }) {
           <div style={{ width: '100%', height: '100%', background: '#0B1220' }}/>
         )}
 
-        {/* Animated scan-line over de top */}
         <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 60, pointerEvents: 'none', overflow: 'hidden' }}>
           <div style={{
             position: 'absolute', left: 0, right: 0, top: 0, height: 60,
@@ -116,7 +127,6 @@ function ProgressScreen({ file, docType, onDone, onBack }) {
         <DetectedCorners color={T.green} glow/>
       </div>
 
-      {/* Bottom analysis sheet (glassmorphism) */}
       <div style={{
         position: 'absolute', left: 12, right: 12, bottom: 34,
         borderRadius: 24,
@@ -129,37 +139,53 @@ function ProgressScreen({ file, docType, onDone, onBack }) {
         zIndex: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, letterSpacing: -0.3 }}>Document analyseren</div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600, fontFamily: T.mono, letterSpacing: 0.4 }}>{pct}%</div>
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12.5, fontWeight: 500, letterSpacing: -0.05, marginBottom: 12 }}>
-          Kwaliteitscontroles draaien lokaal · houd het toestel stil
-        </div>
-        <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 6 }}>
-          <div style={{
-            width: `${pct}%`, height: '100%',
-            background: `linear-gradient(90deg, ${T.blue}, #60A5FA)`,
-            borderRadius: 2, boxShadow: '0 0 8px rgba(96,165,250,0.6)',
-            transition: 'width .3s ease',
-          }}/>
-        </div>
-
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '14px -2px 4px' }}/>
-
-        {steps.map((s, i) => (
-          <ProgressCheckItem key={i} label={s} state={i < step ? 'done' : i === step ? 'active' : 'pending'}/>
-        ))}
-
-        <div style={{
-          marginTop: 12, padding: '10px 12px', borderRadius: 12,
-          background: 'rgba(16,185,129,0.12)', border: '0.5px solid rgba(16,185,129,0.3)',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <Icon.Lock c="#34D399" size={13}/>
-          <div style={{ fontSize: 12, color: '#A7F3D0', fontWeight: 600, letterSpacing: -0.05 }}>
-            Lokale verwerking · niets verlaat je telefoon
+          <div style={{ color: '#fff', fontSize: 18, fontWeight: 700, letterSpacing: -0.3 }}>
+            {err ? 'Fout' : 'Document analyseren'}
           </div>
+          {!err && <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600, fontFamily: T.mono, letterSpacing: 0.4 }}>{pct}%</div>}
         </div>
+
+        {err ? (
+          <>
+            <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>{err}</div>
+            <button onClick={onBack} style={{
+              width: '100%', height: 44, borderRadius: 22, border: 'none',
+              background: T.blue, color: '#fff', fontFamily: T.font, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}>Opnieuw proberen</button>
+          </>
+        ) : (<>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12.5, fontWeight: 500, letterSpacing: -0.05, marginBottom: 12 }}>
+            {phase === 'loading' ? 'Tekst-engine laden (eerste keer ~5 sec)...'
+              : phase === 'ocr' ? 'Tekstherkenning loopt — houd het toestel stil'
+              : phase === 'parsing' ? 'Velden uit het document uitlezen...'
+              : 'Klaar — naar review'}
+          </div>
+          <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 6 }}>
+            <div style={{
+              width: `${pct}%`, height: '100%',
+              background: `linear-gradient(90deg, ${T.blue}, #60A5FA)`,
+              borderRadius: 2, boxShadow: '0 0 8px rgba(96,165,250,0.6)',
+              transition: 'width .3s ease',
+            }}/>
+          </div>
+
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '14px -2px 4px' }}/>
+
+          {checks.map((c, i) => (
+            <ProgressCheckItem key={i} label={c.label} state={c.done ? 'done' : c.active ? 'active' : 'pending'}/>
+          ))}
+
+          <div style={{
+            marginTop: 12, padding: '10px 12px', borderRadius: 12,
+            background: 'rgba(16,185,129,0.12)', border: '0.5px solid rgba(16,185,129,0.3)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <Icon.Lock c="#34D399" size={13}/>
+            <div style={{ fontSize: 12, color: '#A7F3D0', fontWeight: 600, letterSpacing: -0.05 }}>
+              Lokale verwerking · niets verlaat je telefoon
+            </div>
+          </div>
+        </>)}
       </div>
     </div>
   );
