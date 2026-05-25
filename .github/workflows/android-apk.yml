@@ -1,0 +1,75 @@
+name: Build Android APK
+
+# Bouwt de passport-reader-APK automatisch bij elke push naar de
+# default branch. APK wordt aan een GitHub Release "latest" gehangen
+# zodat je 'm vanaf je telefoon direct kan downloaden via:
+#   https://github.com/idkmanLool9/uitvaart/releases/latest
+
+on:
+  push:
+    branches:
+      - claude/funeral-director-website-raXTm
+    paths:
+      - 'android-passport-reader/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android-passport-reader/**/*.gradle*', 'android-passport-reader/**/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      - name: Build debug APK
+        working-directory: android-passport-reader
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        working-directory: android-passport-reader
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk passport-reader.apk
+          ls -lh passport-reader.apk
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: passport-reader-apk
+          path: android-passport-reader/passport-reader.apk
+
+      - name: Publish naar "latest" Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Passport Reader — laatste build"
+          body: |
+            Automatisch gebouwde debug-APK van commit `${{ github.sha }}`.
+
+            **Download op je telefoon:** tik op `passport-reader.apk` hieronder.
+            (Browser kan vragen om 'apps van onbekende bron toestaan'.)
+          files: android-passport-reader/passport-reader.apk
+          prerelease: false
+          make_latest: 'true'
