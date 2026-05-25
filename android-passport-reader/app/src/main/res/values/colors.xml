@@ -1,18 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_blue">#2563EB</color>
-    <color name="brand_blue_dark">#1D4ED8</color>
-    <color name="brand_blue_soft">#EFF6FF</color>
-    <color name="green">#10B981</color>
-    <color name="amber">#F97316</color>
-    <color name="ink">#0B1220</color>
-    <color name="muted">#6B7280</color>
-    <color name="bg">#F0EEE9</color>
-    <color name="surface">#FFFFFF</color>
-    <color name="hair">#E5E7EB</color>
+    <!-- iOS-system palette (Apple HIG) -->
+    <color name="brand_blue">#007AFF</color>
+    <color name="brand_blue_dark">#0051D5</color>
+    <color name="brand_blue_soft">#E5F1FF</color>
+    <color name="green">#34C759</color>
+    <color name="amber">#FF9500</color>
+    <color name="red">#FF3B30</color>
+
+    <color name="ink">#000000</color>          <!-- iOS labelColor primary -->
+    <color name="ink_2">#3C3C43</color>        <!-- secondary (60% black) -->
+    <color name="muted">#8E8E93</color>        <!-- iOS systemGray -->
+    <color name="muted_2">#AEAEB2</color>      <!-- iOS systemGray2 -->
+
+    <color name="bg">#F2F2F7</color>           <!-- iOS systemGroupedBackground -->
+    <color name="surface">#FFFFFF</color>      <!-- secondarySystemGroupedBackground -->
+    <color name="hair">#C6C6C8</color>         <!-- iOS separator -->
+    <color name="gray_btn">#E5E5EA</color>     <!-- iOS systemGray5 (cancel) -->
+
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
 
-    <!-- Adaptive launcher icon background (matches brand_blue) -->
-    <color name="ic_launcher_background">#2563EB</color>
+    <!-- Adaptive launcher icon background -->
+    <color name="ic_launcher_background">#007AFF</color>
 </resources>

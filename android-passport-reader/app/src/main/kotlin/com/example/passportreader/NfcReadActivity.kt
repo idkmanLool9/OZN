@@ -87,6 +87,7 @@ class NfcReadActivity : AppCompatActivity() {
         }
 
         binding.btnDone.setOnClickListener { finish() }
+        binding.btnCancel.setOnClickListener { finish() }
         binding.btnCouple.setOnClickListener { onCoupleClicked() }
         binding.btnRetry.setOnClickListener {
             binding.btnRetry.visibility = View.GONE
@@ -194,18 +195,20 @@ class NfcReadActivity : AppCompatActivity() {
     private enum class StepState { PENDING, ACTIVE, DONE }
 
     private fun setStepState(step: ItemStepBinding, state: StepState) {
+        val muted = androidx.core.content.ContextCompat.getColor(this, R.color.muted)
+        val ink = androidx.core.content.ContextCompat.getColor(this, R.color.ink)
         when (state) {
             StepState.PENDING -> {
                 step.stepIcon.setImageResource(R.drawable.ic_step_pending)
-                step.stepLabel.setTextColor(Color.parseColor("#6B7280"))
+                step.stepLabel.setTextColor(muted)
             }
             StepState.ACTIVE -> {
                 step.stepIcon.setImageResource(R.drawable.ic_step_active)
-                step.stepLabel.setTextColor(Color.parseColor("#0B1220"))
+                step.stepLabel.setTextColor(ink)
             }
             StepState.DONE -> {
                 step.stepIcon.setImageResource(R.drawable.ic_step_done)
-                step.stepLabel.setTextColor(Color.parseColor("#0B1220"))
+                step.stepLabel.setTextColor(ink)
             }
         }
     }
@@ -318,6 +321,8 @@ class NfcReadActivity : AppCompatActivity() {
     }
 
     private fun addRow(label: String, value: String?, mono: Boolean = false) {
+        val muted = androidx.core.content.ContextCompat.getColor(this, R.color.muted)
+        val ink = androidx.core.content.ContextCompat.getColor(this, R.color.ink)
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -325,14 +330,14 @@ class NfcReadActivity : AppCompatActivity() {
         }
         val lblTv = TextView(this).apply {
             text = label
-            setTextColor(Color.parseColor("#6B7280"))
-            textSize = 13f
+            setTextColor(muted)
+            textSize = 14f
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         val valTv = TextView(this).apply {
             text = value ?: "—"
-            setTextColor(Color.parseColor("#0B1220"))
-            textSize = 14f
+            setTextColor(ink)
+            textSize = 15f
             setTypeface(if (mono) Typeface.MONOSPACE else Typeface.DEFAULT, Typeface.BOLD)
             gravity = Gravity.END
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
