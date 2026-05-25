@@ -10,20 +10,17 @@
     android:paddingTop="24dp">
 
     <TextView
+        style="@style/iOSText.Title2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/picker_title"
-        android:textColor="@color/ink"
-        android:textSize="22sp"
-        android:textStyle="bold"/>
+        android:text="@string/picker_title"/>
 
     <TextView
         android:id="@+id/subtitle"
+        style="@style/iOSText.Caption"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textColor="@color/muted"
-        android:textSize="13sp"/>
+        android:layout_marginTop="6dp"/>
 
     <com.google.android.material.textfield.TextInputLayout
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
@@ -43,7 +40,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:imeOptions="actionSearch"
-            android:inputType="text"/>
+            android:inputType="text"
+            android:textSize="17sp"/>
     </com.google.android.material.textfield.TextInputLayout>
 
     <ProgressBar
@@ -55,12 +53,11 @@
         android:indeterminate="true"
         android:visibility="gone"/>
 
-    <!-- Lege-state met icoon -->
     <LinearLayout
         android:id="@+id/empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="56dp"
+        android:layout_marginTop="64dp"
         android:gravity="center_horizontal"
         android:orientation="vertical"
         android:visibility="gone">
@@ -72,27 +69,24 @@
             android:src="@drawable/ic_folder_search"/>
 
         <TextView
+            style="@style/iOSText.Body"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:gravity="center"
-            android:text="@string/picker_empty"
-            android:textColor="@color/muted"
-            android:textSize="14sp"/>
+            android:text="@string/picker_empty"/>
     </LinearLayout>
 
-    <!-- Dossierlijst in een afgeronde kaart -->
+    <!-- iOS grouped-list-stijl: witte card met gescheiden rijen -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="14dp"
         android:layout_marginBottom="16dp"
         android:layout_weight="1"
         app:cardBackgroundColor="@color/surface"
         app:cardCornerRadius="14dp"
-        app:cardElevation="0dp"
-        app:strokeColor="@color/hair"
-        app:strokeWidth="1dp">
+        app:cardElevation="0dp">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/list"

@@ -4,9 +4,11 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.app.PendingIntent
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
+import android.util.Log
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Build
@@ -85,6 +87,7 @@ class NfcReadActivity : AppCompatActivity() {
         }
 
         binding.btnDone.setOnClickListener { finish() }
+        binding.btnCancel.setOnClickListener { finish() }
         binding.btnCouple.setOnClickListener { onCoupleClicked() }
         binding.btnRetry.setOnClickListener {
             binding.btnRetry.visibility = View.GONE
@@ -192,18 +195,20 @@ class NfcReadActivity : AppCompatActivity() {
     private enum class StepState { PENDING, ACTIVE, DONE }
 
     private fun setStepState(step: ItemStepBinding, state: StepState) {
+        val muted = androidx.core.content.ContextCompat.getColor(this, R.color.muted)
+        val ink = androidx.core.content.ContextCompat.getColor(this, R.color.ink)
         when (state) {
             StepState.PENDING -> {
                 step.stepIcon.setImageResource(R.drawable.ic_step_pending)
-                step.stepLabel.setTextColor(Color.parseColor("#6B7280"))
+                step.stepLabel.setTextColor(muted)
             }
             StepState.ACTIVE -> {
                 step.stepIcon.setImageResource(R.drawable.ic_step_active)
-                step.stepLabel.setTextColor(Color.parseColor("#0B1220"))
+                step.stepLabel.setTextColor(ink)
             }
             StepState.DONE -> {
                 step.stepIcon.setImageResource(R.drawable.ic_step_done)
-                step.stepLabel.setTextColor(Color.parseColor("#0B1220"))
+                step.stepLabel.setTextColor(ink)
             }
         }
     }
@@ -271,10 +276,7 @@ class NfcReadActivity : AppCompatActivity() {
         else
             getString(R.string.nfc_couple_login_first)
 
-        d.faceImageJpeg?.let { bytes ->
-            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            if (bmp != null) binding.photo.setImageBitmap(bmp)
-        }
+        renderPhoto(d.faceImageJpeg)
 
         addRow("Voornaam", d.givenNames)
         addRow("Achternaam", d.surname)
@@ -289,7 +291,38 @@ class NfcReadActivity : AppCompatActivity() {
         })
     }
 
+    private fun renderPhoto(bytes: ByteArray?) {
+        val bmp = bytes?.let { decodeFace(it) }
+        if (bmp != null) {
+            binding.photo.scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            binding.photo.setImageBitmap(bmp)
+            binding.photo.imageTintList = null
+        } else {
+            // Silhouet-placeholder zodat duidelijk is dat er geen foto is
+            // (in plaats van een leeg wit vlak).
+            binding.photo.scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            binding.photo.setImageResource(R.drawable.ic_person_placeholder)
+            Log.w("NfcReadActivity", "Geen pasfoto te tonen (bytes=${bytes?.size ?: 0})")
+        }
+    }
+
+    /** Probeer JPEG (BitmapFactory) eerst; val terug op JPEG2000 (gemalto) als
+     *  de bytes geen geldige JPEG zijn. */
+    private fun decodeFace(bytes: ByteArray): Bitmap? {
+        // 1) Standaard JPEG/PNG/GIF/WebP via Android
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { return it }
+        // 2) JPEG2000 via gemalto's wrapper rond OpenJPEG
+        return try {
+            com.gemalto.jp2.JP2Decoder(bytes).decode()
+        } catch (e: Throwable) {
+            Log.w("NfcReadActivity", "JP2-decode mislukt", e)
+            null
+        }
+    }
+
     private fun addRow(label: String, value: String?, mono: Boolean = false) {
+        val muted = androidx.core.content.ContextCompat.getColor(this, R.color.muted)
+        val ink = androidx.core.content.ContextCompat.getColor(this, R.color.ink)
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -297,14 +330,14 @@ class NfcReadActivity : AppCompatActivity() {
         }
         val lblTv = TextView(this).apply {
             text = label
-            setTextColor(Color.parseColor("#6B7280"))
-            textSize = 13f
+            setTextColor(muted)
+            textSize = 14f
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
         val valTv = TextView(this).apply {
             text = value ?: "—"
-            setTextColor(Color.parseColor("#0B1220"))
-            textSize = 14f
+            setTextColor(ink)
+            textSize = 15f
             setTypeface(if (mono) Typeface.MONOSPACE else Typeface.DEFAULT, Typeface.BOLD)
             gravity = Gravity.END
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

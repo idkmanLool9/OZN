@@ -9,8 +9,9 @@
     <string name="scan_title">Scan de MRZ</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het kader — de regels worden automatisch herkend en gevalideerd.</string>
 
-    <string name="nfc_title">Houd je document tegen de telefoon</string>
-    <string name="nfc_subtitle">De NFC-antenne zit meestal achter het scherm of bovenaan de achterkant. Niet bewegen, ±5-10 sec.</string>
+    <string name="nfc_title">Klaar om te scannen</string>
+    <string name="nfc_subtitle">Houd het identiteitsbewijs tegen de achterkant van de telefoon.</string>
+    <string name="nfc_cancel">Annuleer</string>
     <string name="nfc_reading">Bezig met lezen…</string>
     <string name="nfc_done">Klaar</string>
     <string name="nfc_error_prefix">Fout</string>

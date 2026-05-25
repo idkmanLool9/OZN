@@ -2,6 +2,7 @@ package com.example.passportreader.nfc
 
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
+import android.util.Log
 import com.example.passportreader.model.PassportData
 import com.example.passportreader.mrz.MrzInfo
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,8 @@ import java.security.Security
  * Aanroepen op een achtergrond-coroutine (Dispatchers.IO).
  */
 class PassportNfcReader {
+
+    companion object { private const val TAG = "PassportNfcReader" }
 
     enum class Stage { CONNECTING, PACE, BAC, DG1, DG2 }
 
@@ -105,13 +108,25 @@ class PassportNfcReader {
         val faceBytes: ByteArray? = try {
             val dg2Stream = service.getInputStream(PassportService.EF_DG2)
             val dg2 = LDSFileUtil.getLDSFile(PassportService.EF_DG2, dg2Stream) as DG2File
-            dg2.faceInfos
-                .firstOrNull()
-                ?.faceImageInfos
-                ?.firstOrNull()
-                ?.imageInputStream
-                ?.readBytes()
+            // Loop door alle faceInfos+faceImageInfos; pak de eerste die
+            // succesvol bytes oplevert. (Sommige paspoorten hebben een lege
+            // entry vóór de echte foto.)
+            val bytes = dg2.faceInfos
+                .flatMap { it.faceImageInfos }
+                .firstNotNullOfOrNull { info ->
+                    try {
+                        val b = info.imageInputStream.readBytes()
+                        Log.d(TAG, "DG2 face image: ${b.size} bytes, type=${info.imageDataType}")
+                        b.takeIf { it.isNotEmpty() }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "DG2 face image lezen mislukt", e)
+                        null
+                    }
+                }
+            if (bytes == null) Log.w(TAG, "DG2 bevatte geen leesbare pasfoto")
+            bytes
         } catch (e: Exception) {
+            Log.w(TAG, "DG2 lezen mislukt", e)
             null
         }
 
