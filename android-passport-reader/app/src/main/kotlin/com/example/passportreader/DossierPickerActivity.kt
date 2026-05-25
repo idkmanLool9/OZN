@@ -147,12 +147,14 @@ class DossierPickerActivity : AppCompatActivity() {
             else -> null
         }
         val nat = p.nationality?.trim()?.takeIf { it.isNotBlank() }
+        val bsn = p.bsn?.takeIf { PassportData.isValidBsn(it) }
         return mapOf(
             "voornaam" to voornaam,
             "achternaam" to achternaam,
             "geboortedatum" to geboortedatum,
             "geslacht" to geslacht,
             "nationaliteit" to nat,
+            "bsn" to bsn,
         )
     }
 
