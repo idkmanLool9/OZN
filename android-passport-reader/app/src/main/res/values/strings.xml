@@ -11,7 +11,7 @@
     <string name="main_logout_confirm_cancel">Annuleer</string>
 
     <string name="scan_title">Scan de MRZ</string>
-    <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het kader — de regels worden automatisch herkend en gevalideerd.</string>
+    <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
 
     <string name="nfc_title">Klaar om te scannen</string>
     <string name="nfc_subtitle">Houd het identiteitsbewijs tegen de achterkant van de telefoon.</string>
