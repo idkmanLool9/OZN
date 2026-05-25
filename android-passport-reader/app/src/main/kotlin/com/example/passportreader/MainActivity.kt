@@ -64,9 +64,11 @@ class MainActivity : AppCompatActivity() {
         if (cloud.isLoggedIn) {
             binding.loginStatus.text = getString(R.string.main_logged_in_as, cloud.email ?: "—")
             binding.btnLoginAction.text = getString(R.string.main_logout)
+            binding.loginDot.setBackgroundResource(R.drawable.bg_status_dot_online)
         } else {
             binding.loginStatus.text = getString(R.string.main_logged_out)
             binding.btnLoginAction.text = getString(R.string.main_login)
+            binding.loginDot.setBackgroundResource(R.drawable.bg_status_dot_offline)
         }
     }
 }
