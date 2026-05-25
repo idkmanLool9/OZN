@@ -306,18 +306,21 @@ class NfcReadActivity : AppCompatActivity() {
         }
     }
 
-    /** Probeer JPEG (BitmapFactory) eerst; val terug op JPEG2000 (gemalto) als
-     *  de bytes geen geldige JPEG zijn. */
+    /** Probeer BitmapFactory; sniff anders de magic-bytes om te tonen wat
+     *  voor formaat het is (handig voor diagnose in logcat). JPEG2000 (J2K)
+     *  wordt momenteel niet gedecodeerd — geen vrij beschikbare Android-lib
+     *  op Maven Central sinds JCenter dood is. */
     private fun decodeFace(bytes: ByteArray): Bitmap? {
-        // 1) Standaard JPEG/PNG/GIF/WebP via Android
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { return it }
-        // 2) JPEG2000 via gemalto's wrapper rond OpenJPEG
-        return try {
-            com.gemalto.jp2.JP2Decoder(bytes).decode()
-        } catch (e: Throwable) {
-            Log.w("NfcReadActivity", "JP2-decode mislukt", e)
-            null
-        }
+
+        val magic = bytes.take(12).joinToString("") { "%02X".format(it) }
+        val isJ2k = bytes.size > 12 && (
+            (bytes[4] == 'j'.code.toByte() && bytes[5] == 'P'.code.toByte()) ||
+            (bytes[0] == 0xFF.toByte() && bytes[1] == 0x4F.toByte())
+        )
+        Log.w("NfcReadActivity",
+            "DG2-decode mislukt (size=${bytes.size}, magic=$magic, JPEG2000=$isJ2k)")
+        return null
     }
 
     private fun addRow(label: String, value: String?, mono: Boolean = false) {
