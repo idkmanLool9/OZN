@@ -133,17 +133,6 @@ class PassportNfcReader {
             null
         }
 
-        // BSN: NL paspoorten/ID-kaarten kunnen het BSN-nummer in het MRZ
-        // optionele-data-veld coderen. Probeer in volgorde: TD3 personal
-        // number, TD1 optional data 1 + 2. Validatie via 11-proef voor-
-        // komt false positives uit willekeurige cijfers in andere velden.
-        val bsn = sequenceOf(
-            tryRead { info.personalNumber },
-            tryRead { info.optionalData1 },
-            tryRead { info.optionalData2 },
-        ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
-        if (bsn != null) Log.d(TAG, "BSN gevonden in MRZ-optionele-data")
-
         // 5) Aanvullende data — DG7 (handtekening), DG11 (persoonsdata),
         //    DG12 (uitgifte), DG13 (land-specifiek), DG16 (noodgeval-
         //    contacten). DG3 (vingerafdrukken) en DG4 (iris) zijn EAC-
@@ -196,6 +185,20 @@ class PassportNfcReader {
             val getEncoded = dg13?.javaClass?.methods?.firstOrNull { it.name == "getEncoded" }
             (getEncoded?.invoke(dg13) as? ByteArray)?.size
         } ?: 0
+
+        // BSN: NL paspoorten/ID-kaarten kunnen het BSN-nummer in het MRZ
+        // optionele-data-veld of in DG11.personalNumber coderen. Validatie
+        // via 11-proef voorkomt false positives. Moderne NL ID-kaarten
+        // (>= 2014) laten dit veld meestal leeg vanwege privacy — dan staat
+        // het BSN alleen geprint op de achterkant.
+        val bsn = sequenceOf(
+            tryRead { info.personalNumber },
+            tryRead { info.optionalData1 },
+            tryRead { info.optionalData2 },
+            tryRead { dg11?.personalNumber },
+        ).mapNotNull { PassportData.extractBsn(it) }.firstOrNull()
+        if (bsn != null) Log.d(TAG, "BSN gevonden")
+        else Log.d(TAG, "BSN niet in MRZ/DG11 — staat waarschijnlijk alleen op de achterkant")
 
         PassportData(
             surname          = info.primaryIdentifier?.replace("<", " ")?.trim()?.takeIf { it.isNotEmpty() },
