@@ -94,9 +94,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
+            android:ellipsize="end"
             android:fontFamily="monospace"
             android:gravity="center"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp"/>
+            android:maxLines="2"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp"/>
     </LinearLayout>
 </FrameLayout>

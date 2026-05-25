@@ -7,11 +7,14 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -60,8 +63,20 @@ class ScanMrzActivity : AppCompatActivity() {
                 it.setSurfaceProvider(binding.preview.surfaceProvider)
             }
 
+            // MRZ-tekens zijn klein; standaard 640x480 is te laag. Vraag
+            // 1920x1080 zodat ML Kit de chevrons en cijfers kan onderscheiden.
+            val resolutionSelector = ResolutionSelector.Builder()
+                .setResolutionStrategy(
+                    ResolutionStrategy(
+                        Size(1920, 1080),
+                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                    )
+                )
+                .build()
+
             val analyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setResolutionSelector(resolutionSelector)
                 .build()
                 .also { it.setAnalyzer(cameraExecutor, MrzAnalyzer()) }
 
@@ -98,6 +113,13 @@ class ScanMrzActivity : AppCompatActivity() {
                         }
                         setResult(RESULT_OK, result)
                         finish()
+                    } else if (!done) {
+                        // Live feedback: laat zien wát we momenteel zien zodat
+                        // de gebruiker kan inschatten of de camera de MRZ vindt.
+                        val snap = extractor.lastDebug
+                        runOnUiThread {
+                            binding.debugLine.text = if (snap.isNotEmpty()) snap else "…"
+                        }
                     }
                 } catch (_: Exception) {
                     // doorgaan, volgende frame
