@@ -169,79 +169,115 @@ const VerifiOCR = {
     return `${yyyy}-${mm}-${dd}`;
   },
 
-  // Vrije-tekst-parser — heel soepel. OCR maakt vaak rommel
-  // (extra spaties, opgesplitste woorden, mixed labels NL/EN).
+  // Vrije-tekst-parser — REGEL-GEBASEERD.
+  // NL ID-kaarten zetten labels (Achternaam / Surname / Nom) op één regel
+  // en de waarde op de regel daarna. Oude regex pakte de tweede taal-versie
+  // van het label als waarde — daarom kreeg je "Nom" als achternaam.
+  // Nu zoeken we per label de eerstvolgende regel die ZELF géén label is.
   _parseFreeText(text) {
     const out = {};
-    const lines = text.split(/[\r\n]+/).map(s => s.trim()).filter(Boolean);
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
-    // BSN: 8 of 9 cijfers ergens in de tekst, voorkeur na 'BSN'-label
-    const bsnLabel = text.match(/BSN[^\d]{0,8}(\d[\d\s]{7,11}\d)/i)
-                  || text.match(/Burgerservice[^\d]{0,8}(\d[\d\s]{7,11}\d)/i)
-                  || text.match(/Personal\s*number[^\d]{0,8}(\d[\d\s]{7,11}\d)/i);
-    if (bsnLabel) {
-      out.bsn = bsnLabel[1].replace(/\s+/g, '');
-    } else {
-      // Fallback: een los 9-cijferig getal (NL BSN heeft 9 digits, oud 8)
-      const loose = text.match(/(?:^|\s)(\d{9})(?:\s|$)/m);
-      if (loose) out.bsn = loose[1];
-    }
+    // Een regel die zelf nog een label-keyword bevat → overslaan als waarde
+    const LABEL_RX = /\b(?:achternaam|voornam[ea]n|voornaam|geboorte|geslacht|nationaliteit|document|verloop|expir|surname|family|given|date|place|sex|sexe|prenom|prénom|nom|burgerservice|personal|number|nummer|bsn|forename)\b/i;
 
-    // Achternaam — meerdere label-varianten (NL én EN)
-    const ach =
-         text.match(/Achterna[am]?e?n?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
-      || text.match(/Surname\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
-      || text.match(/Family\s*name\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
-      || text.match(/Nom\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i);
-    if (ach) out.achternaam = VerifiOCR._cleanName(ach[1]);
-
-    // Voornaam / Voornamen
-    const voor =
-         text.match(/Voornam?e?n?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
-      || text.match(/Given\s*name[s]?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i)
-      || text.match(/Pr[ée]nom[s]?\s*[:\/]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ \-'<]{1,40})/i);
-    if (voor) out.voornaam = VerifiOCR._cleanName(voor[1]);
-
-    // Geboortedatum — label gevolgd door datum (NL + EN)
-    const dt =
-         text.match(/(?:Geb(?:oorte)?\s*dat(?:um)?|Date\s*of\s*birth|Birth\s*date|Né[e]?\s*le)\s*[:\/]?\s*(\d{1,2}[\s\-\/.]+\S+[\s\-\/.]+\d{2,4})/i);
-    if (dt) {
-      const parsed = VerifiOCR._parseDate(dt[1]);
-      if (parsed) out.geboortedatum = parsed;
-    } else {
-      // Fallback: zoek een datum in DD MMM YYYY formaat (zoals op NL ID-kaart)
-      const looseDate = text.match(/\b(\d{1,2}\s+(?:JAN|FEB|MRT|MAR|APR|MEI|MAY|JUN|JUL|AUG|SEP|OKT|OCT|NOV|DEC)\s+\d{4})\b/i);
-      if (looseDate) {
-        const parsed = VerifiOCR._parseDate(looseDate[1]);
-        if (parsed) out.geboortedatum = parsed;
+    function valueAfter(labelRegexes, opts) {
+      opts = opts || {};
+      for (let i = 0; i < lines.length; i++) {
+        for (const rx of labelRegexes) {
+          if (!rx.test(lines[i])) continue;
+          for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+            const cand = lines[j];
+            if (LABEL_RX.test(cand) && cand.length < 50) continue;
+            if (/^[A-Z0-9<]{20,}$/.test(cand.replace(/\s+/g, ''))) continue;
+            if (opts.needsDigit && !/\d/.test(cand)) continue;
+            return cand;
+          }
+        }
       }
+      return '';
     }
 
-    // Geslacht
-    const sex = text.match(/(?:Geslacht|Sex|Sexe)\s*[:\/]?\s*([MFVmfv])(?!\w)/);
-    if (sex) {
-      const s = sex[1].toUpperCase();
-      out.geslacht = (s === 'M') ? 'Man' : 'Vrouw';
+    // Achternaam
+    const achRaw = valueAfter([
+      /^\s*Achterna[am]/i, /^\s*Surname/i, /^\s*Family\s*name/i, /^\s*Nom\s*$/i,
+    ]);
+    if (achRaw) out.achternaam = VerifiOCR._cleanName(achRaw.replace(/[<\/].*$/, ''));
+
+    // Voornaam
+    const voorRaw = valueAfter([
+      /^\s*Voornam/i, /^\s*Given\s*names?/i, /^\s*Pr[eé]nom/i, /^\s*Forename/i,
+    ]);
+    if (voorRaw) out.voornaam = VerifiOCR._cleanName(voorRaw.replace(/[<\/].*$/, ''));
+
+    // Geboortedatum
+    const dobRaw = valueAfter([
+      /^\s*Geboortedat/i, /^\s*Date\s*of\s*birth/i, /^\s*Birth\s*date/i, /^\s*Geb\.?\s*dat/i,
+    ], { needsDigit: true });
+    if (dobRaw) {
+      const parsed = VerifiOCR._parseDate(dobRaw);
+      if (parsed) out.geboortedatum = parsed;
     }
 
-    // Nationaliteit — NLD-code of label
-    const nat =
-         text.match(/Nationaliteit\s*[:\/]?\s*([A-Za-zÀ-ÿ\-]{4,20})/i)
-      || text.match(/Nationality\s*[:\/]?\s*([A-Za-zÀ-ÿ\-]{4,20})/i);
-    if (nat) {
-      const v = nat[1].toLowerCase();
-      if (/nederland|netherlands|nld/.test(v)) out.nationaliteit = 'Nederlandse';
-      else out.nationaliteit = nat[1];
+    // Geboorteplaats
+    const placeRaw = valueAfter([
+      /^\s*Geboorteplaats/i, /^\s*Place\s*of\s*birth/i,
+    ]);
+    if (placeRaw) out.geboorteplaats = VerifiOCR._cleanName(placeRaw);
+
+    // Nationaliteit
+    const natRaw = valueAfter([/^\s*Nationaliteit/i, /^\s*Nationality/i]);
+    if (natRaw) {
+      if (/nederland|nld/i.test(natRaw)) out.nationaliteit = 'Nederlandse';
+      else out.nationaliteit = natRaw.split(/[\/\s]/)[0];
     } else if (/\bNLD\b/.test(text)) {
       out.nationaliteit = 'Nederlandse';
     }
 
-    // Document-nummer — NL ID is meestal 9 alfanumeriek
-    const docNr = text.match(/(?:Document(?:nummer)?|Documentnr|Number)\s*[:\/]?\s*([A-Z0-9]{6,12})/i);
-    if (docNr) out.document_nummer = docNr[1];
+    // Geslacht
+    const sexRaw = valueAfter([/^\s*Geslacht/i, /^\s*Sex\b/i, /^\s*Sexe/i]);
+    if (sexRaw) {
+      const m = sexRaw.match(/\b([MFV])\b/i);
+      if (m) {
+        const s = m[1].toUpperCase();
+        out.geslacht = (s === 'M') ? 'Man' : 'Vrouw';
+      }
+    }
+
+    // Documentnummer
+    const docRaw = valueAfter([
+      /^\s*Documentnummer/i, /^\s*Document\s*number/i, /^\s*Documentnr/i,
+    ]);
+    if (docRaw) {
+      const m = docRaw.match(/\b[A-Z0-9]{6,12}\b/);
+      if (m) out.document_nummer = m[0];
+    }
+
+    // Verloopdatum
+    const expRaw = valueAfter([
+      /^\s*Verloopdat/i, /^\s*Date\s*of\s*expir/i, /^\s*Expir(?:y|ation)/i,
+    ], { needsDigit: true });
+    if (expRaw) {
+      const parsed = VerifiOCR._parseDate(expRaw);
+      if (parsed) out.verloopdatum = parsed;
+    }
+
+    // BSN
+    const bsnRaw = valueAfter([
+      /^\s*BSN/i, /^\s*Burgerservice/i, /^\s*Personal\s*number/i,
+    ], { needsDigit: true });
+    if (bsnRaw) {
+      const m = bsnRaw.match(/\d[\d\s]{7,11}\d/);
+      if (m) out.bsn = m[0].replace(/\s+/g, '');
+    }
+    if (!out.bsn) {
+      const loose = text.match(/(?:^|\D)(\d{9})(?:\D|$)/m);
+      if (loose) out.bsn = loose[1];
+    }
 
     return out;
   },
+
 
   _parseDate(raw) {
     const m = raw.match(/(\d{1,2})[\s\-\/.]+(\d{1,2}|[A-Za-z]+)[\s\-\/.]+(\d{2,4})/);
