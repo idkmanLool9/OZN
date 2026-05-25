@@ -7,15 +7,24 @@
     <string name="main_button_scan">Start scan</string>
 
     <string name="scan_title">Scan de MRZ</string>
-    <string name="scan_hint">Houd de onderkant van het paspoort binnen het kader. Twee regels van 44 tekens worden automatisch herkend.</string>
+    <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het kader — de regels worden automatisch herkend en gevalideerd.</string>
 
-    <string name="nfc_title">Houd je paspoort tegen de telefoon</string>
+    <string name="nfc_title">Houd je document tegen de telefoon</string>
     <string name="nfc_subtitle">De NFC-antenne zit meestal achter het scherm of bovenaan de achterkant. Niet bewegen, ±5-10 sec.</string>
     <string name="nfc_reading">Bezig met lezen…</string>
     <string name="nfc_done">Klaar</string>
     <string name="nfc_error_prefix">Fout</string>
+    <string name="nfc_retry">Opnieuw proberen</string>
+    <string name="nfc_retry_prompt">Houd je document weer tegen de telefoon.</string>
 
-    <string name="result_title">Paspoortgegevens</string>
+    <!-- Voortgangs-labels per stap -->
+    <string name="nfc_step_connecting">Verbinden met chip…</string>
+    <string name="nfc_step_pace">PACE-sleutelwissel…</string>
+    <string name="nfc_step_bac">BAC-fallback…</string>
+    <string name="nfc_step_dg1">Persoonsgegevens lezen (DG1)…</string>
+    <string name="nfc_step_dg2">Pasfoto lezen (DG2)…</string>
+
+    <string name="result_title">Gegevens uit chip</string>
     <string name="result_done">Klaar</string>
 
     <string name="perm_camera_needed">Camera-toegang nodig om de MRZ te scannen.</string>
