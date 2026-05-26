@@ -2,6 +2,7 @@
   --bg: #f6f4ef;
   --surface: #ffffff;
   --border: #e5e2da;
+  --hairline: rgba(0, 0, 0, 0.06);
   --text: #2a2724;
   --muted: #6f6a62;
   --primary: #6b1e2a;
@@ -16,8 +17,16 @@
   --blue-soft: #e6eef9;
   --red: #a52a2a;
   --red-soft: #f8e6e6;
-  --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
-  --radius: 8px;
+  --shadow: 0 1px 2px rgba(20, 18, 16, 0.04), 0 4px 16px rgba(20, 18, 16, 0.05);
+  --shadow-lg: 0 4px 12px rgba(20, 18, 16, 0.06), 0 20px 48px rgba(20, 18, 16, 0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-fast: 120ms;
+  --t-base: 200ms;
 }
 
 * { box-sizing: border-box; }
@@ -1336,3 +1345,217 @@ body.is-offline .topbar { box-shadow: inset 0 -2px 0 var(--amber); }
 .small { font-size: .82rem; }
 .center { text-align: center; }
 [hidden] { display: none !important; }
+
+/* ────────────────────────────────────────────────────────────────────
+   Apple-style polish — microinteracties, halo-focus, glass-topbar,
+   iOS segmented tabs, subtiele card-lift. Behoudt religieus karakter
+   (wine + serif h-koppen + cream achtergrond).
+   ──────────────────────────────────────────────────────────────────── */
+
+/* San Francisco eerst, zachtere font-rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Cards: nieuwe radius + lift on hover (alleen op pointer-devices) */
+.card,
+.stat-card,
+.kist-card,
+.scan-preview {
+  border-radius: var(--radius);
+  transition: box-shadow var(--t-base) var(--ease-out),
+              transform var(--t-base) var(--ease-out),
+              border-color var(--t-fast) var(--ease);
+}
+.stat-card { border-radius: var(--radius); }
+@media (hover: hover) and (pointer: fine) {
+  .stat-card:hover,
+  .kist-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--text));
+  }
+}
+
+/* Topbar: iOS glass — translucent met blur */
+.topbar {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--hairline);
+}
+.topnav a {
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease);
+  border-radius: var(--radius-sm);
+}
+
+/* Buttons: tactile press (scale .97), halo focus, geen harde outline */
+.btn {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: background var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              transform 80ms var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: scale(.97);
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+.btn-primary {
+  box-shadow: 0 1px 2px rgba(107, 30, 42, 0.20),
+              0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+.btn-primary:hover {
+  box-shadow: 0 2px 8px rgba(107, 30, 42, 0.25),
+              0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+body.ui-square .btn { border-radius: 2px; }
+
+/* Inputs: halo focus ring (3px, iOS-stijl) ipv harde outline */
+input:focus, select:focus, textarea:focus,
+.form input:focus, .form select:focus, .form textarea:focus,
+.filter-bar input:focus, .filter-bar select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+input, select, textarea,
+.form input, .form select, .form textarea,
+.filter-bar input, .filter-bar select {
+  transition: border-color var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+}
+
+/* Tabs: iOS segmented control — pill achtergrond + soft "selected" chip */
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 1.25rem;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-radius: var(--radius);
+  border-bottom: none;
+}
+.tabs a {
+  padding: .45rem .95rem;
+  border-radius: calc(var(--radius) - 4px);
+  font-size: .88rem;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: none;
+  transition: background var(--t-fast) var(--ease),
+              color var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease);
+}
+.tabs a:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 50%, transparent);
+}
+.tabs a.active {
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06),
+              0 1px 4px rgba(0, 0, 0, 0.04);
+}
+@media (max-width: 540px) {
+  .tabs { display: flex; flex-wrap: wrap; }
+  .tabs a { flex: 1 1 auto; text-align: center; }
+}
+
+/* H2 zonder hard onderlijn — Apple gebruikt witruimte ipv borders */
+h2 {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: .85rem;
+  letter-spacing: -0.01em;
+}
+h1 { letter-spacing: -0.015em; }
+
+/* Status pills: iets steviger, ronder */
+.status, .badge {
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+
+/* Brand-mark: zachtere ring/schaduw */
+.brand-mark {
+  box-shadow: 0 1px 2px rgba(107, 30, 42, 0.2),
+              0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+}
+
+/* Page-head: ademruimte, breekt netter op mobiel */
+.page-head { margin-bottom: 1.75rem; gap: 1.25rem; }
+.page-actions { gap: .4rem; }
+
+/* Modal: nog iets ronder hoekprofiel + helderdere lift */
+.modal-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg),
+              0 30px 80px rgba(20, 18, 16, 0.18);
+}
+
+/* Definition-list: ruimer, geen dashed border (rustiger) */
+.dl > div {
+  border-bottom: 1px solid var(--hairline);
+  padding: .5rem 0;
+}
+
+/* Lists: hairline ipv dashed (rustiger, Apple-stijl) */
+.list li { border-bottom: 1px solid var(--hairline); }
+.taken-list li { border-bottom: 1px solid var(--hairline); }
+.doc-list li { border-bottom: 1px solid var(--hairline); }
+
+/* Tables: hairline borders, hover iets vriendelijker */
+.table th, .table td {
+  border-bottom-color: var(--hairline);
+}
+.table tbody tr {
+  transition: background var(--t-fast) var(--ease);
+}
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
+/* Checkbox-circle: smooth toggle */
+.check {
+  transition: background var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease),
+              transform 100ms var(--ease);
+}
+.check:active { transform: scale(.92); }
+
+/* Kost-toggle: al goed, alleen iets snellere snap */
+.kost-toggle { transition: filter var(--t-fast) var(--ease), transform 80ms var(--ease); }
+
+/* Beweging uit voor toegankelijkheid */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+  .btn:active:not(:disabled) { transform: none; }
+}
+
+/* Beter scrollgedrag op iOS */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-overflow-scrolling: touch; }
+
+/* Safe-area-inset voor iPad/iPhone notch wanneer Capacitor-wrapper draait */
+@supports (padding: env(safe-area-inset-top)) {
+  .topbar { padding-top: env(safe-area-inset-top); }
+  .main { padding-bottom: max(3rem, env(safe-area-inset-bottom)); }
+}
