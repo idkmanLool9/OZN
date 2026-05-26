@@ -310,12 +310,15 @@ class NfcReadActivity : AppCompatActivity() {
         // de werkelijke View-tree is binding.passportCard.root.
         val root: View = binding.passportCard.root
 
-        // Foto (DG2)
+        // Foto (DG2) — gebruik decodeFace() voor JPEG2000-fallback via OpenCV.
+        // Native BitmapFactory kan geen JP2 lezen en veel NL paspoorten/
+        // ID-kaarten gebruiken JP2 voor de pasfoto.
         val photo = root.findViewById<android.widget.ImageView>(R.id.pcPhoto)
         val face = d.faceImageJpeg
-        if (face != null && face.isNotEmpty()) {
-            val bmp = BitmapFactory.decodeByteArray(face, 0, face.size)
+        val bmp = if (face != null && face.isNotEmpty()) decodeFace(face) else null
+        if (bmp != null) {
             photo.setImageBitmap(bmp)
+            photo.setBackgroundColor(android.graphics.Color.TRANSPARENT)
         } else {
             photo.setImageResource(R.drawable.ic_person_placeholder)
         }
