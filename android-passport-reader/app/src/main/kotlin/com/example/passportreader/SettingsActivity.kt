@@ -58,6 +58,7 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.cellTheme.setOnClickListener { showThemePicker() }
         binding.cellLogout.setOnClickListener { confirmLogout() }
+        binding.cellUpdate.setOnClickListener { triggerUpdateCheck() }
         binding.cellPrivacy.setOnClickListener {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW,
@@ -115,6 +116,69 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /** Handmatige update-check. Geeft directe feedback zodat user weet
+     *  wat er gebeurt — vs. de auto-check op MainActivity die silent
+     *  faalt als er niets te updaten valt. */
+    private fun triggerUpdateCheck() {
+        binding.updateSpinner.visibility = android.view.View.VISIBLE
+        binding.cellUpdate.isClickable = false
+
+        AppUpdater.checkForUpdate { info ->
+            binding.updateSpinner.visibility = android.view.View.GONE
+            binding.cellUpdate.isClickable = true
+
+            if (info == null) {
+                // Geen update beschikbaar OF check faalde. Toon "up to date"
+                // bij assumed-succes, en alleen bij Internet-issue de error.
+                android.widget.Toast.makeText(
+                    this,
+                    getString(R.string.settings_uptodate, BuildConfig.VERSION_NAME),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } else {
+                AlertDialog.Builder(this)
+                    .setTitle(getString(R.string.settings_update_available, info.versionName))
+                    .setMessage(info.releaseNotes.take(400))
+                    .setNegativeButton(R.string.update_dismiss, null)
+                    .setPositiveButton(R.string.update_install) { _, _ ->
+                        downloadAndInstall(info)
+                    }
+                    .show()
+            }
+        }
+    }
+
+    private fun downloadAndInstall(info: AppUpdater.UpdateInfo) {
+        val progress = android.app.ProgressDialog(this).apply {
+            setTitle(getString(R.string.update_install))
+            setMessage(getString(R.string.update_subtitle_downloading, 0))
+            setCancelable(false)
+            isIndeterminate = false
+            setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL)
+            max = 100
+            show()
+        }
+        AppUpdater.downloadApk(
+            this,
+            info.downloadUrl,
+            onProgress = { pct ->
+                progress.progress = pct
+                progress.setMessage(getString(R.string.update_subtitle_downloading, pct))
+            },
+            onComplete = { file ->
+                progress.dismiss()
+                if (file == null) {
+                    android.widget.Toast.makeText(
+                        this, R.string.update_subtitle_failed,
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    AppUpdater.installApk(this, file)
+                }
+            }
+        )
     }
 
     private fun confirmLogout() {
