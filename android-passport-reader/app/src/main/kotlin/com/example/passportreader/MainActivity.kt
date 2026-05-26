@@ -3,6 +3,7 @@ package com.example.passportreader
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.passportreader.cloud.SupabaseClient
@@ -24,13 +25,18 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         cloud = SupabaseClient.get(this)
 
-        // ScanMrz opent NfcRead zelf direct — geen round-trip nodig
         binding.btnScan.setOnClickListener {
             startActivity(Intent(this, ScanMrzActivity::class.java))
         }
         binding.loginCard.setOnClickListener {
             if (cloud.isLoggedIn) confirmLogout() else openLogin()
         }
+        binding.btnSettings.setOnClickListener {
+            // Settings-activity komt in een latere commit; voor nu een
+            // korte indicatie dat de knop werkt.
+            Toast.makeText(this, R.string.settings_coming_soon, Toast.LENGTH_SHORT).show()
+        }
+
         binding.version.text = getString(
             R.string.main_version,
             BuildConfig.VERSION_NAME,
@@ -41,6 +47,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateLoginCard()
+        // Recente-scans-lijst herladen — wordt gevuld zodra de cache er
+        // is (commit 8, "recent scans persistence")
+        renderRecent()
     }
 
     private fun openLogin() {
@@ -69,5 +78,12 @@ class MainActivity : AppCompatActivity() {
             binding.loginAction.text = getString(R.string.main_login)
             binding.loginDot.setBackgroundResource(R.drawable.bg_status_dot_offline)
         }
+    }
+
+    /** Vult de Recent-sectie. Voor nu altijd leeg — recente-scans-cache
+     *  komt in een volgende commit. */
+    private fun renderRecent() {
+        binding.recentList.visibility = android.view.View.GONE
+        binding.recentEmpty.visibility = android.view.View.VISIBLE
     }
 }
