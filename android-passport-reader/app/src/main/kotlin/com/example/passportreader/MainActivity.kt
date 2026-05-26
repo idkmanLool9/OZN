@@ -2,35 +2,16 @@ package com.example.passportreader
 
 import android.app.AlertDialog
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.passportreader.cloud.SupabaseClient
 import com.example.passportreader.databinding.ActivityMainBinding
-import com.example.passportreader.mrz.MrzInfo
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var cloud: SupabaseClient
-
-    private val scanLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val data = result.data ?: return@registerForActivityResult
-            val mrz = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                data.getParcelableExtra(MrzInfo.EXTRA_KEY, MrzInfo::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                data.getParcelableExtra<MrzInfo>(MrzInfo.EXTRA_KEY)
-            }
-            if (mrz != null) {
-                val intent = Intent(this, NfcReadActivity::class.java).apply {
-                    putExtra(MrzInfo.EXTRA_KEY, mrz)
-                }
-                startActivity(intent)
-            }
-        }
 
     private val loginLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -43,8 +24,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         cloud = SupabaseClient.get(this)
 
+        // ScanMrz opent NfcRead zelf direct — geen round-trip nodig
         binding.btnScan.setOnClickListener {
-            scanLauncher.launch(Intent(this, ScanMrzActivity::class.java))
+            startActivity(Intent(this, ScanMrzActivity::class.java))
         }
         binding.loginCard.setOnClickListener {
             if (cloud.isLoggedIn) confirmLogout() else openLogin()

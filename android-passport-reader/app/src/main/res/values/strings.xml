@@ -13,6 +13,7 @@
 
     <string name="scan_title">Scan de MRZ</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
+    <string name="scan_matched">Gelukt! Document herkend.</string>
 
     <!-- Achterkant-scan voor BSN op NL ID-kaarten -->
     <string name="scan_bsn_title">Scan de achterkant</string>
