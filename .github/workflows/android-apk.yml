@@ -43,10 +43,25 @@ jobs:
           restore-keys: gradle-
 
       - name: Build debug APK
+        id: build
         working-directory: android-passport-reader
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee gradle-output.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Commit build log to repo on failure
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          tail -300 android-passport-reader/gradle-output.log > BUILD_FAIL.txt
+          echo "---" >> BUILD_FAIL.txt
+          echo "Commit: ${{ github.sha }}" >> BUILD_FAIL.txt
+          echo "Time:   $(date -u +%FT%TZ)" >> BUILD_FAIL.txt
+          git add BUILD_FAIL.txt
+          git commit -m "ci: build failure log for ${{ github.sha }}" || true
+          git push origin HEAD:claude/funeral-director-website-raXTm || true
 
       - name: Rename APK
         working-directory: android-passport-reader
