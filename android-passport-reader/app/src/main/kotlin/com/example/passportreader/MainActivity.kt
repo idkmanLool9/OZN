@@ -3,7 +3,6 @@ package com.example.passportreader
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.example.passportreader.cloud.SupabaseClient
@@ -20,6 +19,10 @@ class MainActivity : AppCompatActivity() {
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Apply opgeslagen theme-keuze VOOR setContentView, anders flikkert
+        // het scherm bij eerste open
+        SettingsActivity.applyStoredTheme(this)
+
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -32,9 +35,7 @@ class MainActivity : AppCompatActivity() {
             if (cloud.isLoggedIn) confirmLogout() else openLogin()
         }
         binding.btnSettings.setOnClickListener {
-            // Settings-activity komt in een latere commit; voor nu een
-            // korte indicatie dat de knop werkt.
-            Toast.makeText(this, R.string.settings_coming_soon, Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         binding.version.text = getString(
