@@ -191,22 +191,25 @@
                 android:gravity="center"
                 android:text="@string/result_subtitle"/>
 
-            <!-- Pasfoto in elegant kader -->
+            <!-- ─── Paspoort-kaart visualisatie (zoals echte NL paspoort) ─── -->
             <FrameLayout
-                android:layout_width="170dp"
-                android:layout_height="220dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="28dp"
-                android:background="@drawable/bg_card_photo"
-                android:padding="6dp">
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp">
 
-                <ImageView
-                    android:id="@+id/photo"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@string/result_photo_alt"
-                    android:scaleType="centerCrop"/>
+                <include
+                    android:id="@+id/passportCard"
+                    layout="@layout/view_passport_card_nl"/>
             </FrameLayout>
+
+            <!-- Originele pasfoto kleiner, links na de card -->
+            <ImageView
+                android:id="@+id/photo"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:contentDescription="@string/result_photo_alt"
+                android:scaleType="centerCrop"/>
 
             <!-- Foto-acties: deel + opslaan, iOS plain-button row -->
             <LinearLayout

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Subtiele cream-naar-licht-blauw gradient achtergrond zoals op de echte
+     Nederlandse paspoort-datapagina. Niet exact (echte heeft watermerk-
+     patroon), maar oogt erop. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="135"
+        android:startColor="#F4E8D8"
+        android:centerColor="#F0DCE8"
+        android:endColor="#DFE7F2"
+        android:type="linear"/>
+    <corners android:radius="6dp"/>
+</shape>

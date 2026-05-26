@@ -269,6 +269,219 @@ class NfcReadActivity : AppCompatActivity() {
         binding.pulseRing3.visibility = View.GONE
     }
 
+    /** Vult de paspoort-kaart visualisatie met data uit de chip. De layout
+     *  is een visuele representatie van de echte NL paspoort-datapagina:
+     *  rode header, foto links, gestructureerde data rechts, gele MRZ
+     *  onderaan. */
+    private fun bindPassportCard(d: PassportData) {
+        val card = binding.passportCard
+        val root = card.findViewById<View>(R.id.passportCardRoot) ?: return
+
+        // Foto (DG2)
+        val photo = root.findViewById<android.widget.ImageView>(R.id.pcPhoto)
+        val face = d.faceImageJpeg
+        if (face != null && face.isNotEmpty()) {
+            val bmp = BitmapFactory.decodeByteArray(face, 0, face.size)
+            photo.setImageBitmap(bmp)
+        } else {
+            photo.setImageResource(R.drawable.ic_person_placeholder)
+        }
+
+        // Nationaliteit + landnaam (NL labels)
+        val natCode = d.nationality?.uppercase() ?: ""
+        root.findViewById<android.widget.TextView>(R.id.pcNationalityCode).text = natCode
+        root.findViewById<android.widget.TextView>(R.id.pcNationalityLabel).text =
+            nationalityLabel(natCode)
+
+        // Documentnummer rechtsboven
+        root.findViewById<android.widget.TextView>(R.id.pcDocNumber).text =
+            d.documentNumber ?: ""
+
+        // Doc-type (P voor passport, I voor ID)
+        // We hebben dit niet direct, dus infer uit doc-nummer of nationaliteit
+        root.findViewById<android.widget.TextView>(R.id.pcDocType).text = "P"
+
+        // Surname + e/v Molenaar split
+        val surname = d.surname?.trim() ?: ""
+        val (surnameMain, surnameSecondary) = splitMarriedName(surname)
+        root.findViewById<android.widget.TextView>(R.id.pcSurname).text = surnameMain
+        val secView = root.findViewById<android.widget.TextView>(R.id.pcSurnameSecondary)
+        if (surnameSecondary != null) {
+            secView.text = surnameSecondary
+            secView.visibility = View.VISIBLE
+        } else {
+            secView.visibility = View.GONE
+        }
+
+        // Voornamen
+        root.findViewById<android.widget.TextView>(R.id.pcGivenNames).text =
+            d.givenNames?.trim() ?: ""
+
+        // Geboortedatum (YYMMDD → "10 MAA/MAR 1965")
+        root.findViewById<android.widget.TextView>(R.id.pcDob).text =
+            formatPassportDate(d.dateOfBirth)
+
+        // Geslacht (M/F → M / V/F)
+        root.findViewById<android.widget.TextView>(R.id.pcSex).text = when (d.gender?.uppercase()) {
+            "F", "FEMALE" -> "V/F"
+            "M", "MALE"   -> "M/M"
+            else -> "—"
+        }
+
+        // Datum van afgifte (YYYYMMDD → "30 AUG/AUG 2021")
+        root.findViewById<android.widget.TextView>(R.id.pcIssueDate).text =
+            formatIssueDate(d.dateOfIssue)
+
+        // Verloopdatum
+        root.findViewById<android.widget.TextView>(R.id.pcExpiry).text =
+            formatPassportDate(d.dateOfExpiry)
+
+        // Authority
+        root.findViewById<android.widget.TextView>(R.id.pcAuthority).text =
+            d.issuingAuthority ?: ""
+
+        // Handtekening (DG7)
+        val sigView = root.findViewById<android.widget.ImageView>(R.id.pcSignature)
+        val sigBytes = d.signatureImageJpeg
+        if (sigBytes != null && sigBytes.isNotEmpty()) {
+            val sigBmp = BitmapFactory.decodeByteArray(sigBytes, 0, sigBytes.size)
+            sigView.setImageBitmap(sigBmp)
+            sigView.visibility = View.VISIBLE
+        } else {
+            sigView.visibility = View.GONE
+        }
+
+        // MRZ reconstrueren uit chip-data (chip slaat MRZ niet exact op)
+        val (mrz1, mrz2) = reconstructMrz(d)
+        root.findViewById<android.widget.TextView>(R.id.pcMrz1).text = mrz1
+        root.findViewById<android.widget.TextView>(R.id.pcMrz2).text = mrz2
+    }
+
+    /** "10 MAA/MAR 1965" stijl zoals op echte NL paspoort. */
+    private fun formatPassportDate(yymmdd: String?): String {
+        if (yymmdd == null || yymmdd.length != 6 || !yymmdd.all { it.isDigit() }) return ""
+        val yy = yymmdd.substring(0, 2).toInt()
+        val mm = yymmdd.substring(2, 4).toInt()
+        val dd = yymmdd.substring(4, 6).toInt()
+        val thisYY = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) % 100
+        val century = if (yy > thisYY + 10) 1900 else 2000
+        val year = century + yy
+        if (mm !in 1..12) return "$dd / $mm / $year"
+        val nl = arrayOf("JAN", "FEB", "MAA", "APR", "MEI", "JUN",
+                         "JUL", "AUG", "SEP", "OKT", "NOV", "DEC")
+        val en = arrayOf("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                         "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+        return "%02d %s/%s %d".format(dd, nl[mm - 1], en[mm - 1], year)
+    }
+
+    /** Voor YYYYMMDD-formaat (DG12 issue-date). */
+    private fun formatIssueDate(yyyymmdd: String?): String {
+        if (yyyymmdd == null || yyyymmdd.length != 8 || !yyyymmdd.all { it.isDigit() }) return ""
+        val year = yyyymmdd.substring(0, 4).toInt()
+        val mm = yyyymmdd.substring(4, 6).toInt()
+        val dd = yyyymmdd.substring(6, 8).toInt()
+        if (mm !in 1..12) return "$dd / $mm / $year"
+        val nl = arrayOf("JAN", "FEB", "MAA", "APR", "MEI", "JUN",
+                         "JUL", "AUG", "SEP", "OKT", "NOV", "DEC")
+        val en = arrayOf("JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                         "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
+        return "%02d %s/%s %d".format(dd, nl[mm - 1], en[mm - 1], year)
+    }
+
+    /** ISO-3-letter landcode → nederlandse landnaam (voor de echte
+     *  paspoort-stijl waar het volledige adjectief staat). */
+    private fun nationalityLabel(code: String): String = when (code.uppercase()) {
+        "NLD" -> "Nederlandse"
+        "DEU" -> "Duitse"
+        "BEL" -> "Belgische"
+        "FRA" -> "Franse"
+        "GBR" -> "Britse"
+        "USA" -> "Amerikaanse"
+        "TUR" -> "Turkse"
+        "MAR" -> "Marokkaanse"
+        "POL" -> "Poolse"
+        "ITA" -> "Italiaanse"
+        "ESP" -> "Spaanse"
+        "PRT" -> "Portugese"
+        else -> code
+    }
+
+    /** "De Bruijn e/v Molenaar" → ("De Bruijn", "e/v Molenaar"). */
+    private fun splitMarriedName(surname: String): Pair<String, String?> {
+        val markers = listOf(" e/v ", " w/v ", " geb. ", " geboren ")
+        for (m in markers) {
+            val idx = surname.indexOf(m, ignoreCase = true)
+            if (idx > 0) {
+                val main = surname.substring(0, idx).trim()
+                val secondary = surname.substring(idx).trim()
+                return main to secondary
+            }
+        }
+        return surname to null
+    }
+
+    /** Reconstrueer MRZ-lijnen uit chip-data voor visuele weergave.
+     *  Check-digits via ICAO 9303 mod-37-3. */
+    private fun reconstructMrz(d: PassportData): Pair<String, String> {
+        val nat = (d.nationality ?: "NLD").take(3).padEnd(3, '<')
+        val surnameClean = (d.surname ?: "")
+            .uppercase()
+            .replace(Regex("[^A-Z ]"), "")
+            .trim()
+            .replace(' ', '<')
+        val givenClean = (d.givenNames ?: "")
+            .uppercase()
+            .replace(Regex("[^A-Z ]"), "")
+            .trim()
+            .replace(' ', '<')
+        val line1Pre = "P<$nat$surnameClean<<$givenClean"
+        val line1 = line1Pre.padEnd(44, '<').take(44)
+
+        val docNum = (d.documentNumber ?: "")
+            .uppercase()
+            .replace(Regex("[^A-Z0-9]"), "")
+            .take(9)
+            .padEnd(9, '<')
+        val docCheck = mrzCheck(docNum)
+        val dob = (d.dateOfBirth ?: "000000").take(6).padEnd(6, '<')
+        val dobCheck = mrzCheck(dob)
+        val sex = when (d.gender?.uppercase()) {
+            "F", "FEMALE" -> "F"
+            "M", "MALE" -> "M"
+            else -> "<"
+        }
+        val exp = (d.dateOfExpiry ?: "000000").take(6).padEnd(6, '<')
+        val expCheck = mrzCheck(exp)
+
+        val personal = (d.bsn ?: "").take(14).padEnd(14, '<')
+        val personalCheck = if (d.bsn != null) mrzCheck(personal.trimEnd('<')) else "<"
+
+        // Composite check over docnum+check+dob+check+exp+check+personal+check
+        val composite = docNum + docCheck + dob + dobCheck + exp + expCheck +
+                       personal + personalCheck
+        val finalCheck = mrzCheck(composite)
+
+        val line2 = "$docNum$docCheck$nat$dob$dobCheck$sex$exp$expCheck" +
+                    "$personal$personalCheck$finalCheck"
+        return line1 to line2.padEnd(44, '<').take(44)
+    }
+
+    /** ICAO 9303 mod-37-3 check-digit. */
+    private fun mrzCheck(field: String): String {
+        val weights = intArrayOf(7, 3, 1)
+        var sum = 0
+        for ((i, c) in field.withIndex()) {
+            val v = when (c) {
+                in '0'..'9' -> c - '0'
+                in 'A'..'Z' -> c - 'A' + 10
+                '<' -> 0
+                else -> 0
+            }
+            sum += v * weights[i % 3]
+        }
+        return (sum % 10).toString()
+    }
+
     /** Deelt de pasfoto via Android Intent.ACTION_SEND. Schrijft JPEG
      *  naar internal cache/shared en geeft toegang via FileProvider zodat
      *  ontvangende apps de file kunnen openen zonder permission. */
@@ -415,6 +628,7 @@ class NfcReadActivity : AppCompatActivity() {
         setStepState(stepExtra, StepState.DONE)
 
         renderResultRows(d)
+        bindPassportCard(d)
 
         // Als 't een NL-document is zonder BSN: automatisch achterkant
         // scannen. BSN staat sinds 2014 niet meer in de chip, alleen

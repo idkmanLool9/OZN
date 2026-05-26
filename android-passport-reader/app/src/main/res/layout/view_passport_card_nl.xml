@@ -1,0 +1,404 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Visualisatie van de NL paspoort/ID-kaart datapagina, opgebouwd uit chip-
+  data (DG1 + DG2 + DG7 + DG11/12). Geen counterfeit — alleen de visuele
+  presentatie van de eigen scan-resultaten in het herkenbare format zodat
+  de uitvaartonderneming meteen ziet wat er gelezen is.
+
+  Layout: landscape 1.4:1. Bij capture-naar-bitmap rendert hij naar
+  vaste pixel-grootte (zie NfcReadActivity.capturePassportCard).
+-->
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardBackgroundColor="#FFFFFF"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:id="@+id/passportCardRoot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_passport_card"
+        android:orientation="vertical">
+
+        <!-- ─── Header: "KONINKRIJK DER NEDERLANDEN" ─── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="6dp">
+
+            <!-- "PASPOORT" vertical micro-text (link rotated) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:rotation="-90"
+                android:text="PASPOORT"
+                android:textColor="#666"
+                android:textSize="6sp"
+                android:textStyle="bold"
+                android:translationX="-8dp"/>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/pcHeaderMain"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-condensed"
+                    android:text="KONINKRIJK DER NEDERLANDEN"
+                    android:textColor="#C8102E"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.02"/>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-condensed"
+                    android:text="KINGDOM OF THE NETHERLANDS · ROYAUME DES PAYS-BAS"
+                    android:textColor="#666"
+                    android:textSize="7sp"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/pcDocType"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="P"
+                android:textColor="#000"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"/>
+        </LinearLayout>
+
+        <!-- ─── Body: foto links, data rechts ─── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="8dp">
+
+            <!-- Foto links -->
+            <ImageView
+                android:id="@+id/pcPhoto"
+                android:layout_width="100dp"
+                android:layout_height="130dp"
+                android:background="#DDD"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"/>
+
+            <!-- Data-kolom rechts -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <!-- Nationaliteit row: NLD + "Nederlandse" -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/pcNationalityCode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="NLD"
+                        android:textColor="#000"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif"/>
+
+                    <TextView
+                        android:id="@+id/pcNationalityLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Nederlandse"
+                        android:textColor="#000"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif"/>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"/>
+
+                    <TextView
+                        android:id="@+id/pcDocNumber"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#000"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif"/>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"/>
+
+                <!-- Surname (bold, biggest) -->
+                <TextView
+                    android:id="@+id/pcSurnameLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Naam / Surname / Nom"
+                    android:textColor="#888"
+                    android:textSize="5.5sp"
+                    android:letterSpacing="0.04"/>
+
+                <TextView
+                    android:id="@+id/pcSurname"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#000"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif"/>
+
+                <TextView
+                    android:id="@+id/pcSurnameSecondary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#444"
+                    android:textSize="10sp"
+                    android:textStyle="italic"
+                    android:fontFamily="sans-serif"
+                    android:visibility="gone"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"/>
+
+                <!-- Voornamen -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Voornamen / Given names / Prénoms"
+                    android:textColor="#888"
+                    android:textSize="5.5sp"
+                    android:letterSpacing="0.04"/>
+
+                <TextView
+                    android:id="@+id/pcGivenNames"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#000"
+                    android:textSize="11.5sp"
+                    android:fontFamily="sans-serif"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"/>
+
+                <!-- Geboortedatum + Geslacht (twee kolommen) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="2"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif"
+                            android:text="Geboortedatum / Date of birth"
+                            android:textColor="#888"
+                            android:textSize="5.5sp"
+                            android:letterSpacing="0.04"/>
+
+                        <TextView
+                            android:id="@+id/pcDob"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#000"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold"
+                            android:fontFamily="sans-serif"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif"
+                            android:text="Geslacht / Sex"
+                            android:textColor="#888"
+                            android:textSize="5.5sp"
+                            android:letterSpacing="0.04"/>
+
+                        <TextView
+                            android:id="@+id/pcSex"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#000"
+                            android:textSize="11.5sp"
+                            android:textStyle="bold"
+                            android:fontFamily="sans-serif"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"/>
+
+                <!-- Datum van afgifte + verloopdatum -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif"
+                            android:text="Datum van afgifte"
+                            android:textColor="#888"
+                            android:textSize="5.5sp"
+                            android:letterSpacing="0.04"/>
+
+                        <TextView
+                            android:id="@+id/pcIssueDate"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#000"
+                            android:textSize="10sp"
+                            android:fontFamily="sans-serif"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif"
+                            android:text="Geldig tot / Expiry"
+                            android:textColor="#888"
+                            android:textSize="5.5sp"
+                            android:letterSpacing="0.04"/>
+
+                        <TextView
+                            android:id="@+id/pcExpiry"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#C8102E"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:fontFamily="sans-serif"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"/>
+
+                <!-- Plaats van afgifte + handtekening (signature) -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif"
+                    android:text="Autoriteit van afgifte / Authority"
+                    android:textColor="#888"
+                    android:textSize="5.5sp"
+                    android:letterSpacing="0.04"/>
+
+                <TextView
+                    android:id="@+id/pcAuthority"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#000"
+                    android:textSize="9.5sp"
+                    android:fontFamily="sans-serif"/>
+
+                <!-- Handtekening (DG7) — als de chip 'm bevat -->
+                <ImageView
+                    android:id="@+id/pcSignature"
+                    android:layout_width="match_parent"
+                    android:layout_height="32dp"
+                    android:layout_marginTop="4dp"
+                    android:adjustViewBounds="true"
+                    android:contentDescription="@null"
+                    android:scaleType="fitStart"
+                    android:visibility="gone"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ─── Gele MRZ-strook onderaan ─── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_passport_mrz"
+            android:orientation="vertical"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
+
+            <TextView
+                android:id="@+id/pcMrz1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="#000"
+                android:textSize="9.5sp"
+                android:letterSpacing="0.05"
+                android:typeface="monospace"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/pcMrz2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textColor="#000"
+                android:textSize="9.5sp"
+                android:letterSpacing="0.05"
+                android:typeface="monospace"
+                android:textStyle="bold"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
