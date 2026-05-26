@@ -39,6 +39,11 @@
             android:screenOrientation="portrait"/>
 
         <activity
+            android:name=".ScanBsnActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"/>
+
+        <activity
             android:name=".NfcReadActivity"
             android:exported="false"
             android:launchMode="singleTop"

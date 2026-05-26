@@ -259,6 +259,19 @@ class NfcReadActivity : AppCompatActivity() {
 
     private var lastResult: PassportData? = null
 
+    private val bsnLauncher =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+            val bsn = result.data?.getStringExtra(ScanBsnActivity.RESULT_KEY)
+            if (!bsn.isNullOrEmpty()) {
+                lastResult?.let { current ->
+                    val updated = current.copy(bsn = bsn)
+                    lastResult = updated
+                    // Re-render: alleen het details-blok wordt opnieuw gevuld
+                    renderResultRows(updated)
+                }
+            }
+        }
+
     private fun onCoupleClicked() {
         val data = lastResult ?: return
         val cloud = SupabaseClient.get(this)
@@ -276,7 +289,6 @@ class NfcReadActivity : AppCompatActivity() {
         stopPulse()
         binding.readingState.visibility = View.GONE
         binding.resultState.visibility = View.VISIBLE
-        binding.details.removeAllViews()
 
         val cloud = SupabaseClient.get(this)
         binding.btnCouple.text = if (cloud.isLoggedIn)
@@ -289,6 +301,18 @@ class NfcReadActivity : AppCompatActivity() {
         // Markeer ook de laatste step als done in result-state
         setStepState(stepExtra, StepState.DONE)
 
+        renderResultRows(d)
+
+        // Als 't een NL-document is zonder BSN: automatisch achterkant
+        // scannen. BSN staat sinds 2014 niet meer in de chip, alleen
+        // geprint op de back. Gebruiker kan in dat scherm overslaan.
+        if (d.bsn == null && d.nationality == "NLD") {
+            bsnLauncher.launch(Intent(this, ScanBsnActivity::class.java))
+        }
+    }
+
+    private fun renderResultRows(d: PassportData) {
+        binding.details.removeAllViews()
         addRow("Voornaam", d.givenNames)
         addRow("Achternaam", d.surname)
         if (d.title != null) addRow("Titel", d.title)
