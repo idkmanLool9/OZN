@@ -22,6 +22,10 @@
 
     <!-- Achterkant-scan voor BSN op NL ID-kaarten -->
     <string name="scan_bsn_title">Scan de achterkant</string>
+    <string name="scan_bsn_title_v2">Scan BSN</string>
+    <string name="scan_bsn_subtitle_v2">Draai de ID-kaart om en houd de achterkant binnen het kader. Het BSN-blok staat onder het persoonsnummer.</string>
+    <string name="scan_bsn_status_searching">Zoeken naar BSN…</string>
+    <string name="scan_bsn_status_found">BSN gevonden!</string>
     <string name="scan_bsn_hint">Het BSN staat op de achterkant van NL ID-kaarten. Houd het in het kader.</string>
     <string name="scan_bsn_skip">BSN overslaan</string>
 
@@ -77,6 +81,7 @@
     <string name="picker_subtitle">Gegevens van %1$s worden in het gekozen dossier overgenomen.</string>
     <string name="picker_search_hint">Zoek op naam, dossiernr. of gezinsnummer</string>
     <string name="picker_empty">Geen dossiers gevonden.</string>
+    <string name="picker_empty_hint">Probeer een andere zoekopdracht of maak een nieuw dossier aan via de webapp.</string>
     <string name="picker_confirm_title">Velden overnemen?</string>
     <string name="picker_confirm_message">De volgende velden worden bijgewerkt voor %1$s:</string>
     <string name="picker_confirm_apply">Bijwerken</string>
