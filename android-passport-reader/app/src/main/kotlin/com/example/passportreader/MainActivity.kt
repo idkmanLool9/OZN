@@ -60,8 +60,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkForUpdate() {
         if (updateDismissed || pendingUpdate != null) return
-        AppUpdater.checkForUpdate { info ->
-            if (info == null || updateDismissed) return@checkForUpdate
+        AppUpdater.checkForUpdateLegacy { info ->
+            if (info == null || updateDismissed) return@checkForUpdateLegacy
             pendingUpdate = info
             showUpdateBanner(info)
         }

@@ -52,66 +52,99 @@ object AppUpdater {
         val releaseNotes: String,
     )
 
-    /** Checkt async of er een nieuwere release is. Callback krijgt
-     *  UpdateInfo (nieuwer beschikbaar) of null (al up-to-date / fout). */
-    fun checkForUpdate(callback: (UpdateInfo?) -> Unit) {
+    /** Resultaat van een update-check. Sealed class zodat caller expliciet
+     *  alle drie de cases kan onderscheiden (geen verwarring meer tussen
+     *  "geen update" en "fout"). */
+    sealed class CheckResult {
+        /** Nieuwer beschikbaar — actie nodig. */
+        data class UpdateAvailable(val info: UpdateInfo) : CheckResult()
+        /** Geen update — caller toont "je bent up-to-date" met current. */
+        data class UpToDate(val currentVersion: String, val currentBuild: Int) : CheckResult()
+        /** Check faalde — caller toont foutmelding met reden. */
+        data class Error(val reason: String) : CheckResult()
+    }
+
+    /** Checkt async of er een nieuwere release is. Callback krijgt een
+     *  expliciete CheckResult zodat caller drie cases kan tonen. */
+    fun checkForUpdate(callback: (CheckResult) -> Unit) {
         Thread {
-            try {
+            val result: CheckResult = try {
                 val req = Request.Builder()
                     .url(RELEASE_URL)
                     .header("Accept", "application/vnd.github+json")
                     .build()
                 val resp = http.newCall(req).execute()
                 if (!resp.isSuccessful) {
-                    Log.w(TAG, "Release-check faalde: HTTP ${resp.code}")
-                    mainHandler.post { callback(null) }
-                    return@Thread
-                }
-                val body = resp.body?.string() ?: ""
-                val json = JSONObject(body)
-                val name = json.optString("name")
-                val bodyText = json.optString("body")
-                val assets = json.optJSONArray("assets")
-                val apk = (0 until (assets?.length() ?: 0))
-                    .map { assets!!.getJSONObject(it) }
-                    .firstOrNull {
-                        it.optString("name").endsWith(".apk", ignoreCase = true)
-                    }
-                val downloadUrl = apk?.optString("browser_download_url")
-                    ?.takeIf { it.isNotBlank() }
+                    val code = resp.code
+                    Log.w(TAG, "Release-check faalde: HTTP $code")
+                    CheckResult.Error("Server-fout HTTP $code (GitHub bereikbaar?)")
+                } else {
+                    val body = resp.body?.string() ?: ""
+                    val json = JSONObject(body)
+                    val name = json.optString("name")
+                    val bodyText = json.optString("body")
+                    val assets = json.optJSONArray("assets")
+                    val apk = (0 until (assets?.length() ?: 0))
+                        .map { assets!!.getJSONObject(it) }
+                        .firstOrNull {
+                            it.optString("name").endsWith(".apk", ignoreCase = true)
+                        }
+                    val downloadUrl = apk?.optString("browser_download_url")
+                        ?.takeIf { it.isNotBlank() }
 
-                // Parse "build 14" uit het release-body
-                val buildMatch = Regex("build\\s+(\\d+)", RegexOption.IGNORE_CASE)
-                    .find(bodyText)
-                val remoteBuild = buildMatch?.groupValues?.get(1)?.toIntOrNull()
+                    // Parse "build 14" uit het release-body
+                    val buildMatch = Regex("build\\s+(\\d+)", RegexOption.IGNORE_CASE)
+                        .find(bodyText)
+                    val remoteBuild = buildMatch?.groupValues?.get(1)?.toIntOrNull()
 
-                // Parse "1.2.2" uit naam ("Passport Reader v1.2.2")
-                val verMatch = Regex("""(\d+\.\d+\.\d+)""").find(name)
-                val remoteVersion = verMatch?.groupValues?.get(1)
+                    // Parse "1.2.2" uit naam ("Passport Reader v1.2.2")
+                    val verMatch = Regex("""(\d+\.\d+\.\d+)""").find(name)
+                    val remoteVersion = verMatch?.groupValues?.get(1)
 
-                Log.d(TAG, "Remote build=$remoteBuild, local=${BuildConfig.VERSION_CODE}")
+                    Log.d(TAG, "Remote build=$remoteBuild ($remoteVersion), " +
+                        "local=${BuildConfig.VERSION_CODE} (${BuildConfig.VERSION_NAME})")
 
-                if (remoteBuild != null &&
-                    remoteBuild > BuildConfig.VERSION_CODE &&
-                    downloadUrl != null) {
-                    mainHandler.post {
-                        callback(
-                            UpdateInfo(
-                                versionName = remoteVersion ?: "?",
-                                versionCode = remoteBuild,
-                                downloadUrl = downloadUrl,
-                                releaseNotes = bodyText,
+                    when {
+                        remoteBuild == null ->
+                            CheckResult.Error("Kon versie-info niet lezen uit release")
+                        downloadUrl == null ->
+                            CheckResult.Error("Geen APK in release gevonden")
+                        remoteBuild > BuildConfig.VERSION_CODE ->
+                            CheckResult.UpdateAvailable(
+                                UpdateInfo(
+                                    versionName = remoteVersion ?: "?",
+                                    versionCode = remoteBuild,
+                                    downloadUrl = downloadUrl,
+                                    releaseNotes = bodyText,
+                                )
                             )
+                        else -> CheckResult.UpToDate(
+                            currentVersion = BuildConfig.VERSION_NAME,
+                            currentBuild = BuildConfig.VERSION_CODE,
                         )
                     }
-                } else {
-                    mainHandler.post { callback(null) }
                 }
+            } catch (e: java.net.UnknownHostException) {
+                CheckResult.Error("Geen internetverbinding")
+            } catch (e: java.net.SocketTimeoutException) {
+                CheckResult.Error("Verbinding met GitHub timed out")
             } catch (e: Exception) {
                 Log.w(TAG, "Release-check exception", e)
-                mainHandler.post { callback(null) }
+                CheckResult.Error("Onverwachte fout: ${e.javaClass.simpleName} ${e.message ?: ""}")
             }
+            mainHandler.post { callback(result) }
         }.start()
+    }
+
+    /** Backward-compat: oude callback-vorm die alleen UpdateInfo? gaf.
+     *  Wordt nog gebruikt door MainActivity-banner; intern wrap nieuwe API. */
+    fun checkForUpdateLegacy(callback: (UpdateInfo?) -> Unit) {
+        checkForUpdate { result ->
+            when (result) {
+                is CheckResult.UpdateAvailable -> callback(result.info)
+                else -> callback(null)
+            }
+        }
     }
 
     /** Downloadt het APK-bestand met progress-callbacks (0-100). De
