@@ -43,7 +43,7 @@ class NfcReadActivity : AppCompatActivity() {
     private lateinit var stepDg2:     ItemStepBinding
     private lateinit var stepExtra:   ItemStepBinding
 
-    private var pulseAnimator: AnimatorSet? = null
+    private val pulseAnimators = mutableListOf<AnimatorSet>()
 
     @Volatile private var processing = false
     private var lastTag: Tag? = null
@@ -96,7 +96,7 @@ class NfcReadActivity : AppCompatActivity() {
             binding.btnRetry.visibility = View.GONE
             binding.errorMsg.visibility = View.GONE
             resetSteps()
-            binding.stepsCard.visibility = View.GONE
+            binding.stepsCardWrap.visibility = View.GONE
             startPulse()
             val tag = lastTag
             if (tag != null) startReading(tag)
@@ -146,7 +146,7 @@ class NfcReadActivity : AppCompatActivity() {
         binding.btnRetry.visibility = View.GONE
         binding.errorMsg.visibility = View.GONE
         resetSteps()
-        binding.stepsCard.visibility = View.VISIBLE
+        binding.stepsCardWrap.visibility = View.VISIBLE
         setStepState(stepConnect, StepState.ACTIVE)
 
         lifecycleScope.launch {
@@ -229,32 +229,44 @@ class NfcReadActivity : AppCompatActivity() {
         stepCrypto.stepLabel.setText(R.string.step_crypto)
     }
 
+    /** Concentrische sonar-rings rond NFC-icoon. Drie ringen, elk 600ms
+     *  gestaggerd voor "ping"-effect zoals iOS AirDrop/Find My. */
     private fun startPulse() {
-        if (pulseAnimator != null) return
-        val ring = binding.pulseRing
-        ring.visibility = View.VISIBLE
-        val scaleX = ObjectAnimator.ofFloat(ring, "scaleX", 1f, 1.25f)
-        val scaleY = ObjectAnimator.ofFloat(ring, "scaleY", 1f, 1.25f)
-        val alpha  = ObjectAnimator.ofFloat(ring, "alpha", 0.6f, 0f)
+        if (pulseAnimators.isNotEmpty()) return
+        val rings = listOf(binding.pulseRing1, binding.pulseRing2, binding.pulseRing3)
+        rings.forEachIndexed { idx, ring ->
+            ring.visibility = View.VISIBLE
+            val set = buildRingAnimator(ring)
+            set.startDelay = (idx * 600L)
+            set.start()
+            pulseAnimators += set
+        }
+    }
+
+    private fun buildRingAnimator(ring: View): AnimatorSet {
+        val scaleX = ObjectAnimator.ofFloat(ring, "scaleX", 0.6f, 1.5f)
+        val scaleY = ObjectAnimator.ofFloat(ring, "scaleY", 0.6f, 1.5f)
+        val alpha  = ObjectAnimator.ofFloat(ring, "alpha", 0.7f, 0f)
         val set = AnimatorSet().apply {
             playTogether(scaleX, scaleY, alpha)
-            duration = 1400
+            duration = 1800
             interpolator = AccelerateDecelerateInterpolator()
         }
         set.addListener(object : android.animation.AnimatorListenerAdapter() {
             override fun onAnimationEnd(animation: android.animation.Animator) {
-                ring.scaleX = 1f; ring.scaleY = 1f; ring.alpha = 0.6f
-                if (pulseAnimator != null) set.start()
+                ring.scaleX = 0.6f; ring.scaleY = 0.6f; ring.alpha = 0.7f
+                if (pulseAnimators.isNotEmpty()) set.start()
             }
         })
-        pulseAnimator = set
-        set.start()
+        return set
     }
 
     private fun stopPulse() {
-        pulseAnimator?.cancel()
-        pulseAnimator = null
-        binding.pulseRing.visibility = View.GONE
+        pulseAnimators.forEach { it.cancel() }
+        pulseAnimators.clear()
+        binding.pulseRing1.visibility = View.GONE
+        binding.pulseRing2.visibility = View.GONE
+        binding.pulseRing3.visibility = View.GONE
     }
 
     private var lastResult: PassportData? = null

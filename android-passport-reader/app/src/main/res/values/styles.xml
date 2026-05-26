@@ -68,6 +68,50 @@
         <item name="android:textSize">13sp</item>
     </style>
 
+    <!-- v0.5.0+ extensions — grotere, vettere iOS-stijl typografie -->
+
+    <style name="iOSText.LargeBold">
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.015</item>
+        <item name="android:lineSpacingMultiplier">1.05</item>
+    </style>
+
+    <style name="iOSText.Headline">
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.005</item>
+    </style>
+
+    <style name="iOSText.Subtitle">
+        <item name="android:textColor">@color/ink_2</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
+    <style name="iOSText.SectionHeader">
+        <item name="android:textColor">@color/muted</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+    </style>
+
+    <!-- Grote primaire CTA voor cruciale acties (56dp, Apple-conventie) -->
+    <style name="iOSButton.PrimaryLarge" parent="Widget.Material3.Button">
+        <item name="android:layout_height">56dp</item>
+        <item name="backgroundTint">@color/brand_blue</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="elevation">0dp</item>
+        <item name="rippleColor">#33FFFFFF</item>
+    </style>
+
     <!-- ─── iOS-stijl card (vlak, hairline-border, zachte radius) ───── -->
 
     <style name="iOSCard" parent="Widget.Material3.CardView.Filled">
