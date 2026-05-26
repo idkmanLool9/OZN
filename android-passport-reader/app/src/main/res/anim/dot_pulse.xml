@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Zachte ademende puls op het status-dotje -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="900"
+    android:repeatCount="infinite"
+    android:repeatMode="reverse">
+    <alpha
+        android:fromAlpha="1.0"
+        android:toAlpha="0.35"/>
+    <scale
+        android:fromXScale="1.0"
+        android:toXScale="1.25"
+        android:fromYScale="1.0"
+        android:toYScale="1.25"
+        android:pivotX="50%"
+        android:pivotY="50%"/>
+</set>

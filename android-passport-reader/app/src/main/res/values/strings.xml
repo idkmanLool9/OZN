@@ -12,6 +12,11 @@
     <string name="main_logout_confirm_cancel">Annuleer</string>
 
     <string name="scan_title">Scan de MRZ</string>
+    <string name="scan_title_v2">Scan ID-document</string>
+    <string name="scan_subtitle_v2">Houd het hele document binnen het kader. Herkenning gebeurt automatisch.</string>
+    <string name="scan_status_searching">Zoeken naar document…</string>
+    <string name="scan_status_found">Document gevonden!</string>
+    <string name="scan_close">Sluiten</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
     <string name="scan_matched">Gelukt! Document herkend.</string>
 
