@@ -208,6 +208,50 @@
                     android:scaleType="centerCrop"/>
             </FrameLayout>
 
+            <!-- Foto-acties: deel + opslaan, iOS plain-button row -->
+            <LinearLayout
+                android:id="@+id/photoActions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSharePhoto"
+                    style="@style/iOSButton.Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/result_share_photo"
+                    app:icon="@drawable/ic_share"
+                    app:iconGravity="textStart"
+                    app:iconPadding="6dp"
+                    app:iconSize="18dp"
+                    app:iconTint="@color/brand_blue"/>
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@color/hair"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSavePhoto"
+                    style="@style/iOSButton.Text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/result_save_photo"
+                    app:icon="@drawable/ic_save"
+                    app:iconGravity="textStart"
+                    app:iconPadding="6dp"
+                    app:iconSize="18dp"
+                    app:iconTint="@color/brand_blue"/>
+            </LinearLayout>
+
             <!-- Persoonsgegevens-card -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"

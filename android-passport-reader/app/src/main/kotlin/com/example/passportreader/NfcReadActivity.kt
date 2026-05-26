@@ -269,6 +269,89 @@ class NfcReadActivity : AppCompatActivity() {
         binding.pulseRing3.visibility = View.GONE
     }
 
+    /** Deelt de pasfoto via Android Intent.ACTION_SEND. Schrijft JPEG
+     *  naar internal cache/shared en geeft toegang via FileProvider zodat
+     *  ontvangende apps de file kunnen openen zonder permission. */
+    private fun sharePhoto(bytes: ByteArray, personName: String) {
+        try {
+            val sharedDir = java.io.File(cacheDir, "shared")
+            sharedDir.mkdirs()
+            // Maak filename met persoonsnaam (gesaniteerd) zodat ontvanger
+            // weet bij wie de foto hoort
+            val safeName = personName
+                .replace(Regex("[^A-Za-z0-9 -]"), "")
+                .trim()
+                .ifBlank { "pasfoto" }
+            val file = java.io.File(sharedDir, "$safeName.jpg")
+            file.writeBytes(bytes)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "${packageName}.fileprovider", file
+            )
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/jpeg"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(
+                intent, getString(R.string.result_share_chooser_title)
+            ))
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(
+                this, e.message ?: "Delen mislukt",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    /** Slaat de pasfoto op in de galerij via MediaStore. Werkt op alle
+     *  Android-versies; op API 29+ via RELATIVE_PATH, op oudere via de
+     *  deprecated insertImage (nog steeds functioneel). */
+    private fun savePhotoToGallery(bytes: ByteArray, personName: String) {
+        try {
+            val safeName = personName
+                .replace(Regex("[^A-Za-z0-9 -]"), "")
+                .trim()
+                .ifBlank { "pasfoto" }
+            val filename = "${safeName}_${System.currentTimeMillis()}.jpg"
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val cv = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, filename)
+                    put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(
+                        android.provider.MediaStore.Images.Media.RELATIVE_PATH,
+                        "${android.os.Environment.DIRECTORY_PICTURES}/Pasfoto"
+                    )
+                }
+                val uri = contentResolver.insert(
+                    android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv
+                ) ?: throw java.io.IOException("Kon geen MediaStore-entry maken")
+                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    ?: throw java.io.IOException("Kon output-stream niet openen")
+            } else {
+                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                @Suppress("DEPRECATION")
+                android.provider.MediaStore.Images.Media.insertImage(
+                    contentResolver, bmp, filename, "Pasfoto van ID-document"
+                )
+            }
+
+            android.widget.Toast.makeText(
+                this, R.string.result_photo_saved,
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            binding.root.performHapticFeedback(
+                android.view.HapticFeedbackConstants.CONFIRM
+            )
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(
+                this,
+                "${getString(R.string.result_photo_save_failed)}: ${e.message}",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     private var lastResult: PassportData? = null
 
     private val bsnLauncher =
@@ -316,6 +399,17 @@ class NfcReadActivity : AppCompatActivity() {
             getString(R.string.nfc_couple_login_first)
 
         renderPhoto(d.faceImageJpeg)
+
+        // Toon pasfoto-actie-buttons alleen als er daadwerkelijk een
+        // foto in de chip stond
+        val face = d.faceImageJpeg
+        if (face != null && face.isNotEmpty()) {
+            binding.photoActions.visibility = View.VISIBLE
+            binding.btnSharePhoto.setOnClickListener { sharePhoto(face, fullName) }
+            binding.btnSavePhoto.setOnClickListener { savePhotoToGallery(face, fullName) }
+        } else {
+            binding.photoActions.visibility = View.GONE
+        }
 
         // Markeer ook de laatste step als done in result-state
         setStepState(stepExtra, StepState.DONE)
