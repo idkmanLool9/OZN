@@ -70,6 +70,7 @@ function renderDossierDetail(params) {
           </p>
         </div>
         <div class="page-actions">
+          <button type="button" class="btn btn-ghost" id="btn-scan-id" title="Scan paspoort of ID-kaart en werk dit dossier bij">🆔 Scan ID</button>
           <button type="button" class="btn btn-ghost" id="btn-print" title="Printen of opslaan als PDF">🖨️ Print</button>
           <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Factuur openen">📄 Factuur</a>
           <a href="#/dossiers/${d.id}/rouwkaart" class="btn btn-ghost" title="Rouwkaart maken">🪦 Rouwkaart</a>
@@ -745,6 +746,18 @@ function bindDetailEvents(id) {
         renderDossierDetail({ id });
       } catch (_) {
         renderDossierDetail({ id });
+      }
+    });
+  }
+
+  // Scan ID/paspoort → patch dit dossier
+  const scanIdBtn = $('#btn-scan-id');
+  if (scanIdBtn) {
+    scanIdBtn.addEventListener('click', async () => {
+      try { await IDScan.scanForDossier(id); }
+      catch (e) {
+        Modal.show({ type: 'error', title: 'Scan mislukt',
+          message: e.message || String(e) });
       }
     });
   }
