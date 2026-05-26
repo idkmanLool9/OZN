@@ -563,21 +563,38 @@ class NfcReadActivity : AppCompatActivity() {
         return (sum % 10).toString()
     }
 
+    /** Converteer chip-bytes (kunnen JPEG OF JPEG2000 zijn) naar échte
+     *  JPEG-bytes. De DG2 face-image van veel NL paspoorten is JP2;
+     *  Android galerij + ontvangende apps verwachten JPEG-stream met
+     *  matchende MIME, anders zien ze een grijze placeholder. */
+    private fun toRealJpegBytes(input: ByteArray, quality: Int = 92): ByteArray? {
+        val bmp = decodeFace(input) ?: return null
+        val baos = java.io.ByteArrayOutputStream()
+        return try {
+            bmp.compress(Bitmap.CompressFormat.JPEG, quality, baos)
+            baos.toByteArray()
+        } finally {
+            bmp.recycle()
+        }
+    }
+
     /** Deelt de pasfoto via Android Intent.ACTION_SEND. Schrijft JPEG
      *  naar internal cache/shared en geeft toegang via FileProvider zodat
      *  ontvangende apps de file kunnen openen zonder permission. */
     private fun sharePhoto(bytes: ByteArray, personName: String) {
         try {
+            // Convert chip-bytes naar echte JPEG (mogelijk JP2 → JPEG via OpenCV)
+            val jpegBytes = toRealJpegBytes(bytes) ?: throw java.io.IOException(
+                "Kon pasfoto niet converteren — chip-formaat onbekend"
+            )
             val sharedDir = java.io.File(cacheDir, "shared")
             sharedDir.mkdirs()
-            // Maak filename met persoonsnaam (gesaniteerd) zodat ontvanger
-            // weet bij wie de foto hoort
             val safeName = personName
                 .replace(Regex("[^A-Za-z0-9 -]"), "")
                 .trim()
                 .ifBlank { "pasfoto" }
             val file = java.io.File(sharedDir, "$safeName.jpg")
-            file.writeBytes(bytes)
+            file.writeBytes(jpegBytes)
             val uri = androidx.core.content.FileProvider.getUriForFile(
                 this, "${packageName}.fileprovider", file
             )
@@ -608,6 +625,12 @@ class NfcReadActivity : AppCompatActivity() {
                 .ifBlank { "pasfoto" }
             val filename = "${safeName}_${System.currentTimeMillis()}.jpg"
 
+            // Converteer chip-bytes naar echte JPEG (JP2 → JPEG via OpenCV)
+            // anders kan Android-galerij ze niet renderen → grijze tile.
+            val jpegBytes = toRealJpegBytes(bytes) ?: throw java.io.IOException(
+                "Kon pasfoto niet converteren — chip-formaat onbekend"
+            )
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val cv = android.content.ContentValues().apply {
                     put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, filename)
@@ -620,10 +643,11 @@ class NfcReadActivity : AppCompatActivity() {
                 val uri = contentResolver.insert(
                     android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, cv
                 ) ?: throw java.io.IOException("Kon geen MediaStore-entry maken")
-                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                contentResolver.openOutputStream(uri)?.use { it.write(jpegBytes) }
                     ?: throw java.io.IOException("Kon output-stream niet openen")
             } else {
-                val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                val bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+                    ?: throw java.io.IOException("JPEG-decode mislukt")
                 @Suppress("DEPRECATION")
                 android.provider.MediaStore.Images.Media.insertImage(
                     contentResolver, bmp, filename, "Pasfoto van ID-document"
