@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Paden die de FileProvider met andere apps mag delen.
-     Alleen de "shared" subdir in de internal cache — gebruikt voor de
-     pasfoto-share-flow (tijdelijk JPEG dat een andere app ophaalt). -->
+<!-- Paden die de FileProvider met andere apps mag delen. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Voor pasfoto-share-flow (Intent.ACTION_SEND) -->
     <cache-path
         name="shared"
         path="shared/"/>
+    <!-- Voor self-update flow: gedownloade APK die system-installer opent -->
+    <cache-path
+        name="updates"
+        path="updates/"/>
 </paths>

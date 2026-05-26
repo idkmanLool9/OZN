@@ -48,9 +48,76 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateLoginCard()
-        // Recente-scans-lijst herladen — wordt gevuld zodra de cache er
-        // is (commit 8, "recent scans persistence")
         renderRecent()
+        checkForUpdate()
+    }
+
+    /** Self-update check: GitHub Releases API → toon banner als nieuwer
+     *  beschikbaar. Banner geeft 1-tap download + install (Android system
+     *  installer). Sessie-onthouden: 1x dismiss → niet opnieuw deze sessie. */
+    private var updateDismissed = false
+    private var pendingUpdate: AppUpdater.UpdateInfo? = null
+
+    private fun checkForUpdate() {
+        if (updateDismissed || pendingUpdate != null) return
+        AppUpdater.checkForUpdate { info ->
+            if (info == null || updateDismissed) return@checkForUpdate
+            pendingUpdate = info
+            showUpdateBanner(info)
+        }
+    }
+
+    private fun showUpdateBanner(info: AppUpdater.UpdateInfo) {
+        binding.updateBanner.visibility = android.view.View.VISIBLE
+        binding.updateBanner.alpha = 0f
+        binding.updateBanner.animate().alpha(1f).setDuration(220).start()
+        binding.updateSubtitle.text = getString(
+            R.string.update_subtitle_available, info.versionName
+        )
+        binding.btnUpdate.setOnClickListener { startDownload(info) }
+        binding.btnUpdateDismiss.setOnClickListener {
+            updateDismissed = true
+            binding.updateBanner.animate()
+                .alpha(0f).translationY(-20f).setDuration(180)
+                .withEndAction { binding.updateBanner.visibility = android.view.View.GONE }
+                .start()
+        }
+    }
+
+    private fun startDownload(info: AppUpdater.UpdateInfo) {
+        binding.btnUpdate.isEnabled = false
+        binding.btnUpdateDismiss.visibility = android.view.View.GONE
+        binding.updateProgress.visibility = android.view.View.VISIBLE
+        binding.updateProgress.progress = 0
+        binding.updateSubtitle.text = getString(R.string.update_subtitle_downloading, 0)
+
+        AppUpdater.downloadApk(
+            this,
+            info.downloadUrl,
+            onProgress = { pct ->
+                binding.updateProgress.progress = pct
+                binding.updateSubtitle.text =
+                    getString(R.string.update_subtitle_downloading, pct)
+            },
+            onComplete = { file ->
+                if (file == null) {
+                    binding.updateSubtitle.text =
+                        getString(R.string.update_subtitle_failed)
+                    binding.btnUpdate.isEnabled = true
+                    binding.btnUpdateDismiss.visibility = android.view.View.VISIBLE
+                    binding.updateProgress.visibility = android.view.View.GONE
+                } else {
+                    binding.updateSubtitle.text =
+                        getString(R.string.update_subtitle_ready)
+                    AppUpdater.installApk(this, file)
+                    // Houd banner zichtbaar — gebruiker keert mogelijk terug
+                    // na "Annuleer" in de installer
+                    binding.btnUpdate.isEnabled = true
+                    binding.btnUpdateDismiss.visibility = android.view.View.VISIBLE
+                    binding.updateProgress.visibility = android.view.View.GONE
+                }
+            }
+        )
     }
 
     private fun openLogin() {

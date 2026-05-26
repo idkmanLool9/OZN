@@ -61,6 +61,96 @@
                 android:paddingEnd="20dp"
                 android:text="@string/main_subtitle"/>
 
+            <!-- ─── Update-banner (zichtbaar als nieuwere versie beschikbaar) ─── -->
+            <LinearLayout
+                android:id="@+id/updateBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_update_banner"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_update"/>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/updateTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/update_available"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"/>
+
+                    <TextView
+                        android:id="@+id/updateSubtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="#CCFFFFFF"
+                        android:textSize="13sp"/>
+
+                    <ProgressBar
+                        android:id="@+id/updateProgress"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="3dp"
+                        android:layout_marginTop="8dp"
+                        android:max="100"
+                        android:progressTint="#FFFFFF"
+                        android:visibility="gone"/>
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnUpdate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="10dp"
+                    android:backgroundTint="#FFFFFF"
+                    android:fontFamily="sans-serif-medium"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:text="@string/update_install"
+                    android:textAllCaps="false"
+                    android:textColor="#007AFF"
+                    android:textSize="14sp"
+                    app:cornerRadius="18dp"
+                    app:elevation="0dp"/>
+
+                <ImageButton
+                    android:id="@+id/btnUpdateDismiss"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="2dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/update_dismiss"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_close"
+                    app:tint="#FFFFFF"/>
+            </LinearLayout>
+
             <!-- ─── Section: ACCOUNT ─── -->
             <TextView
                 style="@style/iOSText.SectionHeader"

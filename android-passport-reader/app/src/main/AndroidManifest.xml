@@ -10,6 +10,12 @@
          dossier' tikt. -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Self-update flow: app downloadt nieuwere APK uit GitHub Releases en
+         opent system-installer. Op API 26+ moet user eenmalig "Install
+         unknown apps" toggle voor deze app aanzetten — AppUpdater stuurt
+         dan zelf naar de juiste settings-pagina. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
     <uses-feature android:name="android.hardware.camera" android:required="true"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <uses-feature android:name="android.hardware.nfc" android:required="true"/>
