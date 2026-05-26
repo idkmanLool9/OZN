@@ -241,6 +241,30 @@ class SupabaseClient private constructor(context: Context) {
         return path
     }
 
+    /** Upload de paspoort-card visualisatie (gerenderde paspoort-pagina als
+     *  JPEG) naar dezelfde 'overledenen' bucket onder een aparte path. Pad
+     *  wordt opgeslagen in dossiers.paspoort_kaart_pad zodat de webapp 'm
+     *  als beeld kan tonen onder Documenten. */
+    suspend fun uploadPaspoortKaart(dossierId: Long, jpegBytes: ByteArray): String {
+        val path = "$dossierId/paspoort_kaart.jpg"
+        val body = jpegBytes.toRequestBody(JPEG)
+        val req = Request.Builder()
+            .url("$url/storage/v1/object/overledenen/$path")
+            .headers(authHeaders())
+            .header("Content-Type", "image/jpeg")
+            .header("x-upsert", "true")
+            .header("Cache-Control", "3600")
+            .post(body)
+            .build()
+        execute(req).use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw SupabaseException(
+                parseErrorMessage(text) ?: "Paspoort-kaart upload mislukt (${resp.code})"
+            )
+        }
+        return path
+    }
+
     // ─── Helpers ─────────────────────────────────────────────────────────
     private fun JSONObject.optStringOrNull(key: String): String? =
         if (isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }

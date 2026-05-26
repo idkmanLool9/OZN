@@ -114,8 +114,9 @@ class DossierPickerActivity : AppCompatActivity() {
     private fun applyToDossier(d: SupabaseClient.DossierSummary) {
         binding.progress.visibility = View.VISIBLE
         lifecycleScope.launch {
-            // Twee aparte foutmeldingen zodat je in de toast kan zien
-            // welke stap precies struikelt: foto-upload of dossier-update.
+            // Drie aparte foutmeldingen zodat je in de toast kan zien
+            // welke stap precies struikelt: foto-upload / paspoort-kaart /
+            // dossier-update.
             try {
                 val patch = passportToPatch(passport).toMutableMap()
                 val faceBytes = passport.faceImageJpeg
@@ -127,6 +128,25 @@ class DossierPickerActivity : AppCompatActivity() {
                     }
                     patch["foto_overledene_pad"] = path
                 }
+
+                // Paspoort-card visualisatie (JPEG van de gerenderde card)
+                // is door NfcReadActivity in cache/pending_passport_card.jpg
+                // geschreven. Lees en upload als die er staat.
+                val cardFile = java.io.File(cacheDir, "pending_passport_card.jpg")
+                if (cardFile.exists() && cardFile.length() > 0) {
+                    try {
+                        val cardBytes = cardFile.readBytes()
+                        val cardPath = cloud.uploadPaspoortKaart(d.id, cardBytes)
+                        patch["paspoort_kaart_pad"] = cardPath
+                        cardFile.delete()
+                    } catch (e: Exception) {
+                        // Niet-fataal: dossier krijgt geen card-image, andere
+                        // velden worden wel bijgewerkt
+                        android.util.Log.w("Picker",
+                            "Paspoort-card upload mislukt: ${e.message}")
+                    }
+                }
+
                 try {
                     cloud.updateDossier(d.id, patch)
                 } catch (e: Exception) {

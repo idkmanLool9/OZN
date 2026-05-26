@@ -269,13 +269,46 @@ class NfcReadActivity : AppCompatActivity() {
         binding.pulseRing3.visibility = View.GONE
     }
 
+    /** Render de paspoort-card naar een JPEG en schrijf naar internal cache
+     *  als 'pending_passport_card.jpg'. DossierPickerActivity gebruikt deze
+     *  file om bij het koppelen óók een upload naar Supabase te doen.
+     *  Gebruikt View.post() omdat de layout pas in de volgende frame klaar is. */
+    private fun capturePassportCardAfterLayout() {
+        val cardView = binding.passportCard.root
+        cardView.post {
+            try {
+                val w = cardView.width
+                val h = cardView.height
+                if (w <= 0 || h <= 0) return@post
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    w, h, android.graphics.Bitmap.Config.ARGB_8888
+                )
+                val canvas = android.graphics.Canvas(bmp)
+                // Wit fallback achter de gradient zodat transparante delen niet
+                // zwart worden
+                canvas.drawColor(android.graphics.Color.WHITE)
+                cardView.draw(canvas)
+
+                val baos = java.io.ByteArrayOutputStream()
+                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, baos)
+                bmp.recycle()
+
+                val file = java.io.File(cacheDir, "pending_passport_card.jpg")
+                file.writeBytes(baos.toByteArray())
+            } catch (_: Exception) {
+                // Niet-fataal: koppelen werkt nog steeds, alleen zonder card-image
+            }
+        }
+    }
+
     /** Vult de paspoort-kaart visualisatie met data uit de chip. De layout
      *  is een visuele representatie van de echte NL paspoort-datapagina:
      *  rode header, foto links, gestructureerde data rechts, gele MRZ
      *  onderaan. */
     private fun bindPassportCard(d: PassportData) {
-        val card = binding.passportCard
-        val root = card.findViewById<View>(R.id.passportCardRoot) ?: return
+        // binding.passportCard is een ViewPassportCardNlBinding (geen View);
+        // de werkelijke View-tree is binding.passportCard.root.
+        val root: View = binding.passportCard.root
 
         // Foto (DG2)
         val photo = root.findViewById<android.widget.ImageView>(R.id.pcPhoto)
@@ -629,6 +662,7 @@ class NfcReadActivity : AppCompatActivity() {
 
         renderResultRows(d)
         bindPassportCard(d)
+        capturePassportCardAfterLayout()
 
         // Als 't een NL-document is zonder BSN: automatisch achterkant
         // scannen. BSN staat sinds 2014 niet meer in de chip, alleen
