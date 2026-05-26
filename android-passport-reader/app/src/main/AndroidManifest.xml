@@ -74,5 +74,17 @@
             android:exported="false"
             android:label="@string/settings_title"
             android:screenOrientation="portrait"/>
+
+        <!-- FileProvider voor pasfoto-share — geeft andere apps tijdelijke
+             content:// toegang tot de gedeelde JPEG in internal cache. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"/>
+        </provider>
     </application>
 </manifest>
