@@ -12,8 +12,10 @@ import android.view.animation.AnimationUtils
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -50,6 +52,8 @@ class ScanBsnActivity : AppCompatActivity() {
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     @Volatile private var done = false
     private var cameraProvider: ProcessCameraProvider? = null
+    private var camera: Camera? = null
+    private var torchOn = false
 
     private val permLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -89,6 +93,15 @@ class ScanBsnActivity : AppCompatActivity() {
             setResult(RESULT_CANCELED)
             finish()
         }
+        binding.btnTorch.setOnClickListener { toggleTorch() }
+
+        binding.preview.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                handleTapToFocus(event.x, event.y)
+                binding.preview.performClick()
+                true
+            } else false
+        }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
@@ -121,14 +134,38 @@ class ScanBsnActivity : AppCompatActivity() {
 
             try {
                 provider.unbindAll()
-                provider.bindToLifecycle(
+                camera = provider.bindToLifecycle(
                     this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analyzer
                 )
+                binding.btnTorch.visibility =
+                    if (camera?.cameraInfo?.hasFlashUnit() == true)
+                        View.VISIBLE else View.GONE
             } catch (e: Exception) {
                 Toast.makeText(this, "Camera-fout: ${e.message}", Toast.LENGTH_LONG).show()
                 finish()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun toggleTorch() {
+        val cam = camera ?: return
+        torchOn = !torchOn
+        cam.cameraControl.enableTorch(torchOn)
+        binding.btnTorch.setImageResource(
+            if (torchOn) R.drawable.ic_torch_on else R.drawable.ic_torch
+        )
+        binding.btnTorch.performHapticFeedback(
+            android.view.HapticFeedbackConstants.LONG_PRESS
+        )
+    }
+
+    private fun handleTapToFocus(x: Float, y: Float) {
+        val cam = camera ?: return
+        val point = binding.preview.meteringPointFactory.createPoint(x, y)
+        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+            .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        cam.cameraControl.startFocusAndMetering(action)
     }
 
     private fun onBsnFound(bsn: String) {

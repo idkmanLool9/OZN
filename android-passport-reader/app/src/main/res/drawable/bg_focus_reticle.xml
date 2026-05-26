@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- iOS-stijl tap-to-focus reticle: dunne gele cirkel -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <stroke
+        android:width="2dp"
+        android:color="#FFCC00"/>
+    <solid android:color="#00000000"/>
+</shape>

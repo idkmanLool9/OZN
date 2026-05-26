@@ -302,6 +302,13 @@ class NfcReadActivity : AppCompatActivity() {
         binding.readingState.visibility = View.GONE
         binding.resultState.visibility = View.VISIBLE
 
+        // Bewaar in recente-scans cache (versleuteld lokaal, max 5)
+        val fullName = listOfNotNull(d.givenNames, d.surname)
+            .joinToString(" ").trim()
+        if (fullName.isNotBlank() && !d.documentNumber.isNullOrBlank()) {
+            RecentScans.add(this, fullName, d.documentNumber!!)
+        }
+
         val cloud = SupabaseClient.get(this)
         binding.btnCouple.text = if (cloud.isLoggedIn)
             getString(R.string.nfc_couple_button)

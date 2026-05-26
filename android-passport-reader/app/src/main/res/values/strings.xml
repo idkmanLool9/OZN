@@ -6,6 +6,29 @@
     <string name="main_subtitle">Lees paspoort of ID-kaart uit via camera en NFC. Gegevens blijven lokaal, totdat je ze zelf aan een dossier koppelt.</string>
     <string name="main_button_scan">Scan ID</string>
     <string name="main_caption">100% lokaal · privacyvriendelijk</string>
+    <string name="main_section_account">Account</string>
+    <string name="main_section_recent">Recent</string>
+    <string name="main_recent_empty">Nog geen scans deze sessie</string>
+    <string name="main_settings">Instellingen</string>
+    <string name="settings_coming_soon">Instellingen komen eraan</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Instellingen</string>
+    <string name="settings_done">Klaar</string>
+    <string name="settings_section_appearance">Weergave</string>
+    <string name="settings_theme">Thema</string>
+    <string name="settings_theme_system">Volgt systeem</string>
+    <string name="settings_theme_light">Licht</string>
+    <string name="settings_theme_dark">Donker</string>
+    <string name="settings_section_account">Account</string>
+    <string name="settings_account">Ingelogd</string>
+    <string name="settings_account_none">Niet ingelogd</string>
+    <string name="settings_logout">Uitloggen</string>
+    <string name="settings_logout_confirm">Weet je zeker dat je wilt uitloggen?</string>
+    <string name="settings_section_about">Over</string>
+    <string name="settings_version">App-versie</string>
+    <string name="settings_privacy">Privacybeleid</string>
+    <string name="settings_footer">Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</string>
     <string name="main_version">v%1$s (build %2$d)</string>
     <string name="main_logout_confirm_title">Uitloggen?</string>
     <string name="main_logout_confirm_yes">Uitloggen</string>
@@ -17,6 +40,7 @@
     <string name="scan_status_searching">Zoeken naar document…</string>
     <string name="scan_status_found">Document gevonden!</string>
     <string name="scan_close">Sluiten</string>
+    <string name="scan_torch">Zaklamp</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
     <string name="scan_matched">Gelukt! Document herkend.</string>
 
@@ -82,6 +106,9 @@
     <string name="picker_search_hint">Zoek op naam, dossiernr. of gezinsnummer</string>
     <string name="picker_empty">Geen dossiers gevonden.</string>
     <string name="picker_empty_hint">Probeer een andere zoekopdracht of maak een nieuw dossier aan via de webapp.</string>
+    <string name="picker_cancel">Annuleer</string>
+    <string name="picker_section_found">Gescand</string>
+    <string name="picker_section_attach">Koppel aan dossier</string>
     <string name="picker_confirm_title">Velden overnemen?</string>
     <string name="picker_confirm_message">De volgende velden worden bijgewerkt voor %1$s:</string>
     <string name="picker_confirm_apply">Bijwerken</string>

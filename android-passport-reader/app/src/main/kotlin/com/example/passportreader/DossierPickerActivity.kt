@@ -50,10 +50,20 @@ class DossierPickerActivity : AppCompatActivity() {
         binding.list.layoutManager = LinearLayoutManager(this)
         binding.list.adapter = adapter
 
-        binding.subtitle.text = getString(
-            R.string.picker_subtitle,
-            listOfNotNull(passport.givenNames, passport.surname).joinToString(" "),
-        )
+        // Passport-info card vullen
+        val fullName = listOfNotNull(passport.givenNames, passport.surname)
+            .joinToString(" ").trim()
+        binding.subtitle.text = fullName.ifBlank { "—" }
+        binding.passportInitials.text = initials(fullName)
+        val metaParts = mutableListOf<String>()
+        passport.dateOfBirth?.let { dob ->
+            isoFromYYMMDD(dob)?.let { iso -> metaParts += "Geb. $iso" }
+        }
+        passport.documentNumber?.let { metaParts += "Doc. $it" }
+        binding.passportMeta.text = metaParts.joinToString(" · ")
+            .ifBlank { passport.nationality ?: "" }
+
+        binding.btnCancel.setOnClickListener { finish() }
 
         binding.search.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -162,6 +172,15 @@ class DossierPickerActivity : AppCompatActivity() {
             "woonplaats_overledene" to p.city,
             "beroep" to p.profession,
         )
+    }
+
+    /** Initials van naam: "Jan Janssen" → "JJ", "M. de Vries" → "MV" */
+    private fun initials(name: String): String {
+        val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return "?"
+        val first = words.first().firstOrNull()?.uppercase() ?: ""
+        val last  = if (words.size > 1) words.last().firstOrNull()?.uppercase() ?: "" else ""
+        return (first + last).ifBlank { "?" }
     }
 
     /** YYMMDD → YYYY-MM-DD volgens ICAO-eeuw-conventie. */

@@ -50,6 +50,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"/>
 
+    <!-- Torch-knop rechtsboven (toggle zaklamp) -->
+    <ImageButton
+        android:id="@+id/btnTorch"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_close_button"
+        android:contentDescription="@string/scan_torch"
+        android:padding="9dp"
+        android:src="@drawable/ic_torch"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
     <!-- Grote, vette titel — Apple's large-title typografie -->
     <TextView
         android:id="@+id/scanTitle"
