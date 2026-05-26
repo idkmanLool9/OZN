@@ -413,6 +413,26 @@ const FotoOverledene = {
   },
 };
 
+// ─── Paspoort-kaart visualisatie (door Android NFC-scanner app gemaakt) ──
+// Zelfde 'overledenen' bucket; pad staat in dossiers.paspoort_kaart_pad
+const PaspoortKaart = {
+  publicUrl(path) {
+    if (!path) return null;
+    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
+    return data?.publicUrl || null;
+  },
+  urlVoor(path) {
+    if (!path) return null;
+    const base = PaspoortKaart.publicUrl(path);
+    if (!base) return null;
+    return base + '?v=' + Date.now();
+  },
+  async remove(path) {
+    if (!path) return;
+    await sb.storage.from('overledenen').remove([path]).catch(() => {});
+  },
+};
+
 // ─── Eten & drinken-catalogus + foto's (publieke bucket) ────────────────────
 const EtenDrinkenFotos = {
   slug(naam) {

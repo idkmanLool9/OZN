@@ -95,6 +95,9 @@ function renderDossierDetail(params) {
           <div class="meta"><p><strong>${esc(d.dossier_nummer)}</strong></p><p>Status: ${esc((d.status||'').replace('_',' '))}</p><p>Afgedrukt: ${new Date().toLocaleString('nl-NL')}</p></div>
         </div>
         <h2>Overzicht</h2>
+
+        ${renderIdentiteitSection(d)}
+
         <h3>Overledene</h3>
         <dl class="dl">
           ${dlRow('Naam', fullName(d))}
@@ -630,6 +633,47 @@ function dlRow(label, value) {
   // value mag al HTML zijn als 'ie van kistRowValue komt; anders escapen
   const isHtml = typeof v === 'string' && v.startsWith('<');
   return `<div><dt>${esc(label)}</dt><dd>${isHtml ? v : esc(v)}</dd></div>`;
+}
+
+/** Identiteitsdocument-sectie: toont paspoort-kaart visualisatie (door
+ *  Android NFC-app gemaakt) + losse pasfoto-thumbnail. Beide met
+ *  download-link. Niet rendered als geen van beide aanwezig is. */
+function renderIdentiteitSection(d) {
+  const kaartUrl = d.paspoort_kaart_pad ? PaspoortKaart.urlVoor(d.paspoort_kaart_pad) : null;
+  const fotoUrl  = d.foto_overledene_pad ? FotoOverledene.urlVoor(d.foto_overledene_pad) : null;
+  if (!kaartUrl && !fotoUrl) return '';
+
+  // Lightbox onClick: zelfde mechanisme als doc-thumb (re-uses Lightbox helper)
+  const openLightbox = (url, alt) =>
+    `onclick="Lightbox.open('${esc(url)}','${esc(alt)}')"`;
+
+  return `
+    <h3>Identiteitsdocument</h3>
+    <div class="identiteit-grid">
+      ${kaartUrl ? `
+        <div class="identiteit-kaart">
+          <button type="button" class="identiteit-kaart-btn no-print" ${openLightbox(kaartUrl, 'Paspoort/ID')} aria-label="Vergroot paspoort-kaart">
+            <img src="${esc(kaartUrl)}" alt="Paspoort/ID-kaart" loading="lazy"/>
+          </button>
+          <img class="print-only" src="${esc(kaartUrl)}" alt="Paspoort/ID-kaart"
+            style="max-width: 100%; height: auto; display:none;"/>
+          <div class="identiteit-meta">
+            <span class="muted small">Gerenderd uit NFC-chip-data</span>
+            <a class="btn btn-sm btn-ghost no-print" href="${esc(kaartUrl)}" download="paspoort-kaart.jpg" target="_blank" rel="noopener">⬇️ Download</a>
+          </div>
+        </div>` : ''}
+      ${fotoUrl ? `
+        <div class="identiteit-foto">
+          <button type="button" class="identiteit-foto-btn no-print" ${openLightbox(fotoUrl, 'Pasfoto')} aria-label="Vergroot pasfoto">
+            <img src="${esc(fotoUrl)}" alt="Pasfoto" loading="lazy"/>
+          </button>
+          <div class="identiteit-meta">
+            <span class="muted small">Pasfoto uit chip (DG2)</span>
+            <a class="btn btn-sm btn-ghost no-print" href="${esc(fotoUrl)}" download="pasfoto.jpg" target="_blank" rel="noopener">⬇️ Download</a>
+          </div>
+        </div>` : ''}
+    </div>
+  `;
 }
 
 function kistRowValue(kistNaam) {
