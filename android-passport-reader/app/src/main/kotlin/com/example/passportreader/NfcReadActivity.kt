@@ -364,17 +364,30 @@ class NfcReadActivity : AppCompatActivity() {
             else -> "—"
         }
 
-        // Datum van afgifte (YYYYMMDD → "30 AUG/AUG 2021")
-        root.findViewById<android.widget.TextView>(R.id.pcIssueDate).text =
-            formatIssueDate(d.dateOfIssue)
+        // Datum van afgifte (YYYYMMDD → "30 AUG/AUG 2021"). Als de chip
+        // geen DG12 had: afleiden uit verloopdatum + leeftijd (NL geeft 5j
+        // voor minderjarigen, 10j voor volwassenen).
+        val issueDateStr = formatIssueDate(d.dateOfIssue)
+            .ifBlank { formatPassportDate(estimateIssueYymmdd(d.dateOfBirth, d.dateOfExpiry)) }
+        root.findViewById<android.widget.TextView>(R.id.pcIssueDate).text = issueDateStr
 
         // Verloopdatum
         root.findViewById<android.widget.TextView>(R.id.pcExpiry).text =
             formatPassportDate(d.dateOfExpiry)
 
-        // Authority
-        root.findViewById<android.widget.TextView>(R.id.pcAuthority).text =
-            d.issuingAuthority ?: ""
+        // Autoriteit — chip-data niet altijd gevuld; verberg label én value
+        // wanneer leeg zodat de card er compact en klaar uitziet
+        val authText = d.issuingAuthority?.takeIf { it.isNotBlank() }
+        root.findViewById<android.widget.TextView>(R.id.pcAuthority).apply {
+            if (authText != null) {
+                text = authText
+                visibility = View.VISIBLE
+            } else {
+                visibility = View.GONE
+            }
+        }
+        root.findViewById<android.widget.TextView>(R.id.pcAuthorityLabel)?.visibility =
+            if (authText != null) View.VISIBLE else View.GONE
 
         // Handtekening (DG7)
         val sigView = root.findViewById<android.widget.ImageView>(R.id.pcSignature)
@@ -391,6 +404,38 @@ class NfcReadActivity : AppCompatActivity() {
         val (mrz1, mrz2) = reconstructMrz(d)
         root.findViewById<android.widget.TextView>(R.id.pcMrz1).text = mrz1
         root.findViewById<android.widget.TextView>(R.id.pcMrz2).text = mrz2
+    }
+
+    /** Schat de uitgiftedatum o.b.v. NL-conventie:
+     *  - 0-18 jaar: 5 jaar geldig
+     *  - 18+: 10 jaar geldig
+     *  Returns YYMMDD-string (zoals dateOfBirth/Expiry) of "" als
+     *  onbepaalbaar. Wordt alleen aangeroepen als DG12.dateOfIssue
+     *  echt leeg is.
+     */
+    private fun estimateIssueYymmdd(dobYymmdd: String?, expiryYymmdd: String?): String {
+        if (expiryYymmdd == null || expiryYymmdd.length != 6 ||
+            !expiryYymmdd.all { it.isDigit() }) return ""
+        val expYy = expiryYymmdd.substring(0, 2).toInt()
+        val expMm = expiryYymmdd.substring(2, 4)
+        val expDd = expiryYymmdd.substring(4, 6)
+        val thisYY = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) % 100
+        // Expiry is altijd in de toekomst t.o.v. dit eeuw-tellen
+        val expYear = (if (expYy > thisYY + 10) 1900 else 2000) + expYy
+
+        // Validity-jaren bepalen via geboortedatum (als beschikbaar)
+        val validity = if (dobYymmdd != null && dobYymmdd.length == 6 &&
+                           dobYymmdd.all { it.isDigit() }) {
+            val dobYy = dobYymmdd.substring(0, 2).toInt()
+            val dobYear = (if (dobYy > thisYY + 10) 1900 else 2000) + dobYy
+            val ageAtExpiry = expYear - dobYear
+            // Als persoon bij expiry-jaar ≤ 23 → 5-jarig (minor at issue, 5j)
+            // Anders 10-jarig (volwassene)
+            if (ageAtExpiry <= 23) 5 else 10
+        } else 10
+        val issueYear = expYear - validity
+        val issueYy = "%02d".format(issueYear % 100)
+        return "$issueYy$expMm$expDd"
     }
 
     /** "10 MAA/MAR 1965" stijl zoals op echte NL paspoort. */
