@@ -87,6 +87,9 @@
     <string name="picker_search_hint">Zoek op naam, dossiernr. of gezinsnummer</string>
     <string name="picker_empty">Geen dossiers gevonden.</string>
     <string name="picker_empty_hint">Probeer een andere zoekopdracht of maak een nieuw dossier aan via de webapp.</string>
+    <string name="picker_cancel">Annuleer</string>
+    <string name="picker_section_found">Gescand</string>
+    <string name="picker_section_attach">Koppel aan dossier</string>
     <string name="picker_confirm_title">Velden overnemen?</string>
     <string name="picker_confirm_message">De volgende velden worden bijgewerkt voor %1$s:</string>
     <string name="picker_confirm_apply">Bijwerken</string>

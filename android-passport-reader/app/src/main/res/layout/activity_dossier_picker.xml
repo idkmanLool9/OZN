@@ -1,130 +1,243 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
-    android:orientation="vertical">
+    android:fitsSystemWindows="true">
 
-    <!-- iOS Large Title-header met genereuze top-padding -->
-    <LinearLayout
+    <!-- ─── Top bar: cancel link links, titel in midden ─── -->
+    <FrameLayout
+        android:id="@+id/topbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingTop="32dp"
-        android:paddingBottom="8dp">
+        android:layout_height="44dp"
+        android:layout_marginTop="8dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
         <TextView
-            style="@style/iOSText.LargeBold"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/picker_title"/>
-
-        <TextView
-            android:id="@+id/subtitle"
-            style="@style/iOSText.Subtitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"/>
-    </LinearLayout>
-
-    <!-- iOS-stijl search-bar: pill-vorm, gray_btn achtergrond, geen outline -->
-    <com.google.android.material.textfield.TextInputLayout
-        style="@style/Widget.Material3.TextInputLayout.FilledBox"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="14dp"
-        android:layout_marginEnd="16dp"
-        android:hint="@string/picker_search_hint"
-        app:boxBackgroundColor="@color/gray_btn"
-        app:boxCornerRadiusBottomEnd="14dp"
-        app:boxCornerRadiusBottomStart="14dp"
-        app:boxCornerRadiusTopEnd="14dp"
-        app:boxCornerRadiusTopStart="14dp"
-        app:boxStrokeWidth="0dp"
-        app:boxStrokeWidthFocused="0dp"
-        app:startIconDrawable="@android:drawable/ic_menu_search"
-        app:startIconTint="@color/muted"
-        app:hintTextColor="@color/muted">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/search"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="@android:color/transparent"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
+            android:id="@+id/btnCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="start|center_vertical"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:paddingStart="4dp"
+            android:paddingEnd="12dp"
+            android:text="@string/picker_cancel"
+            android:textColor="@color/brand_blue"
             android:textSize="17sp"/>
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <ProgressBar
-        android:id="@+id/progress"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:layout_marginTop="6dp"
-        android:indeterminate="true"
-        android:visibility="gone"/>
-
-    <!-- Empty-state met groter icoon en mooiere typo -->
-    <LinearLayout
-        android:id="@+id/empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingStart="32dp"
-        android:paddingEnd="32dp"
-        android:visibility="gone">
-
-        <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:alpha="0.35"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_folder_search"/>
 
         <TextView
             style="@style/iOSText.Headline"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:text="@string/picker_empty"
-            android:textColor="@color/muted"/>
-
-        <TextView
-            style="@style/iOSText.Caption"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:gravity="center"
-            android:text="@string/picker_empty_hint"/>
-    </LinearLayout>
-
-    <!-- iOS grouped-list-stijl: witte card met gescheiden rijen -->
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp"
-        android:layout_weight="1"
-        app:cardBackgroundColor="@color/surface"
-        app:cardCornerRadius="14dp"
-        app:cardElevation="0dp">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/list"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingTop="2dp"
-            android:paddingBottom="2dp"/>
-    </com.google.android.material.card.MaterialCardView>
-</LinearLayout>
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:text="@string/picker_title"/>
+    </FrameLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/hair"
+        app:layout_constraintTop_toBottomOf="@id/topbar"/>
+
+    <!-- ─── Scrollende content: paspoort-info + search + list ─── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topbar">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- ─── Passport-info-card: "We vonden Jan Janssen" ─── -->
+            <TextView
+                style="@style/iOSText.SectionHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="20dp"
+                android:text="@string/picker_section_found"/>
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/iOSGroupedSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+
+                    <FrameLayout
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_avatar_circle">
+
+                        <TextView
+                            android:id="@+id/passportInitials"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:textColor="@color/brand_blue"
+                            android:textSize="16sp"
+                            android:textStyle="bold"/>
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/subtitle"
+                            style="@style/iOSText.Headline"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"/>
+
+                        <TextView
+                            android:id="@+id/passportMeta"
+                            style="@style/iOSText.Footnote"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ─── Section: KOPPEL AAN ─── -->
+            <TextView
+                style="@style/iOSText.SectionHeader"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="20dp"
+                android:text="@string/picker_section_attach"/>
+
+            <!-- iOS pill search-bar -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.FilledBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/picker_search_hint"
+                    app:boxBackgroundColor="@color/gray_btn"
+                    app:boxCornerRadiusBottomEnd="12dp"
+                    app:boxCornerRadiusBottomStart="12dp"
+                    app:boxCornerRadiusTopEnd="12dp"
+                    app:boxCornerRadiusTopStart="12dp"
+                    app:boxStrokeWidth="0dp"
+                    app:boxStrokeWidthFocused="0dp"
+                    app:hintTextColor="@color/muted"
+                    app:startIconDrawable="@android:drawable/ic_menu_search"
+                    app:startIconTint="@color/muted">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/search"
+                        android:layout_width="match_parent"
+                        android:layout_height="46dp"
+                        android:background="@android:color/transparent"
+                        android:imeOptions="actionSearch"
+                        android:inputType="text"
+                        android:textSize="17sp"/>
+                </com.google.android.material.textfield.TextInputLayout>
+            </FrameLayout>
+
+            <ProgressBar
+                android:id="@+id/progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_marginBottom="4dp"
+                android:indeterminate="true"
+                android:visibility="gone"/>
+
+            <!-- ─── Empty state ─── -->
+            <LinearLayout
+                android:id="@+id/empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:alpha="0.35"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_folder_search"/>
+
+                <TextView
+                    style="@style/iOSText.Headline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:text="@string/picker_empty"
+                    android:textColor="@color/muted"/>
+
+                <TextView
+                    style="@style/iOSText.Footnote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center"
+                    android:text="@string/picker_empty_hint"/>
+            </LinearLayout>
+
+            <!-- ─── Grouped-list met dossiers ─── -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/iOSGroupedSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false"
+                    android:overScrollMode="never"/>
+            </com.google.android.material.card.MaterialCardView>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
