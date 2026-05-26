@@ -60,12 +60,23 @@ jobs:
           name: passport-reader-apk
           path: android-passport-reader/passport-reader.apk
 
+      - name: Lees versie uit build.gradle.kts
+        id: version
+        working-directory: android-passport-reader
+        run: |
+          VNAME=$(grep -E '^\s*versionName' app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          VCODE=$(grep -E '^\s*versionCode' app/build.gradle.kts | head -1 | sed -E 's/.*= *([0-9]+).*/\1/')
+          echo "name=$VNAME" >> $GITHUB_OUTPUT
+          echo "code=$VCODE" >> $GITHUB_OUTPUT
+
       - name: Publish naar "latest" Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "Passport Reader — laatste build"
+          name: "Passport Reader v${{ steps.version.outputs.name }}"
           body: |
+            **Versie ${{ steps.version.outputs.name }} (build ${{ steps.version.outputs.code }})**
+
             Automatisch gebouwde debug-APK van commit `${{ github.sha }}`.
 
             **Download op je telefoon:** tik op `passport-reader.apk` hieronder.

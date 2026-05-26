@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark-mode palet (iOS dark Apple HIG) ─────────────────────────── -->
+    <!-- Brand-blue blijft helder maar iets minder verzadigd zodat 'ie
+         comfortabel oogt op donkere achtergrond -->
+    <color name="brand_blue">#0A84FF</color>
+    <color name="brand_blue_dark">#0066CC</color>
+    <color name="brand_blue_soft">#0A2A47</color>
+
+    <color name="green">#30D158</color>
+    <color name="amber">#FF9F0A</color>
+    <color name="red">#FF453A</color>
+
+    <!-- Labels — iOS dark: white(.85) primary, white(.55) secondary -->
+    <color name="ink">#FFFFFF</color>
+    <color name="ink_2">#EBEBF5</color>
+    <color name="muted">#8E8E93</color>
+    <color name="muted_2">#636366</color>
+
+    <!-- Surfaces — iOS dark grouped-bg #000 + surface #1C1C1E -->
+    <color name="bg">#000000</color>
+    <color name="surface">#1C1C1E</color>
+    <color name="hair">#38383A</color>
+    <color name="gray_btn">#2C2C2E</color>
+</resources>
