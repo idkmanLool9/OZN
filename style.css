@@ -1559,3 +1559,73 @@ body { -webkit-overflow-scrolling: touch; }
   .topbar { padding-top: env(safe-area-inset-top); }
   .main { padding-bottom: max(3rem, env(safe-area-inset-bottom)); }
 }
+
+/* ─── Identiteitsdocument-sectie (paspoort-kaart + pasfoto in dossier) ─── */
+.identiteit-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+  margin: .5rem 0 1.25rem;
+  align-items: start;
+}
+@media (max-width: 600px) {
+  .identiteit-grid { grid-template-columns: 1fr; }
+}
+.identiteit-kaart,
+.identiteit-foto {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.identiteit-kaart-btn,
+.identiteit-foto-btn {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0;
+  cursor: zoom-in;
+  overflow: hidden;
+  transition: transform var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease);
+}
+.identiteit-kaart-btn:hover,
+.identiteit-foto-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: var(--primary);
+}
+.identiteit-kaart-btn img,
+.identiteit-foto-btn img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.identiteit-foto-btn {
+  max-width: 200px;
+}
+.identiteit-foto-btn img {
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+.identiteit-meta {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.identiteit-meta .btn { flex: 0 0 auto; }
+
+@media print {
+  .identiteit-grid { grid-template-columns: 1fr; gap: 0.5rem; }
+  .identiteit-kaart-btn,
+  .identiteit-foto-btn { display: none; }
+  .identiteit-meta { display: none; }
+  .identiteit-kaart .print-only {
+    display: block !important;
+    max-width: 100% !important;
+    border: 1px solid #999;
+    page-break-inside: avoid;
+  }
+}
