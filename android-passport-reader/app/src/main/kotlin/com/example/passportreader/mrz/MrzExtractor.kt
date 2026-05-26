@@ -26,36 +26,57 @@ class MrzExtractor {
     suspend fun extract(image: InputImage): MrzInfo? {
         val result: Text = recognizer.process(image).await()
 
-        // ML Kit geeft per Line een bounding-box; sorteer op verticale positie
-        // zodat MRZ-regels altijd in document-volgorde komen, ongeacht de
-        // textBlock-volgorde.
-        val sortedLines = result.textBlocks
-            .flatMap { it.lines }
-            .sortedBy { it.boundingBox?.top ?: 0 }
+        // STAP 1: Verzamel alle Lines, sorteer op Y. ML Kit splitst de MRZ
+        // soms in fragments — typisch de laatste cijfer/chevrons-staart komt
+        // in een eigen textBlock. We groeperen daarom per Y-rij en plakken
+        // links→rechts terug aan elkaar.
+        val allLines = result.textBlocks.flatMap { it.lines }
+        val mergedRows = mergeLinesByYRow(allLines)
 
-        // Per "regel": OCR-correctie + filter op MRZ-achtige inhoud (>=20 chars
-        // met overwegend [A-Z0-9<]). Lange "geglueede" regels splitten we op
-        // de juiste lengte.
+        // STAP 2: Classificeer kandidaten. Content-based eerst (P< = TD3,
+        // I/A/C = TD1), daarna lossere length-fallback.
         val candidates = mutableListOf<String>()
-        for (line in sortedLines) {
-            val cleaned = normalizeMrz(line.text)
+        for (row in mergedRows) {
+            val cleaned = normalizeMrz(row)
             if (cleaned.length < 20) continue
             if (!isMostlyMrz(cleaned)) continue
 
             when {
-                cleaned.length in 28..32 -> candidates += cleaned.padEndChevrons(30)
-                cleaned.length in 40..46 -> candidates += cleaned.padEndChevrons(44)
-                // Geglueed: 2x TD3 op één regel
+                // ─── Content-based classificatie (eerste-letter-magic) ─── //
+                cleaned.startsWith("P<") || cleaned.startsWith("P0") ||
+                cleaned.startsWith("PO") -> {
+                    // TD3 paspoort line 1: forceer 44 chars
+                    candidates += cleaned.padEndChevrons(44)
+                }
+                cleaned.length >= 28 && cleaned.length <= 32 &&
+                Regex("^[IACP][A-Z0-9<]").containsMatchIn(cleaned) -> {
+                    // TD1 line 1 begint met I/A/C/IP — exact 30 verwacht
+                    candidates += cleaned.padEndChevrons(30)
+                }
+
+                // ─── Length-based: TD3 line 2 of TD1 line 2/3 ─── //
+                cleaned.length in 28..32 -> {
+                    // Voeg ZOWEL TD1- als TD3-padding toe; beide parsers
+                    // proberen het. Hieronder voor "lone last digit"-bug:
+                    // 28 chars zou TD3 line 2 kunnen zijn die in deze
+                    // grootte aankomt omdat ML Kit de staart afkapte.
+                    candidates += cleaned.padEndChevrons(30)
+                    candidates += cleaned.padEndChevrons(44)
+                }
+                cleaned.length in 33..50 -> {
+                    // Truncated of bijna-volledige TD3 line — pad naar 44
+                    candidates += cleaned.padEndChevrons(44)
+                }
+
+                // ─── Geglueed: meerdere MRZ-lijnen op één regel ─── //
                 cleaned.length in 84..92 -> {
                     candidates += cleaned.substring(0, 44).padEndChevrons(44)
                     candidates += cleaned.substring(44).padEndChevrons(44)
                 }
-                // Geglueed: 2x TD1 op één regel
                 cleaned.length in 58..62 -> {
                     candidates += cleaned.substring(0, 30).padEndChevrons(30)
                     candidates += cleaned.substring(30).padEndChevrons(30)
                 }
-                // Geglueed: 3x TD1
                 cleaned.length in 88..92 && cleaned.startsWith("I") -> {
                     candidates += cleaned.substring(0, 30).padEndChevrons(30)
                     candidates += cleaned.substring(30, 60).padEndChevrons(30)
@@ -185,6 +206,44 @@ class MrzExtractor {
     }
 
     fun close() = recognizer.close()
+
+    /** ML Kit splitst MRZ-regels regelmatig op in losse fragments: de
+     *  hoofd-data komt als één Line, en de trailing chevrons + laatste
+     *  check-digit (de "lone digit") komen als aparte Line met dezelfde Y.
+     *  Deze functie groepeert Lines op Y-rij (binnen 50% van line-height
+     *  tolerantie) en plakt ze links→rechts terug aan elkaar — waardoor
+     *  het hele MRZ-regel weer 44 chars wordt voor de parser.
+     */
+    private fun mergeLinesByYRow(lines: List<Text.Line>): List<String> {
+        if (lines.isEmpty()) return emptyList()
+
+        // Bereken gemiddelde line-height voor tolerance
+        val heights = lines.mapNotNull { it.boundingBox?.height() }
+        val avgHeight = if (heights.isNotEmpty()) heights.average() else 30.0
+        val tolerance = (avgHeight * 0.5).toInt().coerceAtLeast(10)
+
+        // Group on Y-center
+        val rows = mutableListOf<MutableList<Text.Line>>()
+        for (line in lines) {
+            val box = line.boundingBox ?: continue
+            val yCenter = (box.top + box.bottom) / 2
+            val target = rows.firstOrNull { row ->
+                val rowBox = row.first().boundingBox!!
+                val rowY = (rowBox.top + rowBox.bottom) / 2
+                kotlin.math.abs(yCenter - rowY) <= tolerance
+            }
+            if (target != null) target += line
+            else rows += mutableListOf(line)
+        }
+
+        // Sorteer rijen top→bottom, en binnen elke rij left→right
+        return rows
+            .sortedBy { it.first().boundingBox?.top ?: 0 }
+            .map { row ->
+                row.sortedBy { it.boundingBox?.left ?: 0 }
+                    .joinToString("") { it.text }
+            }
+    }
 
     // ─── Normalisatie / OCR-correcties ─────────────────────────────────────
 
