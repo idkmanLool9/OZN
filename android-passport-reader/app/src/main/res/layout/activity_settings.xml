@@ -259,6 +259,46 @@
                     <View style="@style/iOSDivider"/>
 
                     <LinearLayout
+                        android:id="@+id/cellUpdate"
+                        style="@style/iOSListCell"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_marginEnd="12dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_update"
+                            app:tint="@color/brand_blue"/>
+
+                        <TextView
+                            style="@style/iOSText.Body"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/settings_check_updates"/>
+
+                        <ProgressBar
+                            android:id="@+id/updateSpinner"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginEnd="6dp"
+                            android:indeterminateTint="@color/brand_blue"
+                            android:visibility="gone"/>
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="22dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_right"
+                            app:tint="@color/muted_2"/>
+                    </LinearLayout>
+
+                    <View style="@style/iOSDivider"/>
+
+                    <LinearLayout
                         android:id="@+id/cellPrivacy"
                         style="@style/iOSListCell"
                         android:layout_width="match_parent"

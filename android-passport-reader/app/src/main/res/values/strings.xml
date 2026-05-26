@@ -37,6 +37,10 @@
     <string name="settings_section_about">Over</string>
     <string name="settings_version">App-versie</string>
     <string name="settings_privacy">Privacybeleid</string>
+    <string name="settings_check_updates">Zoek updates</string>
+    <string name="settings_uptodate">Je gebruikt de nieuwste versie (%1$s)</string>
+    <string name="settings_update_available">Versie %1$s beschikbaar</string>
+    <string name="settings_update_check_failed">Update-check mislukt — controleer je internet</string>
     <string name="settings_footer">Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</string>
     <string name="main_version">v%1$s (build %2$d)</string>
     <string name="main_logout_confirm_title">Uitloggen?</string>
