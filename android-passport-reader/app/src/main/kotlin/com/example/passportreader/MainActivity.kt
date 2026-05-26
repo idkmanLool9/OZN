@@ -64,7 +64,9 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton(R.string.main_logout_confirm_cancel, null)
             .setPositiveButton(R.string.main_logout_confirm_yes) { _, _ ->
                 cloud.logout()
+                RecentScans.clear(this)
                 updateLoginCard()
+                renderRecent()
             }
             .show()
     }
@@ -81,10 +83,75 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Vult de Recent-sectie. Voor nu altijd leeg — recente-scans-cache
-     *  komt in een volgende commit. */
+    /** Vult de Recent-sectie met de laatste N scans uit
+     *  EncryptedSharedPreferences. */
     private fun renderRecent() {
-        binding.recentList.visibility = android.view.View.GONE
-        binding.recentEmpty.visibility = android.view.View.VISIBLE
+        val items = RecentScans.list(this)
+        binding.recentList.removeAllViews()
+        if (items.isEmpty()) {
+            binding.recentList.visibility = android.view.View.GONE
+            binding.recentEmpty.visibility = android.view.View.VISIBLE
+            return
+        }
+        binding.recentList.visibility = android.view.View.VISIBLE
+        binding.recentEmpty.visibility = android.view.View.GONE
+
+        val inflater = layoutInflater
+        items.forEachIndexed { index, entry ->
+            val row = inflater.inflate(
+                R.layout.item_recent_scan,
+                binding.recentList,
+                false
+            )
+            row.findViewById<android.widget.TextView>(R.id.name).text = entry.name
+            row.findViewById<android.widget.TextView>(R.id.docNo).text =
+                "Doc. ${entry.docNo} · ${formatRelative(entry.timestamp)}"
+            row.findViewById<android.widget.TextView>(R.id.avatar).text =
+                initials(entry.name)
+            binding.recentList.addView(row)
+
+            if (index < items.lastIndex) {
+                val divider = android.view.View(this).apply {
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        (0.5f * resources.displayMetrics.density).toInt().coerceAtLeast(1),
+                    ).apply { setMargins(
+                        (16 * resources.displayMetrics.density).toInt(), 0, 0, 0
+                    )}
+                    setBackgroundColor(
+                        androidx.core.content.ContextCompat.getColor(
+                            this@MainActivity, R.color.hair
+                        )
+                    )
+                }
+                binding.recentList.addView(divider)
+            }
+        }
+    }
+
+    private fun initials(name: String): String {
+        val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return "?"
+        val first = words.first().firstOrNull()?.uppercase() ?: ""
+        val last  = if (words.size > 1) words.last().firstOrNull()?.uppercase() ?: "" else ""
+        return (first + last).ifBlank { "?" }
+    }
+
+    private fun formatRelative(ts: Long): String {
+        val diffMs = System.currentTimeMillis() - ts
+        val diffMin = diffMs / 60_000
+        return when {
+            diffMin < 1 -> "Zojuist"
+            diffMin < 60 -> "${diffMin}m geleden"
+            diffMin < 60 * 24 -> "${diffMin / 60}u geleden"
+            else -> {
+                val days = diffMin / (60 * 24)
+                if (days < 7) "${days}d geleden"
+                else {
+                    val fmt = java.text.SimpleDateFormat("d MMM", java.util.Locale("nl"))
+                    fmt.format(java.util.Date(ts))
+                }
+            }
+        }
     }
 }

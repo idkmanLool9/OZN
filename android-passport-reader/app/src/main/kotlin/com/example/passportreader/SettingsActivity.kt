@@ -124,6 +124,7 @@ class SettingsActivity : AppCompatActivity() {
             .setNegativeButton(R.string.main_logout_confirm_cancel, null)
             .setPositiveButton(R.string.main_logout_confirm_yes) { _, _ ->
                 cloud.logout()
+                RecentScans.clear(this)
                 refreshAccountCell()
             }
             .show()
