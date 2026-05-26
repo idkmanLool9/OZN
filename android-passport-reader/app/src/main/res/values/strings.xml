@@ -12,6 +12,15 @@
     <string name="main_settings">Instellingen</string>
     <string name="settings_coming_soon">Instellingen komen eraan</string>
 
+    <!-- Self-update flow -->
+    <string name="update_available">Nieuwe versie beschikbaar</string>
+    <string name="update_install">Bijwerken</string>
+    <string name="update_dismiss">Sluiten</string>
+    <string name="update_subtitle_available">Versie %1$s — tik om bij te werken</string>
+    <string name="update_subtitle_downloading">Downloaden… %1$d%%</string>
+    <string name="update_subtitle_ready">Installer wordt geopend…</string>
+    <string name="update_subtitle_failed">Bijwerken mislukt — probeer later opnieuw</string>
+
     <!-- Settings -->
     <string name="settings_title">Instellingen</string>
     <string name="settings_done">Klaar</string>
