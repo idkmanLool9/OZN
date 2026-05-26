@@ -10,6 +10,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
+    <!-- Donkere overlay buiten de scan-area om focus te leggen op het frame -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#66000000"/>
+
     <!-- Witte pill-hint bovenaan (iOS-stijl) -->
     <TextView
         android:layout_width="wrap_content"
@@ -26,14 +32,28 @@
         android:textSize="14sp"
         android:textStyle="bold"/>
 
-    <!-- Scan-frame: 4 iOS-gele hoek-brackets -->
+    <!-- Scan-frame: 4 iOS-gele hoek-brackets + animerende scan-lijn -->
     <FrameLayout
         android:id="@+id/scanFrame"
         android:layout_width="match_parent"
-        android:layout_height="150dp"
+        android:layout_height="160dp"
         android:layout_gravity="center"
         android:layout_marginStart="20dp"
         android:layout_marginEnd="20dp">
+
+        <!-- Heldere "kijkvenster"-laag die de donkere overlay doorprikt -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#00000000"/>
+
+        <!-- Geanimeerde scan-lijn in het frame -->
+        <View
+            android:id="@+id/scanLine"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:layout_gravity="top"
+            android:background="@drawable/scan_line"/>
 
         <ImageView
             android:layout_width="36dp"
@@ -69,6 +89,7 @@
 
     <!-- iOS-stijl bottom-sheet met instructie + progress -->
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/bottomSheet"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
@@ -89,6 +110,7 @@
             android:paddingBottom="18dp">
 
             <TextView
+                android:id="@+id/scanStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
@@ -98,6 +120,7 @@
                 android:textSize="14sp"/>
 
             <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/scanProgress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
@@ -120,4 +143,21 @@
                 android:textSize="11sp"/>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <!-- Succes-overlay: groene flash + grote checkmark. Hidden by default. -->
+    <View
+        android:id="@+id/successFlash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_success_flash"
+        android:visibility="gone"/>
+
+    <ImageView
+        android:id="@+id/successCheck"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_gravity="center"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_check_big"
+        android:visibility="gone"/>
 </FrameLayout>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lijn beweegt van bovenkant scanframe naar onderkant, repeat reverse -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fillAfter="true"
+    android:fillEnabled="true">
+    <translate
+        android:duration="1400"
+        android:fromYDelta="0%p"
+        android:toYDelta="100%p"
+        android:repeatCount="infinite"
+        android:repeatMode="reverse"
+        android:interpolator="@android:interpolator/accelerate_decelerate"/>
+</set>
