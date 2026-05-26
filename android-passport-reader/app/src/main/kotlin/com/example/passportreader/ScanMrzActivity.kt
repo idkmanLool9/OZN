@@ -3,9 +3,11 @@ package com.example.passportreader
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Size
 import android.view.HapticFeedbackConstants
+import android.view.View
 import android.view.animation.AnimationUtils
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -19,6 +21,9 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.ViewCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.passportreader.databinding.ActivityScanMrzBinding
 import com.example.passportreader.mrz.MrzExtractor
@@ -52,9 +57,32 @@ class ScanMrzActivity : AppCompatActivity() {
         binding = ActivityScanMrzBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Start scan-lijn animatie
-        val lineAnim = AnimationUtils.loadAnimation(this, R.anim.scan_line_loop)
-        binding.scanLine.startAnimation(lineAnim)
+        // ─── Edge-to-edge: status/nav bars transparant over de camera ───
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+
+        // Status-bar icons wit (camera-scherm is donker)
+        WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = false
+
+        // Top-controls onder de status bar duwen via inset-padding
+        ViewCompat.setOnApplyWindowInsetsListener(binding.btnClose) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(v.paddingLeft, bars.top, v.paddingRight, v.paddingBottom)
+            insets
+        }
+
+        // ─── Animaties starten ──────────────────────────────────────────
+        binding.scanLine.startAnimation(
+            AnimationUtils.loadAnimation(this, R.anim.scan_line_loop)
+        )
+        binding.statusDot.startAnimation(
+            AnimationUtils.loadAnimation(this, R.anim.dot_pulse)
+        )
+
+        // Close-knop
+        binding.btnClose.setOnClickListener { finish() }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
@@ -106,42 +134,45 @@ class ScanMrzActivity : AppCompatActivity() {
     }
 
     /**
-     * Match-handler: stopt camera DIRECT, toont visuele bevestiging,
-     * dan binnen 350ms door naar NfcReadActivity. Skipt de round-trip
-     * naar MainActivity zodat er geen tussenfase zichtbaar is.
+     * Match-handler: stopt camera DIRECT, toont visuele bevestiging
+     * (groene flash + checkmark + haptic), opent dan NfcRead zonder
+     * MainActivity round-trip.
      */
     private fun onMatchFound(mrz: MrzInfo) {
-        // 1. Camera direct stoppen — geen frames meer renderen, ML Kit niets meer voeren
+        // 1. Camera direct stoppen — geen frames meer renderen
         cameraProvider?.unbindAll()
 
-        // 2. Bottom-sheet wegfaden, success-overlay & checkmark in laten poppen
-        binding.bottomSheet.animate()
-            .alpha(0f)
-            .translationY(40f)
-            .setDuration(180)
-            .start()
+        // 2. Status-dot wordt groen + animatie stopt
+        binding.statusDot.clearAnimation()
+        binding.statusDot.setBackgroundResource(R.drawable.bg_status_dot_found)
+        binding.scanStatus.text = getString(R.string.scan_status_found)
+        binding.scanLine.clearAnimation()
+        binding.scanLine.visibility = View.GONE
 
-        binding.successFlash.visibility = android.view.View.VISIBLE
+        // 3. Titel/subtitel + status fadet weg, scan-frame schaalt licht
+        binding.scanTitle.animate().alpha(0f).setDuration(180).start()
+        binding.scanSubtitle.animate().alpha(0f).setDuration(180).start()
+        binding.statusPill.animate()
+            .alpha(0f).translationY(20f).setDuration(180).start()
+        binding.debugLine.animate().alpha(0f).setDuration(180).start()
+        binding.scanFrame.animate().scaleX(0.96f).scaleY(0.96f).setDuration(220).start()
+
+        // 4. Groene flash + grote checkmark
+        binding.successFlash.visibility = View.VISIBLE
         binding.successFlash.alpha = 0f
-        binding.successFlash.animate().alpha(1f).setDuration(120).start()
+        binding.successFlash.animate().alpha(1f).setDuration(160).start()
 
-        binding.successCheck.visibility = android.view.View.VISIBLE
+        binding.successCheck.visibility = View.VISIBLE
         binding.successCheck.startAnimation(
             AnimationUtils.loadAnimation(this, R.anim.check_pop_in)
         )
 
-        // 3. Haptic feedback — kort tikje (vereist geen permission)
+        // 5. Haptic feedback — kort tikje (no extra permission)
         binding.root.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
 
-        // 4. Status-text update voor screen readers
-        binding.scanStatus.text = getString(R.string.scan_matched)
-        binding.debugLine.text = "✓ ${mrz.documentNumber}"
-
-        // 5. Na 320ms (animatie zichtbaar) door naar NfcRead. Geen
-        //    activity-transitie animatie — anders ploft het check-overlay weg
-        //    voordat NfcRead zichtbaar is.
+        // 6. Na 380ms door naar NfcRead — geen activity-transitie animatie
         lifecycleScope.launch {
-            delay(320)
+            delay(380)
             val intent = Intent(this@ScanMrzActivity, NfcReadActivity::class.java).apply {
                 putExtra(MrzInfo.EXTRA_KEY, mrz)
                 addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
@@ -162,7 +193,7 @@ class ScanMrzActivity : AppCompatActivity() {
 
             lifecycleScope.launch {
                 try {
-                    // ML Kit op IO-dispatcher → Main-thread blijft snel voor UI
+                    // ML Kit op background-dispatcher → Main blijft snel voor UI
                     val mrz = withContext(Dispatchers.Default) {
                         extractor.extract(image)
                     }
