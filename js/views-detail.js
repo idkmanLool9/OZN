@@ -637,7 +637,11 @@ function dlRow(label, value) {
 
 /** Identiteitsdocument-sectie: toont paspoort-kaart visualisatie (door
  *  Android NFC-app gemaakt) + losse pasfoto-thumbnail. Beide met
- *  download-link. Niet rendered als geen van beide aanwezig is. */
+ *  download-link. Niet rendered als geen van beide aanwezig is.
+ *
+ *  Display-default: zwart-wit zoals op de echte paspoort-datapagina.
+ *  Toggle "Toon in kleur" wisselt via CSS-filter. Voorkeur wordt
+ *  onthouden in localStorage. */
 function renderIdentiteitSection(d) {
   const kaartUrl = d.paspoort_kaart_pad ? PaspoortKaart.urlVoor(d.paspoort_kaart_pad) : null;
   const fotoUrl  = d.foto_overledene_pad ? FotoOverledene.urlVoor(d.foto_overledene_pad) : null;
@@ -647,9 +651,16 @@ function renderIdentiteitSection(d) {
   const openLightbox = (url, alt) =>
     `onclick="Lightbox.open('${esc(url)}','${esc(alt)}')"`;
 
+  // Toggle-stand uit localStorage (default false = zwart-wit)
+  const showColor = localStorage.getItem('sok_id_show_color') === '1';
+  const colorClass = showColor ? 'show-color' : '';
+  const toggleLabel = showColor ? '⚫ Origineel (zw/w)' : '🎨 Toon in kleur';
+
   return `
-    <h3>Identiteitsdocument</h3>
-    <div class="identiteit-grid">
+    <h3>Identiteitsdocument
+      <button type="button" class="btn btn-sm btn-ghost no-print" id="btn-id-color-toggle" style="float:right; font-weight:500;">${toggleLabel}</button>
+    </h3>
+    <div class="identiteit-grid ${colorClass}" id="identiteit-grid">
       ${kaartUrl ? `
         <div class="identiteit-kaart">
           <button type="button" class="identiteit-kaart-btn no-print" ${openLightbox(kaartUrl, 'Paspoort/ID')} aria-label="Vergroot paspoort-kaart">
@@ -674,6 +685,19 @@ function renderIdentiteitSection(d) {
         </div>` : ''}
     </div>
   `;
+}
+
+/** Wire de kleur/zw-w toggle nadat de detail-view in DOM staat. */
+function wireIdentiteitColorToggle() {
+  const btn = document.getElementById('btn-id-color-toggle');
+  const grid = document.getElementById('identiteit-grid');
+  if (!btn || !grid) return;
+  btn.addEventListener('click', () => {
+    const nowColor = !grid.classList.contains('show-color');
+    grid.classList.toggle('show-color', nowColor);
+    localStorage.setItem('sok_id_show_color', nowColor ? '1' : '0');
+    btn.textContent = nowColor ? '⚫ Origineel (zw/w)' : '🎨 Toon in kleur';
+  });
 }
 
 function kistRowValue(kistNaam) {
@@ -717,6 +741,7 @@ function edRowValue(naam) {
 function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
+  wireIdentiteitColorToggle();
 
   async function sendOrFallback(btn, toEmail, subject, body) {
     if (!toEmail) {
