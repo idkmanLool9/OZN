@@ -12,8 +12,10 @@ import android.view.animation.AnimationUtils
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -42,6 +44,9 @@ class ScanMrzActivity : AppCompatActivity() {
     private val extractor = MrzExtractor()
     @Volatile private var done = false
     private var cameraProvider: ProcessCameraProvider? = null
+    private var camera: Camera? = null
+    private var torchOn = false
+    private var focusReticle: View? = null
 
     private val permLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -84,6 +89,18 @@ class ScanMrzActivity : AppCompatActivity() {
         // Close-knop
         binding.btnClose.setOnClickListener { finish() }
 
+        // Torch-toggle
+        binding.btnTorch.setOnClickListener { toggleTorch() }
+
+        // Tap-to-focus op de live preview
+        binding.preview.setOnTouchListener { _, event ->
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                handleTapToFocus(event.x, event.y)
+                binding.preview.performClick()
+                true
+            } else false
+        }
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED) {
             startCamera()
@@ -120,17 +137,73 @@ class ScanMrzActivity : AppCompatActivity() {
 
             try {
                 provider.unbindAll()
-                provider.bindToLifecycle(
+                camera = provider.bindToLifecycle(
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
                     analyzer
                 )
+                // Verberg torch-knop op toestellen zonder flash-unit
+                binding.btnTorch.visibility =
+                    if (camera?.cameraInfo?.hasFlashUnit() == true)
+                        View.VISIBLE else View.GONE
             } catch (e: Exception) {
                 Toast.makeText(this, "Camera-fout: ${e.message}", Toast.LENGTH_LONG).show()
                 finish()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun toggleTorch() {
+        val cam = camera ?: return
+        torchOn = !torchOn
+        cam.cameraControl.enableTorch(torchOn)
+        binding.btnTorch.setImageResource(
+            if (torchOn) R.drawable.ic_torch_on else R.drawable.ic_torch
+        )
+        binding.btnTorch.performHapticFeedback(
+            android.view.HapticFeedbackConstants.LONG_PRESS
+        )
+    }
+
+    private fun handleTapToFocus(x: Float, y: Float) {
+        val cam = camera ?: return
+        val point = binding.preview.meteringPointFactory.createPoint(x, y)
+        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF)
+            .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        cam.cameraControl.startFocusAndMetering(action)
+        showFocusReticle(x, y)
+    }
+
+    /** Een kleine cirkel die kortstondig op de tap-positie verschijnt
+     *  zodat de gebruiker visueel feedback krijgt dat focus is getriggerd. */
+    private fun showFocusReticle(x: Float, y: Float) {
+        focusReticle?.let { (it.parent as? android.view.ViewGroup)?.removeView(it) }
+        val size = (72 * resources.displayMetrics.density).toInt()
+        val r = View(this).apply {
+            layoutParams = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(size, size)
+            background = androidx.core.content.ContextCompat.getDrawable(
+                this@ScanMrzActivity, R.drawable.bg_focus_reticle
+            )
+            translationX = x - size / 2f
+            translationY = y - size / 2f
+            scaleX = 1.4f
+            scaleY = 1.4f
+            alpha = 0f
+        }
+        binding.root.addView(r)
+        focusReticle = r
+        r.animate()
+            .alpha(1f).scaleX(1f).scaleY(1f)
+            .setDuration(140)
+            .withEndAction {
+                r.animate()
+                    .alpha(0f).setStartDelay(700).setDuration(220)
+                    .withEndAction { (r.parent as? android.view.ViewGroup)?.removeView(r) }
+                    .start()
+            }
+            .start()
     }
 
     /**

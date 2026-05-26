@@ -40,6 +40,7 @@
     <string name="scan_status_searching">Zoeken naar document…</string>
     <string name="scan_status_found">Document gevonden!</string>
     <string name="scan_close">Sluiten</string>
+    <string name="scan_torch">Zaklamp</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
     <string name="scan_matched">Gelukt! Document herkend.</string>
 
