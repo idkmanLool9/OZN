@@ -87,6 +87,12 @@ ALTER TABLE public.kosten
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS foto_overledene_pad TEXT;
 
+-- Gerenderde paspoort-card visualisatie (door Android app gemaakt) —
+-- toont het hele paspoort in originele NL-layout. Pad naar overledenen/
+-- bucket; webapp kan via getPublicUrl ophalen.
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS paspoort_kaart_pad TEXT;
+
 -- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
 ALTER TABLE public.dossiers
   -- Overledene: partner + kinderen
