@@ -118,34 +118,44 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Handmatige update-check. Geeft directe feedback zodat user weet
-     *  wat er gebeurt — vs. de auto-check op MainActivity die silent
-     *  faalt als er niets te updaten valt. */
+    /** Handmatige update-check. Toont nu expliciet onderscheid tussen
+     *  "geen update beschikbaar", "nieuwere versie gevonden", en
+     *  "check faalde" — vs. de oude versie die altijd "je bent up to
+     *  date" zei, ook bij fouten. */
     private fun triggerUpdateCheck() {
         binding.updateSpinner.visibility = android.view.View.VISIBLE
         binding.cellUpdate.isClickable = false
 
-        AppUpdater.checkForUpdate { info ->
+        AppUpdater.checkForUpdate { result ->
             binding.updateSpinner.visibility = android.view.View.GONE
             binding.cellUpdate.isClickable = true
 
-            if (info == null) {
-                // Geen update beschikbaar OF check faalde. Toon "up to date"
-                // bij assumed-succes, en alleen bij Internet-issue de error.
-                android.widget.Toast.makeText(
-                    this,
-                    getString(R.string.settings_uptodate, BuildConfig.VERSION_NAME),
-                    android.widget.Toast.LENGTH_LONG
-                ).show()
-            } else {
-                AlertDialog.Builder(this)
-                    .setTitle(getString(R.string.settings_update_available, info.versionName))
-                    .setMessage(info.releaseNotes.take(400))
-                    .setNegativeButton(R.string.update_dismiss, null)
-                    .setPositiveButton(R.string.update_install) { _, _ ->
-                        downloadAndInstall(info)
-                    }
-                    .show()
+            when (result) {
+                is AppUpdater.CheckResult.UpdateAvailable -> {
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.settings_update_available,
+                            result.info.versionName))
+                        .setMessage(result.info.releaseNotes.take(400))
+                        .setNegativeButton(R.string.update_dismiss, null)
+                        .setPositiveButton(R.string.update_install) { _, _ ->
+                            downloadAndInstall(result.info)
+                        }
+                        .show()
+                }
+                is AppUpdater.CheckResult.UpToDate -> {
+                    android.widget.Toast.makeText(
+                        this,
+                        getString(R.string.settings_uptodate, result.currentVersion),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                is AppUpdater.CheckResult.Error -> {
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.settings_update_check_failed)
+                        .setMessage(result.reason)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                }
             }
         }
     }
