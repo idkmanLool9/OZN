@@ -13,6 +13,11 @@
     <string name="scan_title">Scan de MRZ</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
 
+    <!-- Achterkant-scan voor BSN op NL ID-kaarten -->
+    <string name="scan_bsn_title">Scan de achterkant</string>
+    <string name="scan_bsn_hint">Het BSN staat op de achterkant van NL ID-kaarten. Houd het in het kader.</string>
+    <string name="scan_bsn_skip">BSN overslaan</string>
+
     <string name="nfc_title">Klaar om te scannen</string>
     <string name="nfc_subtitle">Houd het identiteitsbewijs tegen de achterkant van de telefoon.</string>
     <string name="nfc_cancel">Annuleer</string>
