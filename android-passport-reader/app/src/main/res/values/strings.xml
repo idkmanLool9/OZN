@@ -6,6 +6,7 @@
     <string name="main_subtitle">Lees paspoort of ID-kaart uit via camera en NFC. Gegevens blijven lokaal, totdat je ze zelf aan een dossier koppelt.</string>
     <string name="main_button_scan">Scan ID</string>
     <string name="main_caption">100% lokaal · privacyvriendelijk</string>
+    <string name="main_version">v%1$s (build %2$d)</string>
     <string name="main_logout_confirm_title">Uitloggen?</string>
     <string name="main_logout_confirm_yes">Uitloggen</string>
     <string name="main_logout_confirm_cancel">Annuleer</string>

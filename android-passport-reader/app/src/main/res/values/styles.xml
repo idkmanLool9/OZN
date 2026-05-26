@@ -68,4 +68,20 @@
         <item name="android:textSize">13sp</item>
     </style>
 
+    <!-- ─── iOS-stijl card (vlak, hairline-border, zachte radius) ───── -->
+
+    <style name="iOSCard" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/surface</item>
+        <item name="cardCornerRadius">14dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/hair</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="rippleColor">@color/brand_blue_soft</item>
+    </style>
+
+    <style name="iOSCard.Elevated">
+        <item name="strokeWidth">0dp</item>
+        <item name="cardElevation">2dp</item>
+    </style>
+
 </resources>

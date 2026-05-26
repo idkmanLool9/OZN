@@ -49,6 +49,11 @@ class MainActivity : AppCompatActivity() {
         binding.loginCard.setOnClickListener {
             if (cloud.isLoggedIn) confirmLogout() else openLogin()
         }
+        binding.version.text = getString(
+            R.string.main_version,
+            BuildConfig.VERSION_NAME,
+            BuildConfig.VERSION_CODE
+        )
     }
 
     override fun onResume() {
