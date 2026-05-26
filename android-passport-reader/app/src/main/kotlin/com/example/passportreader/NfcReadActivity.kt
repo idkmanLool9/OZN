@@ -122,8 +122,8 @@ class NfcReadActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        pulseAnimator?.cancel()
-        pulseAnimator = null
+        pulseAnimators.forEach { it.cancel() }
+        pulseAnimators.clear()
     }
 
     override fun onNewIntent(intent: Intent) {
