@@ -313,12 +313,15 @@ class NfcReadActivity : AppCompatActivity() {
         // Foto (DG2) — gebruik decodeFace() voor JPEG2000-fallback via OpenCV.
         // Native BitmapFactory kan geen JP2 lezen en veel NL paspoorten/
         // ID-kaarten gebruiken JP2 voor de pasfoto.
+        // BELANGRIJK: foto wordt standaard zwart-wit getoond zoals op de
+        // echte paspoort-datapagina. Toggle "Toon in kleur" wisselt.
         val photo = root.findViewById<android.widget.ImageView>(R.id.pcPhoto)
         val face = d.faceImageJpeg
         val bmp = if (face != null && face.isNotEmpty()) decodeFace(face) else null
         if (bmp != null) {
             photo.setImageBitmap(bmp)
             photo.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            applyGrayscaleFilter(photo, !showFaceInColor)
         } else {
             photo.setImageResource(R.drawable.ic_person_placeholder)
         }
@@ -672,6 +675,20 @@ class NfcReadActivity : AppCompatActivity() {
 
     private var lastResult: PassportData? = null
 
+    /** Toon de chip-pasfoto in kleur (true) of zwart-wit (false). Default
+     *  false omdat een echt NL paspoort de foto in zw/w print. */
+    private var showFaceInColor = false
+
+    /** Zet (of haal) een grayscale ColorMatrixColorFilter op een ImageView. */
+    private fun applyGrayscaleFilter(view: android.widget.ImageView, gray: Boolean) {
+        if (gray) {
+            val matrix = android.graphics.ColorMatrix().apply { setSaturation(0f) }
+            view.colorFilter = android.graphics.ColorMatrixColorFilter(matrix)
+        } else {
+            view.colorFilter = null
+        }
+    }
+
     private val bsnLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
             val bsn = result.data?.getStringExtra(ScanBsnActivity.RESULT_KEY)
@@ -735,6 +752,22 @@ class NfcReadActivity : AppCompatActivity() {
         renderResultRows(d)
         bindPassportCard(d)
         capturePassportCardAfterLayout()
+
+        // Toggle voor kleur/zw-w op de paspoort-card foto
+        binding.btnFaceColor.text = getString(
+            if (showFaceInColor) R.string.face_show_grayscale else R.string.face_show_color
+        )
+        binding.btnFaceColor.setOnClickListener {
+            showFaceInColor = !showFaceInColor
+            // Re-render alleen de card (sneller dan full showResult)
+            bindPassportCard(d)
+            // Re-capture zodat ALS user nu koppelt, de geüploade card de
+            // huidige toggle-stand heeft
+            capturePassportCardAfterLayout()
+            binding.btnFaceColor.text = getString(
+                if (showFaceInColor) R.string.face_show_grayscale else R.string.face_show_color
+            )
+        }
 
         // Als 't een NL-document is zonder BSN: automatisch achterkant
         // scannen. BSN staat sinds 2014 niet meer in de chip, alleen

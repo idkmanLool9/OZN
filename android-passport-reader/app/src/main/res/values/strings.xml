@@ -59,6 +59,8 @@
     <string name="result_photo_saved">Pasfoto opgeslagen in galerij</string>
     <string name="result_photo_save_failed">Pasfoto opslaan mislukt</string>
     <string name="result_share_chooser_title">Pasfoto delen via…</string>
+    <string name="face_show_color">🎨 Toon in kleur</string>
+    <string name="face_show_grayscale">⚫ Toon zwart-wit (origineel)</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>
     <string name="scan_matched">Gelukt! Document herkend.</string>
 

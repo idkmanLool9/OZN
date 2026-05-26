@@ -1600,6 +1600,18 @@ body { -webkit-overflow-scrolling: touch; }
   width: 100%;
   height: auto;
   display: block;
+  /* Default zwart-wit zoals echte NL paspoort. Toggle via
+     .identiteit-grid.show-color klasse op de container. */
+  filter: grayscale(100%);
+  transition: filter .25s ease;
+}
+.identiteit-grid.show-color .identiteit-kaart-btn img,
+.identiteit-grid.show-color .identiteit-foto-btn img,
+.identiteit-grid.show-color .identiteit-kaart .print-only {
+  filter: none;
+}
+.identiteit-kaart .print-only {
+  filter: grayscale(100%);
 }
 .identiteit-foto-btn {
   max-width: 200px;

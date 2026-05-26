@@ -121,8 +121,12 @@ class DossierPickerActivity : AppCompatActivity() {
                 val patch = passportToPatch(passport).toMutableMap()
                 val faceBytes = passport.faceImageJpeg
                 if (faceBytes != null && faceBytes.isNotEmpty()) {
+                    // DG2-pasfoto kan JP2 zijn — converteer naar echte JPEG
+                    // anders krijgt browser/galerij een onleesbare stream
+                    val realJpeg = com.example.passportreader.util.ImageHelpers
+                        .toRealJpegBytes(faceBytes) ?: faceBytes
                     val path = try {
-                        cloud.uploadOverledeneFoto(d.id, faceBytes)
+                        cloud.uploadOverledeneFoto(d.id, realJpeg)
                     } catch (e: Exception) {
                         throw SupabaseClient.SupabaseException("Pasfoto opslaan mislukt: ${e.message}")
                     }
