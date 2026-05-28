@@ -93,6 +93,22 @@ ALTER TABLE public.dossiers
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS paspoort_kaart_pad TEXT;
 
+-- Tracking: welk lokaal profiel (Rume / Robert) deed de laatste wijziging?
+-- Wordt automatisch geset door de client (ActiveProfile.current().name) bij
+-- elke insert/update op dossiers. Notities en kosten gebruiken hun eigen
+-- 'auteur'-veld.
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS bijgewerkt_door TEXT;
+
+ALTER TABLE public.kosten
+  ADD COLUMN IF NOT EXISTS bijgewerkt_door TEXT;
+
+ALTER TABLE public.documenten
+  ADD COLUMN IF NOT EXISTS bijgewerkt_door TEXT;
+
+-- PostgREST-cache vernieuwen zodat de nieuwe kolommen meteen bruikbaar zijn
+NOTIFY pgrst, 'reload schema';
+
 -- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
 ALTER TABLE public.dossiers
   -- Overledene: partner + kinderen

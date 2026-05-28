@@ -101,6 +101,63 @@ const Cloud = {
   },
 };
 
+// Tabellen die een 'bijgewerkt_door' kolom hebben (zie supabase-schema.sql)
+const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten']);
+
+// Wrapper rond insert/update: als de DB nog geen bijgewerkt_door kolom heeft
+// (oude schema, gebruiker heeft migratie nog niet gedraaid), proberen we het
+// nogmaals zonder het veld in plaats van de hele save te laten falen.
+function isMissingTrackColumn(err) {
+  if (!err) return false;
+  const msg = (err.message || '').toLowerCase();
+  // PostgREST: PGRST204 = "Could not find the 'X' column"
+  // Postgres : 42703  = "column ... does not exist"
+  return (err.code === 'PGRST204' || err.code === '42703') &&
+         msg.includes('bijgewerkt_door');
+}
+
+async function insertWithTrackFallback(tbl, row) {
+  const { data, error } = await sb.from(tbl).insert(row).select().single();
+  if (!error) return data;
+  if (isMissingTrackColumn(error) && row.bijgewerkt_door !== undefined) {
+    const { bijgewerkt_door, ...rest } = row;
+    const retry = await sb.from(tbl).insert(rest).select().single();
+    if (!retry.error) {
+      logTrackColumnHint();
+      return retry.data;
+    }
+  }
+  if (isStaleReferenceError(error)) { await handleStaleCache(); throw error; }
+  Modal.show({ type: 'error', title: 'Opslaan mislukt', message: error.message });
+  throw error;
+}
+
+async function updateWithTrackFallback(tbl, id, patch) {
+  const { data, error } = await sb.from(tbl).update(patch).eq('id', id).select().single();
+  if (!error) return data;
+  if (isMissingTrackColumn(error) && patch.bijgewerkt_door !== undefined) {
+    const { bijgewerkt_door, ...rest } = patch;
+    const retry = await sb.from(tbl).update(rest).eq('id', id).select().single();
+    if (!retry.error) {
+      logTrackColumnHint();
+      return retry.data;
+    }
+  }
+  if (isStaleReferenceError(error)) { await handleStaleCache(); throw error; }
+  Modal.show({ type: 'error', title: 'Bijwerken mislukt', message: error.message });
+  throw error;
+}
+
+let _trackHintLogged = false;
+function logTrackColumnHint() {
+  if (_trackHintLogged) return;
+  _trackHintLogged = true;
+  console.warn(
+    '[uitvaart] Kolom "bijgewerkt_door" ontbreekt — wie-wijzigde-wat-tracking is uit. ' +
+    'Draai de SQL-migratie in supabase-schema.sql (ALTER TABLE dossiers ADD COLUMN bijgewerkt_door TEXT) ' +
+    'gevolgd door NOTIFY pgrst, \'reload schema\';');
+}
+
 function normRow(r) { return r; }
 function normKosten(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
 function normBloem(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
@@ -126,20 +183,21 @@ const DB = {
       throw new Error('offline');
     }
     const u = Auth.current();
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+      ? ActiveProfile.current().name : null;
     const row = Object.assign({}, payload);
     if (tbl === 'dossiers' && u) row.created_by = u.id;
     if (tbl === 'notities' && u) row.auteur_id = u.id;
     if (tbl === 'documenten' && u) row.geupload_door = u.id;
-    cleanEmpty(row);
-    const { data, error } = await sb.from(tbl).insert(row).select().single();
-    if (error) {
-      if (isStaleReferenceError(error)) {
-        await handleStaleCache();
-        throw error;
-      }
-      Modal.show({ type: 'error', title: 'Opslaan mislukt', message: error.message });
-      throw error;
+    // Auto-track: welk profiel (Rume / Robert) deed de wijziging?
+    if (TRACK_TABLES.has(tbl) && profielNaam && row.bijgewerkt_door == null) {
+      row.bijgewerkt_door = profielNaam;
     }
+    if (tbl === 'notities' && profielNaam && !row.auteur) {
+      row.auteur = profielNaam;
+    }
+    cleanEmpty(row);
+    const data = await insertWithTrackFallback(tbl, row);
     const norm = normalize(tbl, data);
     Cloud.cache[tbl].push(norm);
     return norm;
@@ -155,16 +213,13 @@ const DB = {
       throw new Error('offline');
     }
     const p = Object.assign({}, patch);
-    cleanEmpty(p);
-    const { data, error } = await sb.from(tbl).update(p).eq('id', id).select().single();
-    if (error) {
-      if (isStaleReferenceError(error)) {
-        await handleStaleCache();
-        throw error;
-      }
-      Modal.show({ type: 'error', title: 'Bijwerken mislukt', message: error.message });
-      throw error;
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+      ? ActiveProfile.current().name : null;
+    if (TRACK_TABLES.has(tbl) && profielNaam && p.bijgewerkt_door === undefined) {
+      p.bijgewerkt_door = profielNaam;
     }
+    cleanEmpty(p);
+    const data = await updateWithTrackFallback(tbl, id, p);
     const norm = normalize(tbl, data);
     const i = Cloud.cache[tbl].findIndex(x => x.id === id);
     if (i >= 0) Cloud.cache[tbl][i] = norm;

@@ -56,7 +56,7 @@ function renderDossierList(params, path) {
           <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
           <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
           <td><span class="status status-${esc(d.status||'nieuw')}">${esc((d.status||'nieuw').replace('_',' '))}</span></td>
-          <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}</span></td>
+          <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? ' · ' + esc(d.bijgewerkt_door) : ''}</span></td>
         </tr>`).join('')}
       </tbody></table>`}
     </div>`;
@@ -139,8 +139,8 @@ function renderAccount(msg) {
         ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
         ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
         <form id="pw-form" class="form" autocomplete="off">
-          <label><span>Nieuw wachtwoord</span><input type="password" name="nieuw" required minlength="6"></label>
-          <label><span>Herhaal nieuw wachtwoord</span><input type="password" name="herhaal" required minlength="6"></label>
+          <label><span>Nieuw wachtwoord</span><input type="password" name="nieuw" required minlength="8" autocomplete="new-password"></label>
+          <label><span>Herhaal nieuw wachtwoord</span><input type="password" name="herhaal" required minlength="8" autocomplete="new-password"></label>
           <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
         </form>
       </section>
@@ -982,10 +982,26 @@ function renderAccount(msg) {
   $('#pw-form').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
-    if (f.nieuw.value !== f.herhaal.value) return renderAccount({ error: 'Wachtwoorden komen niet overeen.' });
-    if (f.nieuw.value.length < 6) return renderAccount({ error: 'Minstens 6 tekens.' });
+    if (f.nieuw.value !== f.herhaal.value) {
+      return Modal.show({ type: 'warning', title: 'Wachtwoorden verschillen',
+        message: 'De twee wachtwoorden zijn niet gelijk. Vul ze allebei opnieuw in.' });
+    }
+    if (f.nieuw.value.length < 8) {
+      return Modal.show({ type: 'warning', title: 'Te kort',
+        message: 'Kies een wachtwoord van minstens 8 tekens — voor de zekerheid.' });
+    }
+    const btn = f.querySelector('button[type="submit"]');
+    const origText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Bezig...';
     const err = await Auth.changePassword(f.nieuw.value);
-    renderAccount(err ? { error: err } : { success: 'Wachtwoord gewijzigd.' });
+    btn.disabled = false; btn.textContent = origText;
+    if (err) {
+      Modal.show({ type: 'error', title: 'Wijzigen mislukt', message: err });
+    } else {
+      f.reset();
+      Modal.show({ type: 'success', title: 'Wachtwoord gewijzigd',
+        message: 'Je nieuwe wachtwoord is meteen actief op alle apparaten waar je bent ingelogd.' });
+    }
   });
 
   const syncBtn = $('#btn-sync-now');

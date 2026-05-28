@@ -66,7 +66,7 @@ function renderDossierDetail(params) {
           </p>
           <p class="muted small dossier-timestamps">
             Aangemaakt: <strong title="${esc(d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.created_at) || '—')}</strong>
-            · Laatst opgeslagen: <strong title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at) || '—')}</strong>
+            · Laatst opgeslagen: <strong title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at) || '—')}</strong>${d.bijgewerkt_door ? ' door <strong>' + esc(d.bijgewerkt_door) + '</strong>' : ''}
           </p>
         </div>
         <div class="page-actions">
@@ -963,9 +963,11 @@ function bindDetailEvents(id) {
   $('#add-notitie').addEventListener('submit', async e => {
     e.preventDefault();
     const tekst = e.target.tekst.value.trim(); if (!tekst) return;
+    const profiel = ActiveProfile.current();
     const u = Auth.current();
+    const auteur = profiel ? profiel.name : (u ? (u.fullName || u.email) : 'Onbekend');
     try {
-      await DB.insert(KEYS.NOTITIES, { dossier_id: id, tekst, auteur: u ? (u.fullName || u.email) : 'Onbekend' });
+      await DB.insert(KEYS.NOTITIES, { dossier_id: id, tekst, auteur });
       await DB.touchDossier(id);
       renderDossierDetail({ id });
     } catch (_) {}
