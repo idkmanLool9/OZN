@@ -710,6 +710,7 @@ const Router = {
     const path = fullHash.split('?')[0].split('#')[0];
 
     if (!Auth.current()) { showLogin(); return; }
+    if (!ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();
 
     for (const r of Router.routes) {
@@ -904,8 +905,49 @@ class SignaturePad {
   }
 }
 
-function showLogin() { $('#login-screen').hidden = false; $('#app').hidden = true; }
-function showApp() {
-  $('#login-screen').hidden = true; $('#app').hidden = false;
-  const s = Auth.current(); if (s) $('#user-name').textContent = s.fullName || s.email;
+function showLogin() {
+  $('#login-screen').hidden = false;
+  $('#profile-screen').hidden = true;
+  $('#app').hidden = true;
 }
+function showProfilePicker() {
+  $('#login-screen').hidden = true;
+  $('#profile-screen').hidden = false;
+  $('#app').hidden = true;
+}
+function showApp() {
+  $('#login-screen').hidden = true;
+  $('#profile-screen').hidden = true;
+  $('#app').hidden = false;
+  const s = Auth.current(); if (s) $('#user-name').textContent = s.fullName || s.email;
+  ActiveProfile.renderChip();
+}
+
+// ─── Actief profiel (Rume / Robert) — onthouden in localStorage ───
+const ActiveProfile = {
+  PROFILES: {
+    rume:   { id: 'rume',   name: 'Rume',   role: 'Uitvaartleider', color: '#6b1e2a' },
+    robert: { id: 'robert', name: 'Robert', role: 'Uitvaartleider', color: '#2a5d6b' },
+  },
+  STORAGE_KEY: 'sok_active_profile',
+  current() {
+    try {
+      const id = localStorage.getItem(ActiveProfile.STORAGE_KEY);
+      return id && ActiveProfile.PROFILES[id] ? ActiveProfile.PROFILES[id] : null;
+    } catch (_) { return null; }
+  },
+  set(id) {
+    if (!ActiveProfile.PROFILES[id]) return;
+    try { localStorage.setItem(ActiveProfile.STORAGE_KEY, id); } catch (_) {}
+  },
+  clear() {
+    try { localStorage.removeItem(ActiveProfile.STORAGE_KEY); } catch (_) {}
+  },
+  renderChip() {
+    const p = ActiveProfile.current();
+    const chip = $('#btn-active-profile');
+    if (!chip || !p) return;
+    $('#active-profile-name').textContent = p.name;
+    $('#active-profile-dot').style.background = p.color;
+  },
+};

@@ -476,6 +476,72 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 .notitie-meta { display: flex; align-items: center; gap: .75rem; margin-bottom: .35rem; }
 .prewrap { white-space: pre-wrap; word-wrap: break-word; }
 
+/* Profielkeuze — "Wie werkt er vandaag?" */
+.profile-screen {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  padding: 1.5rem; overflow: auto;
+}
+body:has(#profile-screen:not([hidden])) { overflow: hidden; }
+.profile-card {
+  width: 100%; max-width: 520px;
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 2.5rem 2rem 2rem;
+  box-shadow: 0 30px 60px rgba(0,0,0,.3);
+  text-align: center;
+}
+.profile-title {
+  margin: 0 0 .5rem; font-size: 1.6rem; font-weight: 600;
+  color: var(--text); letter-spacing: -0.5px;
+}
+.profile-subtitle {
+  margin: 0 0 2rem; color: var(--muted); font-size: .95rem; line-height: 1.5;
+}
+.profile-options {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+}
+@media (max-width: 480px) { .profile-options { grid-template-columns: 1fr; } }
+.profile-option {
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  padding: 1.5rem 1rem; border: 2px solid var(--border); border-radius: 16px;
+  background: var(--surface); cursor: pointer; transition: all .2s;
+  font-family: inherit;
+}
+.profile-option:hover {
+  border-color: var(--primary); transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,.08);
+}
+.profile-option:active { transform: translateY(0); }
+.profile-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 1.8rem; font-weight: 600;
+  font-family: var(--font-heading, Georgia, serif);
+}
+.profile-name {
+  font-size: 1.1rem; font-weight: 600; color: var(--text); margin-top: .25rem;
+}
+.profile-role {
+  font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+}
+
+/* Topbar-chip die het actieve profiel toont */
+.active-profile-chip {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .35rem .75rem; border: 1px solid var(--border);
+  border-radius: 999px; background: var(--bg);
+  cursor: pointer; font-family: inherit;
+  font-size: .85rem; color: var(--text); font-weight: 500;
+  transition: background .15s, border-color .15s;
+}
+.active-profile-chip:hover { background: var(--primary-soft); border-color: var(--primary); }
+.active-profile-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--primary);
+  flex-shrink: 0;
+}
+
 /* Login — split-screen, vast op het scherm (geen scroll) */
 .login-screen {
   position: fixed; inset: 0; z-index: 100;

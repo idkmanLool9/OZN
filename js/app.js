@@ -722,9 +722,30 @@ Router.add('/account', () => renderAccount());
 
   document.getElementById('btn-logout').addEventListener('click', async () => {
     await Auth.logout();
+    ActiveProfile.clear();
     Cloud.cache = { dossiers: [], taken: [], kosten: [], notities: [], documenten: [] };
     Cloud.loaded = false;
     location.hash = '';
+    Router.handle();
+  });
+
+  // ─── Profielkeuze: Rume of Robert ────────────────────────────
+  document.querySelectorAll('#profile-screen .profile-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-profile');
+      ActiveProfile.set(id);
+      Router.handle();
+    });
+  });
+  document.getElementById('profile-logout').addEventListener('click', async () => {
+    await Auth.logout();
+    ActiveProfile.clear();
+    location.hash = '';
+    Router.handle();
+  });
+  // Klik op de chip in de topbar → terug naar profielkeuze
+  document.getElementById('btn-active-profile').addEventListener('click', () => {
+    ActiveProfile.clear();
     Router.handle();
   });
 

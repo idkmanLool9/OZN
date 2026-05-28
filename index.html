@@ -122,6 +122,27 @@
     </main>
   </section>
 
+  <!-- Wie werkt vandaag? -->
+  <section id="profile-screen" class="profile-screen" hidden>
+    <div class="profile-card">
+      <h1 class="profile-title">Wie werkt er vandaag?</h1>
+      <p class="profile-subtitle">Kies hieronder met wie je bent ingelogd — zo blijft duidelijk wie wat heeft bijgewerkt in de dossiers.</p>
+      <div class="profile-options">
+        <button type="button" class="profile-option" data-profile="rume">
+          <span class="profile-avatar" style="background:#6b1e2a;">R</span>
+          <span class="profile-name">Rume</span>
+          <span class="profile-role">Uitvaartleider</span>
+        </button>
+        <button type="button" class="profile-option" data-profile="robert">
+          <span class="profile-avatar" style="background:#2a5d6b;">R</span>
+          <span class="profile-name">Robert</span>
+          <span class="profile-role">Uitvaartleider</span>
+        </button>
+      </div>
+      <button type="button" id="profile-logout" class="btn btn-ghost btn-sm" style="margin-top:1.5rem;">Uitloggen</button>
+    </div>
+  </section>
+
   <!-- App -->
   <div id="app" hidden>
     <header class="topbar">
@@ -143,6 +164,10 @@
         </nav>
         <div class="user-area">
           <span class="offline-badge" id="offline-badge" hidden title="Geen internet — leesmodus">offline</span>
+          <button type="button" id="btn-active-profile" class="active-profile-chip" title="Wissel actieve gebruiker">
+            <span class="active-profile-dot" id="active-profile-dot"></span>
+            <span class="active-profile-name" id="active-profile-name"></span>
+          </button>
           <span class="user-name" id="user-name"></span>
           <button type="button" id="btn-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
         </div>
