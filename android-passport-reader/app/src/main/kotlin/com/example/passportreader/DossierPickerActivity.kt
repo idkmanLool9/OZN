@@ -172,8 +172,11 @@ class DossierPickerActivity : AppCompatActivity() {
 
     // ─── Mapping van DG1-velden naar dossier-kolommen ──────────────────────
     private fun passportToPatch(p: PassportData): Map<String, String?> {
-        val voornaam = p.givenNames?.split(" ")?.firstOrNull()?.takeIf { it.isNotBlank() }
+        val voornaam = p.givenNames?.split(" ")?.firstOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { toProperCase(it) }
         val achternaam = p.surname?.trim()?.takeIf { it.isNotBlank() }
+            ?.let { toProperCase(it) }
         val geboortedatum = isoFromYYMMDD(p.dateOfBirth)
         val geslacht = when (p.gender?.uppercase()) {
             "MALE", "M" -> "M"
@@ -189,13 +192,30 @@ class DossierPickerActivity : AppCompatActivity() {
             "geslacht" to geslacht,
             "nationaliteit" to nat,
             "bsn" to bsn,
-            // DG11-velden — alleen patchen als gevuld
-            "geboorteplaats" to p.placeOfBirth,
-            "adres_overledene" to p.address,
-            "postcode_overledene" to p.postcode,
-            "woonplaats_overledene" to p.city,
-            "beroep" to p.profession,
+            // DG11-velden — alleen patchen als gevuld. Title-case op tekstuele
+            // velden zodat chip-uppercase niet rauw in het dossier eindigt.
+            "geboorteplaats" to toProperCase(p.placeOfBirth),
+            "adres_overledene" to toProperCase(p.address),
+            "postcode_overledene" to p.postcode?.uppercase(),
+            "woonplaats_overledene" to toProperCase(p.city),
+            "beroep" to toProperCase(p.profession),
         )
+    }
+
+    /** Converteer een uppercase MRZ-string naar normale schrijfwijze:
+     *  alleen eerste letter van elk woord een hoofdletter, rest lowercase.
+     *  "WILLEKE LISELOTTE" → "Willeke Liselotte"
+     *  "DE BRUIJN" → "De Bruijn"
+     *  "JAN-PETER" → "Jan-Peter"
+     */
+    private fun toProperCase(text: String?): String? {
+        if (text.isNullOrBlank()) return text
+        // Split op whitespace en hyphen, bewaar de separators
+        return text.lowercase().split(Regex("(?=[ \\-])|(?<=[ \\-])"))
+            .joinToString("") { token ->
+                if (token.isEmpty() || token[0] == ' ' || token[0] == '-') token
+                else token[0].uppercaseChar() + token.substring(1)
+            }
     }
 
     /** Initials van naam: "Jan Janssen" → "JJ", "M. de Vries" → "MV" */
