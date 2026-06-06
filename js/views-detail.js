@@ -166,15 +166,13 @@ function renderDossierDetail(params) {
         })()}
       </section>
 
-      <section id="kosten" class="card kosten-card ${localStorage.getItem('sok_kosten_collapsed') === '1' ? 'collapsed' : ''}">
-        <div class="kosten-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
-          <button type="button" class="kosten-toggle-btn" id="btn-kosten-toggle" aria-expanded="${localStorage.getItem('sok_kosten_collapsed') === '1' ? 'false' : 'true'}" aria-controls="kosten-body" title="In- of uitklappen">
-            <span class="kosten-chevron" aria-hidden="true">▾</span>
-            <h2 style="border:none;padding:0;margin:0;display:inline;">Kosten</h2>
-            ${kosten.length > 0 ? `<span class="muted small kosten-summary">· ${kosten.length} ${kosten.length === 1 ? 'post' : 'posten'} · ${fmtEUR(totaal)}${moetNogBetalen > 0 ? ` · <strong style="color:#b34;">open ${fmtEUR(moetNogBetalen)}</strong>` : ' · <strong style="color:#2a7a3a;">volledig betaald</strong>'}</span>` : ''}
-          </button>
-          ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm">📄 Factuur openen</a>` : ''}
-        </div>
+      <section id="kosten" class="card kosten-card ${localStorage.getItem('sok_kosten_collapsed') !== '0' ? 'collapsed' : ''}">
+        <button type="button" class="kosten-header" id="btn-kosten-toggle" aria-expanded="${localStorage.getItem('sok_kosten_collapsed') !== '0' ? 'false' : 'true'}" aria-controls="kosten-body" title="Klik om in- of uit te klappen">
+          <span class="kosten-chevron" aria-hidden="true">▾</span>
+          <h2 style="border:none;padding:0;margin:0;display:inline;">Kosten</h2>
+          ${kosten.length > 0 ? `<span class="muted small kosten-summary">· ${kosten.length} ${kosten.length === 1 ? 'post' : 'posten'} · ${fmtEUR(totaal)}${moetNogBetalen > 0 ? ` · <strong style="color:#b34;">open ${fmtEUR(moetNogBetalen)}</strong>` : ' · <strong style="color:#2a7a3a;">volledig betaald</strong>'}</span>` : ''}
+          ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm kosten-factuur-link" onclick="event.stopPropagation()">📄 Factuur openen</a>` : ''}
+        </button>
         <div id="kosten-body" class="kosten-body">
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' : (() => {
           // Groepeer per categorie in vaste volgorde
