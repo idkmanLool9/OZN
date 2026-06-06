@@ -27,8 +27,6 @@ function renderDossierList(params, path) {
       <div class="page-head">
         <h1>Dossiers</h1>
         <div class="page-actions">
-          <button type="button" class="btn btn-ghost" id="btn-scan-intake" title="Scan een ingevuld papieren intake-formulier en maak er automatisch een dossier van">📷 Scan intake</button>
-          <button type="button" class="btn btn-ghost" id="btn-scan-id" title="Scan een paspoort of ID-kaart en maak er automatisch een dossier van">🆔 Scan ID</button>
           <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
         </div>
       </div>
@@ -60,30 +58,6 @@ function renderDossierList(params, path) {
         </tr>`).join('')}
       </tbody></table>`}
     </div>`;
-
-  // Scan intake — papieren formulier inscannen → OCR → dossier voorgevuld
-  const scanBtn = $('#btn-scan-intake');
-  if (scanBtn) {
-    scanBtn.addEventListener('click', async () => {
-      try { await IntakeScan.start(); }
-      catch (e) {
-        Modal.show({ type: 'error', title: 'Scan mislukt',
-          message: e.message || String(e) });
-      }
-    });
-  }
-
-  // Scan ID/paspoort — voor + achterkant OCR → nieuw dossier
-  const scanIdBtn = $('#btn-scan-id');
-  if (scanIdBtn) {
-    scanIdBtn.addEventListener('click', async () => {
-      try { await IDScan.scanForNew(); }
-      catch (e) {
-        Modal.show({ type: 'error', title: 'Scan mislukt',
-          message: e.message || String(e) });
-      }
-    });
-  }
 
   $('#filter-form').addEventListener('submit', e => {
     e.preventDefault();
