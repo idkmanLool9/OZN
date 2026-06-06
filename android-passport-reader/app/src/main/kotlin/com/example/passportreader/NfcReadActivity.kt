@@ -92,6 +92,7 @@ class NfcReadActivity : AppCompatActivity() {
         binding.btnDone.setOnClickListener { finish() }
         binding.btnCancel.setOnClickListener { finish() }
         binding.btnCouple.setOnClickListener { onCoupleClicked() }
+        binding.btnDelete.setOnClickListener { onDeleteClicked() }
         binding.btnRetry.setOnClickListener {
             binding.btnRetry.visibility = View.GONE
             binding.errorMsg.visibility = View.GONE
@@ -702,6 +703,20 @@ class NfcReadActivity : AppCompatActivity() {
             }
         }
 
+    /** Gooi de huidige scan-resultaat weg en sluit terug naar Main — daar
+     *  kan user opnieuw beginnen. iOS trash-knop conventie. */
+    private fun onDeleteClicked() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.result_delete_confirm_title)
+            .setMessage(R.string.result_delete_confirm_msg)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.result_delete) { _, _ ->
+                lastResult = null
+                finish()
+            }
+            .show()
+    }
+
     private fun onCoupleClicked() {
         val data = lastResult ?: return
         val cloud = SupabaseClient.get(this)
@@ -719,6 +734,16 @@ class NfcReadActivity : AppCompatActivity() {
         stopPulse()
         binding.readingState.visibility = View.GONE
         binding.resultState.visibility = View.VISIBLE
+
+        // iOS bottom-sheet style slide-up animatie (vanaf onderkant)
+        binding.resultState.translationY = 240f
+        binding.resultState.alpha = 0f
+        binding.resultState.animate()
+            .translationY(0f)
+            .alpha(1f)
+            .setDuration(320)
+            .setInterpolator(android.view.animation.DecelerateInterpolator(1.6f))
+            .start()
 
         // Bewaar in recente-scans cache (versleuteld lokaal, max 5)
         val fullName = listOfNotNull(d.givenNames, d.surname)

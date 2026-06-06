@@ -13,18 +13,18 @@
         android:clipChildren="false"
         android:clipToPadding="false"
         android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
         android:paddingTop="56dp"
         android:paddingBottom="28dp">
 
-        <!-- ─── Reading-state ─── -->
+        <!-- ─── Reading-state (heeft eigen horizontale padding, sheet niet) ─── -->
         <LinearLayout
             android:id="@+id/readingState"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:clipChildren="false"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp">
 
             <!-- Concentrische pulse-ringen rond NFC-icoon -->
             <FrameLayout
@@ -168,13 +168,27 @@
                 android:text="@string/nfc_cancel"/>
         </LinearLayout>
 
-        <!-- ─── Result-state ─── -->
+        <!-- ─── Result-state als iOS bottom-sheet ─── -->
         <LinearLayout
             android:id="@+id/resultState"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@drawable/bg_bottom_sheet"
+            android:layout_marginTop="20dp"
             android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="20dp"
             android:visibility="gone">
+
+            <!-- Drag-handle bovenaan (iOS sheet-conventie) -->
+            <View
+                android:layout_width="44dp"
+                android:layout_height="5dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="20dp"
+                android:background="@drawable/bg_drag_handle"/>
 
             <TextView
                 style="@style/iOSText.LargeBold"
@@ -289,12 +303,42 @@
                     android:paddingBottom="8dp"/>
             </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnCouple"
-                style="@style/iOSButton.PrimaryLarge"
+            <!-- Confirm + Delete-knop naast elkaar (iOS-stijl met trash-knop
+                 om de scan te annuleren en opnieuw te beginnen) -->
+            <LinearLayout
                 android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="28dp"
-                android:text="@string/nfc_couple_button"/>
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCouple"
+                    style="@style/iOSButton.PrimaryLarge"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="@string/nfc_couple_button"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDelete"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:layout_marginStart="10dp"
+                    android:contentDescription="@string/result_delete"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:padding="0dp"
+                    app:cornerRadius="14dp"
+                    app:icon="@drawable/ic_trash"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconSize="22dp"
+                    app:iconTint="@color/red"
+                    app:strokeColor="@color/hair"
+                    app:strokeWidth="1dp"/>
+            </LinearLayout>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDone"

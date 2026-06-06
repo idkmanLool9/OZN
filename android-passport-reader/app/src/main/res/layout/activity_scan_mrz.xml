@@ -64,6 +64,20 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"/>
 
+    <!-- Help-icoon links van torch — opent uitleg-dialog -->
+    <ImageButton
+        android:id="@+id/btnHelp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/bg_close_button"
+        android:contentDescription="@string/intro_help"
+        android:padding="8dp"
+        android:src="@drawable/ic_help_circle"
+        app:layout_constraintEnd_toStartOf="@id/btnTorch"
+        app:layout_constraintTop_toTopOf="parent"/>
+
     <!-- Grote, vette titel — Apple's large-title typografie -->
     <TextView
         android:id="@+id/scanTitle"
