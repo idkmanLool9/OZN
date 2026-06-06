@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.passportreader"
         minSdk = 23                // EncryptedSharedPreferences vereist 23+
         targetSdk = 34
-        versionCode = 24
-        versionName = "1.5.1"
+        versionCode = 25
+        versionName = "1.5.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // OpenCV bevat native .so's voor 4 ABI's; alleen de twee ARM-
@@ -34,7 +34,25 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$sbAnonKey\"")
     }
 
+    // Vaste debug-signing keystore zodat ALLE builds (CI + lokaal) met
+    // dezelfde key tekenen. Anders krijg je bij elke update een
+    // "package conflicts with existing package" foutmelding op Android
+    // omdat een andere key niet over de vorige install heen mag.
+    // Keystore zelf staat in de repo (../debug.keystore) — slechts een
+    // debug-key, geen production-secret.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("../debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
