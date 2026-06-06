@@ -1,35 +1,5 @@
 // Dossier detail: overzicht + taken + kosten + notities + print
 
-function isImageDoc(doc) {
-  if (!doc) return false;
-  const src = (doc.naam || '') + ' ' + (doc.storage_pad || '');
-  return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)(\?|$)/i.test(src);
-}
-
-// Cache van signed-URLs binnen één render-tick zodat we ze niet dubbel ophalen
-const _docUrlCache = new Map();
-
-async function loadDocThumbnails(documenten) {
-  const imgs = documenten.filter(isImageDoc);
-  await Promise.all(imgs.map(async doc => {
-    const el = document.querySelector(`img.doc-thumb[data-doc-id="${doc.id}"]`);
-    if (!el) return;
-    try {
-      let url = _docUrlCache.get(doc.storage_pad);
-      if (!url) {
-        url = await Storage.signedUrl(doc.storage_pad, 600); // 10 min
-        _docUrlCache.set(doc.storage_pad, url);
-      }
-      el.src = url;
-      el.alt = doc.naam || 'document';
-    } catch (_) {
-      // val terug op icoon
-      const wrap = el.closest('.doc-thumb-btn');
-      if (wrap) wrap.outerHTML = '<div class="doc-icon" aria-hidden="true">📄</div>';
-    }
-  }));
-}
-
 function renderDossierDetail(params) {
   const id = parseInt(params.id, 10);
   const d = DB.byId(KEYS.DOSSIERS, id);
@@ -37,7 +7,6 @@ function renderDossierDetail(params) {
 
   const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
   const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-  const documenten = DB.where(KEYS.DOCUMENTEN, doc => doc.dossier_id === id).sort((a, b) => (b.geupload_op || '').localeCompare(a.geupload_op || ''));
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzekerd = d.verzekering_status === 'met verzekering';
@@ -85,7 +54,6 @@ function renderDossierDetail(params) {
       <nav class="tabs">
         <a href="#/dossiers/${d.id}#overzicht">Overzicht</a>
         <a href="#/dossiers/${d.id}#kosten">Kosten</a>
-        <a href="#/dossiers/${d.id}#documenten">Documenten (${documenten.length})</a>
         <a href="#/dossiers/${d.id}#notities">Notities (${notities.length})</a>
       </nav>
 
@@ -333,58 +301,6 @@ function renderDossierDetail(params) {
         </form>
       </section>
 
-      <section id="documenten" class="card">
-        <h2>Documenten</h2>
-        ${documenten.length === 0 ? '<p class="muted">Nog geen documenten geüpload.</p>' :
-          '<ul class="doc-list">' + documenten.map(doc => {
-            const isImg = isImageDoc(doc);
-            return `
-            <li class="doc-item">
-              ${isImg
-                ? `<button type="button" class="doc-thumb-btn" data-action="zoom-doc" data-id="${doc.id}" title="Klik om te vergroten">
-                     <img class="doc-thumb" data-doc-id="${doc.id}" alt="">
-                   </button>`
-                : `<div class="doc-icon" aria-hidden="true">📄</div>`}
-              <div class="doc-info">
-                <button type="button" class="link-btn" data-action="download-doc" data-id="${doc.id}">${esc(doc.naam)}</button>
-                ${doc.type ? `<span class="badge">${esc(doc.type)}</span>` : ''}
-                <span class="muted small">${doc.grootte ? Math.round(doc.grootte/1024) + ' KB · ' : ''}${esc(fmtDate(doc.geupload_op))}</span>
-              </div>
-              <button type="button" class="btn-icon" data-action="del-doc" data-id="${doc.id}" title="Verwijderen">×</button>
-            </li>`;
-          }).join('') + '</ul>'}
-        <form id="add-doc" class="row-form">
-          <input type="text" name="naam" placeholder="Documentnaam (optioneel)">
-          <select name="type">
-            <option value="">Type</option>
-            <option value="overlijdensakte">Overlijdensakte</option>
-            <option value="identiteitsbewijs">Identiteitsbewijs</option>
-            <option value="medische verklaring">Medische verklaring</option>
-            <option value="verzekeringspolis">Verzekeringspolis</option>
-            <option value="grafrechten">Grafrechten</option>
-            <option value="verlof tot begraven">Verlof tot begraven</option>
-            <option value="overig">Overig</option>
-          </select>
-          <input type="file" name="bestand" id="add-doc-file" accept="image/*,application/pdf" capture="environment" required>
-          <label class="btn btn-ghost" title="Document/ID-kaart scannen met automatische uitsnijding en correctie" style="cursor:pointer;">
-            📸 Scan ID
-            <input type="file" id="scan-doc-file" accept="image/*" capture="environment" hidden>
-          </label>
-          <button type="submit" class="btn">+ Uploaden</button>
-        </form>
-        <div id="scan-preview" class="scan-preview" hidden>
-          <img id="scan-preview-img" alt="Scan-voorbeeld">
-          <div class="scan-preview-meta">
-            <strong>Scan klaar</strong>
-            <span class="muted small" id="scan-preview-info"></span>
-            <div class="scan-preview-actions">
-              <button type="button" class="btn btn-sm btn-ghost" id="scan-preview-clear">✕ Wis scan</button>
-            </div>
-          </div>
-        </div>
-        <p class="muted small" style="margin-top:.35rem;">Tip: <strong>📸 Scan ID</strong> snijdt automatisch het document uit, zet het recht en corrigeert het perspectief — zoals een professionele scan-app.</p>
-      </section>
-
       <section id="notities" class="card">
         <h2>Notities</h2>
         <form id="add-notitie" class="form">
@@ -405,7 +321,6 @@ function renderDossierDetail(params) {
     </div>`;
 
   bindDetailEvents(id);
-  loadDocThumbnails(documenten);
 }
 
 function toWaNumber(tel) {
@@ -805,93 +720,6 @@ function bindDetailEvents(id) {
     });
   });
 
-  // Scan-knop: foto maken → auto-crop → in het bestandskeuze-veld zetten
-  const scanInput = $('#scan-doc-file');
-  if (scanInput) {
-    scanInput.addEventListener('change', async e => {
-      const file = e.target.files[0]; if (!file) return;
-      if (!file.type.startsWith('image/')) {
-        Modal.show({ type: 'error', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen kunnen gescand worden.' });
-        return;
-      }
-      // Toon niet-blokkerende laad-modal; sluiten we straks zelf via Modal.close()
-      let userCancelled = false;
-      let programmaticClose = false;
-      Modal.show({
-        type: 'info',
-        title: 'Bezig met scannen...',
-        message: 'De scan-bibliotheek wordt geladen en je foto wordt automatisch uitgesneden, rechtgezet en gecorrigeerd. Dit kan een paar seconden duren bij de eerste keer.',
-        confirmText: 'Annuleren',
-      }).then(() => { if (!programmaticClose) userCancelled = true; });
-      try {
-        const scanned = await DocumentScanner.scan(file);
-        if (userCancelled) return;
-        // Vervang het bestand in de upload-input
-        const dt = new DataTransfer();
-        dt.items.add(scanned);
-        const fileInp = $('#add-doc-file');
-        fileInp.files = dt.files;
-        // Stel automatisch type in op identiteitsbewijs als nog niet ingevuld
-        const typeSel = $('#add-doc select[name="type"]');
-        if (typeSel && !typeSel.value) typeSel.value = 'identiteitsbewijs';
-        // Toon preview
-        const prev = $('#scan-preview');
-        const img = $('#scan-preview-img');
-        const info = $('#scan-preview-info');
-        if (img._objectUrl) URL.revokeObjectURL(img._objectUrl);
-        const url = URL.createObjectURL(scanned);
-        img._objectUrl = url;
-        img.src = url;
-        info.textContent = `${(scanned.size/1024).toFixed(0)} KB · klaar om te uploaden`;
-        prev.hidden = false;
-        // Loading-modal nu wegklikken — werk is klaar
-        programmaticClose = true;
-        Modal.close();
-      } catch (err) {
-        programmaticClose = true;
-        Modal.close();
-        Modal.show({ type: 'error', title: 'Scannen mislukt', message: err.message || String(err) });
-      } finally {
-        scanInput.value = ''; // reset zodat hetzelfde bestand opnieuw te kiezen is
-      }
-    });
-  }
-
-  const scanClear = $('#scan-preview-clear');
-  if (scanClear) {
-    scanClear.addEventListener('click', () => {
-      const fileInp = $('#add-doc-file');
-      if (fileInp) fileInp.value = '';
-      const prev = $('#scan-preview');
-      const img = $('#scan-preview-img');
-      if (img._objectUrl) { URL.revokeObjectURL(img._objectUrl); img._objectUrl = null; }
-      img.removeAttribute('src');
-      prev.hidden = true;
-    });
-  }
-
-  $('#add-doc').addEventListener('submit', async e => {
-    e.preventDefault();
-    const f = e.target;
-    const file = f.bestand.files[0]; if (!file) return;
-    const btn = f.querySelector('button[type=submit]');
-    btn.disabled = true; const old = btn.textContent; btn.textContent = 'Bezig met uploaden...';
-    try {
-      const path = await Storage.upload(id, file);
-      await DB.insert(KEYS.DOCUMENTEN, {
-        dossier_id: id,
-        naam: (f.naam.value || file.name).trim(),
-        type: f.type.value || null,
-        storage_pad: path,
-        grootte: file.size,
-      });
-      await DB.touchDossier(id);
-      renderDossierDetail({ id });
-    } catch (_) {
-      btn.disabled = false; btn.textContent = old;
-    }
-  });
-
   $('#add-notitie').addEventListener('submit', async e => {
     e.preventDefault();
     const tekst = e.target.tekst.value.trim(); if (!tekst) return;
@@ -943,28 +771,6 @@ function bindDetailEvents(id) {
         } else {
           await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
         }
-        await DB.touchDossier(id); renderDossierDetail({ id });
-      } else if (action === 'download-doc') {
-        const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
-        const url = await Storage.signedUrl(doc.storage_pad, 60);
-        window.open(url, '_blank');
-      } else if (action === 'zoom-doc') {
-        const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
-        let url = _docUrlCache.get(doc.storage_pad);
-        if (!url) {
-          url = await Storage.signedUrl(doc.storage_pad, 600);
-          _docUrlCache.set(doc.storage_pad, url);
-        }
-        Lightbox.show({
-          src: url,
-          title: doc.naam || '',
-          subtitle: [doc.type, doc.grootte ? Math.round(doc.grootte/1024) + ' KB' : '', fmtDate(doc.geupload_op)].filter(Boolean).join(' · '),
-        });
-      } else if (action === 'del-doc') {
-        if (!confirm('Document verwijderen?')) return;
-        const doc = DB.byId(KEYS.DOCUMENTEN, tid); if (!doc) return;
-        await Storage.remove(doc.storage_pad);
-        await DB.remove(KEYS.DOCUMENTEN, tid);
         await DB.touchDossier(id); renderDossierDetail({ id });
       }
     } catch (_) {}
