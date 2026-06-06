@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.passportreader"
         minSdk = 23                // EncryptedSharedPreferences vereist 23+
         targetSdk = 34
-        versionCode = 23
-        versionName = "1.5.0"
+        versionCode = 24
+        versionName = "1.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // OpenCV bevat native .so's voor 4 ABI's; alleen de twee ARM-
