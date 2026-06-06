@@ -54,11 +54,24 @@
     <string name="scan_status_found">Document gevonden!</string>
     <string name="scan_close">Sluiten</string>
     <string name="scan_torch">Zaklamp</string>
+
+    <!-- Pre-scan intro -->
+    <string name="intro_title">Scan ID-document</string>
+    <string name="intro_back">Terug</string>
+    <string name="intro_help">Hulp</string>
+    <string name="intro_headline">Gebruik je camera om het document te scannen</string>
+    <string name="intro_subline">Houd je telefoon stil en zorg dat de onderkant van het paspoort of de ID-kaart goed in beeld is.</string>
+    <string name="intro_start">Begin scan</string>
+    <string name="intro_help_title">Scan-tips</string>
+    <string name="intro_help_body">• Houd de telefoon ongeveer 15 cm boven het document.\n\n• Zorg voor goed licht — vermijd schaduwen op het document.\n\n• De twee onderste regels (MRZ-strook met chevrons \&lt;\&lt;\&lt;) moeten volledig in het gele kader staan.\n\n• Beweeg langzaam — de app pakt automatisch de eerste scherpe frame.\n\n• Tap ergens in het beeld om handmatig scherp te stellen.</string>
     <string name="result_share_photo">Delen</string>
     <string name="result_save_photo">Opslaan</string>
     <string name="result_photo_saved">Pasfoto opgeslagen in galerij</string>
     <string name="result_photo_save_failed">Pasfoto opslaan mislukt</string>
     <string name="result_share_chooser_title">Pasfoto delen via…</string>
+    <string name="result_delete">Opnieuw scannen</string>
+    <string name="result_delete_confirm_title">Scan weggooien?</string>
+    <string name="result_delete_confirm_msg">De uitgelezen chip-data wordt verwijderd. Je kunt opnieuw beginnen.</string>
     <string name="face_show_color">🎨 Toon in kleur</string>
     <string name="face_show_grayscale">⚫ Toon zwart-wit (origineel)</string>
     <string name="scan_hint">Houd de onderkant van het paspoort of ID-kaart binnen het gele kader. Herkenning is automatisch.</string>

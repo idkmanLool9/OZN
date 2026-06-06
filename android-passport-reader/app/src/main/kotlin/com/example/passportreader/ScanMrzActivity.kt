@@ -92,6 +92,15 @@ class ScanMrzActivity : AppCompatActivity() {
         // Torch-toggle
         binding.btnTorch.setOnClickListener { toggleTorch() }
 
+        // Help-dialog
+        binding.btnHelp.setOnClickListener {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.intro_help_title)
+                .setMessage(R.string.intro_help_body)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        }
+
         // Tap-to-focus op de live preview
         binding.preview.setOnTouchListener { _, event ->
             if (event.action == android.view.MotionEvent.ACTION_DOWN) {

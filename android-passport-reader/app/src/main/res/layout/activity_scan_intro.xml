@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pre-scan intro-scherm. Eenvoudige line-art illustratie + uitleg-tekst,
+  primaire "Begin scan" CTA onderaan. Geïnspireerd op klassieke iOS
+  onboarding-pattern (hand-met-telefoon visual).
+
+  Donkere bg om aan te sluiten op het camera-scherm dat hierna komt
+  (geen flash-wit-naar-zwart sprong bij overgang).
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1C1C1E"
+    android:fitsSystemWindows="true">
+
+    <!-- ─── Top bar: back + titel + help ─── -->
+    <FrameLayout
+        android:id="@+id/topbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/bg_close_button"
+            android:contentDescription="@string/intro_back"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back"/>
+
+        <TextView
+            style="@style/iOSText.Headline"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:text="@string/intro_title"
+            android:textColor="#FFFFFF"/>
+
+        <ImageButton
+            android:id="@+id/btnHelp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="16dp"
+            android:background="@drawable/bg_close_button"
+            android:contentDescription="@string/intro_help"
+            android:padding="8dp"
+            android:src="@drawable/ic_help_circle"/>
+    </FrameLayout>
+
+    <!-- ─── Centered illustratie + tekst ─── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        app:layout_constraintBottom_toTopOf="@id/btnStart"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topbar"
+        app:layout_constraintVertical_bias="0.45">
+
+        <ImageView
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_scan_intro_illustration"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:letterSpacing="-0.012"
+            android:lineSpacingMultiplier="1.15"
+            android:text="@string/intro_headline"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/intro_subline"
+            android:textColor="#CCFFFFFF"
+            android:textSize="15sp"/>
+    </LinearLayout>
+
+    <!-- ─── Bottom CTA (witte pill button — iOS conventie) ─── -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnStart"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="28dp"
+        android:backgroundTint="#FFFFFF"
+        android:fontFamily="sans-serif-medium"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:letterSpacing="-0.004"
+        android:text="@string/intro_start"
+        android:textAllCaps="false"
+        android:textColor="#000000"
+        android:textSize="17sp"
+        app:cornerRadius="14dp"
+        app:elevation="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

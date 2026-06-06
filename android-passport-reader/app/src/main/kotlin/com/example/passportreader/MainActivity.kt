@@ -29,7 +29,8 @@ class MainActivity : AppCompatActivity() {
         cloud = SupabaseClient.get(this)
 
         binding.btnScan.setOnClickListener {
-            startActivity(Intent(this, ScanMrzActivity::class.java))
+            // Eerst intro-scherm (uitleg + illustratie), dan ScanMrz
+            startActivity(Intent(this, ScanIntroActivity::class.java))
         }
         binding.loginCard.setOnClickListener {
             if (cloud.isLoggedIn) confirmLogout() else openLogin()

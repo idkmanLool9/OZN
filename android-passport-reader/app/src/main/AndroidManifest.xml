@@ -40,6 +40,12 @@
         </activity>
 
         <activity
+            android:name=".ScanIntroActivity"
+            android:exported="false"
+            android:label="@string/intro_title"
+            android:screenOrientation="portrait"/>
+
+        <activity
             android:name=".ScanMrzActivity"
             android:exported="false"
             android:screenOrientation="portrait"/>
