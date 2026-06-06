@@ -126,7 +126,9 @@ class SettingsActivity : AppCompatActivity() {
         binding.updateSpinner.visibility = android.view.View.VISIBLE
         binding.cellUpdate.isClickable = false
 
-        AppUpdater.checkForUpdate { result ->
+        // Settings → Zoek updates is een expliciete user-actie, dus
+        // forceFresh: cache overslaan en altijd live GitHub bellen
+        AppUpdater.checkForUpdate(this, forceFresh = true) { result ->
             binding.updateSpinner.visibility = android.view.View.GONE
             binding.cellUpdate.isClickable = true
 
