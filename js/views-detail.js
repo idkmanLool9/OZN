@@ -166,11 +166,16 @@ function renderDossierDetail(params) {
         })()}
       </section>
 
-      <section id="kosten" class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
-          <h2 style="border:none;padding:0;margin:0;">Kosten</h2>
+      <section id="kosten" class="card kosten-card ${localStorage.getItem('sok_kosten_collapsed') === '1' ? 'collapsed' : ''}">
+        <div class="kosten-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;">
+          <button type="button" class="kosten-toggle-btn" id="btn-kosten-toggle" aria-expanded="${localStorage.getItem('sok_kosten_collapsed') === '1' ? 'false' : 'true'}" aria-controls="kosten-body" title="In- of uitklappen">
+            <span class="kosten-chevron" aria-hidden="true">▾</span>
+            <h2 style="border:none;padding:0;margin:0;display:inline;">Kosten</h2>
+            ${kosten.length > 0 ? `<span class="muted small kosten-summary">· ${kosten.length} ${kosten.length === 1 ? 'post' : 'posten'} · ${fmtEUR(totaal)}${moetNogBetalen > 0 ? ` · <strong style="color:#b34;">open ${fmtEUR(moetNogBetalen)}</strong>` : ' · <strong style="color:#2a7a3a;">volledig betaald</strong>'}</span>` : ''}
+          </button>
           ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm">📄 Factuur openen</a>` : ''}
         </div>
+        <div id="kosten-body" class="kosten-body">
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' : (() => {
           // Groepeer per categorie in vaste volgorde
           const buckets = {};
@@ -299,6 +304,7 @@ function renderDossierDetail(params) {
           <label class="checkbox-inline"><input type="checkbox" name="betaald"> betaald</label>
           <button type="submit" class="btn">+ Toevoegen</button>
         </form>
+        </div><!-- /.kosten-body -->
       </section>
 
       <section id="notities" class="card">
@@ -589,6 +595,17 @@ function edRowValue(naam) {
 function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
+
+  // Kosten-sectie in-/uitklappen, voorkeur onthouden in localStorage
+  const kostenToggle = $('#btn-kosten-toggle');
+  if (kostenToggle) {
+    kostenToggle.addEventListener('click', () => {
+      const section = $('#kosten');
+      const collapsed = section.classList.toggle('collapsed');
+      kostenToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      localStorage.setItem('sok_kosten_collapsed', collapsed ? '1' : '0');
+    });
+  }
 
   async function sendOrFallback(btn, toEmail, subject, body) {
     if (!toEmail) {
