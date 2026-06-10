@@ -308,6 +308,46 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="email-footer-instellingen">
+        <h2>E-mail handtekening / footer</h2>
+        <p class="muted small">Donker balkje onderaan élke verzonden mail (dossier &amp; factuur). Laat een veld leeg om dat onderdeel weg te laten.</p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="email-footer-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="email_footer_enabled" ${s.email_footer_enabled ? 'checked' : ''}>
+              Footer toevoegen aan uitgaande e-mails
+            </label>
+            <label>
+              <span>Adres (onderaan footer)</span>
+              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="Straat 123, 1234AB Plaats" maxlength="160">
+            </label>
+            <div class="grid-2" style="gap:.85rem;">
+              <label>
+                <span>Algemene Voorwaarden (URL)</span>
+                <input type="url" name="email_footer_terms_url" value="${esc(s.email_footer_terms_url)}" placeholder="https://...">
+              </label>
+              <label>
+                <span>Privacy Voorwaarden (URL)</span>
+                <input type="url" name="email_footer_privacy_url" value="${esc(s.email_footer_privacy_url)}" placeholder="https://...">
+              </label>
+              <label>
+                <span>Facebook (URL)</span>
+                <input type="url" name="email_footer_facebook_url" value="${esc(s.email_footer_facebook_url)}" placeholder="https://facebook.com/...">
+              </label>
+              <label>
+                <span>Instagram (URL)</span>
+                <input type="url" name="email_footer_instagram_url" value="${esc(s.email_footer_instagram_url)}" placeholder="https://instagram.com/...">
+              </label>
+            </div>
+            <div class="form-actions" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="parochies">
         <h2>Parochies &amp; priesters</h2>
         <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Aboona) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
@@ -665,6 +705,24 @@ function renderAccount(msg) {
       });
       renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
     });
+
+    // Footer / handtekening
+    const emailFooterForm = $('#email-footer-form');
+    if (emailFooterForm) {
+      emailFooterForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = e.target;
+        Settings.set({
+          email_footer_enabled:       f.email_footer_enabled.checked,
+          email_footer_address:       f.email_footer_address.value.trim(),
+          email_footer_terms_url:     f.email_footer_terms_url.value.trim(),
+          email_footer_privacy_url:   f.email_footer_privacy_url.value.trim(),
+          email_footer_facebook_url:  f.email_footer_facebook_url.value.trim(),
+          email_footer_instagram_url: f.email_footer_instagram_url.value.trim(),
+        });
+        renderAccount({ success: 'E-mail-footer opgeslagen.' });
+      });
+    }
 
     $('#btn-email-test').addEventListener('click', async () => {
       const f = emailForm;

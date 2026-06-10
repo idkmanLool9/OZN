@@ -56,6 +56,13 @@ const Settings = {
     emailjs_public_key: '',
     emailjs_service_id: '',
     emailjs_template_id: '',
+    // E-mail-footer (handtekening onderaan elke verzonden mail)
+    email_footer_enabled: true,
+    email_footer_terms_url:     '',
+    email_footer_privacy_url:   '',
+    email_footer_facebook_url:  '',
+    email_footer_instagram_url: '',
+    email_footer_address: 'Beethovenstraat 385, 1083HK Amsterdam, Noord Holland',
     // Login-scherm teksten (split-screen)
     login_brand_title: 'Welkom terug',
     login_brand_subtitle: 'Beheer dossiers, kosten, documenten en facturen — alles op één plek.',

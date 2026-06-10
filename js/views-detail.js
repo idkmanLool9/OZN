@@ -347,6 +347,44 @@ function emH3(t) {
   return `<h3 style="margin:18px 0 4px;font-family:inherit;font-size:15px;font-weight:600;color:#6b1e2a;border-bottom:1px solid #e5e2da;padding-bottom:4px;">${esc(t)}</h3>`;
 }
 
+// E-mail-footer: donker balkje met links + socials + adres,
+// onderaan elke uitgaande mail. Configureerbaar via Account.
+function buildEmailFooter() {
+  const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+  if (s.email_footer_enabled === false) return '';
+
+  const linkStyle = 'color:#a8b3c6;text-decoration:none;';
+  const links = [];
+  if (s.email_footer_terms_url)
+    links.push(`<a href="${esc(s.email_footer_terms_url)}" style="${linkStyle}">Algemene Voorwaarden</a>`);
+  if (s.email_footer_privacy_url)
+    links.push(`<a href="${esc(s.email_footer_privacy_url)}" style="${linkStyle}">Privacy Voorwaarden</a>`);
+  const linksRow = links.length
+    ? `<div style="margin-bottom:14px;font-size:13px;">${links.join(' &nbsp;|&nbsp; ')}</div>` : '';
+
+  const socials = [];
+  if (s.email_footer_facebook_url) {
+    socials.push(`<a href="${esc(s.email_footer_facebook_url)}" style="${linkStyle}display:inline-block;width:28px;height:28px;line-height:26px;border:1px solid #a8b3c6;border-radius:50%;margin:0 4px;font-weight:700;font-family:Arial,sans-serif;">f</a>`);
+  }
+  if (s.email_footer_instagram_url) {
+    socials.push(`<a href="${esc(s.email_footer_instagram_url)}" style="${linkStyle}display:inline-block;width:28px;height:28px;line-height:26px;border:1px solid #a8b3c6;border-radius:50%;margin:0 4px;font-family:Arial,sans-serif;">IG</a>`);
+  }
+  const socialsRow = socials.length
+    ? `<div style="margin-bottom:14px;">${socials.join('')}</div>` : '';
+
+  const addrRow = s.email_footer_address
+    ? `<div style="font-size:12px;color:#a8b3c6;">${esc(s.email_footer_address)}</div>` : '';
+
+  if (!linksRow && !socialsRow && !addrRow) return '';
+
+  return `
+    <div style="margin-top:28px;background:#101a35;padding:28px 20px;border-radius:6px;text-align:center;font-family:system-ui,Arial,sans-serif;color:#a8b3c6;">
+      ${linksRow}
+      ${socialsRow}
+      ${addrRow}
+    </div>`;
+}
+
 function buildDossierEmail(d) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
   const adresC = [[d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '), d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
@@ -445,6 +483,7 @@ function buildDossierEmail(d) {
 
   const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
   parts.push(`<p style="margin:18px 0 0;font-size:13px;color:#6f6a62;">Met vriendelijke groet,<br><strong>${esc(s.app_name || 'Uitvaartleider')}</strong>${s.app_tagline ? '<br>' + esc(s.app_tagline) : ''}</p>`);
+  parts.push(buildEmailFooter());
   return parts.join('\n');
 }
 
@@ -535,6 +574,7 @@ function buildFactuurEmail(d, kosten) {
   }
 
   parts.push(`<p style="margin:18px 0 0;font-size:13px;color:#6f6a62;">Met vriendelijke groet,<br><strong>${esc(s.app_name || 'Uitvaartleider')}</strong>${s.app_tagline ? '<br>' + esc(s.app_tagline) : ''}</p>`);
+  parts.push(buildEmailFooter());
   return parts.join('\n');
 }
 
