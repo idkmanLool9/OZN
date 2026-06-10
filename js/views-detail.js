@@ -373,15 +373,28 @@ function buildEmailFooter() {
     ? `<div style="margin-bottom:14px;">${socials.join('')}</div>` : '';
 
   const addrRow = s.email_footer_address
-    ? `<div style="font-size:12px;color:#a8b3c6;">${esc(s.email_footer_address)}</div>` : '';
+    ? `<div style="font-size:12px;color:#cfd6e3;margin-bottom:4px;">${esc(s.email_footer_address)}</div>` : '';
 
-  if (!linksRow && !socialsRow && !addrRow) return '';
+  // Contact-regel met ·-separator: alleen ingevulde velden tonen
+  const contactParts = [];
+  if (s.email_footer_phone)   contactParts.push(`<a href="tel:${esc(s.email_footer_phone.replace(/\s+/g,''))}" style="${linkStyle}">${esc(s.email_footer_phone)}</a>`);
+  if (s.email_footer_email)   contactParts.push(`<a href="mailto:${esc(s.email_footer_email)}" style="${linkStyle}">${esc(s.email_footer_email)}</a>`);
+  if (s.email_footer_website) {
+    const url = /^https?:\/\//.test(s.email_footer_website) ? s.email_footer_website : 'https://' + s.email_footer_website;
+    const label = s.email_footer_website.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    contactParts.push(`<a href="${esc(url)}" style="${linkStyle}">${esc(label)}</a>`);
+  }
+  const contactRow = contactParts.length
+    ? `<div style="font-size:12px;color:#a8b3c6;">${contactParts.join(' &nbsp;·&nbsp; ')}</div>` : '';
+
+  if (!linksRow && !socialsRow && !addrRow && !contactRow) return '';
 
   return `
     <div style="margin-top:28px;background:#101a35;padding:28px 20px;border-radius:6px;text-align:center;font-family:system-ui,Arial,sans-serif;color:#a8b3c6;">
       ${linksRow}
       ${socialsRow}
       ${addrRow}
+      ${contactRow}
     </div>`;
 }
 

@@ -320,10 +320,22 @@ function renderAccount(msg) {
               Footer toevoegen aan uitgaande e-mails
             </label>
             <label>
-              <span>Adres (onderaan footer)</span>
-              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="Straat 123, 1234AB Plaats" maxlength="160">
+              <span>Adres (één regel)</span>
+              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="St. Ephrem de Syriër Klooster · Glanerbrugstr. 33, 7585 Glane/Losser" maxlength="200">
             </label>
             <div class="grid-2" style="gap:.85rem;">
+              <label>
+                <span>Telefoon</span>
+                <input type="tel" name="email_footer_phone" value="${esc(s.email_footer_phone)}" placeholder="bv. 053 538 4054">
+              </label>
+              <label>
+                <span>E-mail</span>
+                <input type="email" name="email_footer_email" value="${esc(s.email_footer_email)}" placeholder="info@sok-antiochie.nl">
+              </label>
+              <label class="span-2">
+                <span>Website</span>
+                <input type="text" name="email_footer_website" value="${esc(s.email_footer_website)}" placeholder="www.sok-antiochie.nl">
+              </label>
               <label>
                 <span>Algemene Voorwaarden (URL)</span>
                 <input type="url" name="email_footer_terms_url" value="${esc(s.email_footer_terms_url)}" placeholder="https://...">
@@ -715,6 +727,9 @@ function renderAccount(msg) {
         Settings.set({
           email_footer_enabled:       f.email_footer_enabled.checked,
           email_footer_address:       f.email_footer_address.value.trim(),
+          email_footer_phone:         f.email_footer_phone.value.trim(),
+          email_footer_email:         f.email_footer_email.value.trim(),
+          email_footer_website:       f.email_footer_website.value.trim(),
           email_footer_terms_url:     f.email_footer_terms_url.value.trim(),
           email_footer_privacy_url:   f.email_footer_privacy_url.value.trim(),
           email_footer_facebook_url:  f.email_footer_facebook_url.value.trim(),

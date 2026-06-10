@@ -62,7 +62,10 @@ const Settings = {
     email_footer_privacy_url:   '',
     email_footer_facebook_url:  '',
     email_footer_instagram_url: '',
-    email_footer_address: 'Beethovenstraat 385, 1083HK Amsterdam, Noord Holland',
+    email_footer_address: 'St. Ephrem de Syriër Klooster · Glanerbrugstr. 33, 7585 Glane/Losser',
+    email_footer_phone:   '',
+    email_footer_email:   '',
+    email_footer_website: '',
     // Login-scherm teksten (split-screen)
     login_brand_title: 'Welkom terug',
     login_brand_subtitle: 'Beheer dossiers, kosten, documenten en facturen — alles op één plek.',
