@@ -603,44 +603,16 @@ function bindDetailEvents(id) {
     });
   }
 
-  async function sendOrFallback(btn, toEmail, subject, body) {
-    if (!toEmail) {
-      Modal.show({ type: 'warning', title: 'Geen e-mailadres',
-        message: 'De contactpersoon heeft nog geen e-mailadres in dit dossier. Vul het in via "Bewerken".' });
-      return;
-    }
-    if (!EmailService.isConfigured()) {
-      // Niet ingesteld — fallback: open mailclient
-      Modal.show({
-        type: 'info',
-        title: 'E-mail-koppeling niet ingesteld',
-        message: 'Stel EmailJS in via Account → E-mail verzenden om automatisch te versturen. Voor nu open ik je mail-app met de tekst klaar.',
-      }).then(() => openMailto(toEmail, subject, body));
-      return;
-    }
-    if (!confirm(`E-mail versturen naar ${toEmail}?`)) return;
-    btn.disabled = true; const orig = btn.textContent;
-    btn.textContent = 'Bezig met verzenden...';
-    try {
-      await EmailService.send(toEmail, subject, body);
-      Modal.show({ type: 'success', title: 'E-mail verzonden',
-        message: `Verstuurd naar ${toEmail}.` });
-    } catch (e) {
-      Modal.show({ type: 'error', title: 'Verzenden mislukt',
-        message: (e && e.text) ? e.text : (e.message || String(e)) });
-    } finally {
-      btn.disabled = false;
-      btn.textContent = orig;
-    }
-  }
-
   const emailDosBtn = $('#btn-email-dossier');
   if (emailDosBtn) {
     emailDosBtn.addEventListener('click', () => {
       const d = DB.byId(KEYS.DOSSIERS, id); if (!d) return;
-      const subj = `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim();
-      const body = buildDossierEmail(d);
-      sendOrFallback(emailDosBtn, d.contact_email, subj, body);
+      MailComposer.open({
+        dossier: d,
+        type: 'dossier',
+        subject: `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim(),
+        body: buildDossierEmail(d),
+      });
     });
   }
   const emailFactBtn = $('#btn-email-factuur');
@@ -648,9 +620,13 @@ function bindDetailEvents(id) {
     emailFactBtn.addEventListener('click', () => {
       const d = DB.byId(KEYS.DOSSIERS, id); if (!d) return;
       const ks = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
-      const subj = `Factuur uitvaart ${d.dossier_nummer} — ${fullName(d) || ''}`.trim();
-      const body = buildFactuurEmail(d, ks);
-      sendOrFallback(emailFactBtn, d.contact_email, subj, body);
+      MailComposer.open({
+        dossier: d,
+        type: 'factuur',
+        subject: `Factuur uitvaart ${d.dossier_nummer} — ${fullName(d) || ''}`.trim(),
+        body: buildFactuurEmail(d, ks),
+        kosten: ks,
+      });
     });
   }
   const copyBtn = $('#btn-copy-nr');
@@ -776,4 +752,307 @@ function bindDetailEvents(id) {
       }
     } catch (_) {}
   };
+}
+
+// ─── MailComposer: modal voor multi-recipient + CC + adresboek + PDF ──────
+const MailComposer = {
+  EMAIL_RX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+
+  // Verzamel suggesties voor To/CC: contact + verzekeraar + persoonlijke
+  // (Rume/Robert) + opgeslagen adresboek van dit dossier.
+  collectSuggestions(d) {
+    const set = new Map(); // email → label
+    const add = (email, label) => {
+      if (!email || !MailComposer.EMAIL_RX.test(email)) return;
+      if (!set.has(email)) set.set(email, label || email);
+    };
+    add(d.contact_email, 'Contactpersoon');
+    add(d.verzekering_contact_email || '', 'Verzekeraar');
+    // adresboek per dossier
+    const boek = Array.isArray(d.email_adresboek) ? d.email_adresboek : [];
+    boek.forEach(item => {
+      if (typeof item === 'string') add(item, 'Eerder gebruikt');
+      else if (item && item.email) add(item.email, item.label || 'Eerder gebruikt');
+    });
+    return Array.from(set, ([email, label]) => ({ email, label }));
+  },
+
+  async open({ dossier, type, subject, body, kosten = null }) {
+    const d = dossier;
+    const suggesties = MailComposer.collectSuggestions(d);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'mail-overlay';
+    overlay.innerHTML = `
+      <div class="mail-backdrop"></div>
+      <div class="mail-card" role="dialog" aria-modal="true" aria-labelledby="mail-title">
+        <header class="mail-head">
+          <h2 id="mail-title">${type === 'factuur' ? '📄 E-mail factuur' : '📋 E-mail dossier'}</h2>
+          <button type="button" class="mail-close" aria-label="Sluiten">×</button>
+        </header>
+        <div class="mail-body">
+          <p class="mail-sub muted small">Dossier <strong>${esc(d.dossier_nummer)}</strong> · ${esc(fullName(d) || '—')}</p>
+
+          <label class="mail-field">
+            <span>Aan</span>
+            <div class="mail-tags" data-field="to">
+              <input type="email" class="mail-tag-input" placeholder="adres@email.nl, druk Enter">
+            </div>
+          </label>
+
+          <label class="mail-field">
+            <span>CC <span class="muted small">(optioneel)</span></span>
+            <div class="mail-tags" data-field="cc">
+              <input type="email" class="mail-tag-input" placeholder="adres@email.nl, druk Enter">
+            </div>
+          </label>
+
+          ${suggesties.length ? `
+            <div class="mail-suggesties">
+              <span class="muted small">Suggesties:</span>
+              ${suggesties.map(s => `
+                <button type="button" class="mail-sugg" data-email="${esc(s.email)}" data-label="${esc(s.label)}" title="Toevoegen aan 'Aan'">
+                  + ${esc(s.email)} <span class="muted small">${esc(s.label)}</span>
+                </button>
+              `).join('')}
+            </div>` : ''}
+
+          <label class="mail-field">
+            <span>Onderwerp</span>
+            <input type="text" class="mail-subject" value="${esc(subject)}">
+          </label>
+
+          <label class="mail-attach">
+            <input type="checkbox" class="mail-pdf" ${type === 'factuur' ? 'checked' : ''}>
+            <span>📎 ${type === 'factuur' ? 'Factuur als PDF meesturen' : 'Dossier als PDF meesturen'} <span class="muted small">(download-link, 7 dagen geldig)</span></span>
+          </label>
+
+          <details class="mail-preview">
+            <summary>📝 Voorbeeld van mail-inhoud</summary>
+            <pre class="mail-preview-text">${esc(body)}</pre>
+          </details>
+
+          <div class="mail-status" hidden></div>
+        </div>
+        <footer class="mail-foot">
+          <button type="button" class="btn btn-ghost mail-cancel">Annuleren</button>
+          <button type="button" class="btn btn-primary mail-send">Verzenden ✉</button>
+        </footer>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('shown'));
+
+    // ─── Tag-input helpers ───
+    const addTag = (fieldName, email) => {
+      const e = String(email || '').trim().toLowerCase();
+      if (!MailComposer.EMAIL_RX.test(e)) return false;
+      const wrap = overlay.querySelector(`.mail-tags[data-field="${fieldName}"]`);
+      if (!wrap) return false;
+      // dubbele check
+      const exists = Array.from(wrap.querySelectorAll('.mail-tag')).some(t => t.dataset.email === e);
+      if (exists) return false;
+      const input = wrap.querySelector('.mail-tag-input');
+      const tag = document.createElement('span');
+      tag.className = 'mail-tag';
+      tag.dataset.email = e;
+      tag.innerHTML = `${esc(e)}<button type="button" class="mail-tag-x" aria-label="Verwijderen">×</button>`;
+      wrap.insertBefore(tag, input);
+      tag.querySelector('.mail-tag-x').addEventListener('click', () => tag.remove());
+      return true;
+    };
+    const readTags = fieldName =>
+      Array.from(overlay.querySelectorAll(`.mail-tags[data-field="${fieldName}"] .mail-tag`))
+        .map(t => t.dataset.email);
+
+    // Vooraf-invullen: contact_email als 'Aan'
+    if (d.contact_email && MailComposer.EMAIL_RX.test(d.contact_email)) {
+      addTag('to', d.contact_email);
+    }
+
+    // Tag-inputs: Enter, komma of blur voegt tag toe
+    overlay.querySelectorAll('.mail-tag-input').forEach(inp => {
+      const field = inp.parentElement.dataset.field;
+      const tryAdd = () => {
+        const v = inp.value.trim().replace(/[,;]$/, '');
+        if (v && addTag(field, v)) inp.value = '';
+      };
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); tryAdd(); }
+        if (e.key === 'Backspace' && !inp.value) {
+          const lastTag = inp.parentElement.querySelector('.mail-tag:last-of-type');
+          if (lastTag) lastTag.remove();
+        }
+      });
+      inp.addEventListener('blur', tryAdd);
+    });
+
+    // Suggesties: klik = direct toevoegen aan 'Aan' (of CC met shift+klik)
+    overlay.querySelectorAll('.mail-sugg').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const field = e.shiftKey ? 'cc' : 'to';
+        addTag(field, btn.dataset.email);
+      });
+    });
+
+    // ─── Sluiten ───
+    const close = () => {
+      overlay.classList.remove('shown');
+      setTimeout(() => overlay.remove(), 200);
+    };
+    overlay.querySelector('.mail-close').addEventListener('click', close);
+    overlay.querySelector('.mail-cancel').addEventListener('click', close);
+    overlay.querySelector('.mail-backdrop').addEventListener('click', close);
+
+    // ─── Verzenden ───
+    overlay.querySelector('.mail-send').addEventListener('click', async () => {
+      // Forceer eventuele open tag-input naar tag
+      overlay.querySelectorAll('.mail-tag-input').forEach(i => i.dispatchEvent(new Event('blur')));
+
+      const to = readTags('to');
+      const cc = readTags('cc');
+      const subj = overlay.querySelector('.mail-subject').value.trim();
+      const wantsPdf = overlay.querySelector('.mail-pdf').checked;
+      const status = overlay.querySelector('.mail-status');
+      const sendBtn = overlay.querySelector('.mail-send');
+
+      if (!to.length) {
+        status.hidden = false;
+        status.className = 'mail-status mail-status-error';
+        status.textContent = 'Vul ten minste één ontvanger in.';
+        return;
+      }
+
+      sendBtn.disabled = true;
+      const origLabel = sendBtn.textContent;
+
+      try {
+        // 1) PDF genereren + uploaden (indien gevraagd)
+        let bodyMetBijlage = body;
+        if (wantsPdf) {
+          sendBtn.textContent = 'PDF maken...';
+          status.hidden = false;
+          status.className = 'mail-status mail-status-info';
+          status.textContent = 'PDF wordt gemaakt (~10s bij eerste keer)...';
+          let pdfBlob;
+          if (type === 'factuur') {
+            const ks = kosten || DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id).sort((a,b)=>a.id-b.id);
+            pdfBlob = await PdfGen.fromHTML(buildFactuurDocHTML(d, ks), `factuur-${d.dossier_nummer}.pdf`);
+          } else {
+            pdfBlob = await PdfGen.fromHTML(buildDossierDocHTML(d), `dossier-${d.dossier_nummer}.pdf`);
+          }
+          sendBtn.textContent = 'Uploaden...';
+          const up = await PdfGen.uploadAsAttachment(d.id, pdfBlob, type);
+          bodyMetBijlage += `\n\n— Bijlage —\n📎 ${type === 'factuur' ? 'Factuur' : 'Dossier-overzicht'} (PDF): ${up.url}\n(link is 7 dagen geldig)`;
+        }
+        if (cc.length) {
+          bodyMetBijlage += `\n\n(CC: ${cc.join(', ')})`;
+        }
+
+        // 2) Versturen
+        sendBtn.textContent = 'Verzenden...';
+        status.className = 'mail-status mail-status-info';
+        status.textContent = `Versturen naar ${to.length + cc.length} ontvanger(s)...`;
+
+        const alle = [...to, ...cc];
+        if (EmailService.isConfigured()) {
+          // Per ontvanger een aparte mail (EmailJS Free heeft geen native cc)
+          let ok = 0, fout = [];
+          for (const adres of alle) {
+            try { await EmailService.send(adres, subj, bodyMetBijlage); ok++; }
+            catch (e) { fout.push(`${adres}: ${(e && e.text) || e.message || String(e)}`); }
+          }
+          if (fout.length) {
+            status.className = 'mail-status mail-status-error';
+            status.textContent = `${ok} verstuurd, ${fout.length} mislukt: ${fout.join(' · ')}`;
+            sendBtn.disabled = false; sendBtn.textContent = origLabel;
+            return;
+          }
+          status.className = 'mail-status mail-status-success';
+          status.textContent = `✓ ${ok} mail(s) verstuurd.`;
+        } else {
+          // Geen EmailJS — open mailclient met de eerste To (CC in tekst)
+          openMailto(to.join(','), subj, bodyMetBijlage);
+          status.className = 'mail-status mail-status-info';
+          status.textContent = '✓ Mail-app geopend met tekst klaar. Klik op Verzenden in je mail-app.';
+        }
+
+        // 3) Adresboek bijwerken in Supabase (alleen nieuwe adressen)
+        await MailComposer.saveToAddrBook(d, alle);
+
+        // 4) Korte vertraging, dan sluiten
+        setTimeout(close, 1500);
+      } catch (e) {
+        status.hidden = false;
+        status.className = 'mail-status mail-status-error';
+        status.textContent = e.message || String(e);
+        sendBtn.disabled = false;
+        sendBtn.textContent = origLabel;
+      }
+    });
+
+    // Esc sluit
+    const keyHandler = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', keyHandler); } };
+    document.addEventListener('keydown', keyHandler);
+  },
+
+  // Voeg gebruikte adressen toe aan dossier.email_adresboek (zonder dubbels)
+  async saveToAddrBook(d, emails) {
+    const huidig = Array.isArray(d.email_adresboek) ? d.email_adresboek : [];
+    const set = new Set(huidig.map(e => typeof e === 'string' ? e : (e && e.email)).filter(Boolean));
+    const nieuw = emails.filter(e => MailComposer.EMAIL_RX.test(e) && !set.has(e));
+    if (!nieuw.length) return;
+    const updated = [...huidig, ...nieuw];
+    try {
+      await DB.update(KEYS.DOSSIERS, d.id, { email_adresboek: updated });
+    } catch (_) { /* niet fataal */ }
+  },
+};
+
+// Minimale HTML voor dossier-PDF (mag verder uitgebreid worden)
+function buildDossierDocHTML(d) {
+  const s = Settings.all();
+  return `
+    <div class="factuur-doc">
+      <div class="factuur-header">
+        <div>
+          <h2 style="border:none;padding:0;margin:0;font-size:1.4rem;">${esc(s.app_name)}</h2>
+          <p style="margin:.15rem 0;font-size:.9rem;color:#666;">${esc(s.app_tagline)}</p>
+        </div>
+        <div class="factuur-meta">
+          <p style="margin:0;"><strong>UITVAARTDOSSIER</strong></p>
+          <p style="margin:.1rem 0;">Dossier: ${esc(d.dossier_nummer)}</p>
+          <p style="margin:.1rem 0;">Datum: ${new Date().toLocaleDateString('nl-NL')}</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top:1rem;">Overledene</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td style="padding:4px 0;width:35%;color:#666;">Naam</td><td><strong>${esc(fullName(d) || '—')}</strong></td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Geboortedatum</td><td>${esc(fmtDate(d.geboortedatum) || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Geboorteplaats</td><td>${esc(d.geboorteplaats || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Overlijdensdatum</td><td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Overlijdensplaats</td><td>${esc(d.overlijdensplaats || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Adres</td><td>${esc([d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ') || '—')}</td></tr>
+      </table>
+
+      <h3 style="margin-top:1rem;">Contactpersoon</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td style="padding:4px 0;width:35%;color:#666;">Naam</td><td><strong>${esc([d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') || '—')}</strong></td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Relatie</td><td>${esc(d.contact_relatie || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Telefoon</td><td>${esc(d.contact_telefoon || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">E-mail</td><td>${esc(d.contact_email || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Adres</td><td>${esc([d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ') || '—')}</td></tr>
+      </table>
+
+      <h3 style="margin-top:1rem;">Uitvaart</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td style="padding:4px 0;width:35%;color:#666;">Datum</td><td>${esc(fmtDate(d.uitvaart_datum) || '—')} ${esc(d.uitvaart_tijd || '')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Type</td><td>${esc(d.uitvaart_type || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Parochie</td><td>${esc(d.parochie || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Priester</td><td>${esc(d.priester || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Kerklocatie</td><td>${esc(d.kerk_locatie || '—')}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Begraafplaats</td><td>${esc(d.begraafplaats || '—')}</td></tr>
+      </table>
+    </div>`;
 }

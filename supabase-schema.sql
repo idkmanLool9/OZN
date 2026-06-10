@@ -106,6 +106,12 @@ ALTER TABLE public.kosten
 ALTER TABLE public.documenten
   ADD COLUMN IF NOT EXISTS bijgewerkt_door TEXT;
 
+-- E-mail-adresboek per dossier: lijst van eerder gebruikte mailadressen
+-- (familie, verzekeraar, mede-uitvaartleider, ...) zodat ze in de mail-
+-- modal direct als suggestie verschijnen.
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS email_adresboek JSONB DEFAULT '[]'::jsonb;
+
 -- PostgREST-cache vernieuwen zodat de nieuwe kolommen meteen bruikbaar zijn
 NOTIFY pgrst, 'reload schema';
 

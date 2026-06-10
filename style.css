@@ -1003,6 +1003,107 @@ button.kist-card-img-btn:focus { outline: 2px solid var(--primary); outline-offs
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
+
+/* ── Mail-composer modal ────────────────────────────────────────────── */
+.mail-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  opacity: 0; transition: opacity .2s ease;
+}
+.mail-overlay.shown { opacity: 1; }
+.mail-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(20,18,16,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.mail-card {
+  position: relative; background: #fff;
+  border-radius: 14px; width: 100%; max-width: 620px;
+  max-height: 92vh; display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  transform: translateY(10px) scale(.98);
+  transition: transform .25s cubic-bezier(.2,.9,.3,1.2);
+}
+.mail-overlay.shown .mail-card { transform: none; }
+.mail-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+}
+.mail-head h2 { margin: 0; font-size: 1.15rem; border: none; padding: 0; background: none; }
+.mail-close {
+  background: none; border: 0; font-size: 1.6rem; line-height: 1;
+  cursor: pointer; color: var(--muted); padding: .15rem .5rem;
+}
+.mail-close:hover { color: var(--primary); }
+.mail-body { padding: 1rem 1.25rem; overflow-y: auto; flex: 1; }
+.mail-sub { margin: 0 0 .85rem; }
+.mail-field { display: block; margin-bottom: .85rem; }
+.mail-field > span { display: block; font-weight: 600; margin-bottom: .3rem; font-size: .9rem; }
+.mail-field input[type="text"] {
+  width: 100%; box-sizing: border-box;
+  padding: .55rem .7rem; border: 1px solid var(--border);
+  border-radius: 8px; font: inherit;
+}
+.mail-tags {
+  display: flex; flex-wrap: wrap; gap: .35rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: .35rem; min-height: 2.4rem; align-items: center;
+}
+.mail-tags:focus-within { border-color: var(--primary); }
+.mail-tag {
+  display: inline-flex; align-items: center; gap: .3rem;
+  background: var(--primary-soft, #f0e6e8); color: var(--primary);
+  padding: .2rem .5rem; border-radius: 999px; font-size: .85rem;
+}
+.mail-tag-x {
+  background: none; border: 0; padding: 0; color: inherit;
+  cursor: pointer; font-size: 1.1rem; line-height: 1;
+}
+.mail-tag-input {
+  flex: 1; min-width: 140px; border: 0; outline: none;
+  font: inherit; padding: .25rem; background: transparent;
+}
+.mail-suggesties {
+  margin: -.4rem 0 .85rem; display: flex; gap: .35rem;
+  flex-wrap: wrap; align-items: center;
+}
+.mail-sugg {
+  background: var(--bg, #f7f3ee); border: 1px solid var(--border);
+  border-radius: 6px; padding: .25rem .6rem;
+  font-size: .85rem; cursor: pointer; color: inherit;
+}
+.mail-sugg:hover { background: var(--primary-soft, #f0e6e8); border-color: var(--primary); }
+.mail-attach {
+  display: flex; align-items: flex-start; gap: .5rem;
+  padding: .65rem .75rem; background: var(--bg, #f7f3ee);
+  border-radius: 8px; margin-bottom: .85rem; cursor: pointer;
+}
+.mail-attach input { margin-top: .2rem; }
+.mail-preview { margin-bottom: .5rem; }
+.mail-preview summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+.mail-preview-text {
+  white-space: pre-wrap; font: 0.85rem/1.5 ui-monospace, monospace;
+  background: var(--bg, #f7f3ee); border-radius: 8px;
+  padding: .75rem; margin: .5rem 0 0; max-height: 220px; overflow: auto;
+}
+.mail-status {
+  margin-top: .5rem; padding: .55rem .75rem; border-radius: 8px;
+  font-size: .9rem;
+}
+.mail-status-info    { background: #e9f2fb; color: #1a4a7a; }
+.mail-status-success { background: #e6f4ea; color: #1e6b34; }
+.mail-status-error   { background: #fdecea; color: #a02525; }
+.mail-foot {
+  display: flex; justify-content: flex-end; gap: .5rem;
+  padding: .85rem 1.25rem; border-top: 1px solid var(--border);
+}
+@media (max-width: 600px) {
+  .mail-card { max-height: 100vh; height: 100vh; border-radius: 0; }
+  .mail-overlay { padding: 0; }
+}
+
 .modal-card {
   position: relative;
   background: #fff;

@@ -737,6 +737,61 @@ const Router = {
 
 // ─── DocumentScanner: auto-crop, perspective-correctie en deskew via jscanify ──
 // Gebruikt jscanify (CDN) dat OpenCV.js dynamisch laadt. Bij eerste scan wordt
+// ─── PdfGen: HTML → PDF Blob via html2pdf.js (lazy load) ───────────────────
+const PdfGen = {
+  _loadPromise: null,
+  CDN: 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js',
+
+  load() {
+    if (window.html2pdf) return Promise.resolve();
+    if (PdfGen._loadPromise) return PdfGen._loadPromise;
+    PdfGen._loadPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = PdfGen.CDN;
+      s.async = true;
+      s.onload  = () => resolve();
+      s.onerror = () => reject(new Error('html2pdf.js kon niet worden geladen — controleer internet.'));
+      document.head.appendChild(s);
+    });
+    return PdfGen._loadPromise;
+  },
+
+  // Render HTML-string naar een offscreen container en converteer naar PDF Blob.
+  async fromHTML(htmlString, filename = 'document.pdf') {
+    await PdfGen.load();
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;padding:24px;color:#111;font:14px/1.5 system-ui,sans-serif;';
+    wrap.innerHTML = htmlString;
+    document.body.appendChild(wrap);
+    try {
+      const opt = {
+        margin: [10, 10, 14, 10],
+        filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+      const blob = await window.html2pdf().set(opt).from(wrap).output('blob');
+      return blob;
+    } finally {
+      wrap.remove();
+    }
+  },
+
+  // Upload PDF Blob naar Supabase Storage en geef een tijdelijke download-link
+  // (7 dagen) terug. Pad: documenten/<dossierId>/email-bijlagen/<timestamp>-<type>.pdf
+  async uploadAsAttachment(dossierId, blob, type = 'bijlage') {
+    const path = `${dossierId}/email-bijlagen/${Date.now()}-${type}.pdf`;
+    const file = new File([blob], `${type}.pdf`, { type: 'application/pdf' });
+    const { error } = await sb.storage.from('documenten').upload(path, file, { upsert: false });
+    if (error) throw new Error('Upload van PDF-bijlage faalde: ' + error.message);
+    const { data, error: urlErr } = await sb.storage.from('documenten')
+      .createSignedUrl(path, 7 * 24 * 3600); // 7 dagen
+    if (urlErr) throw new Error('Tijdelijke download-link maken faalde: ' + urlErr.message);
+    return { url: data.signedUrl, path };
+  },
+};
+
 // OpenCV ingeladen (~7MB), daarna gecached door de service-worker.
 const DocumentScanner = {
   _ready: false,
