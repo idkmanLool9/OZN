@@ -781,10 +781,12 @@ function bindDetailEvents(id) {
         await DB.update(KEYS.KOSTEN, tid, { gedekt: !k.gedekt });
         await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'del-kosten') {
-        if (!confirm('Kostenpost verwijderen?')) return;
+        const ok = await Modal.confirm({ title: 'Kostenpost verwijderen?', message: 'Deze actie kan niet ongedaan worden gemaakt.', confirmText: 'Verwijderen' });
+        if (!ok) return;
         await DB.remove(KEYS.KOSTEN, tid); await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'del-notitie') {
-        if (!confirm('Notitie verwijderen?')) return;
+        const ok = await Modal.confirm({ title: 'Notitie verwijderen?', message: 'Deze actie kan niet ongedaan worden gemaakt.', confirmText: 'Verwijderen' });
+        if (!ok) return;
         await DB.remove(KEYS.NOTITIES, tid); await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'add-preset') {
         const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
@@ -852,14 +854,14 @@ const MailComposer = {
           <label class="mail-field">
             <span>Aan</span>
             <div class="mail-tags" data-field="to">
-              <input type="email" class="mail-tag-input" placeholder="adres@email.nl, druk Enter">
+              <input type="email" class="mail-tag-input" placeholder="Typ een adres en druk Enter">
             </div>
           </label>
 
           <label class="mail-field">
             <span>CC <span class="muted small">(optioneel)</span></span>
             <div class="mail-tags" data-field="cc">
-              <input type="email" class="mail-tag-input" placeholder="adres@email.nl, druk Enter">
+              <input type="email" class="mail-tag-input" placeholder="Typ een adres en druk Enter">
             </div>
           </label>
 

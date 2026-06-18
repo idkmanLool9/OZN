@@ -164,7 +164,8 @@ function renderBloemenBeheer(msg) {
       const id = parseInt(del.getAttribute('data-delete'), 10);
       const b = DB.byId(KEYS.BLOEMEN, id);
       if (!b) return;
-      if (!confirm(`Bloemstuk "${b.naam}" verwijderen?`)) return;
+      const ok = await Modal.confirm({ title: 'Bloemstuk verwijderen?', message: `"${b.naam}" wordt definitief uit de catalogus verwijderd.`, confirmText: 'Verwijderen' });
+      if (!ok) return;
       try {
         await BloemenFotos.removeFoto(b);
         await DB.remove(KEYS.BLOEMEN, id);

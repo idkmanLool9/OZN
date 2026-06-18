@@ -621,8 +621,9 @@ function renderAccount(msg) {
       renderAccount({ success: 'Branding opgeslagen.' });
     });
 
-    $('#btn-reset-brand').addEventListener('click', () => {
-      if (!confirm('Branding terugzetten naar standaard? (logo wordt verwijderd)')) return;
+    $('#btn-reset-brand').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Branding herstellen?', message: 'Alle branding-instellingen worden teruggezet en het logo verdwijnt.', confirmText: 'Herstellen' });
+      if (!ok) return;
       Settings.set({
         app_name: Settings.defaults.app_name,
         app_tagline: Settings.defaults.app_tagline,
@@ -654,8 +655,9 @@ function renderAccount(msg) {
       Branding.apply();
       renderAccount({ success: 'Loginscherm-teksten opgeslagen.' });
     });
-    $('#btn-reset-login').addEventListener('click', () => {
-      if (!confirm('Loginscherm-teksten terugzetten naar standaard?')) return;
+    $('#btn-reset-login').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Loginscherm herstellen?', message: 'Alle teksten op het loginscherm worden teruggezet naar de standaard.', confirmText: 'Herstellen' });
+      if (!ok) return;
       Settings.set({
         login_brand_title:    Settings.defaults.login_brand_title,
         login_brand_subtitle: Settings.defaults.login_brand_subtitle,
@@ -754,7 +756,7 @@ function renderAccount(msg) {
         await EmailService.send(to,
           'Test — ' + (Settings.get('app_name') || 'Uitvaartbeheer'),
           'Dit is een test-e-mail vanuit je Uitvaartbeheer-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
-        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Check de inbox (en spam-map).</div>`;
+        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Controleer de inbox (en spam-map).</div>`;
       } catch (e) {
         result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.text ? e.text : (e.message || String(e)))}</div>`;
       } finally {
@@ -935,8 +937,9 @@ function renderAccount(msg) {
       renderAccount({ success: 'Welkomscherm-instellingen opgeslagen.' });
     });
 
-    $('#btn-reset-splash').addEventListener('click', () => {
-      if (!confirm('Welkomscherm-instellingen terugzetten naar standaard?')) return;
+    $('#btn-reset-splash').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Welkomscherm herstellen?', message: 'Alle welkomscherm-instellingen worden teruggezet naar de standaard.', confirmText: 'Herstellen' });
+      if (!ok) return;
       // Reset alleen splash-instellingen
       Settings.set({
         splash_enabled: Settings.defaults.splash_enabled,

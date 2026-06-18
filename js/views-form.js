@@ -302,7 +302,7 @@ function renderDossierForm(params) {
               <label><span>Eindafrekening status</span>
                 <select name="eindafrekening_status">
                   <option value="">—</option>
-                  ${['open','voldaan','deels voldaan','overdue'].map(x =>
+                  ${['open','voldaan','deels voldaan','te laat'].map(x =>
                     `<option value="${esc(x)}" ${sel('eindafrekening_status', x)}>${esc(x)}</option>`).join('')}
                 </select>
               </label>
@@ -589,9 +589,15 @@ function renderDossierForm(params) {
       if (restored > 0) {
         banner.hidden = false;
         banner.innerHTML = `Niet-opgeslagen wijzigingen hersteld. <a href="#" id="btn-discard-draft">Concept verwerpen</a>`;
-        $('#btn-discard-draft').addEventListener('click', e => {
+        $('#btn-discard-draft').addEventListener('click', async e => {
           e.preventDefault();
-          if (!confirm('Niet-opgeslagen wijzigingen weggooien?')) return;
+          const ok = await Modal.confirm({
+            title: 'Wijzigingen weggooien?',
+            message: 'Alle niet-opgeslagen wijzigingen in dit formulier gaan verloren.',
+            confirmText: 'Weggooien',
+            cancelText: 'Annuleren',
+          });
+          if (!ok) return;
           localStorage.removeItem(draftKey);
           renderDossierForm(params);
         });

@@ -77,7 +77,7 @@ const Settings = {
     ],
     login_brand_foot: '© Syrisch-Orthodoxe parochies',
     login_form_title: 'Inloggen',
-    login_form_subtitle: 'Voer uw e-mailadres en wachtwoord in om door te gaan.',
+    login_form_subtitle: 'Voer je e-mailadres en wachtwoord in om door te gaan.',
     login_secretariaat_text: 'Geen account? Vraag het secretariaat.',
     // Verzekeringsmaatschappijen (datalist in intake)
     verzekering_maatschappijen: [

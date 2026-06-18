@@ -89,7 +89,8 @@ function renderKistenBeheer(msg) {
     const btn = e.target.closest('button[data-remove]');
     if (!btn) return;
     const naam = btn.getAttribute('data-remove');
-    if (!confirm(`Foto van "${naam}" verwijderen?`)) return;
+    const ok = await Modal.confirm({ title: 'Foto verwijderen?', message: `De foto van "${naam}" wordt definitief verwijderd.`, confirmText: 'Verwijderen' });
+    if (!ok) return;
     try {
       await KistFotos.remove(naam);
       renderKistenBeheer({ success: 'Foto verwijderd.' });

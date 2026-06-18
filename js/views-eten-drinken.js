@@ -172,7 +172,8 @@ function renderEtenDrinkenBeheer(msg) {
       const id = parseInt(del.getAttribute('data-delete'), 10);
       const b = DB.byId(KEYS.ETEN_DRINKEN, id);
       if (!b) return;
-      if (!confirm(`Product "${b.naam}" verwijderen?`)) return;
+      const ok = await Modal.confirm({ title: 'Product verwijderen?', message: `"${b.naam}" wordt definitief uit de catalogus verwijderd.`, confirmText: 'Verwijderen' });
+      if (!ok) return;
       try {
         await EtenDrinkenFotos.removeFoto(b);
         await DB.remove(KEYS.ETEN_DRINKEN, id);
