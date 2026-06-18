@@ -81,10 +81,14 @@ function renderAccount(msg) {
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
         </dl>
         <div id="update-result"></div>
-        <div class="form-actions" style="justify-content:flex-start;">
+        <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;">
           <button type="button" class="btn btn-primary" id="btn-check-update">Check op updates</button>
+          <button type="button" class="btn btn-ghost" id="btn-hard-reset" title="Wis alle lokale cache en service-worker, en herlaad alles vanaf de server">🧹 Reset volledig</button>
         </div>
-        <p class="muted small" style="margin-top:.5rem;">Forceert een controle op een nieuwere versie en herlaadt de service-worker. Daarna automatisch verversen.</p>
+        <p class="muted small" style="margin-top:.5rem;">
+          <strong>Check op updates</strong> haalt de laatste versie binnen.<br>
+          <strong>Reset volledig</strong> gebruik je alleen als de app vast blijft hangen op een oude versie — dossiers blijven veilig staan, alleen de offline-kopie wordt gewist.
+        </p>
       </section>
 
       <section class="card narrow">
@@ -789,6 +793,22 @@ function renderAccount(msg) {
         result.innerHTML = `<div class="alert alert-error">Update-check mislukt: ${esc(e.message || e)}</div>`;
         updBtn.disabled = false; updBtn.textContent = orig;
       }
+    });
+  }
+
+  const resetBtn = $('#btn-hard-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      const ok = await Modal.confirm({
+        title: 'Volledig resetten?',
+        message: 'De service-worker en alle lokale cache worden gewist. Dossiers blijven veilig in de cloud staan. Daarna wordt de app opnieuw vanaf de server geladen.',
+        confirmText: 'Resetten',
+        cancelText: 'Annuleren',
+      });
+      if (!ok) return;
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Bezig...';
+      await Updater.hardReset();
     });
   }
 

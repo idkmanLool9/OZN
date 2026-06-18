@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 57;
-const APP_VERSION    = '5.5.2';
+const APP_BUILD      = 58;
+const APP_VERSION    = '5.5.3';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -480,8 +480,11 @@ const Splash = {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(err =>
-      console.warn('Service worker registratie mislukt:', err));
+    // updateViaCache:'none' zorgt dat de browser de service-worker.js
+    // file zelf NOOIT uit zijn HTTP-cache haalt — anders denkt-ie soms
+    // dagenlang dat er geen nieuwe versie is, ook al staat hij er.
+    navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })
+      .catch(err => console.warn('Service worker registratie mislukt:', err));
   });
 }
 
@@ -566,6 +569,27 @@ const Updater = {
       hasUpdate,
       swUpdated: swReady,
     };
+  },
+
+  // Nucleaire reset: unregister service-worker + wis alle caches + reload.
+  // Voor het geval dat de SW vast blijft zitten op een oude versie en
+  // de gewone Update-knop het niet meer trekt. Verliest alleen de
+  // offline-cache — dossiers staan veilig in de cloud.
+  async hardReset() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch (e) { console.warn('hardReset issue:', e); }
+    // Bypass HTTP-cache met query-param + force reload
+    const u = new URL(location.href);
+    u.searchParams.set('_reset', Date.now());
+    location.replace(u.toString());
   },
 
   // Reload pas wanneer de NIEUWE service-worker daadwerkelijk de pagina
