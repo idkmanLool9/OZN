@@ -112,6 +112,37 @@ ALTER TABLE public.documenten
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS email_adresboek JSONB DEFAULT '[]'::jsonb;
 
+-- ────────────────────────────────────────────────────────────────────
+-- 1.B  Cleanup voor ongebruikte kolommen / tabellen (v5.5.0)
+--
+-- Onderstaande commando's zijn DESTRUCTIEF — alleen draaien als je zeker
+-- weet dat de data niet meer nodig is. Verwijderen van een hele tabel
+-- (taken, documenten) is bijvoorbeeld nooit terug te krijgen.
+-- Haal de "--"-tekens weg voor de regels die je écht wilt uitvoeren.
+-- ────────────────────────────────────────────────────────────────────
+
+-- Kolommen op dossiers die niet meer door de UI worden gebruikt:
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS doopnaam;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS burgerlijke_staat;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS beroep;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS avondwake_datum;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS avondwake_tijd;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS avondwake_locatie;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS muziek_zang;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS paspoort_kaart_pad;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS foto_overledene_pad;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_zelfde_als_contact;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_naam;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_geboortedatum;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_geboorteplaats;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS akte_overlijden;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS publicatie_krant;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangifte_datum;
+
+-- Hele tabellen die door de UI niet meer worden bevraagd:
+-- DROP TABLE IF EXISTS public.taken CASCADE;
+-- DROP TABLE IF EXISTS public.documenten CASCADE;
+
 -- PostgREST-cache vernieuwen zodat de nieuwe kolommen meteen bruikbaar zijn
 NOTIFY pgrst, 'reload schema';
 

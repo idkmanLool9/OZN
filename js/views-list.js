@@ -513,10 +513,8 @@ function renderAccount(msg) {
           const offline = !!Cloud.offline || !navigator.onLine;
           const cnt = {
             dossiers: DB.list(KEYS.DOSSIERS).length,
-            taken: DB.list(KEYS.TAKEN).length,
             kosten: DB.list(KEYS.KOSTEN).length,
             notities: DB.list(KEYS.NOTITIES).length,
-            documenten: DB.list(KEYS.DOCUMENTEN).length,
             kisten_fotos: DB.list(KEYS.KIST_AFBEELDINGEN).length,
             bloemen: DB.list(KEYS.BLOEMEN).length,
             eten_drinken: DB.list(KEYS.ETEN_DRINKEN).length,
@@ -525,7 +523,7 @@ function renderAccount(msg) {
           <div class="alert ${offline ? 'alert-error' : 'alert-success'}" style="margin-bottom:.75rem;">
             <strong>${offline ? '⚠ Offline — leesmodus' : '✓ Veilig in de cloud'}</strong>
             <p class="muted small" style="margin:.35rem 0 0;color:inherit;opacity:.9;">
-              Alle dossiers, taken, kosten, notities, documenten, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
+              Alle dossiers, kosten, notities, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
               ${offline
                 ? 'Op dit moment offline — wijzigingen kunnen pas worden opgeslagen zodra je weer internet hebt. Bestaande gegevens blijven veilig staan.'
                 : 'Op elk apparaat zichtbaar zodra je inlogt. localStorage wordt enkel als offline-kopie gebruikt — niets gaat verloren bij cache wissen of nieuwe browser.'}
@@ -533,10 +531,8 @@ function renderAccount(msg) {
           </div>
           <dl class="dl" style="grid-template-columns: 1fr 1fr;">
             <div><dt>Dossiers</dt><dd><strong>${cnt.dossiers}</strong></dd></div>
-            <div><dt>Taken</dt><dd>${cnt.taken}</dd></div>
             <div><dt>Kostenposten</dt><dd>${cnt.kosten}</dd></div>
             <div><dt>Notities</dt><dd>${cnt.notities}</dd></div>
-            <div><dt>Documenten</dt><dd>${cnt.documenten}</dd></div>
             <div><dt>Bloemstukken</dt><dd>${cnt.bloemen}</dd></div>
             <div><dt>Eten &amp; drinken</dt><dd>${cnt.eten_drinken}</dd></div>
             <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
@@ -579,9 +575,9 @@ function renderAccount(msg) {
     $('#logo-input').addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
-      if (!file.type.startsWith('image/')) return alert('Alleen afbeeldingen toegestaan.');
-      if (file.size > 1024 * 1024) return alert('Logo te groot (max. 1 MB).');
-      if (!navigator.onLine) return alert('Logo uploaden kan alleen met internet (gaat naar de cloud).');
+      if (!file.type.startsWith('image/')) return Modal.show({ type: 'warning', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen toegestaan.' });
+      if (file.size > 1024 * 1024) return Modal.show({ type: 'warning', title: 'Logo te groot', message: 'Maximaal 1 MB.' });
+      if (!navigator.onLine) return Modal.show({ type: 'offline', title: 'Geen internet', message: 'Logo uploaden kan alleen met een actieve internetverbinding.' });
       const lbl = e.target.closest('label');
       if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
       try {
@@ -589,7 +585,7 @@ function renderAccount(msg) {
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
       } catch (err) {
-        alert('Upload mislukt: ' + (err.message || err));
+        Modal.show({ type: 'error', title: 'Upload mislukt', message: err.message || String(err) });
       } finally {
         if (lbl) { lbl.style.opacity = 1; }
       }
@@ -1073,10 +1069,8 @@ function renderAccount(msg) {
   $('#btn-export').addEventListener('click', () => {
     const data = {
       dossiers: DB.list(KEYS.DOSSIERS),
-      taken: DB.list(KEYS.TAKEN),
       kosten: DB.list(KEYS.KOSTEN),
       notities: DB.list(KEYS.NOTITIES),
-      documenten: DB.list(KEYS.DOCUMENTEN),
       exported_at: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

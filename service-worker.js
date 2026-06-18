@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-54';
+const CACHE_VERSION = 'sok-uitvaart-build-55';
 const SHELL = [
   './',
   './index.html',
@@ -25,8 +25,6 @@ const SHELL = [
   './js/views-bloemen.js',
   './js/views-eten-drinken.js',
   './js/views-factuur.js',
-  './js/views-rouwkaart.js',
-  './js/intake-scan.js',
   './js/app.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
@@ -75,13 +73,11 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // jsdelivr CDN (Supabase SDK + jscanify) + Google Fonts +
-  // OpenCV.js (docs.opencv.org): stale-while-revalidate
-  // (zo werken lettertype + scan-bibliotheek ook offline na 1e laad)
+  // jsdelivr CDN (Supabase SDK + EmailJS + html2pdf) + Google Fonts:
+  // stale-while-revalidate zodat ze offline werken na 1e laad
   if (url.host === 'cdn.jsdelivr.net' ||
       url.host === 'fonts.googleapis.com' ||
-      url.host === 'fonts.gstatic.com' ||
-      url.host === 'docs.opencv.org') {
+      url.host === 'fonts.gstatic.com') {
     e.respondWith(staleWhileRevalidate(req));
     return;
   }

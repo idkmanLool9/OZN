@@ -6,10 +6,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const KEYS = {
   DOSSIERS: 'dossiers',
-  TAKEN: 'taken',
   KOSTEN: 'kosten',
   NOTITIES: 'notities',
-  DOCUMENTEN: 'documenten',
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
   BLOEMEN: 'bloemen_catalogus',
   ETEN_DRINKEN: 'eten_drinken_catalogus',
@@ -55,28 +53,24 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], taken: [], kosten: [], notities: [], documenten: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] },
   loaded: false,
   offline: false,
 
   async loadAll() {
     try {
-      const [d, t, k, n, doc, kim, blm, ed] = await Promise.all([
+      const [d, k, n, kim, blm, ed] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
-        sb.from('taken').select('*').order('volgorde', { ascending: true }),
         sb.from('kosten').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
-        sb.from('documenten').select('*').order('geupload_op', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
         sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
         sb.from('eten_drinken_catalogus').select('*').order('naam', { ascending: true }),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
-      Cloud.cache.taken = (t.data || []).map(normRow);
       Cloud.cache.kosten = (k.data || []).map(normKosten);
       Cloud.cache.notities = (n.data || []).map(normRow);
-      Cloud.cache.documenten = (doc.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
       Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
       Cloud.cache.eten_drinken_catalogus = (ed.data || []).map(normBloem);
@@ -288,33 +282,6 @@ async function handleStaleCache() {
   });
 }
 
-// ─── Storage (documenten-uploads, privé) ────────────────────────────────────
-const Storage = {
-  async upload(dossierId, file) {
-    const compressed = await compressImage(file, 2200, 0.9); // images compressed; PDFs etc. blijven onveranderd
-    const safe = compressed.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${dossierId}/${Date.now()}-${safe}`;
-    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-    if (error) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
-      throw error;
-    }
-    return path;
-  },
-  async signedUrl(path, seconds = 60) {
-    const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
-    if (error) {
-      Modal.show({ type: 'error', title: 'Download-link mislukt', message: error.message });
-      throw error;
-    }
-    return data.signedUrl;
-  },
-  async remove(path) {
-    const { error } = await sb.storage.from('documenten').remove([path]);
-    if (error) console.warn('Bestand verwijderen faalde:', error.message);
-  },
-};
-
 // ─── Kistfoto's (publieke bucket) ───────────────────────────────────────────
 const KistFotos = {
   slug(naam) {
@@ -434,57 +401,6 @@ const BloemenFotos = {
     if (b && b.storage_pad) {
       await sb.storage.from('bloemen').remove([b.storage_pad]).catch(() => {});
     }
-  },
-};
-
-// ─── Foto van overledene (publieke bucket 'documenten' — privé via signed URLs zou ook kunnen, maar voor weergave op rouwkaart maken we een aparte bucket) ───
-const FotoOverledene = {
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  urlVoor(path) {
-    if (!path) return null;
-    const base = FotoOverledene.publicUrl(path);
-    if (!base) return null;
-    return base + '?v=' + Date.now();
-  },
-  async upload(dossierId, file) {
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-    const path = `${dossierId}/foto.${ext}`;
-    const { error } = await sb.storage.from('overledenen').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (error) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
-      throw error;
-    }
-    return path;
-  },
-  async remove(path) {
-    if (!path) return;
-    await sb.storage.from('overledenen').remove([path]).catch(() => {});
-  },
-};
-
-// ─── Paspoort-kaart visualisatie (door Android NFC-scanner app gemaakt) ──
-// Zelfde 'overledenen' bucket; pad staat in dossiers.paspoort_kaart_pad
-const PaspoortKaart = {
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  urlVoor(path) {
-    if (!path) return null;
-    const base = PaspoortKaart.publicUrl(path);
-    if (!base) return null;
-    return base + '?v=' + Date.now();
-  },
-  async remove(path) {
-    if (!path) return;
-    await sb.storage.from('overledenen').remove([path]).catch(() => {});
   },
 };
 

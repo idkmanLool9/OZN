@@ -709,13 +709,16 @@ function bindDetailEvents(id) {
   }
 
   $('#btn-delete').addEventListener('click', async () => {
-    if (!confirm('Weet u zeker dat u dit dossier wilt verwijderen? Alle taken, kosten, documenten en notities worden ook verwijderd.')) return;
+    const ok = await Modal.confirm({
+      title: 'Dossier verwijderen?',
+      message: 'Het dossier en alle bijbehorende kosten en notities worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.',
+      confirmText: 'Verwijderen',
+      cancelText: 'Annuleren',
+    });
+    if (!ok) return;
     try {
-      const docs = DB.where(KEYS.DOCUMENTEN, doc => doc.dossier_id === id);
-      for (const doc of docs) await Storage.remove(doc.storage_pad);
-      await DB.remove(KEYS.DOSSIERS, id); // cascade verwijdert taken/kosten/notities/documenten in DB
-      // cache opschonen voor de child-tabellen
-      ['taken','kosten','notities','documenten'].forEach(t =>
+      await DB.remove(KEYS.DOSSIERS, id); // cascade verwijdert kosten/notities in DB
+      ['kosten','notities'].forEach(t =>
         Cloud.cache[t] = Cloud.cache[t].filter(x => x.dossier_id !== id));
       Router.go('/dossiers');
     } catch (e) {}

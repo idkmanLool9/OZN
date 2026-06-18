@@ -16,9 +16,9 @@
 //                    build 48 → 4.8.0
 //                    build 50 → 5.0.0
 //                    build 60 → 6.0.0
-const APP_BUILD      = 54;
-const APP_VERSION    = '5.4.0';
-const APP_BUILD_DATE = '2026-05-28';
+const APP_BUILD      = 55;
+const APP_VERSION    = '5.5.0';
+const APP_BUILD_DATE = '2026-06-10';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -70,9 +70,9 @@ const Settings = {
     login_brand_title: 'Welkom terug',
     login_brand_subtitle: 'Beheer dossiers, kosten, documenten en facturen — alles op één plek.',
     login_brand_features: [
-      'Dossiers met taken, kosten en documenten',
-      'Automatische ID-kaart-scan met perspectief-correctie',
-      'Digitale handtekeningen + e-mail-verzending',
+      'Dossiers met kosten en notities — altijd up-to-date',
+      'Facturen direct opmaken en als PDF mailen',
+      'Digitale handtekeningen onder elk dossier',
       'Versleutelde sessie · automatische uitlog',
     ],
     login_brand_foot: '© Syrisch-Orthodoxe parochies',
@@ -618,7 +618,6 @@ Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
-Router.add('/dossiers/:id/rouwkaart', p => renderRouwkaart(p));
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
 Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
@@ -723,7 +722,7 @@ Router.add('/account', () => renderAccount());
       return;
     }
     document.getElementById('login-password').value = '';
-    try { await Cloud.loadAll(); } catch (e2) { alert('Laden mislukt: ' + (e2.message || e2)); }
+    try { await Cloud.loadAll(); } catch (e2) { Modal.show({ type: 'error', title: 'Laden mislukt', message: e2.message || String(e2) }); }
     try { await Settings.loadFromCloud(); Branding.apply(); } catch (_) {}
     updateOfflineUI();
     if (!location.hash || location.hash === '#/login') location.hash = '#/';

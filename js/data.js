@@ -178,39 +178,6 @@ function kistSVG(materiaal) {
     </svg>`;
 }
 
-const STANDAARD_TAKEN_GEMEEN = [
-  'Familie informeren en intake afnemen',
-  'Overlijdensakte opvragen bij gemeente',
-  'Parochie en priester aanstellen',
-  'Datum en tijd uitvaartdienst vastleggen',
-  'Kerk reserveren en koster informeren',
-  'Begraafplaats en graf reserveren',
-  'Kist bestellen en ophalen',
-  'Rouwvervoer regelen (rouwauto + volgauto\'s)',
-  'Dragers regelen',
-  'Rouwkaarten ontwerpen en versturen',
-  'Bloemstukken bestellen',
-  'Avondwake / huisbezoek inplannen',
-  'Condoleance en catering organiseren',
-  'Aangifte bij Burgerzaken',
-];
-
-const STANDAARD_TAKEN_MET_VERZEKERING = [
-  ...STANDAARD_TAKEN_GEMEEN,
-  'Polis controleren bij verzekeraar',
-  'Declaratie / aanmelding indienen',
-  'Akkoord en pakketinhoud bevestigen',
-  'Meerprijs met familie afstemmen indien dekking onvoldoende',
-];
-
-const STANDAARD_TAKEN_ZONDER_VERZEKERING = [
-  ...STANDAARD_TAKEN_GEMEEN,
-  'Budget bespreken met familie',
-  'Aanbetaling vragen vóór de uitvaart',
-  'Eindfactuur opstellen',
-  'Eindbetaling ontvangen / voldaan',
-];
-
 // Velden die we als 'aangeraden in te vullen' beschouwen — bij opslaan
 // zonder deze waardes verschijnt een waarschuwingspop-up.
 const AANBEVOLEN_VELDEN = [
@@ -228,13 +195,6 @@ const AANBEVOLEN_VELDEN = [
   { name: 'kerk_locatie',          label: 'Kerk / dienstlocatie' },
   { name: 'begraafplaats',         label: 'Begraafplaats' },
   { name: 'verzekering_status',    label: 'Verzekering ja/nee' },
-];
-
-// Backwards compat: oude lijst gebruikt voor onbekende status (pre-bestaande dossiers)
-const STANDAARD_TAKEN = [
-  ...STANDAARD_TAKEN_GEMEEN,
-  'Verzekering / financiële afhandeling regelen',
-  'Eindafrekening opstellen',
 ];
 
 const DOSSIER_VELDEN = [
