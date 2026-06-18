@@ -853,6 +853,22 @@ const Router = {
     const fullHash = (location.hash || '#/').slice(1) || '/';
     const path = fullHash.split('?')[0].split('#')[0];
 
+    // Familie-portaal: anonieme route, geen login/profiel-keuze nodig
+    if (path.startsWith('/familie/')) {
+      for (const r of Router.routes) {
+        const m = path.match(r.regex);
+        if (m) {
+          const params = {};
+          r.keys.forEach((k, i) => params[k] = decodeURIComponent(m[i + 1]));
+          r.handler(params, fullHash);
+          window.scrollTo(0, 0);
+          return;
+        }
+      }
+      render404();
+      return;
+    }
+
     if (!Auth.current()) { showLogin(); return; }
     if (!ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();

@@ -1681,3 +1681,160 @@ body { -webkit-overflow-scrolling: touch; }
   .main { padding-bottom: max(3rem, env(safe-area-inset-bottom)); }
 }
 
+
+/* ─── Familie-portaal admin-sectie (binnen dossier-detail) ─── */
+.portaal-link-row {
+  display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+  margin: .75rem 0 .25rem;
+}
+.portaal-link-row input {
+  flex: 1; min-width: 200px;
+  padding: .55rem .75rem; border: 1px solid var(--border);
+  border-radius: 8px; font-family: ui-monospace, monospace;
+  font-size: .85rem; background: var(--bg, #f7f3ee);
+}
+.portaal-item {
+  display: flex; gap: .5rem; align-items: flex-start;
+  padding: .65rem; margin-bottom: .5rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface);
+}
+.portaal-item-fields { flex: 1; display: flex; flex-direction: column; gap: .35rem; }
+.portaal-item-fields input,
+.portaal-item-fields textarea {
+  width: 100%; padding: .5rem .65rem;
+  border: 1px solid var(--border); border-radius: 6px; font: inherit;
+}
+.portaal-item-fields input { font-weight: 600; }
+.portaal-item .btn-icon { flex-shrink: 0; }
+
+#portaal-welkomtekst {
+  width: 100%; min-height: 100px;
+  padding: .65rem .75rem; border: 1px solid var(--border);
+  border-radius: 8px; font: inherit; resize: vertical;
+}
+
+/* ─── Familie-portaal publieke pagina (familie ziet dit) ─── */
+.familie-portaal-body {
+  background: #f7f3ee;
+}
+.familie-portaal-body .topbar,
+.familie-portaal-body .footer,
+.familie-portaal-body #login-screen,
+.familie-portaal-body #profile-screen,
+.familie-portaal-body #splash {
+  display: none !important;
+}
+.fp-page {
+  min-height: 100vh;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  color: #1a1714;
+  line-height: 1.55;
+}
+.fp-header {
+  background: #6b1e2a;
+  color: #fff;
+  padding: 1.5rem 1.25rem;
+  border-radius: 0 0 12px 12px;
+  margin-bottom: 1rem;
+}
+.fp-brand {
+  display: flex; align-items: center; gap: .85rem;
+}
+.fp-cross {
+  font-size: 2.2rem;
+  line-height: 1;
+  opacity: .9;
+}
+.fp-brand strong {
+  display: block; font-size: 1.1rem; font-weight: 600;
+}
+.fp-brand span {
+  display: block; font-size: .85rem; opacity: .85;
+}
+.fp-main {
+  padding: 0 1.25rem 1rem;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.fp-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem 1.35rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.fp-welkom p { margin: 0; font-size: 1rem; color: #2a2724; }
+.fp-titel {
+  margin: 0 0 .35rem;
+  font-size: 1.55rem; font-weight: 600;
+  border: none; padding: 0; background: none;
+}
+.fp-sub {
+  margin: 0; color: #6b6760; font-size: .9rem;
+  display: flex; gap: .35rem; flex-wrap: wrap; align-items: center;
+}
+.fp-dot { color: #b8b3aa; }
+.fp-card h2 {
+  margin: 0 0 .85rem; font-size: 1.05rem; font-weight: 600;
+  color: #6b1e2a; border: none; padding: 0; background: none;
+}
+.fp-dl {
+  display: grid; grid-template-columns: 1fr; gap: .55rem;
+  margin: 0;
+}
+.fp-dl > div {
+  display: flex; flex-direction: column; gap: .15rem;
+}
+.fp-dl dt {
+  font-size: .8rem; color: #8a847a; text-transform: uppercase; letter-spacing: .03em;
+}
+.fp-dl dd {
+  margin: 0; font-size: .98rem;
+}
+.fp-checklist {
+  list-style: none; padding: 0; margin: .5rem 0 0;
+  display: flex; flex-direction: column; gap: .65rem;
+}
+.fp-checklist li {
+  display: flex; gap: .65rem; align-items: flex-start;
+  padding: .65rem .85rem;
+  background: #f7f3ee; border-radius: 8px;
+}
+.fp-check-mark {
+  font-size: 1.3rem; line-height: 1; flex-shrink: 0;
+  color: #6b1e2a; margin-top: .15rem;
+}
+.fp-checklist strong {
+  display: block; font-weight: 600; font-size: .98rem;
+}
+.fp-checklist p {
+  margin: .25rem 0 0; color: #6b6760; font-size: .88rem;
+}
+.fp-footer {
+  margin-top: 1rem; padding: 1.25rem;
+  text-align: center; color: #6b6760; font-size: .85rem;
+  background: #101a35;
+  border-radius: 12px 12px 0 0;
+}
+.fp-foot-addr { color: #cfd6e3; margin-bottom: .45rem; }
+.fp-foot-contact { color: #a8b3c6; font-size: .82rem; }
+.fp-foot-contact a { color: #a8b3c6; text-decoration: none; }
+
+.fp-error-card {
+  background: #fff; border-radius: 12px;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.fp-error-icon { font-size: 2.5rem; margin-bottom: .5rem; color: #b34; }
+.fp-error-card h1 { margin: 0 0 .5rem; font-size: 1.2rem; border: none; padding: 0; background: none; }
+.fp-error-card p { color: #6b6760; margin: 0; }
+.fp-loading {
+  padding: 4rem 1rem; text-align: center;
+}
+
+@media (min-width: 640px) {
+  .fp-dl { grid-template-columns: 1fr 1fr; }
+}

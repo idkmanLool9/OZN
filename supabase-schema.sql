@@ -146,6 +146,89 @@ ALTER TABLE public.dossiers
 -- PostgREST-cache vernieuwen zodat de nieuwe kolommen meteen bruikbaar zijn
 NOTIFY pgrst, 'reload schema';
 
+-- ────────────────────────────────────────────────────────────────────
+-- Familie-portaal: tijdelijke publieke deel-link per dossier
+-- (v5.6.0) Genereer een tijdelijke link die de familie kan gebruiken
+-- om hun eigen dossier-info in te zien — geen login nodig.
+-- ────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS familie_checklist JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS familie_welkomtekst TEXT;
+
+CREATE TABLE IF NOT EXISTS public.familie_portaal_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  dossier_id BIGINT NOT NULL REFERENCES public.dossiers(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  naam TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by UUID REFERENCES auth.users(id)
+);
+CREATE INDEX IF NOT EXISTS familie_portaal_tokens_token_idx
+  ON public.familie_portaal_tokens(token);
+CREATE INDEX IF NOT EXISTS familie_portaal_tokens_dossier_idx
+  ON public.familie_portaal_tokens(dossier_id);
+
+ALTER TABLE public.familie_portaal_tokens ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_familie" ON public.familie_portaal_tokens;
+CREATE POLICY "auth_all_familie" ON public.familie_portaal_tokens
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- RPC: anonieme lezing van EEN SUBSET van dossier-gegevens met een token.
+-- Returnt NULL als token onbekend of verlopen — bewust geen 'access denied'
+-- om geen info te lekken.
+CREATE OR REPLACE FUNCTION public.get_familie_portaal(p_token TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_dossier_id BIGINT;
+  v_result JSONB;
+BEGIN
+  SELECT dossier_id INTO v_dossier_id
+    FROM public.familie_portaal_tokens
+   WHERE token = p_token AND expires_at > now();
+
+  IF v_dossier_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Bouw veilige publieke subset (GEEN BSN, GEEN kosten, GEEN notities)
+  SELECT jsonb_build_object(
+    'dossier_nummer',     dossier_nummer,
+    'voornaam',           voornaam,
+    'achternaam',         achternaam,
+    'geboortedatum',      geboortedatum,
+    'overlijdensdatum',   overlijdensdatum,
+    'uitvaart_datum',     uitvaart_datum,
+    'uitvaart_tijd',      uitvaart_tijd,
+    'uitvaart_type',      uitvaart_type,
+    'kerk_locatie',       kerk_locatie,
+    'begraafplaats',      begraafplaats,
+    'parochie',           parochie,
+    'priester',           priester,
+    'huisbezoek_datum',   huisbezoek_datum,
+    'huisbezoek_tijd',    huisbezoek_tijd,
+    'avondwake_datum',    avondwake_datum,
+    'avondwake_tijd',     avondwake_tijd,
+    'avondwake_locatie',  avondwake_locatie,
+    'condoleance_locatie',condoleance_locatie,
+    'familie_checklist',  COALESCE(familie_checklist, '[]'::jsonb),
+    'familie_welkomtekst',familie_welkomtekst
+  ) INTO v_result
+    FROM public.dossiers
+   WHERE id = v_dossier_id;
+
+  RETURN v_result;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_familie_portaal(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_familie_portaal(TEXT) TO authenticated;
+
 -- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
 ALTER TABLE public.dossiers
   -- Overledene: partner + kinderen

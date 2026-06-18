@@ -308,6 +308,8 @@ function renderDossierDetail(params) {
         </div><!-- /.kosten-body -->
       </section>
 
+      ${renderFamiliePortaalSection(d)}
+
       <section id="notities" class="card">
         <h2>Notities</h2>
         <form id="add-notitie" class="form">
@@ -328,6 +330,7 @@ function renderDossierDetail(params) {
     </div>`;
 
   bindDetailEvents(id);
+  bindFamiliePortaalSection(id);
 }
 
 function toWaNumber(tel) {
@@ -806,6 +809,9 @@ function bindDetailEvents(id) {
         const ok = await Modal.confirm({ title: 'Notitie verwijderen?', message: 'Deze actie kan niet ongedaan worden gemaakt.', confirmText: 'Verwijderen' });
         if (!ok) return;
         await DB.remove(KEYS.NOTITIES, tid); await DB.touchDossier(id); renderDossierDetail({ id });
+      } else if (action === 'del-portaal-item') {
+        const row = btn.closest('.portaal-item');
+        if (row) row.remove();
       } else if (action === 'add-preset') {
         const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
         if (!p) return;
@@ -828,6 +834,235 @@ function bindDetailEvents(id) {
       }
     } catch (_) {}
   };
+}
+
+// ─── Familie-portaal: tijdelijke deel-link + welkomtekst + checklist ──────
+const FamiliePortaal = {
+  TOKEN_LEN: 32,
+  DEFAULT_DAYS: 60,
+
+  // Cryptografisch veilige random token — base32-achtig zonder lookalikes
+  generateToken() {
+    const alf = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // geen I/O/1/0
+    const bytes = new Uint8Array(FamiliePortaal.TOKEN_LEN);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => alf[b % alf.length]).join('');
+  },
+
+  buildUrl(token) {
+    return `${location.origin}${location.pathname}#/familie/${token}`;
+  },
+
+  // Haal token voor dit dossier op uit de cloud (cache lokaal even)
+  async getForDossier(dossierId) {
+    const { data, error } = await sb.from('familie_portaal_tokens')
+      .select('*')
+      .eq('dossier_id', dossierId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error) { console.warn(error); return null; }
+    return (data && data[0]) || null;
+  },
+
+  async createOrReplace(dossierId, days = FamiliePortaal.DEFAULT_DAYS) {
+    // Oude tokens van dit dossier verwijderen
+    await sb.from('familie_portaal_tokens').delete().eq('dossier_id', dossierId);
+    const u = Auth.current();
+    const token = FamiliePortaal.generateToken();
+    const expires = new Date(Date.now() + days * 86400000).toISOString();
+    const { data, error } = await sb.from('familie_portaal_tokens')
+      .insert({ dossier_id: dossierId, token, expires_at: expires, created_by: u ? u.id : null })
+      .select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async revoke(dossierId) {
+    const { error } = await sb.from('familie_portaal_tokens').delete().eq('dossier_id', dossierId);
+    if (error) throw error;
+  },
+};
+
+// State per render: ingeladen token-info zodat de Familie-portaal-sectie
+// async kan laden zonder de hele detail-view onhandig te maken.
+const _portaalCache = new Map();
+
+function renderFamiliePortaalSection(d) {
+  const checklist = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
+  return `
+    <section id="familie-portaal" class="card">
+      <button type="button" class="kosten-header" id="btn-portaal-toggle"
+        aria-expanded="${localStorage.getItem('sok_portaal_collapsed') === '0' ? 'true' : 'false'}"
+        title="Klik om in- of uit te klappen">
+        <span class="kosten-chevron" aria-hidden="true">▾</span>
+        <h2 style="border:none;padding:0;margin:0;display:inline;">Familie-portaal</h2>
+        <span class="muted small kosten-summary" id="portaal-status">…</span>
+      </button>
+      <div id="familie-portaal-body" class="kosten-body" ${localStorage.getItem('sok_portaal_collapsed') === '0' ? '' : 'hidden'}>
+        <p class="muted small">
+          Genereer een tijdelijke link die je naar de familie stuurt. Zij zien een vereenvoudigde pagina met
+          de praktische info en jouw checklist — zonder in te loggen, zonder gevoelige gegevens (geen kosten, geen BSN, geen notities).
+        </p>
+
+        <div id="portaal-link-row" class="portaal-link-row" hidden>
+          <input type="text" id="portaal-link" readonly>
+          <button type="button" class="btn btn-sm" id="btn-portaal-copy">📋 Kopiëren</button>
+          <button type="button" class="btn btn-sm btn-ghost" id="btn-portaal-open" title="Open in nieuw tabblad">↗ Open</button>
+        </div>
+
+        <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin-top:.5rem;">
+          <button type="button" class="btn btn-primary" id="btn-portaal-create">🔗 Nieuwe link maken</button>
+          <button type="button" class="btn btn-ghost" id="btn-portaal-revoke" hidden>🗑 Link intrekken</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
+
+        <h3>Welkomtekst</h3>
+        <p class="muted small">Eerste tekst die de familie ziet op de portaal-pagina.</p>
+        <textarea id="portaal-welkomtekst" rows="4" placeholder="Beste familie, hierbij de praktische informatie rondom de uitvaart…">${esc(d.familie_welkomtekst || '')}</textarea>
+
+        <h3 style="margin-top:1.25rem;">Checklist <span class="muted small">(wat de familie moet voorbereiden / meenemen)</span></h3>
+        <div id="portaal-checklist-rows">
+          ${checklist.map((item, i) => renderChecklistRow(item, i)).join('')}
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-portaal-add-item" style="margin-top:.5rem;">+ Item toevoegen</button>
+
+        <div class="form-actions" style="justify-content:flex-end;margin-top:1rem;">
+          <button type="button" class="btn btn-primary" id="btn-portaal-save">Opslaan</button>
+        </div>
+      </div>
+    </section>`;
+}
+
+function renderChecklistRow(item, idx) {
+  const it = item && typeof item === 'object' ? item : { titel: String(item || ''), beschrijving: '' };
+  return `
+    <div class="portaal-item" data-idx="${idx}">
+      <div class="portaal-item-fields">
+        <input type="text" class="portaal-item-titel" value="${esc(it.titel || '')}" placeholder="bv. ID-bewijs overledene meenemen">
+        <textarea class="portaal-item-desc" rows="2" placeholder="Korte uitleg (optioneel)">${esc(it.beschrijving || '')}</textarea>
+      </div>
+      <button type="button" class="btn-icon" data-action="del-portaal-item" data-idx="${idx}" title="Verwijderen">×</button>
+    </div>`;
+}
+
+async function bindFamiliePortaalSection(id) {
+  const toggle = $('#btn-portaal-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      const body = $('#familie-portaal-body');
+      const isHidden = body.hidden;
+      body.hidden = !isHidden;
+      const chev = toggle.querySelector('.kosten-chevron');
+      toggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      localStorage.setItem('sok_portaal_collapsed', isHidden ? '0' : '1');
+    });
+  }
+
+  // Laad bestaande token uit cloud
+  const refreshStatus = async () => {
+    const status = $('#portaal-status');
+    const linkRow = $('#portaal-link-row');
+    const linkInp = $('#portaal-link');
+    const createBtn = $('#btn-portaal-create');
+    const revokeBtn = $('#btn-portaal-revoke');
+    try {
+      const t = await FamiliePortaal.getForDossier(id);
+      _portaalCache.set(id, t);
+      if (t && new Date(t.expires_at) > new Date()) {
+        const url = FamiliePortaal.buildUrl(t.token);
+        linkInp.value = url;
+        linkRow.hidden = false;
+        revokeBtn.hidden = false;
+        createBtn.textContent = '🔄 Nieuwe link maken';
+        const daysLeft = Math.ceil((new Date(t.expires_at) - Date.now()) / 86400000);
+        if (status) status.innerHTML = `· <strong style="color:#2a7a3a;">actief</strong> · verloopt over ${daysLeft} dagen`;
+      } else {
+        linkRow.hidden = true;
+        revokeBtn.hidden = true;
+        createBtn.textContent = '🔗 Nieuwe link maken';
+        if (status) status.innerHTML = '· geen link actief';
+      }
+    } catch (_) {
+      if (status) status.innerHTML = '· (laden mislukt)';
+    }
+  };
+  refreshStatus();
+
+  $('#btn-portaal-create').addEventListener('click', async () => {
+    const btn = $('#btn-portaal-create');
+    btn.disabled = true; const orig = btn.textContent;
+    btn.textContent = 'Bezig...';
+    try {
+      await FamiliePortaal.createOrReplace(id);
+      await refreshStatus();
+      Modal.show({ type: 'success', title: 'Link aangemaakt', message: 'De familie-link is klaar. Kopieer en stuur via WhatsApp of e-mail.' });
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'Aanmaken mislukt', message: e.message || String(e) });
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
+
+  $('#btn-portaal-revoke').addEventListener('click', async () => {
+    const ok = await Modal.confirm({
+      title: 'Link intrekken?',
+      message: 'De familie kan de portaal-pagina daarna niet meer openen.',
+      confirmText: 'Intrekken',
+    });
+    if (!ok) return;
+    try {
+      await FamiliePortaal.revoke(id);
+      await refreshStatus();
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'Intrekken mislukt', message: e.message || String(e) });
+    }
+  });
+
+  $('#btn-portaal-copy').addEventListener('click', async () => {
+    const link = $('#portaal-link').value;
+    try {
+      await navigator.clipboard.writeText(link);
+      const btn = $('#btn-portaal-copy');
+      const orig = btn.textContent; btn.textContent = '✓ Gekopieerd';
+      setTimeout(() => btn.textContent = orig, 1500);
+    } catch (_) { /* clipboard niet toegestaan */ }
+  });
+
+  $('#btn-portaal-open').addEventListener('click', () => {
+    const link = $('#portaal-link').value;
+    if (link) window.open(link, '_blank');
+  });
+
+  $('#btn-portaal-add-item').addEventListener('click', () => {
+    const rows = $('#portaal-checklist-rows');
+    const idx = rows.querySelectorAll('.portaal-item').length;
+    rows.insertAdjacentHTML('beforeend', renderChecklistRow({ titel: '', beschrijving: '' }, idx));
+  });
+
+  // Verwijder-knop click via event-delegation op #view zelf gebeurt al
+  // (data-action='del-portaal-item' is hieronder afgehandeld).
+
+  $('#btn-portaal-save').addEventListener('click', async () => {
+    const welkom = $('#portaal-welkomtekst').value.trim();
+    const items = Array.from(document.querySelectorAll('#portaal-checklist-rows .portaal-item')).map(row => ({
+      titel: row.querySelector('.portaal-item-titel').value.trim(),
+      beschrijving: row.querySelector('.portaal-item-desc').value.trim(),
+    })).filter(it => it.titel);
+    const btn = $('#btn-portaal-save');
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Bezig...';
+    try {
+      await DB.update(KEYS.DOSSIERS, id, {
+        familie_welkomtekst: welkom || null,
+        familie_checklist: items,
+      });
+      Modal.show({ type: 'success', title: 'Opgeslagen', message: 'De familie ziet de wijzigingen meteen.' });
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'Opslaan mislukt', message: e.message || String(e) });
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
 }
 
 // ─── MailComposer: modal voor multi-recipient + CC + adresboek + PDF ──────

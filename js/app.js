@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 58;
-const APP_VERSION    = '5.5.3';
+const APP_BUILD      = 59;
+const APP_VERSION    = '5.6.0';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -642,6 +642,7 @@ Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
 Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
 Router.add('/account', () => renderAccount());
+Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
 
 (async function init() {
   // Branding meteen toepassen — vóór de splash zichtbaar wordt
