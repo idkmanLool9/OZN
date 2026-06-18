@@ -532,17 +532,18 @@ function renderDossierForm(params) {
     pakketInp.addEventListener('input',  tryFillDekking);
   }
 
-  // ─── Postcode-autofill via PDOK Locatieserver ────────────────────────
-  Postcode.bindAutofill({
-    adresEl:      $('input[name="adres_overledene"]'),
+  // ─── Adres-autocomplete via PDOK Locatieserver ───────────────────────
+  // Typ "Straatnaam 12" → kies uit dropdown → alle velden auto-ingevuld.
+  Postcode.bindAddressAutocomplete({
+    straatEl:     $('input[name="adres_overledene"]'),
     postcodeEl:   $('input[name="postcode_overledene"]'),
     woonplaatsEl: $('input[name="woonplaats_overledene"]'),
   });
-  Postcode.bindAutofill({
-    adresEl:        $('input[name="contact_adres"]'),
-    huisnummerEl:   $('input[name="contact_huisnummer"]'),
-    postcodeEl:     $('input[name="contact_postcode"]'),
-    woonplaatsEl:   $('input[name="contact_woonplaats"]'),
+  Postcode.bindAddressAutocomplete({
+    straatEl:     $('input[name="contact_adres"]'),
+    huisnummerEl: $('input[name="contact_huisnummer"]'),
+    postcodeEl:   $('input[name="contact_postcode"]'),
+    woonplaatsEl: $('input[name="contact_woonplaats"]'),
   });
 
   // ─── #3 Auto-fill contactpersoon-gegevens uit eerder dossier ──────────

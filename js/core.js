@@ -352,6 +352,138 @@ const Postcode = {
       });
     }
   },
+
+  // Google-style autocomplete: typ straat + huisnummer, zie een lijstje
+  // matches uit PDOK Locatieserver, klik = postcode/woonplaats meteen mee
+  // ingevuld. Werkt op zowel "één gecombineerd adres-veld" als op
+  // "aparte straat + huisnummer"-velden.
+  //
+  // straatEl     — verplicht. Krijgt of straatnaam (als huisnummerEl er is)
+  //                of "Straat 12" (als huisnummerEl ontbreekt).
+  // huisnummerEl — optioneel apart veld. Als ingevuld, dan splitsen we
+  //                straat en huisnummer over twee velden.
+  // postcodeEl   — verplicht. Wordt geformatteerd als '1234 AB'.
+  // woonplaatsEl — verplicht.
+  bindAddressAutocomplete({ straatEl, huisnummerEl, postcodeEl, woonplaatsEl }) {
+    if (!straatEl || straatEl.dataset.autocompleteBound === '1') return;
+    straatEl.dataset.autocompleteBound = '1';
+
+    // Dropdown-container — eenmalig per veld
+    const wrap = document.createElement('div');
+    wrap.className = 'addr-autocomplete';
+    const ddown = document.createElement('div');
+    ddown.className = 'addr-autocomplete-list';
+    ddown.hidden = true;
+
+    // Plaats wrap rond straatEl
+    straatEl.parentNode.insertBefore(wrap, straatEl);
+    wrap.appendChild(straatEl);
+    wrap.appendChild(ddown);
+
+    let activeIdx = -1;
+    let results = [];
+    let abortCtrl = null;
+    let debounceT = null;
+
+    const renderList = () => {
+      if (!results.length) { ddown.hidden = true; return; }
+      ddown.innerHTML = results.map((r, i) => `
+        <button type="button" class="addr-autocomplete-item ${i === activeIdx ? 'active' : ''}" data-idx="${i}">
+          <strong>${esc((r.straatnaam || '') + ' ' + (r.huis_nlt || r.huisnummer || ''))}</strong>
+          <span class="muted small">${esc(formatPostcode(r.postcode || ''))} ${esc(r.woonplaatsnaam || '')}</span>
+        </button>
+      `).join('');
+      ddown.hidden = false;
+    };
+
+    const formatPostcode = pc => {
+      const n = String(pc || '').replace(/\s+/g, '').toUpperCase();
+      return /^\d{4}[A-Z]{2}$/.test(n) ? n.slice(0, 4) + ' ' + n.slice(4) : pc;
+    };
+
+    const pickResult = r => {
+      // Adres-/straat-veld invullen
+      if (huisnummerEl) {
+        straatEl.value = r.straatnaam || '';
+        huisnummerEl.value = r.huis_nlt || r.huisnummer || '';
+        huisnummerEl.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        const huis = r.huis_nlt || r.huisnummer || '';
+        straatEl.value = ((r.straatnaam || '') + (huis ? ' ' + huis : '')).trim();
+      }
+      if (postcodeEl)   postcodeEl.value   = formatPostcode(r.postcode || '');
+      if (woonplaatsEl) woonplaatsEl.value = r.woonplaatsnaam || '';
+      // Trigger change events zodat dependent listeners (autosave, validatie) actief blijven
+      [straatEl, postcodeEl, woonplaatsEl].filter(Boolean).forEach(el => {
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      ddown.hidden = true;
+      results = [];
+      activeIdx = -1;
+    };
+
+    const fetchSuggestions = async () => {
+      const straat = straatEl.value.trim();
+      const huis   = huisnummerEl ? huisnummerEl.value.trim() : '';
+      const q = (straat + ' ' + huis).trim();
+      if (q.length < 3) { ddown.hidden = true; results = []; return; }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+      const url = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?' +
+        'fq=type:adres&fl=weergavenaam,straatnaam,huisnummer,huis_nlt,postcode,woonplaatsnaam&rows=8&q=' +
+        encodeURIComponent(q);
+      try {
+        const r = await fetch(url, { signal: abortCtrl.signal });
+        if (!r.ok) return;
+        const j = await r.json();
+        results = (j.response && j.response.docs) || [];
+        activeIdx = -1;
+        renderList();
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('PDOK suggest faalde:', e);
+      }
+    };
+
+    const scheduleFetch = () => {
+      clearTimeout(debounceT);
+      debounceT = setTimeout(fetchSuggestions, 300);
+    };
+
+    // Input-events op beide velden (straat én huisnummer indien apart)
+    [straatEl, huisnummerEl].filter(Boolean).forEach(el => {
+      el.addEventListener('input', scheduleFetch);
+    });
+
+    // Pijltjes + Enter + Escape
+    [straatEl, huisnummerEl].filter(Boolean).forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (ddown.hidden || !results.length) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault(); activeIdx = (activeIdx + 1) % results.length; renderList();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault(); activeIdx = (activeIdx - 1 + results.length) % results.length; renderList();
+        } else if (e.key === 'Enter' && activeIdx >= 0) {
+          e.preventDefault(); pickResult(results[activeIdx]);
+        } else if (e.key === 'Escape') {
+          ddown.hidden = true;
+        }
+      });
+    });
+
+    // Klik op een item
+    ddown.addEventListener('click', e => {
+      const item = e.target.closest('.addr-autocomplete-item');
+      if (!item) return;
+      pickResult(results[parseInt(item.dataset.idx, 10)]);
+    });
+
+    // Sluit dropdown bij klik buiten
+    document.addEventListener('click', e => {
+      if (!wrap.contains(e.target)) ddown.hidden = true;
+    });
+  },
 };
 
 // ─── WheelDate: dag/maand/jaar wiel-picker (iOS-stijl) ──────────────────────
