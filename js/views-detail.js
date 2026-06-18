@@ -39,13 +39,18 @@ function renderDossierDetail(params) {
           </p>
         </div>
         <div class="page-actions">
-          <button type="button" class="btn btn-ghost" id="btn-print" title="Printen of opslaan als PDF">🖨️ Print</button>
           <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Factuur openen">📄 Factuur</a>
-          <button type="button" class="btn btn-ghost" id="btn-email-dossier" title="Stuur dossier per e-mail">📧 E-mail dossier</button>
           <button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>
-          <button type="button" class="btn btn-ghost" id="btn-copy-nr" title="Kopieer dossiernummer">⧉ Kopieer nr</button>
           <a href="#/dossiers/${d.id}/bewerken" class="btn btn-primary">Bewerken</a>
-          <button type="button" class="btn btn-danger" id="btn-delete">Verwijderen</button>
+          <details class="page-actions-more">
+            <summary class="btn btn-ghost" title="Meer acties">⋯</summary>
+            <div class="page-actions-menu">
+              <button type="button" class="btn btn-ghost btn-block" id="btn-email-dossier">📧 E-mail dossier</button>
+              <button type="button" class="btn btn-ghost btn-block" id="btn-print">🖨️ Print</button>
+              <button type="button" class="btn btn-ghost btn-block" id="btn-copy-nr">⧉ Kopieer dossiernummer</button>
+              <button type="button" class="btn btn-danger btn-block" id="btn-delete">🗑 Verwijderen</button>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -645,6 +650,19 @@ function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
 
+  // Overflow-menu (⋯) — sluit na klikken op een actie, of bij klik buiten
+  const moreMenu = $('.page-actions-more');
+  if (moreMenu) {
+    moreMenu.querySelectorAll('.page-actions-menu button').forEach(btn => {
+      btn.addEventListener('click', () => moreMenu.removeAttribute('open'));
+    });
+    document.addEventListener('click', e => {
+      if (moreMenu.hasAttribute('open') && !moreMenu.contains(e.target)) {
+        moreMenu.removeAttribute('open');
+      }
+    });
+  }
+
   // Kosten-sectie in-/uitklappen, voorkeur onthouden in localStorage
   const kostenToggle = $('#btn-kosten-toggle');
   if (kostenToggle) {
@@ -841,6 +859,9 @@ const MailComposer = {
 
     const overlay = document.createElement('div');
     overlay.className = 'mail-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'mail-title');
     overlay.innerHTML = `
       <div class="mail-backdrop"></div>
       <div class="mail-card" role="dialog" aria-modal="true" aria-labelledby="mail-title">
@@ -859,7 +880,7 @@ const MailComposer = {
           </label>
 
           <label class="mail-field">
-            <span>CC <span class="muted small">(optioneel)</span></span>
+            <span>CC <span class="muted small">(elke ontvanger krijgt een aparte mail — geen echte CC-header)</span></span>
             <div class="mail-tags" data-field="cc">
               <input type="email" class="mail-tag-input" placeholder="Typ een adres en druk Enter">
             </div>
@@ -869,9 +890,12 @@ const MailComposer = {
             <div class="mail-suggesties">
               <span class="muted small">Suggesties:</span>
               ${suggesties.map(s => `
-                <button type="button" class="mail-sugg" data-email="${esc(s.email)}" data-label="${esc(s.label)}" title="Toevoegen aan 'Aan'">
-                  + ${esc(s.email)} <span class="muted small">${esc(s.label)}</span>
-                </button>
+                <span class="mail-sugg-wrap">
+                  <button type="button" class="mail-sugg" data-email="${esc(s.email)}" data-target="to" title="Toevoegen aan 'Aan'">
+                    + ${esc(s.email)} <span class="muted small">${esc(s.label)}</span>
+                  </button>
+                  <button type="button" class="mail-sugg mail-sugg-cc" data-email="${esc(s.email)}" data-target="cc" title="Toevoegen aan 'CC'">CC</button>
+                </span>
               `).join('')}
             </div>` : ''}
 
@@ -928,12 +952,23 @@ const MailComposer = {
       addTag('to', d.contact_email);
     }
 
-    // Tag-inputs: Enter, komma of blur voegt tag toe
+    // Splitser: hetzelfde bij plak / Enter / blur. Splits op komma, puntkomma,
+    // whitespace, of newline — zo werkt zowel "a@x.nl, b@y.nl" als één paste,
+    // als één-voor-één getypt.
+    const SPLIT_RX = /[,;\s]+/;
+    const addManyFromText = (field, text) => {
+      let added = 0;
+      String(text || '').split(SPLIT_RX).forEach(piece => {
+        if (piece && addTag(field, piece)) added++;
+      });
+      return added;
+    };
+
     overlay.querySelectorAll('.mail-tag-input').forEach(inp => {
       const field = inp.parentElement.dataset.field;
       const tryAdd = () => {
-        const v = inp.value.trim().replace(/[,;]$/, '');
-        if (v && addTag(field, v)) inp.value = '';
+        const added = addManyFromText(field, inp.value);
+        if (added > 0) inp.value = '';
       };
       inp.addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); tryAdd(); }
@@ -943,12 +978,22 @@ const MailComposer = {
         }
       });
       inp.addEventListener('blur', tryAdd);
+      // Plak van "a@x.nl, b@y.nl" → splits in losse tags
+      inp.addEventListener('paste', e => {
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        if (text && SPLIT_RX.test(text)) {
+          e.preventDefault();
+          addManyFromText(field, text);
+          inp.value = '';
+        }
+      });
     });
 
-    // Suggesties: klik = direct toevoegen aan 'Aan' (of CC met shift+klik)
+    // Suggesties: data-target zegt waar de tag heen gaat ('to' of 'cc').
+    // iPad-vriendelijk: aparte CC-knop in plaats van Shift+klik.
     overlay.querySelectorAll('.mail-sugg').forEach(btn => {
-      btn.addEventListener('click', e => {
-        const field = e.shiftKey ? 'cc' : 'to';
+      btn.addEventListener('click', () => {
+        const field = btn.dataset.target === 'cc' ? 'cc' : 'to';
         addTag(field, btn.dataset.email);
       });
     });
@@ -1004,7 +1049,7 @@ const MailComposer = {
           bodyMetBijlage += `\n\n— Bijlage —\n📎 ${type === 'factuur' ? 'Factuur' : 'Dossier-overzicht'} (PDF): ${up.url}\n(link is 7 dagen geldig)`;
         }
         if (cc.length) {
-          bodyMetBijlage += `\n\n(CC: ${cc.join(', ')})`;
+          bodyMetBijlage += `\n\nDeze e-mail is ook gestuurd naar: ${cc.join(', ')}.`;
         }
 
         // 2) Versturen
@@ -1050,8 +1095,26 @@ const MailComposer = {
     });
 
     // Esc sluit
-    const keyHandler = e => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', keyHandler); } };
+    // Focus-trap: Tab cyclet binnen het modal
+    const trapFocus = e => {
+      if (e.key !== 'Tab') return;
+      const focusables = Array.from(overlay.querySelectorAll('button:not([hidden]), input, textarea, select, summary, [tabindex]:not([tabindex="-1"])'))
+        .filter(el => !el.hidden && el.offsetParent !== null);
+      if (!focusables.length) return;
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    const keyHandler = e => {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', keyHandler); }
+      else trapFocus(e);
+    };
     document.addEventListener('keydown', keyHandler);
+    // Initiële focus naar de eerste tag-input (To-veld)
+    setTimeout(() => {
+      const firstInput = overlay.querySelector('.mail-tag-input');
+      if (firstInput) firstInput.focus();
+    }, 60);
   },
 
   // Voeg gebruikte adressen toe aan dossier.email_adresboek (zonder dubbels)

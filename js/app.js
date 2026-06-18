@@ -731,14 +731,29 @@ Router.add('/account', () => renderAccount());
 
   document.getElementById('btn-logout').addEventListener('click', async () => {
     await Auth.logout();
-    ActiveProfile.clear();
-    Cloud.cache = { dossiers: [], taken: [], kosten: [], notities: [], documenten: [] };
-    Cloud.loaded = false;
+    cleanSessionStorage();
     location.hash = '';
     Router.handle();
   });
 
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
+  function cleanSessionStorage() {
+    ActiveProfile.clear();
+    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] };
+    Cloud.loaded = false;
+    // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
+    // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet
+    try {
+      const sessieKeys = ['sok_mirror', 'sok_kosten_collapsed', 'sok_last_ping', 'sok_id_show_color'];
+      sessieKeys.forEach(k => localStorage.removeItem(k));
+      // Alle draft-keys (per-dossier intake-formulier autosave) ook weg
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('sok_draft_')) localStorage.removeItem(k);
+      }
+    } catch (_) {}
+  }
+
   document.querySelectorAll('#profile-screen .profile-option').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-profile');
@@ -748,7 +763,7 @@ Router.add('/account', () => renderAccount());
   });
   document.getElementById('profile-logout').addEventListener('click', async () => {
     await Auth.logout();
-    ActiveProfile.clear();
+    cleanSessionStorage();
     location.hash = '';
     Router.handle();
   });

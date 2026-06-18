@@ -125,9 +125,21 @@ const Modal = {
       Modal._currentClose = close;
       const onConfirm = () => close(true);
       const onCancel = () => close(false);
+      // Focus-trap: Tab/Shift+Tab cyclet binnen het modal i.p.v. te ontsnappen
+      const trapFocus = e => {
+        if (e.key !== 'Tab') return;
+        const focusables = Array.from(m.querySelectorAll('button:not([hidden]), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+          .filter(el => !el.hidden && el.offsetParent !== null);
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last  = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      };
       const keyHandler = e => {
         if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
         else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        else trapFocus(e);
       };
       btn.addEventListener('click', onConfirm);
       btnCancel.addEventListener('click', onCancel);
