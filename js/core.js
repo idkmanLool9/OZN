@@ -733,10 +733,9 @@ const Router = {
         r.handler(params, fullHash);
         $$('#topnav a').forEach(a => {
           const route = a.getAttribute('data-route');
-          let active = false;
-          if (route === '/dossiers/nieuw') active = path === '/dossiers/nieuw';
-          else if (route === '/dossiers') active = path === '/' || (path.startsWith('/dossiers') && path !== '/dossiers/nieuw');
-          else active = path === route;
+          const active = route === '/dossiers'
+            ? (path === '/' || path.startsWith('/dossiers'))
+            : path === route;
           a.classList.toggle('active', active);
         });
         window.scrollTo(0, 0);
