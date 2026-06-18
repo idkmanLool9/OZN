@@ -147,6 +147,32 @@ ALTER TABLE public.dossiers
 NOTIFY pgrst, 'reload schema';
 
 -- ────────────────────────────────────────────────────────────────────
+-- Push-notificaties: per apparaat één subscription opslaan zodat de
+-- Edge Function 'send-push' er notificaties naartoe kan sturen.
+-- ────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  profiel TEXT,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_sent_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx
+  ON public.push_subscriptions(user_id);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_own_push" ON public.push_subscriptions;
+CREATE POLICY "auth_own_push" ON public.push_subscriptions
+  FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- ────────────────────────────────────────────────────────────────────
 -- Familie-portaal: tijdelijke publieke deel-link per dossier
 -- (v5.6.0) Genereer een tijdelijke link die de familie kan gebruiken
 -- om hun eigen dossier-info in te zien — geen login nodig.

@@ -364,6 +364,38 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="push-instellingen">
+        <h2>Push-notificaties</h2>
+        <p class="muted small">
+          Krijg een melding op je telefoon/iPad wanneer er een uitvaart aankomt (standaard 1 dag van tevoren).
+          Werkt op Chrome, Safari (iOS 16.4+, app moet 'op beginscherm' staan) en Android.
+        </p>
+        <div id="push-status" class="alert" style="margin-bottom:.75rem;">Laden…</div>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="push-form" class="form" autocomplete="off">
+            <label>
+              <span>VAPID public key</span>
+              <input type="text" name="push_vapid_public_key" value="${esc(s.push_vapid_public_key)}" placeholder="bv. BNb1...long base64-url string">
+              <span class="muted small">Eenmalig in te stellen. Zie <code>docs/push-setup.md</code> voor hoe je deze sleutels maakt.</span>
+            </label>
+            <label>
+              <span>Aantal dagen vooraf herinneren</span>
+              <input type="number" name="push_remind_days_ahead" value="${esc(s.push_remind_days_ahead)}" min="0" max="14" step="1">
+            </label>
+            <div class="form-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost" id="btn-push-enable">🔔 Inschakelen op dit apparaat</button>
+                <button type="button" class="btn btn-ghost" id="btn-push-disable" hidden>🔕 Uitschakelen</button>
+                <button type="button" class="btn btn-ghost" id="btn-push-test">Test-melding</button>
+              </div>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="parochies">
         <h2>Parochies &amp; priesters</h2>
         <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Aboona) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
@@ -809,6 +841,79 @@ function renderAccount(msg) {
       resetBtn.disabled = true;
       resetBtn.textContent = 'Bezig...';
       await Updater.hardReset();
+    });
+  }
+
+  // ─── Push-notificaties beheer ─────────────────────────────────
+  const pushForm = $('#push-form');
+  if (pushForm) {
+    const refreshPushStatus = async () => {
+      const statusEl = $('#push-status');
+      const enableBtn = $('#btn-push-enable');
+      const disableBtn = $('#btn-push-disable');
+      if (!await PushNotificaties.supported()) {
+        statusEl.className = 'alert alert-error';
+        statusEl.textContent = 'Deze browser ondersteunt geen push-notificaties.';
+        enableBtn.disabled = true;
+        return;
+      }
+      const perm = await PushNotificaties.permission();
+      const sub = await PushNotificaties.currentSubscription();
+      if (sub && perm === 'granted') {
+        statusEl.className = 'alert alert-success';
+        statusEl.innerHTML = '✓ <strong>Ingeschakeld</strong> op dit apparaat.';
+        enableBtn.hidden = true;
+        disableBtn.hidden = false;
+      } else if (perm === 'denied') {
+        statusEl.className = 'alert alert-error';
+        statusEl.innerHTML = '⚠ Notificaties geblokkeerd door de browser. Sta ze handmatig toe via de adresbalk (slot-icoontje).';
+        enableBtn.hidden = false;
+        disableBtn.hidden = true;
+      } else {
+        statusEl.className = 'alert';
+        statusEl.textContent = 'Nog niet ingeschakeld op dit apparaat.';
+        enableBtn.hidden = false;
+        disableBtn.hidden = true;
+      }
+    };
+    refreshPushStatus();
+
+    pushForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        push_vapid_public_key: f.push_vapid_public_key.value.trim(),
+        push_remind_days_ahead: parseInt(f.push_remind_days_ahead.value, 10) || 1,
+      });
+      renderAccount({ success: 'Push-instellingen opgeslagen.' });
+    });
+
+    $('#btn-push-enable').addEventListener('click', async () => {
+      const btn = $('#btn-push-enable');
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Bezig...';
+      try {
+        await PushNotificaties.subscribe();
+        Modal.show({ type: 'success', title: 'Notificaties aan', message: 'Je krijgt nu meldingen op dit apparaat.' });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Inschakelen mislukt', message: e.message || String(e) });
+      } finally {
+        btn.disabled = false; btn.textContent = orig;
+        refreshPushStatus();
+      }
+    });
+
+    $('#btn-push-disable').addEventListener('click', async () => {
+      try { await PushNotificaties.unsubscribe(); } catch (_) {}
+      refreshPushStatus();
+    });
+
+    $('#btn-push-test').addEventListener('click', async () => {
+      try {
+        const ok = await PushNotificaties.testLocal();
+        if (!ok) Modal.show({ type: 'warning', title: 'Toestemming nodig', message: 'Sta notificaties toe in de browser.' });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Test mislukt', message: e.message || String(e) });
+      }
     });
   }
 

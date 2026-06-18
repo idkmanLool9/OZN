@@ -52,6 +52,9 @@ const Settings = {
     emailjs_public_key: '',
     emailjs_service_id: '',
     emailjs_template_id: '',
+    // Push-notificaties (zie PushNotificaties + docs/push-setup.md)
+    push_vapid_public_key: '',
+    push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
     // E-mail-footer (handtekening onderaan elke verzonden mail)
     email_footer_enabled: true,
     email_footer_terms_url:     '',
@@ -487,6 +490,113 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.warn('Service worker registratie mislukt:', err));
   });
 }
+
+// ─── Push-notificaties (Web Push API) ───────────────────────────────────────
+// Werkt op alle moderne browsers + iOS Safari 16.4+ (vereist dat de app
+// 'op beginscherm' staat geïnstalleerd voor iOS).
+//
+// Setup-vereisten (in Supabase):
+//   1. VAPID-sleutels genereren (eenmalig)
+//   2. Public key in Settings → push_vapid_public_key zetten
+//   3. Edge Function 'send-push' draaien die elke ochtend de
+//      aankomende uitvaarten checkt en push verstuurt
+// Zie docs/push-setup.md voor de complete handleiding.
+const PushNotificaties = {
+  STORAGE_KEY: 'sok_push_subscription_id',
+
+  get vapidPublicKey() {
+    const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+    return s.push_vapid_public_key || '';
+  },
+
+  // base64-URL → Uint8Array (vereist door PushManager.subscribe)
+  _urlBase64ToUint8Array(b64) {
+    const padding = '='.repeat((4 - b64.length % 4) % 4);
+    const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  },
+
+  async supported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window &&
+           'Notification' in window;
+  },
+
+  async currentSubscription() {
+    if (!await PushNotificaties.supported()) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return reg.pushManager.getSubscription();
+  },
+
+  async permission() {
+    return Notification.permission; // 'default' | 'granted' | 'denied'
+  },
+
+  async subscribe() {
+    if (!await PushNotificaties.supported()) {
+      throw new Error('Deze browser ondersteunt geen push-notificaties.');
+    }
+    const key = PushNotificaties.vapidPublicKey;
+    if (!key) {
+      throw new Error('Push is nog niet ingesteld. Voer de VAPID public key in via Account → Push-notificaties.');
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      throw new Error('Toestemming voor notificaties geweigerd. Pas dit aan in de browser-instellingen.');
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: PushNotificaties._urlBase64ToUint8Array(key),
+    });
+    // Sla op in Supabase zodat Edge Function ons kan bereiken
+    const u = Auth.current();
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+      ? ActiveProfile.current().name : null;
+    const payload = {
+      user_id: u ? u.id : null,
+      profiel: profielNaam,
+      endpoint: sub.endpoint,
+      p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))),
+      auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')))),
+      user_agent: navigator.userAgent.slice(0, 200),
+    };
+    const { data, error } = await sb.from('push_subscriptions')
+      .upsert(payload, { onConflict: 'endpoint' })
+      .select().single();
+    if (error) throw error;
+    localStorage.setItem(PushNotificaties.STORAGE_KEY, String(data.id));
+    return data;
+  },
+
+  async unsubscribe() {
+    const sub = await PushNotificaties.currentSubscription();
+    if (sub) await sub.unsubscribe();
+    const id = localStorage.getItem(PushNotificaties.STORAGE_KEY);
+    if (id) {
+      await sb.from('push_subscriptions').delete().eq('id', parseInt(id, 10)).catch(() => {});
+      localStorage.removeItem(PushNotificaties.STORAGE_KEY);
+    }
+  },
+
+  // Lokaal een test-notificatie tonen (zonder push-server)
+  async testLocal() {
+    if (Notification.permission !== 'granted') {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') return false;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification('Uitvaartbeheer · test', {
+      body: 'Push-notificaties werken op dit apparaat. Je krijgt voortaan herinneringen voor aankomende uitvaarten.',
+      icon: './icon.svg',
+      badge: './icon.svg',
+      tag: 'sok-test',
+    });
+    return true;
+  },
+};
 
 // ─── E-mail-service (EmailJS) ───────────────────────────────────────────────
 const EmailService = {
