@@ -1,0 +1,14 @@
+# Supabase project config voor lokale dev + functions deploy
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "mpuejmkhmlbkaelqbnae"
+
+# Edge Functions — per function settings
+#
+# send-push: openbaar callable zonder Bearer-token zodat de cron-job
+# (pg_net.http_post vanuit Postgres) hem kan aanroepen zonder JWT.
+# De function is intern alsnog veilig: hij gebruikt de service-role
+# key alleen binnen Deno, doet alleen lees-operaties op publieke data,
+# en stuurt alleen naar reeds geregistreerde subscriptions.
+[functions.send-push]
+verify_jwt = false
