@@ -2043,3 +2043,15 @@ body { -webkit-overflow-scrolling: touch; }
   stroke: #6b1e2a;
   stroke-width: 1.8;
 }
+
+/* Title in SVG */
+.graven-title-text {
+  font-size: 18px; font-weight: 700;
+  fill: #1a1714;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+}
+.graven-svg-rowlabel {
+  font-size: 12px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+}

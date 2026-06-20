@@ -1,7 +1,6 @@
-// Begraafplaats — visueel grid van alle graven, klikbaar zoals
-// vliegtuig-stoelreservering. Filter op rij/status, klik een graf →
-// modal om te reserveren, bezet te zetten of vrij te geven (eventueel
-// gekoppeld aan een dossier).
+// Begraafplaats — visuele replica van de papieren plattegrond,
+// inclusief title, sectie-badges, juiste cirkel-posities,
+// halve-cirkel ingang onderaan, kruis-hatch rechtsonder.
 
 const GravenStore = {
   cache: [],
@@ -12,8 +11,7 @@ const GravenStore = {
     if (GravenStore.loaded && !force) return GravenStore.cache;
     if (GravenStore.loading) return GravenStore.loading;
     GravenStore.loading = (async () => {
-      // Supabase REST geeft default max 1000 rijen — wij hebben er 2150+
-      // Paginate dus expliciet in batches van 1000.
+      // Supabase default limit = 1000, wij hebben er 2150+ → paginate
       let all = [];
       let from = 0;
       const PAGE = 1000;
@@ -38,9 +36,7 @@ const GravenStore = {
   },
 
   byId(id) { return GravenStore.cache.find(g => g.id === id); },
-  byNummer(nr) { return GravenStore.cache.find(g => String(g.nummer) === String(nr)); },
 
-  // Per rij gegroepeerd (zoals "L1", "L2", ..., "R1", ...) — gesorteerd op positie
   perRij() {
     const map = new Map();
     for (const g of GravenStore.cache) {
@@ -48,7 +44,6 @@ const GravenStore = {
       map.get(g.rij).push(g);
     }
     for (const arr of map.values()) arr.sort((a, b) => a.positie - b.positie);
-    // Sorteer rijen: L1, L2, ..., R1, R2, ...
     return new Map([...map.entries()].sort(([a], [b]) => {
       const ax = a[0], bx = b[0];
       if (ax !== bx) return ax === 'L' ? -1 : 1;
@@ -82,15 +77,36 @@ const GravenStore = {
   },
 };
 
-// SVG-plattegrond constanten — matchen visueel de papieren kaart
-const MAP = {
+// ─── Layout constanten (matcht de plattegrond) ───
+const M = {
   PAD: 30,
-  CELL_W: 22,       // breed genoeg voor 4-cijferige grafnummers
-  CELL_H: 26,
-  CELL_GAP: 1.5,
-  ROW_GAP: 8,
-  LABEL_W: 42,
-  SIDE_GAP: 320,    // ruimte tussen linker- en rechterzijde (voor cirkels)
+  TITLE_H: 60,            // title + section badges bovenaan
+  CELL_W: 17,             // breed genoeg voor 4-cijferig nummer op klein font
+  CELL_H: 22,
+  CELL_GAP: 0.8,
+  ROW_H: 26,              // row pitch (cell + spacing)
+  LABEL_W: 36,
+  MID_W: 200,             // ruimte tussen linker- en rechterzijde
+  // Rij-Y-index (0-based binnen elke zijde)
+  LEFT_ROW_IDX: {
+    L1: 0, L2: 1, L3: 2, L4: 3, L5: 4, L6: 5, L7: 6, L8: 7,
+    L9: 8, L10: 9,
+    // wandelpad-gap op rij 10
+    L11: 11, L12: 12, L13: 13, L14: 14, L15: 15, L16: 16, L17: 17,
+  },
+  RIGHT_ROW_IDX: {
+    R1: 0, R2: 1, R3: 2, R4: 3, R5: 4, R6: 5,
+    R7: 6, R8: 7, R9: 8, R10: 9,
+    // wandelpad-gap op rij 10
+    R11: 11, R12: 12, R13: 13, R14: 14, R15: 15, R16: 16,
+    R17: 17, R18: 18, R19: 19, R20: 20, R21: 21,
+  },
+  // Linker rijen die naar rechts geschoven zijn (door cirkel aan linker rand)
+  LEFT_SHIFT: { L8: 70, L9: 80 },
+  // Rechter rijen die niet helemaal naar rechts gaan (door cirkel aan rechter rand)
+  RIGHT_TRIM_END: { R7: 60, R8: 80, R9: 60 },
+  // R20 heeft een gat in het midden voor de half-cirkel
+  R20_SPLIT_AFTER: 22,  // eerste 22 cellen, dan gat, dan rest
 };
 
 async function renderBegraafplaats() {
@@ -118,7 +134,7 @@ async function renderBegraafplaats() {
             </label>
             <label class="graven-filter-inline">
               <span class="muted small">Zoom</span>
-              <input type="range" id="graven-zoom" min="50" max="200" step="10" value="80">
+              <input type="range" id="graven-zoom" min="60" max="200" step="10" value="100">
             </label>
           </div>
         </div>
@@ -126,12 +142,11 @@ async function renderBegraafplaats() {
 
       <section class="card graven-legend-card">
         <div class="graven-legend">
-          <span class="graven-legend-item"><span class="graven-cell-mini graven-beschikbaar"></span> Beschikbaar</span>
+          <span class="graven-legend-item"><span class="graven-cell-mini graven-beschikbaar"></span> Beschikbaar (klikbaar om te boeken)</span>
           <span class="graven-legend-item"><span class="graven-cell-mini graven-gereserveerd"></span> Gereserveerd</span>
           <span class="graven-legend-item"><span class="graven-cell-mini graven-bezet"></span> Bezet</span>
           <span class="graven-legend-item"><span class="graven-cell-mini graven-has-dossier-mini"></span> Gekoppeld aan dossier</span>
         </div>
-        <p class="muted small" style="margin:.5rem 0 0;">Klik op een graf om te reserveren, koppelen aan een dossier, of vrij te geven. Versleep horizontaal om door de plattegrond te scrollen.</p>
       </section>
 
       <div id="graven-map-wrap" class="graven-map-wrap">
@@ -149,154 +164,258 @@ async function renderBegraafplaats() {
   bindGravenEvents();
 }
 
-// Bouw één grote SVG die linker- en rechterzijde tegenover elkaar zet,
-// met de cirkels (paviljoens) in het midden — net als de papieren kaart.
 function renderGravenMap() {
   const totals = GravenStore.totalsByStatus();
-  const totalsEl = $('#graven-totals');
-  if (totalsEl) {
-    totalsEl.innerHTML = `
-      <strong>${totals.totaal}</strong> graven ·
-      <strong style="color:var(--green);">${totals.beschikbaar}</strong> beschikbaar ·
-      <strong style="color:var(--amber);">${totals.gereserveerd}</strong> gereserveerd ·
-      <strong style="color:var(--red);">${totals.bezet}</strong> bezet`;
-  }
+  $('#graven-totals').innerHTML = `
+    <strong>${totals.totaal}</strong> graven ·
+    <strong style="color:#2a7a3a;">${totals.beschikbaar}</strong> beschikbaar ·
+    <strong style="color:#b3870e;">${totals.gereserveerd}</strong> gereserveerd ·
+    <strong style="color:#b34;">${totals.bezet}</strong> bezet`;
 
   const rijen = GravenStore.perRij();
-  const linker  = [...rijen].filter(([r]) => r.startsWith('L'));
+  const linker = [...rijen].filter(([r]) => r.startsWith('L'));
   const rechter = [...rijen].filter(([r]) => r.startsWith('R'));
 
-  // Bepaal benodigde breedte op basis van langste rij
-  const maxCells = (entries) => entries.reduce((m, [, gs]) => Math.max(m, gs.length), 0);
-  const linkerCells = maxCells(linker);
-  const rechterCells = maxCells(rechter);
-  const linkerW = linkerCells * (MAP.CELL_W + MAP.CELL_GAP);
-  const rechterW = rechterCells * (MAP.CELL_W + MAP.CELL_GAP);
-  const totalW = MAP.PAD + MAP.LABEL_W + linkerW + MAP.SIDE_GAP + rechterW + MAP.LABEL_W + MAP.PAD;
-  const maxRows = Math.max(linker.length, rechter.length);
-  const totalH = MAP.PAD * 2 + maxRows * (MAP.CELL_H + MAP.ROW_GAP) + 40;
+  // ─── Bereken benodigde breedte ───
+  const cellPitch = M.CELL_W + M.CELL_GAP;
+  const linkerMaxCells = linker.reduce((m, [, gs]) => Math.max(m, gs.length), 0);
+  const linkerMaxShift = Math.max(0, ...Object.values(M.LEFT_SHIFT));
+  const linkerBlockW = linkerMaxShift + linkerMaxCells * cellPitch;
+  const rechterMaxCells = rechter.reduce((m, [, gs]) => Math.max(m, gs.length), 0);
+  const rechterBlockW = rechterMaxCells * cellPitch;
 
-  // Coördinaten voor cells
-  const linkerX = MAP.PAD + MAP.LABEL_W; // rechts uitlijnen tegen het midden? Nee — links uitlijnen
-  const linkerLabelX = MAP.PAD + MAP.LABEL_W - 6;
-  // Rechterzijde — links uitlijnen na het midden-gat
-  const rechterX = MAP.PAD + MAP.LABEL_W + linkerW + MAP.SIDE_GAP;
-  const rechterLabelX = totalW - MAP.PAD - MAP.LABEL_W + 6;
+  const totalW = M.PAD + M.LABEL_W + linkerBlockW + M.MID_W + rechterBlockW + M.LABEL_W + M.PAD;
+  const maxRowIdx = Math.max(
+    ...Object.values(M.LEFT_ROW_IDX),
+    ...Object.values(M.RIGHT_ROW_IDX),
+  );
+  const cellsTopY = M.PAD + M.TITLE_H + 20;
+  const totalH = cellsTopY + (maxRowIdx + 1) * M.ROW_H + M.PAD + 80;
 
-  const rijStartY = MAP.PAD + 12;
-  const yForRow = idx => rijStartY + idx * (MAP.CELL_H + MAP.ROW_GAP);
+  const leftCellsStartX = M.PAD + M.LABEL_W;
+  const leftCellsEndX = leftCellsStartX + linkerBlockW;
+  const rightCellsStartX = leftCellsEndX + M.MID_W;
+  const rightCellsEndX = rightCellsStartX + rechterBlockW;
+  const midX = leftCellsEndX + M.MID_W / 2;
 
-  // Centrale paden / cirkels (paviljoens) — gepositioneerd zoals
-  // op de papieren plattegrond: een klein chapelletje bovenaan,
-  // een 3-circle cluster halverwege voor de hoofdkapel, en een
-  // half-cirkel ingang onderaan.
-  const midX = MAP.PAD + MAP.LABEL_W + linkerW + MAP.SIDE_GAP / 2;
-  const chapelY = rijStartY + MAP.CELL_H / 2;
-  const cathYCenter = yForRow(Math.floor(linker.length / 2)) + MAP.CELL_H / 2;
-  const ingangY = yForRow(Math.max(linker.length, rechter.length) - 2) + MAP.CELL_H / 2;
+  const yFor = idx => cellsTopY + idx * M.ROW_H;
 
-  const decor = `
-    <!-- Kleine kapel bovenaan (tussen L1 en R1) -->
-    <g class="graven-decor">
-      <circle cx="${midX}" cy="${chapelY}" r="38" fill="#fff" stroke="#b8b0a0" stroke-width="2"/>
-      <text x="${midX}" y="${chapelY + 6}" text-anchor="middle" font-size="22" fill="#9b9384" font-family="serif">⌂</text>
-    </g>
+  // ─── TITEL + SECTION BADGES ───
+  const titleSvg = `
+    <text x="${M.PAD + 4}" y="${M.PAD + 22}" class="graven-title-text">
+      GRAVE BOOKING SYSTEM – CEMETERY MAP (ACCURATE LAYOUT)
+    </text>
+    <g>
+      <rect x="${leftCellsStartX + linkerBlockW/2 - 100}" y="${M.PAD + 36}"
+            width="200" height="22" rx="11" fill="#e6f4ea" stroke="#7fb898" stroke-width="1.2"/>
+      <text x="${leftCellsStartX + linkerBlockW/2}" y="${M.PAD + 51}"
+            text-anchor="middle" font-size="11" font-weight="700" fill="#1e6b34">
+        LEFT SIDE – 17 ROWS
+      </text>
+      <rect x="${rightCellsStartX + rechterBlockW/2 - 100}" y="${M.PAD + 36}"
+            width="200" height="22" rx="11" fill="#e9f2fb" stroke="#82a4cf" stroke-width="1.2"/>
+      <text x="${rightCellsStartX + rechterBlockW/2}" y="${M.PAD + 51}"
+            text-anchor="middle" font-size="11" font-weight="700" fill="#1a4a7a">
+        RIGHT SIDE – 21 ROWS
+      </text>
+    </g>`;
 
-    <!-- Hoofdkapel-cluster in het midden: 3 duidelijk gescheiden cirkels + paden -->
-    <g class="graven-decor">
-      <!-- Verbindingspaden tussen de 3 cirkels -->
-      <line x1="${midX - 105}" y1="${cathYCenter}" x2="${midX - 65}" y2="${cathYCenter}"
-            stroke="#d6cebe" stroke-width="6" stroke-linecap="round"/>
-      <line x1="${midX + 65}" y1="${cathYCenter}" x2="${midX + 105}" y2="${cathYCenter}"
-            stroke="#d6cebe" stroke-width="6" stroke-linecap="round"/>
+  // ─── CELLEN PER RIJ ───
+  const buildCell = (g, x, y) => {
+    const cls = `graven-svg-cell graven-${esc(g.status)}${g.dossier_id ? ' graven-has-dossier' : ''}`;
+    const fs = String(g.nummer).length >= 4 ? 6.5 : 8;
+    return `<g class="graven-cell-group" data-id="${g.id}">
+      <rect x="${x}" y="${y}" width="${M.CELL_W}" height="${M.CELL_H}" class="${cls}" rx="1" data-id="${g.id}">
+        <title>Graf ${esc(g.nummer)} · ${esc(g.status)}${g.dossier_id ? ' · gekoppeld' : ''}</title>
+      </rect>
+      <text x="${x + M.CELL_W/2}" y="${y + M.CELL_H/2 + 2.5}" class="graven-svg-nr"
+            text-anchor="middle" font-size="${fs}" data-id="${g.id}">${esc(g.nummer)}</text>
+    </g>`;
+  };
 
-      <!-- Linker paviljoen -->
-      <circle cx="${midX - 130}" cy="${cathYCenter}" r="40" fill="#fff" stroke="#b8b0a0" stroke-width="2"/>
-
-      <!-- Centrale hoofdkapel met concentrische ringen + cross -->
-      <circle cx="${midX}" cy="${cathYCenter}" r="78" fill="#fff" stroke="#9c9382" stroke-width="2.5"/>
-      <circle cx="${midX}" cy="${cathYCenter}" r="52" fill="none" stroke="#b8b0a0" stroke-width="1.2"/>
-      <circle cx="${midX}" cy="${cathYCenter}" r="24" fill="none" stroke="#b8b0a0" stroke-width="1.2"/>
-      <text x="${midX}" y="${cathYCenter + 9}" text-anchor="middle" font-size="26" font-weight="700" fill="#6b1e2a" font-family="serif">✝</text>
-
-      <!-- Rechter paviljoen -->
-      <circle cx="${midX + 130}" cy="${cathYCenter}" r="40" fill="#fff" stroke="#b8b0a0" stroke-width="2"/>
-    </g>
-
-    <!-- Ingang/poort als half-cirkel onderaan -->
-    <g class="graven-decor">
-      <path d="M ${midX - 70} ${ingangY}
-               A 70 50 0 0 0 ${midX + 70} ${ingangY} L ${midX + 70} ${ingangY + 50}
-               L ${midX - 70} ${ingangY + 50} Z"
-            fill="#fff" stroke="#b8b0a0" stroke-width="2"/>
-      <text x="${midX}" y="${ingangY + 18}" text-anchor="middle" font-size="11" fill="#9b9384" font-family="serif">INGANG</text>
-    </g>
-
-    <!-- Centrale wandelpad (stippellijn van boven naar onder) -->
-    <line x1="${midX}" y1="${chapelY + 40}" x2="${midX}" y2="${cathYCenter - 82}"
-          stroke="#d6cebe" stroke-width="3" stroke-dasharray="4,4"/>
-    <line x1="${midX}" y1="${cathYCenter + 82}" x2="${midX}" y2="${ingangY - 5}"
-          stroke="#d6cebe" stroke-width="3" stroke-dasharray="4,4"/>
-  `;
-
-  // Bouw cells per rij — inclusief het grafnummer in de cell
-  const buildSide = (entries, startX, labelX, anchor) => entries.map(([rij, gs], idx) => {
-    const y = yForRow(idx);
-    const labelY = y + MAP.CELL_H / 2 + 4;
-    const cells = gs.map((g, j) => {
-      const x = startX + j * (MAP.CELL_W + MAP.CELL_GAP);
-      const cls = `graven-svg-cell graven-${esc(g.status)}${g.dossier_id ? ' graven-has-dossier' : ''}`;
-      // Font-size hangt af van aantal cijfers — 4-cijferig past krapper
-      const fs = String(g.nummer).length >= 4 ? 7 : 8;
-      return `<g class="graven-cell-group" data-id="${g.id}">
-        <rect x="${x}" y="${y}" width="${MAP.CELL_W}" height="${MAP.CELL_H}"
-              class="${cls}" rx="2" data-id="${g.id}">
-          <title>Graf ${esc(g.nummer)} · rij ${esc(rij)} · ${esc(g.status)}${g.dossier_id ? ' · gekoppeld aan dossier' : ''}</title>
-        </rect>
-        <text x="${x + MAP.CELL_W / 2}" y="${y + MAP.CELL_H / 2 + 3}"
-              class="graven-svg-nr" text-anchor="middle"
-              font-size="${fs}" data-id="${g.id}">${esc(g.nummer)}</text>
-      </g>`;
-    }).join('');
-    return `
-      <g class="graven-svg-row" data-rij="${esc(rij)}">
-        <text x="${labelX}" y="${labelY}" class="graven-svg-rowlabel" text-anchor="${anchor}">${esc(rij)}</text>
-        ${cells}
-      </g>`;
+  // Linker zijde
+  const linkerSvg = linker.map(([rij, gs]) => {
+    const rowIdx = M.LEFT_ROW_IDX[rij];
+    if (rowIdx === undefined) return '';
+    const y = yFor(rowIdx);
+    const shift = M.LEFT_SHIFT[rij] || 0;
+    const cells = gs.map((g, j) =>
+      buildCell(g, leftCellsStartX + shift + j * cellPitch, y)
+    ).join('');
+    // Label aan de linkerkant (links van de eerste cel positie)
+    const labelX = M.PAD + M.LABEL_W - 6;
+    return `<g class="graven-svg-row" data-rij="${esc(rij)}">
+      <text x="${labelX}" y="${y + M.CELL_H/2 + 4}" class="graven-svg-rowlabel"
+            text-anchor="end" fill="#1e6b34">${esc(rij)}</text>
+      ${cells}
+    </g>`;
   }).join('');
 
-  const linkerSvg = buildSide(linker, linkerX, linkerLabelX, 'end');
-  const rechterSvg = buildSide(rechter, rechterX, rechterLabelX, 'start');
+  // Rechter zijde
+  const rechterSvg = rechter.map(([rij, gs]) => {
+    const rowIdx = M.RIGHT_ROW_IDX[rij];
+    if (rowIdx === undefined) return '';
+    const y = yFor(rowIdx);
+    const trim = M.RIGHT_TRIM_END[rij] || 0;
 
-  // Sectie-titels boven elke zijde
-  const linkerCenter = MAP.PAD + MAP.LABEL_W + linkerW / 2;
-  const rechterCenter = rechterX + rechterW / 2;
-  const titles = `
-    <rect x="${linkerCenter - 100}" y="${MAP.PAD - 8}" width="200" height="22" rx="11" fill="#e6f4ea" stroke="#a3d3b1"/>
-    <text x="${linkerCenter}" y="${MAP.PAD + 7}" text-anchor="middle" font-size="11" font-weight="700" fill="#1e6b34">LINKERZIJDE · 17 RIJEN</text>
-    <rect x="${rechterCenter - 100}" y="${MAP.PAD - 8}" width="200" height="22" rx="11" fill="#e9f2fb" stroke="#a3b8d3"/>
-    <text x="${rechterCenter}" y="${MAP.PAD + 7}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a4a7a">RECHTERZIJDE · 21 RIJEN</text>
-  `;
+    // R20: gat in het midden voor de halfcirkel
+    let cellsHtml = '';
+    if (rij === 'R20') {
+      const splitAt = Math.min(M.R20_SPLIT_AFTER, gs.length);
+      // Eerste deel
+      for (let j = 0; j < splitAt; j++) {
+        cellsHtml += buildCell(gs[j], rightCellsStartX + j * cellPitch, y);
+      }
+      // Gat van 6 cellen, daarna rest
+      const restStart = splitAt + 6;
+      for (let j = splitAt; j < gs.length; j++) {
+        const visualPos = restStart + (j - splitAt);
+        cellsHtml += buildCell(gs[j], rightCellsStartX + visualPos * cellPitch, y);
+      }
+    } else {
+      cellsHtml = gs.map((g, j) =>
+        buildCell(g, rightCellsStartX + j * cellPitch, y)
+      ).join('');
+    }
 
-  // Filter-effect via CSS-vars
+    const labelX = rightCellsEndX + M.LABEL_W - 6;
+    return `<g class="graven-svg-row" data-rij="${esc(rij)}">
+      ${cellsHtml}
+      <text x="${labelX - trim}" y="${y + M.CELL_H/2 + 4}" class="graven-svg-rowlabel"
+            text-anchor="start" fill="#1a4a7a">${esc(rij)}</text>
+    </g>`;
+  }).join('');
+
+  // ─── STRUCTUREN (cirkels, paden, half-cirkel, kruis-hatch) ───
+  const yTop = yFor(0) + M.CELL_H/2;
+  const yCathedral = yFor(8) + M.CELL_H/2;
+  const yIngang = yFor(20) + M.CELL_H + 8;
+
+  const decor = `
+    <g class="graven-decor">
+      <!-- Kleine kapel/structuur bovenaan (tussen L1 en R1) -->
+      <circle cx="${midX}" cy="${yTop}" r="34" fill="#fff" stroke="#666" stroke-width="2"/>
+      <!-- Dak-symbool in de kleine cirkel -->
+      <path d="M ${midX-13} ${yTop+5}
+               L ${midX-13} ${yTop-2}
+               L ${midX} ${yTop-12}
+               L ${midX+13} ${yTop-2}
+               L ${midX+13} ${yTop+5}
+               L ${midX+5} ${yTop+5}
+               L ${midX+5} ${yTop-1}
+               L ${midX-5} ${yTop-1}
+               L ${midX-5} ${yTop+5} Z"
+            fill="none" stroke="#666" stroke-width="1.4"/>
+
+      <!-- Kleine linker-rand cirkel (tussen L8 en L9) -->
+      <circle cx="${leftCellsStartX + 20}" cy="${yFor(7) + M.ROW_H}" r="46"
+              fill="#fff" stroke="#666" stroke-width="1.8"/>
+      <circle cx="${leftCellsStartX + 20}" cy="${yFor(7) + M.ROW_H}" r="6"
+              fill="#666"/>
+
+      <!-- BIG CENTRALE KATHEDRAAL — cluster met concentrische ringen + 4 paden -->
+      <g class="graven-cathedral">
+        <!-- 4 cardinale paden (cross-pattern) -->
+        <line x1="${midX - 100}" y1="${yCathedral}" x2="${midX + 100}" y2="${yCathedral}"
+              stroke="#999" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="${midX}" y1="${yCathedral - 100}" x2="${midX}" y2="${yCathedral + 100}"
+              stroke="#999" stroke-width="2.5" stroke-linecap="round"/>
+
+        <!-- Buitenste grote cirkel -->
+        <circle cx="${midX}" cy="${yCathedral}" r="95"
+                fill="#fff" stroke="#555" stroke-width="2.5"/>
+
+        <!-- Concentrische ringen -->
+        <circle cx="${midX}" cy="${yCathedral}" r="68"
+                fill="none" stroke="#888" stroke-width="1.3"/>
+        <circle cx="${midX}" cy="${yCathedral}" r="42"
+                fill="none" stroke="#888" stroke-width="1.3"/>
+        <circle cx="${midX}" cy="${yCathedral}" r="22"
+                fill="#fff" stroke="#555" stroke-width="1.6"/>
+
+        <!-- Centrale kruis -->
+        <line x1="${midX}" y1="${yCathedral - 14}" x2="${midX}" y2="${yCathedral + 14}"
+              stroke="#222" stroke-width="3" stroke-linecap="round"/>
+        <line x1="${midX - 10}" y1="${yCathedral - 7}" x2="${midX + 10}" y2="${yCathedral - 7}"
+              stroke="#222" stroke-width="3" stroke-linecap="round"/>
+      </g>
+
+      <!-- Kleine rechter-rand cirkel (tussen R7 en R9) -->
+      <circle cx="${rightCellsEndX - 22}" cy="${yFor(7) + M.ROW_H}" r="46"
+              fill="#fff" stroke="#666" stroke-width="1.8"/>
+      <circle cx="${rightCellsEndX - 22}" cy="${yFor(7) + M.ROW_H}" r="6"
+              fill="#666"/>
+
+      <!-- INGANG: gelaagde half-cirkel onderaan (in R20 gat) -->
+      <g>
+        ${[58, 48, 38, 28, 18].map((r, i) => `
+          <path d="M ${midX - r} ${yIngang} Q ${midX} ${yIngang + r + 5} ${midX + r} ${yIngang}"
+                fill="${i === 0 ? '#fff' : 'none'}" stroke="#666" stroke-width="${1.6 - i*0.15}"/>
+        `).join('')}
+      </g>
+
+      <!-- KRUIS-HATCH structuur rechtsonder (na R21) -->
+      <g>
+        <rect x="${rightCellsStartX + rechterMaxCells * cellPitch - 70}"
+              y="${yFor(20) + 6}"
+              width="70" height="${M.ROW_H + 16}"
+              fill="#fff" stroke="#666" stroke-width="1.5"/>
+        <line x1="${rightCellsStartX + rechterMaxCells * cellPitch - 70}"
+              y1="${yFor(20) + 6}"
+              x2="${rightCellsStartX + rechterMaxCells * cellPitch}"
+              y2="${yFor(20) + 6 + M.ROW_H + 16}"
+              stroke="#999" stroke-width="1.2"/>
+        <line x1="${rightCellsStartX + rechterMaxCells * cellPitch}"
+              y1="${yFor(20) + 6}"
+              x2="${rightCellsStartX + rechterMaxCells * cellPitch - 70}"
+              y2="${yFor(20) + 6 + M.ROW_H + 16}"
+              stroke="#999" stroke-width="1.2"/>
+      </g>
+
+      <!-- Horizontaal wandelpad (tussen rij 10 en 11) -->
+      <line x1="${leftCellsStartX}" y1="${yFor(10) + M.ROW_H/2 - 2}"
+            x2="${rightCellsEndX}" y2="${yFor(10) + M.ROW_H/2 - 2}"
+            stroke="#bbb" stroke-width="1" stroke-dasharray="3,3"/>
+
+      <!-- Stippel-paden onder bepaalde rijen (decoratief, als op originele kaart) -->
+      ${[2, 5, 9, 13, 16, 19].map(idx => `
+        <line x1="${leftCellsStartX + 4}" y1="${yFor(idx) + M.CELL_H + 1}"
+              x2="${leftCellsEndX - 4}" y2="${yFor(idx) + M.CELL_H + 1}"
+              stroke="#d0c8b8" stroke-width="0.6" stroke-dasharray="1.5,2"/>
+        <line x1="${rightCellsStartX + 4}" y1="${yFor(idx) + M.CELL_H + 1}"
+              x2="${rightCellsEndX - 4}" y2="${yFor(idx) + M.CELL_H + 1}"
+              stroke="#d0c8b8" stroke-width="0.6" stroke-dasharray="1.5,2"/>
+      `).join('')}
+    </g>`;
+
+  // ─── FILTER STIJL ───
   const search = ($('#graven-search')?.value || '').trim();
   const statusFilter = $('#graven-status-filter')?.value || '';
-  const filterStyle = (search || statusFilter)
-    ? `<style>
-        .graven-svg-cell { opacity: .18; }
-        ${search ? GravenStore.cache
-          .filter(g => String(g.nummer).includes(search))
-          .map(g => `.graven-svg-cell[data-id="${g.id}"]`).join(',') + ' { opacity: 1 !important; stroke: var(--primary); stroke-width: 1.5; }' : ''}
-        ${statusFilter ? `.graven-${statusFilter} { opacity: 1 !important; }` : ''}
-      </style>` : '';
+  let filterStyle = '';
+  if (search || statusFilter) {
+    const matchSel = [];
+    if (search) {
+      GravenStore.cache
+        .filter(g => String(g.nummer).includes(search))
+        .forEach(g => matchSel.push(`.graven-cell-group[data-id="${g.id}"] .graven-svg-cell`));
+    }
+    filterStyle = `<style>
+      .graven-svg-cell { opacity: .2; }
+      .graven-svg-nr { opacity: .25; }
+      ${search ? matchSel.join(',') + ' { opacity: 1 !important; stroke: var(--primary); stroke-width: 1.8; }' : ''}
+      ${search ? matchSel.join(',').replace(/\.graven-svg-cell/g, '.graven-svg-nr') + ' { opacity: 1 !important; font-weight: 700; }' : ''}
+      ${statusFilter ? `.graven-${statusFilter} { opacity: 1 !important; } .graven-cell-group:has(.graven-${statusFilter}) .graven-svg-nr { opacity: 1 !important; }` : ''}
+    </style>`;
+  }
 
   const zoom = parseInt($('#graven-zoom')?.value || '100', 10);
   $('#graven-map-wrap').innerHTML = `
     ${filterStyle}
     <div class="graven-map-scroller" style="--zoom:${zoom/100};">
-      <svg class="graven-svg" viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" preserveAspectRatio="xMidYMid meet">
-        <rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#fbf8f2" rx="8"/>
-        ${titles}
+      <svg class="graven-svg" viewBox="0 0 ${totalW} ${totalH}"
+           width="${totalW}" height="${totalH}" preserveAspectRatio="xMidYMid meet">
+        <rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#ffffff" rx="6"/>
+        ${titleSvg}
         ${decor}
         ${linkerSvg}
         ${rechterSvg}
@@ -313,7 +432,6 @@ function bindGravenEvents() {
   });
 
   $('#graven-map-wrap').addEventListener('click', e => {
-    // Klik kan op rect of op de text in de cell vallen — pak data-id van beide
     const target = e.target.closest('[data-id]');
     if (!target) return;
     const id = parseInt(target.getAttribute('data-id'), 10);
@@ -327,7 +445,6 @@ function openGrafModal(grafId) {
   const dossier = g.dossier_id ? DB.byId(KEYS.DOSSIERS, g.dossier_id) : null;
   const dossierNaam = dossier ? (fullName(dossier) || dossier.dossier_nummer) : null;
 
-  // Lijst van actieve dossiers voor de koppel-dropdown
   const dossiers = (DB.list(KEYS.DOSSIERS) || [])
     .filter(d => d.status !== 'voltooid' && d.status !== 'geannuleerd')
     .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
@@ -350,7 +467,7 @@ function openGrafModal(grafId) {
       </select>
     </div>
 
-    <div class="graf-modal-row" id="graf-dossier-row">
+    <div class="graf-modal-row">
       <label class="muted small">Gekoppeld dossier (optioneel)</label>
       <select id="graf-dossier">
         <option value="">— geen —</option>
@@ -386,7 +503,7 @@ function openGrafModal(grafId) {
         dossier_id: newStatus === 'beschikbaar' ? null : newDossierId,
         opmerking: newOpmerking,
       });
-      renderGravenGrid();
+      renderGravenMap();
     } catch (e) {
       Modal.show({ type: 'error', title: 'Opslaan mislukt', message: e.message || String(e) });
     }
