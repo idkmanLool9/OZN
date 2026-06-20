@@ -2021,3 +2021,25 @@ body { -webkit-overflow-scrolling: touch; }
   width: 110px;
   accent-color: var(--primary, #6b1e2a);
 }
+
+/* SVG cells: tekst in elk graf */
+.graven-svg-nr {
+  fill: #555;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+.graven-svg-cell.graven-bezet + .graven-svg-nr,
+.graven-cell-group .graven-bezet ~ .graven-svg-nr { fill: #fff; }
+/* Bezet-cells: tekst wit voor contrast */
+.graven-cell-group .graven-svg-cell.graven-bezet { fill: #ef6b67; }
+.graven-cell-group:has(.graven-bezet) .graven-svg-nr { fill: #fff; }
+
+/* Decor (cirkels en paden) — niet klikbaar */
+.graven-decor { pointer-events: none; }
+.graven-cell-group { cursor: pointer; }
+.graven-cell-group:hover .graven-svg-cell {
+  stroke: #6b1e2a;
+  stroke-width: 1.8;
+}
