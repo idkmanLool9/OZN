@@ -17,15 +17,38 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import webpush from 'npm:web-push@3.6.7';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY')!;
-const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY') || '';
+const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY') || '';
 const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:info@morephrem.com';
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
-
 Deno.serve(async (req) => {
+  // Vroege env-validatie — geeft duidelijke 500 met JSON-body i.p.v.
+  // generieke 'Internal Server Error'
+  const missing: string[] = [];
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!SUPABASE_SERVICE_ROLE) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!VAPID_PUBLIC) missing.push('VAPID_PUBLIC_KEY');
+  if (!VAPID_PRIVATE) missing.push('VAPID_PRIVATE_KEY');
+  if (missing.length) {
+    return jsonResp({
+      error: 'missing_secrets',
+      msg: `De volgende secrets zijn niet gezet in deze Edge Function: ${missing.join(', ')}. ` +
+           `Run \`supabase secrets set ...\` (zie docs/push-setup.md stap 3) en deploy opnieuw.`,
+    }, 500);
+  }
+
+  try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  } catch (e: any) {
+    return jsonResp({
+      error: 'vapid_invalid',
+      msg: 'VAPID-setup faalde. Controleer dat de public/private keys klopt en het subject een mailto: of https: URL is.',
+      detail: e?.message || String(e),
+    }, 500);
+  }
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
   // Optioneel: dossier_id en aantal-dagen-vooraf via URL params, anders defaults
@@ -39,12 +62,13 @@ Deno.serve(async (req) => {
   if (overrideDays !== null) {
     daysAhead = parseInt(overrideDays, 10) || 1;
   } else {
-    // Lees uit app_instellingen
+    // Lees uit app_instellingen — maybeSingle zodat 't niet crasht als
+    // de rij nog niet bestaat
     const { data: settingsRow } = await supabase
       .from('app_instellingen')
       .select('data')
       .eq('id', 1)
-      .single();
+      .maybeSingle();
     daysAhead = (settingsRow?.data as any)?.push_remind_days_ahead ?? 1;
   }
 
