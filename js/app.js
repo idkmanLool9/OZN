@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 59;
-const APP_VERSION    = '5.6.0';
+const APP_BUILD      = 60;
+const APP_VERSION    = '5.7.0';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -748,6 +748,7 @@ Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
+Router.add('/begraafplaats', () => renderBegraafplaats());
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
 Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
