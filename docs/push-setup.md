@@ -89,11 +89,18 @@ supabase functions deploy send-push --no-verify-jwt
 > want hij heeft alleen lees-rechten op publieke data en stuurt
 > alleen naar geregistreerde subscriptions.
 
-Test direct dat-ie werkt:
+Test direct dat-ie werkt (PowerShell-vriendelijk):
 
 ```powershell
-curl -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
+# Optie A: PowerShell-native (mooie JSON-output)
+Invoke-RestMethod "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
+
+# Optie B: echte curl forceren (.exe voorkomt PowerShell-alias)
+curl.exe -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
 ```
+
+> ⚠️ `curl` zonder `.exe` in PowerShell is een alias voor `Invoke-WebRequest`
+> die geen `-X` kent. Gebruik `curl.exe` of `Invoke-RestMethod`.
 
 Dry-run geeft een JSON terug zonder echt te versturen. Je ziet:
 - aantal aankomende uitvaarten morgen
@@ -164,14 +171,16 @@ dan de function handmatig:
 
 ```powershell
 # Dry-run: zien wat er gebeurt, niets versturen
-curl "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
+Invoke-RestMethod "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
 
 # Echte test: stuurt push voor morgen
-curl -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push"
+Invoke-RestMethod -Method Post "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push"
 
 # Specifieke datum testen
-curl -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?date=2026-06-20"
+Invoke-RestMethod -Method Post "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?date=2026-06-20"
 ```
+
+> Op Mac/Linux of WSL kun je gewone `curl -X POST ...` gebruiken.
 
 Je moet binnen ~30 seconden een notificatie krijgen.
 
