@@ -1958,3 +1958,66 @@ body { -webkit-overflow-scrolling: touch; }
   .graven-cell { width: 24px; height: 24px; font-size: .6rem; }
   .graven-row { grid-template-columns: 40px 1fr; }
 }
+
+/* ─── Begraafplaats — SVG plattegrond ─── */
+.graven-map-wrap {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fbf8f2;
+  overflow: hidden;
+}
+.graven-map-scroller {
+  overflow: auto;
+  max-height: calc(100vh - 280px);
+  min-height: 500px;
+  -webkit-overflow-scrolling: touch;
+}
+.graven-svg {
+  display: block;
+  transform-origin: top left;
+  transform: scale(var(--zoom, 1));
+  transition: transform .15s ease;
+}
+.graven-svg-cell {
+  fill: #fff;
+  stroke: #d6d2cb;
+  stroke-width: 0.5;
+  cursor: pointer;
+  transition: fill .12s ease, stroke .12s ease, transform .08s ease;
+}
+.graven-svg-cell.graven-beschikbaar  { fill: #ffffff; stroke: #c7c0b3; }
+.graven-svg-cell.graven-gereserveerd { fill: #fadc7b; stroke: #d9b34a; }
+.graven-svg-cell.graven-bezet        { fill: #ef6b67; stroke: #c44c47; }
+.graven-svg-cell.graven-has-dossier  { stroke: #6b1e2a; stroke-width: 1.5; }
+.graven-svg-cell:hover {
+  stroke: #6b1e2a;
+  stroke-width: 1.5;
+  filter: brightness(1.05) drop-shadow(0 1px 2px rgba(0,0,0,.18));
+}
+.graven-svg-rowlabel {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #8a847a;
+  font-family: ui-monospace, monospace;
+  user-select: none;
+  pointer-events: none;
+}
+
+.graven-cell-mini {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border-radius: 2px;
+  vertical-align: middle;
+  border: 1px solid #c7c0b3;
+}
+.graven-cell-mini.graven-beschikbaar  { background: #fff; }
+.graven-cell-mini.graven-gereserveerd { background: #fadc7b; border-color: #d9b34a; }
+.graven-cell-mini.graven-bezet        { background: #ef6b67; border-color: #c44c47; }
+.graven-cell-mini.graven-has-dossier-mini { background: #fff; border-color: #6b1e2a; border-width: 2px; }
+
+/* Filter — zoom slider styling */
+#graven-zoom {
+  width: 110px;
+  accent-color: var(--primary, #6b1e2a);
+}

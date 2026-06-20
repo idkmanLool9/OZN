@@ -67,6 +67,19 @@ const GravenStore = {
   },
 };
 
+// SVG-plattegrond constanten — matchen visueel de papieren kaart
+const MAP = {
+  W: 1900,
+  H: 1100,
+  PAD: 24,
+  CELL_W: 13,
+  CELL_H: 22,
+  CELL_GAP: 1,
+  ROW_GAP: 6,
+  LABEL_W: 36,
+  SIDE_GAP: 260, // ruimte tussen linker- en rechterzijde (voor cirkels)
+};
+
 async function renderBegraafplaats() {
   $('#view').innerHTML = `
     <div class="page">
@@ -90,20 +103,25 @@ async function renderBegraafplaats() {
                 <option value="bezet">Bezet</option>
               </select>
             </label>
+            <label class="graven-filter-inline">
+              <span class="muted small">Zoom</span>
+              <input type="range" id="graven-zoom" min="50" max="200" step="10" value="100">
+            </label>
           </div>
         </div>
       </div>
 
       <section class="card graven-legend-card">
         <div class="graven-legend">
-          <span class="graven-legend-item"><span class="graven-cell graven-beschikbaar"></span> Beschikbaar</span>
-          <span class="graven-legend-item"><span class="graven-cell graven-gereserveerd"></span> Gereserveerd</span>
-          <span class="graven-legend-item"><span class="graven-cell graven-bezet"></span> Bezet</span>
+          <span class="graven-legend-item"><span class="graven-cell-mini graven-beschikbaar"></span> Beschikbaar</span>
+          <span class="graven-legend-item"><span class="graven-cell-mini graven-gereserveerd"></span> Gereserveerd</span>
+          <span class="graven-legend-item"><span class="graven-cell-mini graven-bezet"></span> Bezet</span>
+          <span class="graven-legend-item"><span class="graven-cell-mini graven-has-dossier-mini"></span> Gekoppeld aan dossier</span>
         </div>
-        <p class="muted small" style="margin:.5rem 0 0;">Klik op een graf om te reserveren, koppelen aan een dossier, of vrij te geven.</p>
+        <p class="muted small" style="margin:.5rem 0 0;">Klik op een graf om te reserveren, koppelen aan een dossier, of vrij te geven. Versleep horizontaal om door de plattegrond te scrollen.</p>
       </section>
 
-      <div id="graven-grid-wrap" class="graven-grid-wrap">
+      <div id="graven-map-wrap" class="graven-map-wrap">
         <div class="graven-loading"><div class="splash-spinner"></div><p class="muted">Plattegrond laden…</p></div>
       </div>
     </div>`;
@@ -111,14 +129,16 @@ async function renderBegraafplaats() {
   try {
     await GravenStore.load();
   } catch (e) {
-    $('#graven-grid-wrap').innerHTML = `<div class="alert alert-error">Plattegrond kon niet geladen worden: ${esc(e.message || String(e))}</div>`;
+    $('#graven-map-wrap').innerHTML = `<div class="alert alert-error">Plattegrond kon niet geladen worden: ${esc(e.message || String(e))}</div>`;
     return;
   }
-  renderGravenGrid();
+  renderGravenMap();
   bindGravenEvents();
 }
 
-function renderGravenGrid() {
+// Bouw één grote SVG die linker- en rechterzijde tegenover elkaar zet,
+// met de cirkels (paviljoens) in het midden — net als de papieren kaart.
+function renderGravenMap() {
   const totals = GravenStore.totalsByStatus();
   const totalsEl = $('#graven-totals');
   if (totalsEl) {
@@ -129,64 +149,135 @@ function renderGravenGrid() {
       <strong style="color:var(--red);">${totals.bezet}</strong> bezet`;
   }
 
-  const search = ($('#graven-search')?.value || '').trim();
-  const statusFilter = $('#graven-status-filter')?.value || '';
-
   const rijen = GravenStore.perRij();
-  const sections = [];
-  let visibleCount = 0;
-
-  // Splits links / rechts
   const linker  = [...rijen].filter(([r]) => r.startsWith('L'));
   const rechter = [...rijen].filter(([r]) => r.startsWith('R'));
 
-  const renderSide = (entries, label) => {
-    if (!entries.length) return '';
-    return `
-      <div class="graven-side">
-        <h3 class="graven-side-title">${esc(label)}</h3>
-        ${entries.map(([rij, graven]) => {
-          const filtered = graven.filter(g => {
-            if (search && !String(g.nummer).includes(search)) return false;
-            if (statusFilter && g.status !== statusFilter) return false;
-            return true;
-          });
-          if (!filtered.length) return '';
-          visibleCount += filtered.length;
-          return `
-            <div class="graven-row">
-              <div class="graven-row-label">${esc(rij)}</div>
-              <div class="graven-row-cells">
-                ${filtered.map(g => `
-                  <button type="button" class="graven-cell graven-${esc(g.status)}${g.dossier_id ? ' graven-has-dossier' : ''}"
-                          data-action="open-graf" data-id="${g.id}"
-                          title="Graf ${esc(g.nummer)} · ${esc(g.status)}${g.dossier_id ? ' · gekoppeld aan dossier' : ''}">
-                    ${esc(g.nummer)}
-                  </button>
-                `).join('')}
-              </div>
-            </div>`;
-        }).join('')}
-      </div>`;
-  };
+  // Bepaal benodigde breedte op basis van langste rij
+  const maxCells = (entries) => entries.reduce((m, [, gs]) => Math.max(m, gs.length), 0);
+  const linkerCells = maxCells(linker);
+  const rechterCells = maxCells(rechter);
+  const linkerW = linkerCells * (MAP.CELL_W + MAP.CELL_GAP);
+  const rechterW = rechterCells * (MAP.CELL_W + MAP.CELL_GAP);
+  const totalW = MAP.PAD + MAP.LABEL_W + linkerW + MAP.SIDE_GAP + rechterW + MAP.LABEL_W + MAP.PAD;
+  const maxRows = Math.max(linker.length, rechter.length);
+  const totalH = MAP.PAD * 2 + maxRows * (MAP.CELL_H + MAP.ROW_GAP) + 40;
 
-  const html = `
-    <div class="graven-grid">
-      ${renderSide(linker, 'Linkerzijde · 17 rijen')}
-      ${renderSide(rechter, 'Rechterzijde · 21 rijen')}
-    </div>
-    ${visibleCount === 0 ? '<p class="muted center" style="padding:2rem;">Geen graven die aan de filter voldoen.</p>' : ''}`;
-  $('#graven-grid-wrap').innerHTML = html;
+  // Coördinaten voor cells
+  const linkerX = MAP.PAD + MAP.LABEL_W; // rechts uitlijnen tegen het midden? Nee — links uitlijnen
+  const linkerLabelX = MAP.PAD + MAP.LABEL_W - 6;
+  // Rechterzijde — links uitlijnen na het midden-gat
+  const rechterX = MAP.PAD + MAP.LABEL_W + linkerW + MAP.SIDE_GAP;
+  const rechterLabelX = totalW - MAP.PAD - MAP.LABEL_W + 6;
+
+  const rijStartY = MAP.PAD + 12;
+  const yForRow = idx => rijStartY + idx * (MAP.CELL_H + MAP.ROW_GAP);
+
+  // Centrale paden / cirkels (paviljoens en zonnewendingen) — visueel
+  // benaderend zoals het papieren ontwerp.
+  const midX = MAP.PAD + MAP.LABEL_W + linkerW + MAP.SIDE_GAP / 2;
+  const decor = `
+    <!-- Linker grote cirkel (paviljoen tussen L1 en L2) -->
+    <circle cx="${midX - 40}" cy="${rijStartY + 18}" r="36" fill="#fff" stroke="#c7c0b3" stroke-width="1.5"/>
+    <text x="${midX - 40}" y="${rijStartY + 22}" text-anchor="middle" font-size="12" fill="#9b9384" font-family="serif">⌂</text>
+
+    <!-- Linker kleinere cirkel bij L8/L9 -->
+    <circle cx="${midX - 80}" cy="${yForRow(7) + 18}" r="48" fill="#fff" stroke="#c7c0b3" stroke-width="1.5"/>
+
+    <!-- Centrale grote cirkel (hoofdkapel) -->
+    <circle cx="${midX}" cy="${yForRow(8) + 30}" r="90" fill="#fff" stroke="#c7c0b3" stroke-width="2"/>
+    <circle cx="${midX}" cy="${yForRow(8) + 30}" r="55" fill="none" stroke="#c7c0b3" stroke-width="1"/>
+    <circle cx="${midX}" cy="${yForRow(8) + 30}" r="20" fill="none" stroke="#c7c0b3" stroke-width="1"/>
+    <text x="${midX}" y="${yForRow(8) + 34}" text-anchor="middle" font-size="14" fill="#9b9384" font-family="serif">✝</text>
+
+    <!-- Rechter cirkel bij R7/R8 -->
+    <circle cx="${midX + 90}" cy="${yForRow(7) + 8}" r="42" fill="#fff" stroke="#c7c0b3" stroke-width="1.5"/>
+
+    <!-- Onderkant: half-circle (ingang/zonnewende) — onder de plattegrond -->
+    <path d="M ${midX - 80} ${yForRow(maxRows - 1) - 5}
+             A 80 60 0 0 0 ${midX + 80} ${yForRow(maxRows - 1) - 5}"
+          fill="#fff" stroke="#c7c0b3" stroke-width="1.5"/>
+
+    <!-- Verticale paden (visuele indicatie) -->
+    <line x1="${MAP.PAD + MAP.LABEL_W - 4}" y1="${rijStartY - 8}"
+          x2="${MAP.PAD + MAP.LABEL_W - 4}" y2="${yForRow(maxRows - 1) + MAP.CELL_H + 8}"
+          stroke="#e6dfd0" stroke-width="1" stroke-dasharray="2,3"/>
+    <line x1="${rechterX + rechterW + 4}" y1="${rijStartY - 8}"
+          x2="${rechterX + rechterW + 4}" y2="${yForRow(maxRows - 1) + MAP.CELL_H + 8}"
+          stroke="#e6dfd0" stroke-width="1" stroke-dasharray="2,3"/>
+  `;
+
+  // Bouw cells per rij
+  const buildSide = (entries, startX, labelX, anchor) => entries.map(([rij, gs], idx) => {
+    const y = yForRow(idx);
+    const labelY = y + MAP.CELL_H / 2 + 4;
+    // Op linkerzijde: cells van rechts naar links zou kunnen, maar voor leesbaarheid LtR
+    const cells = gs.map((g, j) => {
+      const x = startX + j * (MAP.CELL_W + MAP.CELL_GAP);
+      const cls = `graven-svg-cell graven-${esc(g.status)}${g.dossier_id ? ' graven-has-dossier' : ''}`;
+      return `<rect x="${x}" y="${y}" width="${MAP.CELL_W}" height="${MAP.CELL_H}"
+                class="${cls}" rx="1.5" data-id="${g.id}">
+                <title>Graf ${esc(g.nummer)} · ${esc(g.status)}${g.dossier_id ? ' · gekoppeld' : ''}</title>
+              </rect>`;
+    }).join('');
+    return `
+      <g class="graven-svg-row" data-rij="${esc(rij)}">
+        <text x="${labelX}" y="${labelY}" class="graven-svg-rowlabel" text-anchor="${anchor}">${esc(rij)}</text>
+        ${cells}
+      </g>`;
+  }).join('');
+
+  const linkerSvg = buildSide(linker, linkerX, linkerLabelX, 'end');
+  const rechterSvg = buildSide(rechter, rechterX, rechterLabelX, 'start');
+
+  // Sectie-titels boven elke zijde
+  const linkerCenter = MAP.PAD + MAP.LABEL_W + linkerW / 2;
+  const rechterCenter = rechterX + rechterW / 2;
+  const titles = `
+    <rect x="${linkerCenter - 100}" y="${MAP.PAD - 8}" width="200" height="22" rx="11" fill="#e6f4ea" stroke="#a3d3b1"/>
+    <text x="${linkerCenter}" y="${MAP.PAD + 7}" text-anchor="middle" font-size="11" font-weight="700" fill="#1e6b34">LINKERZIJDE · 17 RIJEN</text>
+    <rect x="${rechterCenter - 100}" y="${MAP.PAD - 8}" width="200" height="22" rx="11" fill="#e9f2fb" stroke="#a3b8d3"/>
+    <text x="${rechterCenter}" y="${MAP.PAD + 7}" text-anchor="middle" font-size="11" font-weight="700" fill="#1a4a7a">RECHTERZIJDE · 21 RIJEN</text>
+  `;
+
+  // Filter-effect via CSS-vars
+  const search = ($('#graven-search')?.value || '').trim();
+  const statusFilter = $('#graven-status-filter')?.value || '';
+  const filterStyle = (search || statusFilter)
+    ? `<style>
+        .graven-svg-cell { opacity: .18; }
+        ${search ? GravenStore.cache
+          .filter(g => String(g.nummer).includes(search))
+          .map(g => `.graven-svg-cell[data-id="${g.id}"]`).join(',') + ' { opacity: 1 !important; stroke: var(--primary); stroke-width: 1.5; }' : ''}
+        ${statusFilter ? `.graven-${statusFilter} { opacity: 1 !important; }` : ''}
+      </style>` : '';
+
+  const zoom = parseInt($('#graven-zoom')?.value || '100', 10);
+  $('#graven-map-wrap').innerHTML = `
+    ${filterStyle}
+    <div class="graven-map-scroller" style="--zoom:${zoom/100};">
+      <svg class="graven-svg" viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" preserveAspectRatio="xMidYMid meet">
+        <rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#fbf8f2" rx="8"/>
+        ${titles}
+        ${decor}
+        ${linkerSvg}
+        ${rechterSvg}
+      </svg>
+    </div>`;
 }
 
 function bindGravenEvents() {
-  $('#graven-search').addEventListener('input', () => renderGravenGrid());
-  $('#graven-status-filter').addEventListener('change', () => renderGravenGrid());
+  $('#graven-search').addEventListener('input', () => renderGravenMap());
+  $('#graven-status-filter').addEventListener('change', () => renderGravenMap());
+  $('#graven-zoom').addEventListener('input', () => {
+    const sc = $('.graven-map-scroller');
+    if (sc) sc.style.setProperty('--zoom', (parseInt($('#graven-zoom').value, 10) / 100));
+  });
 
-  $('#graven-grid-wrap').addEventListener('click', e => {
-    const btn = e.target.closest('[data-action="open-graf"]');
-    if (!btn) return;
-    const id = parseInt(btn.getAttribute('data-id'), 10);
+  $('#graven-map-wrap').addEventListener('click', e => {
+    const rect = e.target.closest('.graven-svg-cell');
+    if (!rect) return;
+    const id = parseInt(rect.getAttribute('data-id'), 10);
     openGrafModal(id);
   });
 }
