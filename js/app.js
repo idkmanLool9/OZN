@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 65;
-const APP_VERSION    = '5.7.5';
+const APP_BUILD      = 66;
+const APP_VERSION    = '5.7.6';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -53,7 +53,7 @@ const Settings = {
     emailjs_service_id: '',
     emailjs_template_id: '',
     // Push-notificaties (zie PushNotificaties + docs/push-setup.md)
-    push_vapid_public_key: '',
+    push_vapid_public_key: 'BFrHC8o3zxJ4e1qirE93vUm5wPZpEdqWIV9OwczE-Omgf3QkoM_hKFI1ZFK2Lon4f7bvwVNKQVUfOZxkFQ6nUmg',
     push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
     // Begraafplaats-plattegrond (PNG/JPG, getoond bovenaan begraafplaats-view)
     cemetery_map_url: '',

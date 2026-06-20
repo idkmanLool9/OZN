@@ -1,161 +1,191 @@
-# Push-notificaties: setup-handleiding
+# Push-notificaties — installatie-handleiding
 
-Werkend op alle moderne browsers + iOS Safari 16.4+ (de app moet wel via "Op
-beginscherm" geïnstalleerd zijn). Vereist eenmalig wat setup-werk: VAPID-
-sleutels genereren + een Edge Function in Supabase die de notificaties
-verstuurt.
-
----
-
-## Stap 1 — VAPID-sleutels genereren (eenmalig)
-
-Op je computer met Node.js geïnstalleerd:
-
-```bash
-npx web-push generate-vapid-keys
-```
-
-Output ziet er zo uit:
-
-```
-Public Key: BNbxxx...long base64-url string
-Private Key: zzz...shorter base64-url string
-```
-
-- **Public Key** → vul in via Account → Push-notificaties → **VAPID public key**
-- **Private Key** → bewaar geheim, gaat in stap 2 als Supabase secret
+Status: **client-kant al klaar**, publieke VAPID-sleutel staat al in de
+default-settings. Wat je nog moet doen is de **server-kant** opzetten:
+de Edge Function deployen + de private VAPID-sleutel als secret opslaan
++ een dagelijkse cron job configureren.
 
 ---
 
-## Stap 2 — Supabase Edge Function `send-push`
+## ⚠️ Belangrijke regel
 
-### a) Geheim instellen
+De **public key** mag in de code (zit nu in `js/app.js`). De **private
+key** mag ABSOLUUT NIET in git terechtkomen — die gaat alleen in
+Supabase Secrets.
 
-```bash
-supabase secrets set VAPID_PRIVATE_KEY="<plak hier de private key>"
-supabase secrets set VAPID_PUBLIC_KEY="<plak hier de public key>"
+---
+
+## Stap 1 — Supabase CLI installeren (eenmalig)
+
+Op je Windows-machine in PowerShell:
+
+```powershell
+# Optie A: via Scoop
+scoop install supabase
+
+# Optie B: via Chocolatey
+choco install supabase
+
+# Optie C: handmatige download
+# https://github.com/supabase/cli/releases — pak de Windows ZIP
+```
+
+Verifieer:
+
+```powershell
+supabase --version
+```
+
+---
+
+## Stap 2 — Inloggen + project linken
+
+```powershell
+cd C:\Users\<jij>\Documents\uitvaart
+supabase login            # opent browser → autoriseer
+supabase link --project-ref mpuejmkhmlbkaelqbnae
+```
+
+---
+
+## Stap 3 — Secrets instellen
+
+> 🔒 **Plak je private key NIET in deze file** (die staat in git). Gebruik
+> hieronder de placeholders en haal de echte waardes uit je wachtwoord-
+> manager of de chat waar je ze gegenereerd hebt.
+
+```powershell
+# Public key mag in een commit-file want is per definitie publiek
+supabase secrets set VAPID_PUBLIC_KEY="<PLAK HIER DE PUBLIC KEY>"
+
+# Private key NOOIT in git — alleen lokaal pasten in deze terminal
+supabase secrets set VAPID_PRIVATE_KEY="<PLAK HIER DE PRIVATE KEY>"
+
+# Subject: een mailto: of https: URL die push-services kunnen gebruiken
+# om jou te bereiken bij problemen
 supabase secrets set VAPID_SUBJECT="mailto:info@morephrem.com"
 ```
 
-### b) Functie aanmaken
+Verifieer:
 
-```bash
-supabase functions new send-push
+```powershell
+supabase secrets list
 ```
 
-Vervang de inhoud van `supabase/functions/send-push/index.ts` door:
+Je zou alle drie moeten zien (waardes zijn afgekapt — dat hoort).
 
-```typescript
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { JWT } from 'https://deno.land/x/djwt@v3.0.0/mod.ts';
+---
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY')!;
-const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY')!;
-const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:info@example.com';
+## Stap 4 — Edge Function deployen
 
-Deno.serve(async (req) => {
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+De code staat al klaar in `supabase/functions/send-push/index.ts`.
 
-  // Pak alle dossiers met uitvaart over X dagen
-  const settings = await supabase.from('app_instellingen').select('data').eq('id', 1).single();
-  const daysAhead = settings.data?.data?.push_remind_days_ahead || 1;
-
-  const target = new Date();
-  target.setDate(target.getDate() + daysAhead);
-  const targetDay = target.toISOString().slice(0, 10);
-
-  const { data: dossiers } = await supabase
-    .from('dossiers')
-    .select('id, voornaam, achternaam, uitvaart_datum, uitvaart_tijd, kerk_locatie')
-    .eq('uitvaart_datum', targetDay);
-
-  if (!dossiers || dossiers.length === 0) {
-    return new Response('Geen aankomende uitvaarten.', { status: 200 });
-  }
-
-  const { data: subs } = await supabase
-    .from('push_subscriptions')
-    .select('*');
-
-  if (!subs) return new Response('Geen subscriptions.', { status: 200 });
-
-  let sent = 0;
-  for (const d of dossiers) {
-    const naam = [d.voornaam, d.achternaam].filter(Boolean).join(' ');
-    const payload = {
-      title: `Uitvaart ${naam} ${daysAhead === 0 ? 'vandaag' : daysAhead === 1 ? 'morgen' : 'over ' + daysAhead + ' dagen'}`,
-      body: `${d.uitvaart_tijd || ''} · ${d.kerk_locatie || ''}`.trim(),
-      url: `/#/dossiers/${d.id}`,
-      tag: `dossier-${d.id}`,
-    };
-
-    for (const sub of subs) {
-      try {
-        await sendWebPush(sub, payload);
-        sent++;
-        await supabase.from('push_subscriptions').update({ last_sent_at: new Date().toISOString() }).eq('id', sub.id);
-      } catch (e) {
-        // Subscription is mogelijk expired — opruimen
-        if (e.message.includes('410')) {
-          await supabase.from('push_subscriptions').delete().eq('id', sub.id);
-        }
-      }
-    }
-  }
-  return new Response(`Verstuurd: ${sent}`, { status: 200 });
-});
-
-async function sendWebPush(sub: any, payload: any) {
-  // Web Push protocol RFC 8030 + RFC 8291 — wordt makkelijker met een lib.
-  // Gebruik bv. https://deno.land/x/webpush voor productie.
-  // Voor de overzichtelijkheid een ge-stripte versie hier:
-  const url = sub.endpoint;
-  const audience = new URL(url).origin;
-  const exp = Math.floor(Date.now() / 1000) + 12 * 3600;
-  const claims = { aud: audience, exp, sub: VAPID_SUBJECT };
-  // ... (verkortingsteken voor duidelijkheid — gebruik npm:web-push of npm:@negrel/webpush)
-  throw new Error('Gebruik een Web Push lib: import * as webpush from "npm:web-push"');
-}
-```
-
-> **Tip**: in plaats van zelf web-push protocol te implementeren, importeer je
-> de bestaande lib in Deno via `import webpush from "npm:web-push";` en gebruik
-> `webpush.sendNotification(sub, JSON.stringify(payload), { vapidDetails: {...} })`.
-
-### c) Deployen
-
-```bash
+```powershell
 supabase functions deploy send-push --no-verify-jwt
 ```
 
-### d) Schedule (dagelijks om 07:00 NL-tijd = 05:00 UTC)
+> Het `--no-verify-jwt` is omdat de cron job geen JWT meestuurt.
+> De function checkt zelf niet wie hem aanroept — dat is veilig
+> want hij heeft alleen lees-rechten op publieke data en stuurt
+> alleen naar geregistreerde subscriptions.
 
-In Supabase Dashboard → **Database → Cron Jobs**:
+Test direct dat-ie werkt:
+
+```powershell
+curl -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
+```
+
+Dry-run geeft een JSON terug zonder echt te versturen. Je ziet:
+- aantal aankomende uitvaarten morgen
+- aantal subscriptions
+- hoeveel zou er verstuurd worden
+
+---
+
+## Stap 5 — Dagelijkse cron job
+
+In **Supabase Dashboard → Database → Extensions** zet je deze 2 extensies aan:
+
+- `pg_cron`
+- `pg_net` (voor HTTP-calls vanuit Postgres)
+
+Dan in **Database → SQL Editor**, draai:
 
 ```sql
+-- Eerst: bestaande job met dezelfde naam opruimen (idempotent)
+SELECT cron.unschedule('daily-uitvaart-push')
+WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'daily-uitvaart-push');
+
+-- Plan: elke dag om 05:00 UTC (= 07:00 NL zomertijd / 06:00 wintertijd)
 SELECT cron.schedule(
   'daily-uitvaart-push',
   '0 5 * * *',
-  $$ SELECT net.http_post(
-       url := 'https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push',
-       headers := '{"Authorization":"Bearer <SUPABASE_ANON_KEY>"}'::jsonb
-     ); $$
+  $$
+  SELECT net.http_post(
+    url := 'https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push',
+    headers := jsonb_build_object('Content-Type', 'application/json')
+  );
+  $$
 );
+```
+
+Controleer dat-ie aangemaakt is:
+
+```sql
+SELECT * FROM cron.job;
+```
+
+Logs zien (na de eerste run):
+
+```sql
+SELECT * FROM cron.job_run_details
+WHERE jobname = 'daily-uitvaart-push'
+ORDER BY start_time DESC LIMIT 10;
 ```
 
 ---
 
-## Stap 3 — Test in de app
+## Stap 6 — Test in de webapp
 
 1. Hard refresh de webapp
-2. Account → Push-notificaties → vul de public key in → **Opslaan**
+2. Account → Push-notificaties → controleer dat de public key automatisch ingevuld is
 3. Klik **🔔 Inschakelen op dit apparaat** → browser vraagt toestemming → OK
-4. Klik **Test-melding** → je krijgt direct een notificatie
+4. Klik **Test-melding** → krijg je direct een lokale notificatie
 
-Op iPad: voeg de app eerst toe aan beginscherm (Share → "Voeg toe aan
-beginscherm"). Pas dan werkt push.
+Op iPad: voeg de app eerst toe aan beginscherm (Deel-knop → "Voeg toe
+aan beginscherm"). Pas dan werkt push (Apple-vereiste).
+
+---
+
+## Stap 7 — End-to-end test met echte server
+
+Maak eerst een test-dossier met **uitvaart_datum** op morgen. Trigger
+dan de function handmatig:
+
+```powershell
+# Dry-run: zien wat er gebeurt, niets versturen
+curl "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?dryRun=1"
+
+# Echte test: stuurt push voor morgen
+curl -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push"
+
+# Specifieke datum testen
+curl -X POST "https://mpuejmkhmlbkaelqbnae.supabase.co/functions/v1/send-push?date=2026-06-20"
+```
+
+Je moet binnen ~30 seconden een notificatie krijgen.
+
+---
+
+## Optionele query-parameters
+
+De function accepteert:
+
+| Parameter | Voorbeeld | Effect |
+|---|---|---|
+| `date=YYYY-MM-DD` | `?date=2026-06-25` | Stuurt voor uitvaarten op die specifieke datum |
+| `days=N` | `?days=3` | Override `push_remind_days_ahead` voor deze run |
+| `dryRun=1` | `?dryRun=1` | Logt wat-ie zou doen zonder echt te versturen |
 
 ---
 
@@ -163,17 +193,18 @@ beginscherm"). Pas dan werkt push.
 
 | Probleem | Oorzaak | Oplossing |
 |---|---|---|
-| "Deze browser ondersteunt geen..." | Te oude browser | Update naar laatste Chrome/Safari/Firefox |
-| Toestemming geweigerd | Notificaties handmatig geblokkeerd | Browser-instellingen → site-rechten → notificaties toestaan |
-| Geen melding ontvangen na cron-run | Endpoint expired (typisch na lange tijd) | App opnieuw inschakelen via knop |
-| iOS krijgt niks | App moet 'op beginscherm' staan | Share → "Voeg toe aan beginscherm" → open vanaf beginscherm |
+| `webpush.setVapidDetails is not a function` | Verkeerde import | Check `npm:web-push@3.6.7` import in index.ts |
+| `400 VAPID public key mismatch` | Public key in webapp ≠ secret server | Check beide identiek |
+| `403 invalid subject` | VAPID_SUBJECT geen geldige mailto: of https: | Zet `mailto:adres@domain.nl` |
+| Geen melding op iPad | App niet op beginscherm geïnstalleerd | Voeg toe via Deel-knop |
+| 410 errors in logs | Subscription verlopen (browser cache gewist) | Function ruimt ze automatisch op |
+| Cron draait niet | `pg_cron` of `pg_net` extensie uit | Database → Extensions → beide aan |
 
 ---
 
-## Privacy
+## Privacy & veiligheid
 
-Subscriptions worden gekoppeld aan jouw `auth.users.id`. Een subscription
-bevat een endpoint-URL (push-service van browser) + twee crypto-sleutels.
-Bij uitloggen wordt de subscription verwijderd. De server kan ALLEEN
-notificaties versturen naar geregistreerde subscriptions — niet via
-endpoint-URLs van derden.
+- Subscriptions zijn gekoppeld aan `auth.users.id` via RLS — niemand anders kan ze lezen of bewerken
+- Server gebruikt **service-role key** alleen binnen Edge Function (nooit naar client gestuurd)
+- Push-endpoints werken via standaard W3C Web Push (Chrome, Firefox, Safari)
+- Geen externe tracking-providers — alles via je eigen Supabase + browser-push-services
