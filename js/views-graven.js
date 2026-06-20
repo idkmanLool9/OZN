@@ -77,6 +77,56 @@ const GravenStore = {
   },
 };
 
+// ─── Image-overlay calibratie ───
+// Voor elke rij: percentages waar de cellen op de geüploade plattegrond staan.
+// Gekalibreerd voor de SOK papieren kaart. Cellen zijn LEFT-aligned binnen
+// hun rij, gelijkmatig verdeeld tussen x1 en x2.
+const IMG_CAL = {
+  cellH: 3.0,  // hoogte per cell in % (van imagehoogte)
+  rows: {
+    // LINKERZIJDE
+    L1:  { y: 8.8,  x1: 3.6,  x2: 36.0, count: 56 },
+    L2:  { y: 12.5, x1: 3.6,  x2: 35.4, count: 54 },
+    L3:  { y: 16.0, x1: 3.6,  x2: 35.0, count: 53 },
+    L4:  { y: 19.5, x1: 3.6,  x2: 30.5, count: 44 },
+    L5:  { y: 23.0, x1: 3.6,  x2: 35.4, count: 54 },
+    L6:  { y: 26.7, x1: 3.6,  x2: 36.0, count: 58 },
+    L7:  { y: 30.3, x1: 3.6,  x2: 36.0, count: 59 },
+    L8:  { y: 34.0, x1: 6.0,  x2: 36.0, count: 61 },   // ingeschoven door linker cirkel
+    L9:  { y: 37.5, x1: 6.0,  x2: 33.5, count: 55 },
+    L10: { y: 41.0, x1: 3.6,  x2: 36.0, count: 60 },
+    L11: { y: 48.0, x1: 3.6,  x2: 36.0, count: 58 },   // na wandelpad-gap
+    L12: { y: 51.5, x1: 3.6,  x2: 36.0, count: 56 },
+    L13: { y: 55.0, x1: 3.6,  x2: 36.0, count: 57 },
+    L14: { y: 58.5, x1: 3.6,  x2: 36.0, count: 58 },
+    L15: { y: 62.0, x1: 3.6,  x2: 35.4, count: 54 },
+    L16: { y: 65.5, x1: 3.6,  x2: 34.6, count: 52 },
+    L17: { y: 69.0, x1: 3.6,  x2: 35.0, count: 53 },
+    // RECHTERZIJDE
+    R1:  { y: 8.8,  x1: 43.5, x2: 79.5, count: 61 },
+    R2:  { y: 12.5, x1: 43.5, x2: 79.5, count: 61 },
+    R3:  { y: 16.0, x1: 43.5, x2: 80.0, count: 65 },
+    R4:  { y: 19.5, x1: 43.5, x2: 79.0, count: 60 },
+    R5:  { y: 23.0, x1: 43.5, x2: 79.0, count: 60 },
+    R6:  { y: 26.7, x1: 43.5, x2: 79.0, count: 60 },
+    R7:  { y: 30.3, x1: 43.5, x2: 76.5, count: 60 },   // ingeschoven door rechter cirkel
+    R8:  { y: 34.0, x1: 43.5, x2: 76.5, count: 62 },
+    R9:  { y: 37.5, x1: 43.5, x2: 76.5, count: 61 },
+    R10: { y: 41.0, x1: 43.5, x2: 79.0, count: 60 },
+    R11: { y: 48.0, x1: 43.5, x2: 79.0, count: 60 },
+    R12: { y: 51.5, x1: 43.5, x2: 79.5, count: 61 },
+    R13: { y: 55.0, x1: 43.5, x2: 79.0, count: 60 },
+    R14: { y: 58.5, x1: 43.5, x2: 79.5, count: 61 },
+    R15: { y: 62.0, x1: 43.5, x2: 79.5, count: 61 },
+    R16: { y: 65.5, x1: 43.5, x2: 79.5, count: 61 },
+    R17: { y: 69.0, x1: 43.5, x2: 79.5, count: 61 },
+    R18: { y: 72.5, x1: 43.5, x2: 79.0, count: 60 },
+    R19: { y: 76.0, x1: 43.5, x2: 78.5, count: 59 },
+    R20: { y: 83.5, x1: 43.5, x2: 79.0, count: 45, splitAt: 22, gapW: 4.0 },  // halfcirkel-gat in midden
+    R21: { y: 87.5, x1: 70.0, x2: 79.0, count: 9 },
+  },
+};
+
 // ─── Layout constanten (matcht de plattegrond) ───
 const M = {
   PAD: 30,
@@ -153,29 +203,21 @@ async function renderBegraafplaats() {
         const url = (typeof Settings !== 'undefined') ? Settings.get('cemetery_map_url') : '';
         if (url) {
           return `
-            <section class="card cemetery-map-ref">
-              <details ${localStorage.getItem('sok_cemetery_ref_open') !== '0' ? 'open' : ''} id="cemetery-ref-details">
-                <summary>
-                  <strong>🗺️ Plattegrond als visuele referentie</strong>
-                  <span class="muted small">— klik op de interactieve grid eronder om te boeken</span>
-                </summary>
-                <div class="cemetery-map-img-wrap">
-                  <img src="${esc(url)}" alt="Plattegrond" id="cemetery-map-img" loading="lazy">
-                </div>
-                <div class="cemetery-map-actions">
-                  <label class="btn btn-sm btn-ghost" style="cursor:pointer;">
-                    Vervang plattegrond
-                    <input type="file" id="cemetery-map-replace" accept="image/*" hidden>
-                  </label>
-                  <button type="button" class="btn btn-sm btn-ghost" id="cemetery-map-remove">Verwijderen</button>
-                </div>
-              </details>
+            <section class="card cemetery-map-actions-card">
+              <div class="cemetery-map-actions">
+                <span class="muted small">Klikbare hotspots zitten over de plattegrond. Hover om een graf te zien.</span>
+                <label class="btn btn-sm btn-ghost" style="cursor:pointer;">
+                  Vervang plattegrond
+                  <input type="file" id="cemetery-map-replace" accept="image/*" hidden>
+                </label>
+                <button type="button" class="btn btn-sm btn-ghost" id="cemetery-map-remove">Verwijderen</button>
+              </div>
             </section>`;
         }
         return `
           <section class="card cemetery-map-upload">
-            <h3 style="margin:0 0 .35rem;">🗺️ Plattegrond uploaden (optioneel)</h3>
-            <p class="muted small">Upload de papieren plattegrond als afbeelding — die verschijnt dan bovenaan als visuele referentie naast de klikbare grid.</p>
+            <h3 style="margin:0 0 .35rem;">🗺️ Plattegrond uploaden</h3>
+            <p class="muted small">Upload de papieren plattegrond als afbeelding — dan komen er klikbare hotspots direct op elk graf, gekalibreerd op rij L1-L17 en R1-R21.</p>
             <label class="btn btn-primary btn-sm" style="cursor:pointer;">
               Kies afbeelding
               <input type="file" id="cemetery-map-upload" accept="image/*" hidden>
@@ -194,8 +236,71 @@ async function renderBegraafplaats() {
     $('#graven-map-wrap').innerHTML = `<div class="alert alert-error">Plattegrond kon niet geladen worden: ${esc(e.message || String(e))}</div>`;
     return;
   }
-  renderGravenMap();
+  const imgUrl = (typeof Settings !== 'undefined') ? Settings.get('cemetery_map_url') : '';
+  if (imgUrl) {
+    renderImageOverlay(imgUrl);
+  } else {
+    renderGravenMap();
+  }
   bindGravenEvents();
+}
+
+// ─── IMAGE-OVERLAY render: plaatst onzichtbare/transparante clickable
+// rectangles bovenop de geüploade plattegrond, gekalibreerd per rij. ───
+function renderImageOverlay(imgUrl) {
+  const totals = GravenStore.totalsByStatus();
+  $('#graven-totals').innerHTML = `
+    <strong>${totals.totaal}</strong> graven ·
+    <strong style="color:#2a7a3a;">${totals.beschikbaar}</strong> beschikbaar ·
+    <strong style="color:#b3870e;">${totals.gereserveerd}</strong> gereserveerd ·
+    <strong style="color:#b34;">${totals.bezet}</strong> bezet`;
+
+  const rijen = GravenStore.perRij();
+  const search = ($('#graven-search')?.value || '').trim();
+  const statusFilter = $('#graven-status-filter')?.value || '';
+
+  const overlays = [];
+  for (const [rij, graven] of rijen) {
+    const cal = IMG_CAL.rows[rij];
+    if (!cal) continue;
+    const totalW = cal.x2 - cal.x1;
+    const splitAt = cal.splitAt || null;
+    const gapW = cal.gapW || 0;
+    const effectiveCount = cal.count;
+    const cellW = (totalW - gapW) / effectiveCount;
+
+    graven.forEach((g, j) => {
+      // Filter: dim/hide niet-matchende
+      let dim = false;
+      if (search && !String(g.nummer).includes(search)) dim = true;
+      if (statusFilter && g.status !== statusFilter) dim = true;
+
+      // Positie binnen rij (rekening houdend met split-gap voor R20)
+      let visualJ = j;
+      if (splitAt !== null && j >= splitAt) {
+        const gapInCells = gapW / cellW;
+        visualJ = j + gapInCells;
+      }
+      const xPct = cal.x1 + visualJ * cellW;
+      const yPct = cal.y - IMG_CAL.cellH / 2;
+      const isMatch = !!search && !dim;
+
+      overlays.push(`
+        <div class="overlay-cell graven-${esc(g.status)}${g.dossier_id ? ' graven-has-dossier' : ''}${dim ? ' overlay-dim' : ''}${isMatch ? ' overlay-match' : ''}"
+             style="left:${xPct.toFixed(3)}%; top:${yPct.toFixed(3)}%; width:${(cellW - 0.05).toFixed(3)}%; height:${IMG_CAL.cellH.toFixed(2)}%;"
+             data-id="${g.id}"
+             title="Graf ${esc(g.nummer)} · ${esc(g.status)}${g.dossier_id ? ' · gekoppeld' : ''}">
+        </div>`);
+    });
+  }
+
+  $('#graven-map-wrap').innerHTML = `
+    <div class="cemetery-overlay-wrap">
+      <img src="${esc(imgUrl)}" class="cemetery-overlay-img" alt="Plattegrond" id="cemetery-overlay-img">
+      <div class="cemetery-overlay-grid">
+        ${overlays.join('')}
+      </div>
+    </div>`;
 }
 
 function renderGravenMap() {
@@ -458,11 +563,20 @@ function renderGravenMap() {
 }
 
 function bindGravenEvents() {
-  $('#graven-search').addEventListener('input', () => renderGravenMap());
-  $('#graven-status-filter').addEventListener('change', () => renderGravenMap());
+  const isImageMode = () => !!Settings.get('cemetery_map_url');
+  const rerender = () => isImageMode()
+    ? renderImageOverlay(Settings.get('cemetery_map_url'))
+    : renderGravenMap();
+  $('#graven-search').addEventListener('input', rerender);
+  $('#graven-status-filter').addEventListener('change', rerender);
   $('#graven-zoom').addEventListener('input', () => {
-    const sc = $('.graven-map-scroller');
-    if (sc) sc.style.setProperty('--zoom', (parseInt($('#graven-zoom').value, 10) / 100));
+    if (isImageMode()) {
+      const wrap = $('.cemetery-overlay-wrap');
+      if (wrap) wrap.style.setProperty('--zoom', (parseInt($('#graven-zoom').value, 10) / 100));
+    } else {
+      const sc = $('.graven-map-scroller');
+      if (sc) sc.style.setProperty('--zoom', (parseInt($('#graven-zoom').value, 10) / 100));
+    }
   });
 
   $('#graven-map-wrap').addEventListener('click', e => {

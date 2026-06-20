@@ -2087,3 +2087,83 @@ body { -webkit-overflow-scrolling: touch; }
   text-align: center; padding: 1.25rem;
   border-style: dashed;
 }
+
+/* Cemetery image-overlay modus (klikbare hotspots op de papieren plattegrond) */
+.cemetery-map-actions-card {
+  padding: .65rem 1rem !important;
+  margin-bottom: .75rem;
+}
+.cemetery-map-actions-card .cemetery-map-actions {
+  display: flex; gap: .65rem; align-items: center; flex-wrap: wrap;
+}
+
+.cemetery-overlay-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  --zoom: 1;
+  overflow: auto;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.cemetery-overlay-img {
+  display: block;
+  width: calc(100% * var(--zoom, 1));
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+}
+.cemetery-overlay-grid {
+  position: absolute;
+  inset: 0;
+  width: calc(100% * var(--zoom, 1));
+  height: 100%;
+}
+.overlay-cell {
+  position: absolute;
+  cursor: pointer;
+  border-radius: 1px;
+  transition: background .15s ease, border-color .15s ease, transform .08s;
+}
+/* Beschikbaar: onzichtbaar, behalve op hover */
+.overlay-cell.graven-beschikbaar {
+  background: transparent;
+  border: 1px solid transparent;
+}
+.overlay-cell.graven-beschikbaar:hover {
+  background: rgba(107, 30, 42, 0.18);
+  border-color: rgba(107, 30, 42, 0.85);
+  transform: scale(1.08);
+  z-index: 5;
+}
+/* Gereserveerd: gele semi-transparante overlay */
+.overlay-cell.graven-gereserveerd {
+  background: rgba(250, 220, 123, 0.6);
+  border: 1.5px solid rgba(217, 152, 30, 0.95);
+}
+.overlay-cell.graven-gereserveerd:hover {
+  background: rgba(250, 220, 123, 0.85);
+}
+/* Bezet: rode semi-transparante overlay */
+.overlay-cell.graven-bezet {
+  background: rgba(239, 107, 103, 0.65);
+  border: 1.5px solid rgba(170, 40, 35, 0.95);
+}
+.overlay-cell.graven-bezet:hover {
+  background: rgba(239, 107, 103, 0.9);
+}
+/* Met dossier: extra outline */
+.overlay-cell.graven-has-dossier {
+  outline: 2px solid #6b1e2a;
+  outline-offset: -2px;
+}
+/* Filter dimming */
+.overlay-cell.overlay-dim { opacity: 0.12; }
+.overlay-cell.overlay-match {
+  background: rgba(107, 30, 42, 0.35) !important;
+  border-color: rgba(107, 30, 42, 0.95) !important;
+  outline: 2px solid #6b1e2a !important;
+  outline-offset: -1px !important;
+  z-index: 4;
+}
