@@ -2055,3 +2055,35 @@ body { -webkit-overflow-scrolling: touch; }
   font-weight: 700;
   font-family: ui-monospace, monospace;
 }
+
+/* Cemetery map als visuele referentie */
+.cemetery-map-ref summary {
+  cursor: pointer; padding: .25rem 0;
+  display: flex; gap: .5rem; align-items: baseline; flex-wrap: wrap;
+}
+.cemetery-map-ref summary::-webkit-details-marker { display: none; }
+.cemetery-map-ref summary::before {
+  content: '▾'; color: var(--muted); display: inline-block;
+  transition: transform .15s ease;
+}
+.cemetery-map-ref details:not([open]) summary::before { transform: rotate(-90deg); }
+.cemetery-map-img-wrap {
+  margin-top: .75rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafafa;
+  max-height: 500px;
+}
+.cemetery-map-img-wrap img {
+  display: block; max-width: 100%; height: auto;
+  margin: 0 auto;
+}
+.cemetery-map-actions {
+  display: flex; gap: .5rem; flex-wrap: wrap;
+  margin-top: .5rem;
+}
+.cemetery-map-upload {
+  text-align: center; padding: 1.25rem;
+  border-style: dashed;
+}

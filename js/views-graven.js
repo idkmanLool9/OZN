@@ -149,6 +149,40 @@ async function renderBegraafplaats() {
         </div>
       </section>
 
+      ${(() => {
+        const url = (typeof Settings !== 'undefined') ? Settings.get('cemetery_map_url') : '';
+        if (url) {
+          return `
+            <section class="card cemetery-map-ref">
+              <details ${localStorage.getItem('sok_cemetery_ref_open') !== '0' ? 'open' : ''} id="cemetery-ref-details">
+                <summary>
+                  <strong>🗺️ Plattegrond als visuele referentie</strong>
+                  <span class="muted small">— klik op de interactieve grid eronder om te boeken</span>
+                </summary>
+                <div class="cemetery-map-img-wrap">
+                  <img src="${esc(url)}" alt="Plattegrond" id="cemetery-map-img" loading="lazy">
+                </div>
+                <div class="cemetery-map-actions">
+                  <label class="btn btn-sm btn-ghost" style="cursor:pointer;">
+                    Vervang plattegrond
+                    <input type="file" id="cemetery-map-replace" accept="image/*" hidden>
+                  </label>
+                  <button type="button" class="btn btn-sm btn-ghost" id="cemetery-map-remove">Verwijderen</button>
+                </div>
+              </details>
+            </section>`;
+        }
+        return `
+          <section class="card cemetery-map-upload">
+            <h3 style="margin:0 0 .35rem;">🗺️ Plattegrond uploaden (optioneel)</h3>
+            <p class="muted small">Upload de papieren plattegrond als afbeelding — die verschijnt dan bovenaan als visuele referentie naast de klikbare grid.</p>
+            <label class="btn btn-primary btn-sm" style="cursor:pointer;">
+              Kies afbeelding
+              <input type="file" id="cemetery-map-upload" accept="image/*" hidden>
+            </label>
+          </section>`;
+      })()}
+
       <div id="graven-map-wrap" class="graven-map-wrap">
         <div class="graven-loading"><div class="splash-spinner"></div><p class="muted">Plattegrond laden…</p></div>
       </div>
@@ -437,6 +471,65 @@ function bindGravenEvents() {
     const id = parseInt(target.getAttribute('data-id'), 10);
     if (id) openGrafModal(id);
   });
+
+  // Plattegrond-upload (eerste keer)
+  const upload = $('#cemetery-map-upload');
+  if (upload) {
+    upload.addEventListener('change', e => handleCemeteryMapUpload(e.target.files[0]));
+  }
+  // Plattegrond-vervangen
+  const replace = $('#cemetery-map-replace');
+  if (replace) {
+    replace.addEventListener('change', e => handleCemeteryMapUpload(e.target.files[0]));
+  }
+  // Plattegrond-verwijderen
+  const remove = $('#cemetery-map-remove');
+  if (remove) {
+    remove.addEventListener('click', async () => {
+      const ok = await Modal.confirm({
+        title: 'Plattegrond verwijderen?',
+        message: 'De afbeelding wordt uit Supabase Storage verwijderd. De interactieve grid blijft werken.',
+        confirmText: 'Verwijderen',
+      });
+      if (!ok) return;
+      try {
+        await BrandingFotos.removeCemeteryMap();
+        Settings.set({ cemetery_map_url: '' });
+        renderBegraafplaats();
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: e.message || String(e) });
+      }
+    });
+  }
+  // Onthoud open/dicht-stand van de plattegrond-details
+  const details = $('#cemetery-ref-details');
+  if (details) {
+    details.addEventListener('toggle', () => {
+      localStorage.setItem('sok_cemetery_ref_open', details.open ? '1' : '0');
+    });
+  }
+}
+
+async function handleCemeteryMapUpload(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    Modal.show({ type: 'warning', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen.' });
+    return;
+  }
+  if (!navigator.onLine) {
+    Modal.show({ type: 'offline', title: 'Geen internet', message: 'Uploaden kan alleen met een internetverbinding.' });
+    return;
+  }
+  Modal.show({ type: 'info', title: 'Uploaden...', message: 'De plattegrond wordt geüpload.' });
+  try {
+    const url = await BrandingFotos.uploadCemeteryMap(file);
+    Modal.close(true);
+    await Settings.set({ cemetery_map_url: url });
+    renderBegraafplaats();
+  } catch (e) {
+    Modal.close(true);
+    Modal.show({ type: 'error', title: 'Upload mislukt', message: e.message || String(e) });
+  }
 }
 
 function openGrafModal(grafId) {

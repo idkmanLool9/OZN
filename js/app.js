@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 63;
-const APP_VERSION    = '5.7.3';
+const APP_BUILD      = 64;
+const APP_VERSION    = '5.7.4';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -55,6 +55,8 @@ const Settings = {
     // Push-notificaties (zie PushNotificaties + docs/push-setup.md)
     push_vapid_public_key: '',
     push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
+    // Begraafplaats-plattegrond (PNG/JPG, getoond bovenaan begraafplaats-view)
+    cemetery_map_url: '',
     // E-mail-footer (handtekening onderaan elke verzonden mail)
     email_footer_enabled: true,
     email_footer_terms_url:     '',
@@ -397,6 +399,25 @@ const BrandingFotos = {
   async removeLogo() {
     const exts = ['png','jpg','jpeg','svg','webp','gif'];
     await sb.storage.from('branding').remove(exts.map(e => `logo.${e}`)).catch(() => {});
+  },
+
+  // Plattegrond van de begraafplaats — getoond als visuele referentie
+  async uploadCemeteryMap(file) {
+    file = await compressImage(file, 2400, 0.92); // grote map mag breder
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const path = `cemetery-map.${ext || 'png'}`;
+    const exts = ['png','jpg','jpeg','svg','webp'].filter(e => e !== ext);
+    if (exts.length) await sb.storage.from('branding').remove(exts.map(e => `cemetery-map.${e}`)).catch(() => {});
+    const { error } = await sb.storage.from('branding').upload(path, file, {
+      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
+    });
+    if (error) throw error;
+    const { data } = sb.storage.from('branding').getPublicUrl(path);
+    return data.publicUrl + '?v=' + Date.now();
+  },
+  async removeCemeteryMap() {
+    const exts = ['png','jpg','jpeg','svg','webp'];
+    await sb.storage.from('branding').remove(exts.map(e => `cemetery-map.${e}`)).catch(() => {});
   },
 };
 
