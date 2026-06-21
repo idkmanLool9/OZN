@@ -112,6 +112,12 @@ ALTER TABLE public.documenten
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS email_adresboek JSONB DEFAULT '[]'::jsonb;
 
+-- v5.11: certificaatnummer (familiegraf), voorganger-priester, artsverklaring-scan
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS certificaat_nummer TEXT,
+  ADD COLUMN IF NOT EXISTS uitvaart_voorganger TEXT,
+  ADD COLUMN IF NOT EXISTS artsverklaring_pad TEXT;
+
 -- ────────────────────────────────────────────────────────────────────
 -- 1.B  Cleanup voor ongebruikte kolommen / tabellen (v5.5.0)
 --

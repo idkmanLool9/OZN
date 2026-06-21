@@ -100,6 +100,17 @@ function renderDossierForm(params) {
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
             <label><span>BSN</span><input type="text" name="bsn" value="${v('bsn')}"></label>
             <label><span>Nationaliteit</span><input type="text" name="nationaliteit" value="${v('nationaliteit')}"></label>
+            <label class="span-3"><span>Artsverklaring (overlijdensverklaring)</span>
+              <input type="hidden" name="artsverklaring_pad" value="${esc(v('artsverklaring_pad'))}">
+              <div class="artsverklaring-row" id="artsverklaring-row">
+                <label class="btn btn-sm" style="cursor:pointer;">
+                  📷 Scan / kies bestand
+                  <input type="file" id="artsverklaring-input" accept="image/*,application/pdf" capture="environment" hidden>
+                </label>
+                <span class="artsverklaring-status muted small" id="artsverklaring-status">${v('artsverklaring_pad') ? '✓ geüpload' : 'nog geen bestand'}</span>
+                ${v('artsverklaring_pad') ? '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-view">Bekijk</button><button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-remove">Verwijder</button>' : ''}
+              </div>
+            </label>
             <label><span>Lid Syrisch-Orthodoxe Kerk</span>
               <select name="syrisch_orthodox_lid">
                 <option value="">—</option>
@@ -208,6 +219,22 @@ function renderDossierForm(params) {
             </label>
             <label><span>Datum uitvaart</span><input type="date" name="uitvaart_datum" value="${v('uitvaart_datum')}"></label>
             <label><span>Tijdstip uitvaart</span><input type="time" name="uitvaart_tijd" value="${v('uitvaart_tijd')}"></label>
+            <label><span>Wie leidt de uitvaart?</span>
+              ${(() => {
+                // Alle ingevulde priesters uit Account → Parochies
+                const priesters = [...new Set((Settings.get('parochies') || [])
+                  .map(p => (p.priester || '').trim()).filter(Boolean))].sort();
+                const huidig = v('uitvaart_voorganger');
+                const inLijst = priesters.some(p => p === huidig);
+                return `
+                <select name="uitvaart_voorganger">
+                  <option value="">— kies een priester —</option>
+                  ${priesters.map(p => `<option value="${esc(p)}" ${huidig === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)}</option>` : ''}
+                </select>
+                ${priesters.length === 0 ? '<span class="muted small">Nog geen priesters ingesteld — voeg toe in <a href="#/account#parochies">Account</a>.</span>' : ''}`;
+              })()}
+            </label>
             <label class="span-3"><span>Kerk / dienstlocatie</span>
               <input type="text" name="kerk_locatie" value="${esc(v('kerk_locatie') || (isNew ? (Settings.get('default_kerk_locatie') || 'Maria kathedraal') : ''))}" placeholder="bv. Maria kathedraal">
             </label>
@@ -222,6 +249,7 @@ function renderDossierForm(params) {
               </select>
             </label>
             <label id="grafnummer-row" ${v('graf_type') ? '' : 'hidden'}><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
+            <label id="certificaat-row" ${v('graf_type') === 'familiegraf' ? '' : 'hidden'}><span>Certificaatnummer <span class="muted small">(familiegraf)</span></span><input type="text" name="certificaat_nummer" value="${v('certificaat_nummer')}"></label>
           </div>
         </fieldset>
 
@@ -268,6 +296,10 @@ function renderDossierForm(params) {
               </div>
             </label>
           </div>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
+          <h3 style="margin:0 0 .5rem;">Kostenoverzicht</h3>
+          <div id="wizard-kosten-mount"></div>
         </fieldset>
 
         <fieldset class="card" data-step="4">
@@ -434,17 +466,170 @@ function renderDossierForm(params) {
     updatePolisRow();
   }
 
-  // Graf-type → grafnummer pas tonen na keuze
+  // Graf-type → grafnummer pas tonen na keuze; certificaatnummer bij familiegraf
   const grafTypeSel = document.getElementById('graf-type-select');
   const grafNrRow = document.getElementById('grafnummer-row');
+  const certRow = document.getElementById('certificaat-row');
   const updateGrafnummerRow = () => {
-    if (!grafTypeSel || !grafNrRow) return;
-    grafNrRow.hidden = !grafTypeSel.value;
+    if (!grafTypeSel) return;
+    if (grafNrRow) grafNrRow.hidden = !grafTypeSel.value;
+    if (certRow)   certRow.hidden   = grafTypeSel.value !== 'familiegraf';
   };
   if (grafTypeSel) {
     grafTypeSel.addEventListener('change', updateGrafnummerRow);
     updateGrafnummerRow();
   }
+
+  // ─── Kostenoverzicht in de wizard (stap 3) ─────────────────────────
+  // Voor bestaande dossiers: live beheer van de kosten-tabel. Voor nieuwe
+  // dossiers: hint dat het kan zodra het dossier is aangemaakt.
+  function renderWizardKosten() {
+    const mount = document.getElementById('wizard-kosten-mount');
+    if (!mount) return;
+    if (isNew) {
+      mount.innerHTML = `<p class="muted small">Sla het dossier eerst op via "Dossier aanmaken". Daarna kun je hier — en op de dossierpagina — alle losse kostenposten toevoegen en beheren. De standaard-posten worden automatisch klaargezet.</p>`;
+      return;
+    }
+    const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id).sort((a,b) => a.id - b.id);
+    const totaal = kosten.reduce((s,k) => s + (Number(k.bedrag)||0), 0);
+    const betaald = kosten.filter(k => k.betaald).reduce((s,k) => s + (Number(k.bedrag)||0), 0);
+    const open = Math.max(0, totaal - betaald);
+
+    mount.innerHTML = `
+      ${kosten.length === 0 ? '<p class="muted small">Nog geen kostenposten. Voeg toe via een snelknop of handmatig hieronder.</p>' : `
+      <table class="table wizard-kosten-table">
+        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th><th></th><th></th></tr></thead>
+        <tbody>
+          ${kosten.map(k => `<tr>
+            <td>${esc(k.omschrijving)}</td>
+            <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
+            <td class="num">${fmtEUR(k.bedrag)}</td>
+            <td class="center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-wk-toggle="${k.id}">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
+            <td><button type="button" class="btn-icon" data-wk-del="${k.id}" title="Verwijderen">×</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="wizard-kosten-totals">
+        <span>Totaal <strong>${fmtEUR(totaal)}</strong></span>
+        <span class="muted">betaald ${fmtEUR(betaald)}</span>
+        <span style="color:#b34;">open <strong>${fmtEUR(open)}</strong></span>
+      </div>`}
+
+      <details class="wizard-kosten-presets" style="margin-top:.85rem;">
+        <summary>+ Snel toevoegen uit standaardlijst</summary>
+        <div class="wizard-preset-grid">
+          ${KOSTEN_PRESETS.map((p, i) => `
+            <button type="button" class="btn btn-sm btn-ghost wizard-preset-btn" data-wk-preset="${i}">
+              ${esc(p.omschrijving)} ${p.bedrag ? '<span class="muted small">' + fmtEUR(p.bedrag) + '</span>' : ''}
+            </button>`).join('')}
+        </div>
+      </details>
+
+      <div class="wizard-kosten-add">
+        <input type="text" id="wk-omschrijving" placeholder="Omschrijving">
+        <select id="wk-categorie">
+          <option value="">Categorie</option>
+          ${KOSTEN_CATEGORIEEN.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
+        </select>
+        <input type="text" id="wk-bedrag" placeholder="0,00" inputmode="decimal" style="max-width:110px;">
+        <button type="button" class="btn btn-sm" id="wk-add-btn">+ Toevoegen</button>
+      </div>`;
+
+    // Bindings
+    mount.querySelectorAll('[data-wk-toggle]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const id = parseInt(b.dataset.wkToggle, 10);
+        const k = DB.byId(KEYS.KOSTEN, id); if (!k) return;
+        try { await DB.update(KEYS.KOSTEN, id, { betaald: !k.betaald }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+      });
+    });
+    mount.querySelectorAll('[data-wk-del]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const id = parseInt(b.dataset.wkDel, 10);
+        const ok = await Modal.confirm({ title: 'Kostenpost verwijderen?', message: 'Deze actie kan niet ongedaan worden gemaakt.', confirmText: 'Verwijderen' });
+        if (!ok) return;
+        try { await DB.remove(KEYS.KOSTEN, id); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+      });
+    });
+    mount.querySelectorAll('[data-wk-preset]').forEach(b => {
+      b.addEventListener('click', async () => {
+        const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)]; if (!p) return;
+        try {
+          await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
+          await DB.touchDossier(dossier.id); renderWizardKosten();
+        } catch (_) {}
+      });
+    });
+    const addBtn = mount.querySelector('#wk-add-btn');
+    if (addBtn) addBtn.addEventListener('click', async () => {
+      const oms = mount.querySelector('#wk-omschrijving').value.trim();
+      if (!oms) { Modal.show({ type: 'warning', title: 'Omschrijving nodig', message: 'Vul een omschrijving in.' }); return; }
+      const cat = mount.querySelector('#wk-categorie').value || null;
+      const bedrag = parseEUR(mount.querySelector('#wk-bedrag').value);
+      try {
+        await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: oms, categorie: cat, bedrag, aantal: 1, betaald: false });
+        await DB.touchDossier(dossier.id); renderWizardKosten();
+      } catch (_) {}
+    });
+  }
+  renderWizardKosten();
+
+  // Artsverklaring scan/upload
+  const avInput = document.getElementById('artsverklaring-input');
+  const avHidden = document.querySelector('input[name="artsverklaring_pad"]');
+  const avRow = document.getElementById('artsverklaring-row');
+  const avStatus = document.getElementById('artsverklaring-status');
+  if (avInput) {
+    avInput.addEventListener('change', async e => {
+      const file = e.target.files[0]; if (!file) return;
+      if (!navigator.onLine) {
+        Modal.show({ type: 'offline', title: 'Geen internet', message: 'Uploaden kan alleen met internetverbinding.' });
+        return;
+      }
+      avStatus.textContent = 'Bezig met uploaden...';
+      try {
+        const path = await ArtsVerklaring.upload(file);
+        // oude verwijderen indien aanwezig
+        const old = avHidden.value;
+        if (old && old !== path) ArtsVerklaring.remove(old);
+        avHidden.value = path;
+        avHidden.dispatchEvent(new Event('input', { bubbles: true }));
+        avStatus.textContent = '✓ geüpload';
+        // Knoppen Bekijk/Verwijder injecteren als ze er nog niet zijn
+        if (!document.getElementById('artsverklaring-view')) {
+          avRow.insertAdjacentHTML('beforeend',
+            '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-view">Bekijk</button>' +
+            '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-remove">Verwijder</button>');
+          bindArtsverklaringButtons();
+        }
+      } catch (_) {
+        avStatus.textContent = 'upload mislukt';
+      } finally {
+        avInput.value = '';
+      }
+    });
+  }
+  function bindArtsverklaringButtons() {
+    const viewBtn = document.getElementById('artsverklaring-view');
+    const remBtn = document.getElementById('artsverklaring-remove');
+    if (viewBtn) viewBtn.addEventListener('click', async () => {
+      try {
+        const url = await ArtsVerklaring.signedUrl(avHidden.value, 300);
+        if (url) window.open(url, '_blank');
+      } catch (_) {}
+    });
+    if (remBtn) remBtn.addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Artsverklaring verwijderen?', message: 'Het bestand wordt verwijderd.', confirmText: 'Verwijderen' });
+      if (!ok) return;
+      const old = avHidden.value;
+      avHidden.value = '';
+      avHidden.dispatchEvent(new Event('input', { bubbles: true }));
+      if (old) ArtsVerklaring.remove(old);
+      avStatus.textContent = 'nog geen bestand';
+      viewBtn?.remove(); remBtn.remove();
+    });
+  }
+  bindArtsverklaringButtons();
 
   // Live kleuren bijwerken bij élke input-wijziging (debounced)
   let colorTimer = null;

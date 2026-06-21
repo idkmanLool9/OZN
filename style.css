@@ -2244,3 +2244,35 @@ fieldset[data-step][hidden] { display: none !important; }
   fieldset[data-step] { display: block !important; }
   .wizard-nav, .wizard-actions { display: none !important; }
 }
+
+/* Artsverklaring scan-rij in intake-form */
+.artsverklaring-row {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+  padding: .5rem .65rem; background: var(--bg, #f7f3ee);
+  border-radius: 8px; border: 1px solid var(--border);
+}
+
+/* Kostenoverzicht in wizard stap 3 */
+.wizard-kosten-table { margin: .5rem 0; }
+.wizard-kosten-totals {
+  display: flex; gap: 1.25rem; flex-wrap: wrap;
+  padding: .5rem 0; font-size: .95rem;
+}
+.wizard-kosten-presets summary {
+  cursor: pointer; color: var(--primary); font-weight: 600; font-size: .9rem;
+}
+.wizard-preset-grid {
+  display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem;
+}
+.wizard-preset-btn { text-align: left; }
+.wizard-kosten-add {
+  display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+  margin-top: .85rem; padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.wizard-kosten-add input,
+.wizard-kosten-add select {
+  padding: .5rem .65rem; border: 1px solid var(--border);
+  border-radius: 6px; font: inherit;
+}
+.wizard-kosten-add #wk-omschrijving { flex: 1; min-width: 180px; }

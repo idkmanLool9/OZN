@@ -282,6 +282,30 @@ async function handleStaleCache() {
   });
 }
 
+// ─── Artsverklaring (privé, bucket 'documenten') ────────────────────────────
+// Scan/foto van de artsverklaring (overlijdensverklaring). Privé opgeslagen;
+// bekijken via tijdelijke signed URL.
+const ArtsVerklaring = {
+  async upload(file) {
+    const compressed = await compressImage(file, 2200, 0.9);
+    const safe = (compressed.name || 'artsverklaring').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `artsverklaring/${Date.now()}-${safe}`;
+    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
+    if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
+    return path;
+  },
+  async signedUrl(path, seconds = 300) {
+    if (!path) return null;
+    const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
+    if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
+    return data.signedUrl;
+  },
+  async remove(path) {
+    if (!path) return;
+    await sb.storage.from('documenten').remove([path]).catch(() => {});
+  },
+};
+
 // ─── Kistfoto's (publieke bucket) ───────────────────────────────────────────
 const KistFotos = {
   slug(naam) {

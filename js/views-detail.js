@@ -77,8 +77,10 @@ function renderDossierDetail(params) {
           ${dlRow('BSN', d.bsn)}
           ${dlRow('Nationaliteit', d.nationaliteit)}
           ${dlRow('Lid SOK', d.syrisch_orthodox_lid)}
+          ${dlRow('Verzekering', d.verzekering_maatschappij)}
+          ${dlRow('Polisnummer', d.polisnummer)}
           ${dlRow('Gezinsnummer', d.gezinsnummer)}
-          ${dlRow('Grafnummer', d.grafnummer)}
+          ${d.artsverklaring_pad ? `<div><dt>Artsverklaring</dt><dd><button type="button" class="link-btn" id="btn-view-artsverklaring">📄 Bekijk scan</button></dd></div>` : ''}
           ${dlRow('(Ex)partner', d.partner_naam)}
           ${dlRow('Kinderen', d.kinderen_status)}
           ${dlRow('Minderjarige kinderen', d.minderjarige_kinderen)}
@@ -105,11 +107,12 @@ function renderDossierDetail(params) {
         <dl class="dl">
           ${dlRow('Parochie', d.parochie)}
           ${dlRow('Priester', d.priester)}
-          ${dlRow('Huisbezoek', [fmtDate(d.huisbezoek_datum), d.huisbezoek_tijd].filter(Boolean).join(' '))}
+          ${dlRow('Voorganger uitvaart', d.uitvaart_voorganger)}
           ${dlRow('Type uitvaart', d.uitvaart_type)}
           ${dlRow('Datum & tijdstip', [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' '))}
           ${dlRow('Kerk', d.kerk_locatie)}
           ${dlRow('Begraafplaats', [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — '))}
+          ${d.graf_type === 'familiegraf' ? dlRow('Certificaatnummer', d.certificaat_nummer) : ''}
         </dl>
         <h3>Logistiek</h3>
         <dl class="dl">
@@ -652,6 +655,17 @@ function edRowValue(naam) {
 function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
+
+  // Artsverklaring bekijken (signed URL)
+  const avBtn = $('#btn-view-artsverklaring');
+  if (avBtn && dRow && dRow.artsverklaring_pad) {
+    avBtn.addEventListener('click', async () => {
+      try {
+        const url = await ArtsVerklaring.signedUrl(dRow.artsverklaring_pad, 300);
+        if (url) window.open(url, '_blank');
+      } catch (_) {}
+    });
+  }
 
   // Overflow-menu (⋯) — sluit na klikken op een actie, of bij klik buiten
   const moreMenu = $('.page-actions-more');
