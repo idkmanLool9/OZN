@@ -483,14 +483,27 @@ function renderDossierForm(params) {
   // ─── Kostenoverzicht in de wizard (stap 3) ─────────────────────────
   // Voor bestaande dossiers: live beheer van de kosten-tabel. Voor nieuwe
   // dossiers: hint dat het kan zodra het dossier is aangemaakt.
+  // Voor nieuwe dossiers bufferen we de kosten lokaal (geen dossier_id nog).
+  // Persistent in localStorage zodat ze een refresh overleven; bij opslaan
+  // worden ze in de echte kosten-tabel geschreven.
+  const kostenBufKey = `sok_kosten_buffer_${isNew ? 'nieuw' : dossier.id}`;
+  let kostenBuffer = (() => {
+    if (!isNew) return null;
+    try { return JSON.parse(localStorage.getItem(kostenBufKey) || '[]'); } catch (_) { return []; }
+  })();
+  const saveBuffer = () => {
+    if (!isNew) return;
+    try { localStorage.setItem(kostenBufKey, JSON.stringify(kostenBuffer)); } catch (_) {}
+  };
+
   function renderWizardKosten() {
     const mount = document.getElementById('wizard-kosten-mount');
     if (!mount) return;
-    if (isNew) {
-      mount.innerHTML = `<p class="muted small">Sla het dossier eerst op via "Dossier aanmaken". Daarna kun je hier — en op de dossierpagina — alle losse kostenposten toevoegen en beheren. De standaard-posten worden automatisch klaargezet.</p>`;
-      return;
-    }
-    const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id).sort((a,b) => a.id - b.id);
+
+    // Bron: buffer (nieuw) of live DB (bestaand)
+    const kosten = isNew
+      ? kostenBuffer.map((k, i) => Object.assign({ id: '_buf_' + i }, k))
+      : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id).sort((a,b) => a.id - b.id);
     const totaal = kosten.reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const betaald = kosten.filter(k => k.betaald).reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const open = Math.max(0, totaal - betaald);
@@ -514,6 +527,7 @@ function renderDossierForm(params) {
         <span class="muted">betaald ${fmtEUR(betaald)}</span>
         <span style="color:#b34;">open <strong>${fmtEUR(open)}</strong></span>
       </div>`}
+      ${isNew && kosten.length === 0 ? '<button type="button" class="btn btn-sm btn-ghost" id="wk-fill-standaard" style="margin-top:.5rem;">+ Alle standaardposten toevoegen</button>' : ''}
 
       <details class="wizard-kosten-presets" style="margin-top:.85rem;">
         <summary>+ Snel toevoegen uit standaardlijst</summary>
@@ -535,41 +549,66 @@ function renderDossierForm(params) {
         <button type="button" class="btn btn-sm" id="wk-add-btn">+ Toevoegen</button>
       </div>`;
 
-    // Bindings
+    // ── Acties: toggle betaald ──
     mount.querySelectorAll('[data-wk-toggle]').forEach(b => {
       b.addEventListener('click', async () => {
-        const id = parseInt(b.dataset.wkToggle, 10);
-        const k = DB.byId(KEYS.KOSTEN, id); if (!k) return;
-        try { await DB.update(KEYS.KOSTEN, id, { betaald: !k.betaald }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+        const id = b.dataset.wkToggle;
+        if (isNew) {
+          const i = parseInt(id.replace('_buf_', ''), 10);
+          if (kostenBuffer[i]) { kostenBuffer[i].betaald = !kostenBuffer[i].betaald; saveBuffer(); renderWizardKosten(); }
+        } else {
+          const k = DB.byId(KEYS.KOSTEN, parseInt(id, 10)); if (!k) return;
+          try { await DB.update(KEYS.KOSTEN, k.id, { betaald: !k.betaald }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+        }
       });
     });
+    // ── Acties: verwijderen ──
     mount.querySelectorAll('[data-wk-del]').forEach(b => {
       b.addEventListener('click', async () => {
-        const id = parseInt(b.dataset.wkDel, 10);
-        const ok = await Modal.confirm({ title: 'Kostenpost verwijderen?', message: 'Deze actie kan niet ongedaan worden gemaakt.', confirmText: 'Verwijderen' });
-        if (!ok) return;
-        try { await DB.remove(KEYS.KOSTEN, id); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+        const id = b.dataset.wkDel;
+        if (isNew) {
+          const i = parseInt(id.replace('_buf_', ''), 10);
+          kostenBuffer.splice(i, 1); saveBuffer(); renderWizardKosten();
+        } else {
+          const ok = await Modal.confirm({ title: 'Kostenpost verwijderen?', message: 'Deze actie kan niet ongedaan worden gemaakt.', confirmText: 'Verwijderen' });
+          if (!ok) return;
+          try { await DB.remove(KEYS.KOSTEN, parseInt(id, 10)); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+        }
       });
     });
+    // ── Acties: preset toevoegen ──
+    const addPreset = async (p) => {
+      if (isNew) {
+        kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
+        saveBuffer(); renderWizardKosten();
+      } else {
+        try { await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+      }
+    };
     mount.querySelectorAll('[data-wk-preset]').forEach(b => {
-      b.addEventListener('click', async () => {
-        const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)]; if (!p) return;
-        try {
-          await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
-          await DB.touchDossier(dossier.id); renderWizardKosten();
-        } catch (_) {}
+      b.addEventListener('click', () => {
+        const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)]; if (p) addPreset(p);
       });
     });
+    // ── Acties: alle standaardposten in één keer (alleen nieuw) ──
+    const fillBtn = mount.querySelector('#wk-fill-standaard');
+    if (fillBtn) fillBtn.addEventListener('click', () => {
+      KOSTEN_PRESETS.forEach(p => kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }));
+      saveBuffer(); renderWizardKosten();
+    });
+    // ── Acties: handmatig toevoegen ──
     const addBtn = mount.querySelector('#wk-add-btn');
     if (addBtn) addBtn.addEventListener('click', async () => {
       const oms = mount.querySelector('#wk-omschrijving').value.trim();
       if (!oms) { Modal.show({ type: 'warning', title: 'Omschrijving nodig', message: 'Vul een omschrijving in.' }); return; }
       const cat = mount.querySelector('#wk-categorie').value || null;
       const bedrag = parseEUR(mount.querySelector('#wk-bedrag').value);
-      try {
-        await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: oms, categorie: cat, bedrag, aantal: 1, betaald: false });
-        await DB.touchDossier(dossier.id); renderWizardKosten();
-      } catch (_) {}
+      if (isNew) {
+        kostenBuffer.push({ omschrijving: oms, categorie: cat, bedrag, aantal: 1, betaald: false });
+        saveBuffer(); renderWizardKosten();
+      } else {
+        try { await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: oms, categorie: cat, bedrag, aantal: 1, betaald: false }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+      }
     });
   }
   renderWizardKosten();
@@ -896,6 +935,7 @@ function renderDossierForm(params) {
       try {
         localStorage.removeItem(stepKey);
         localStorage.removeItem(maxKey);
+        localStorage.removeItem(kostenBufKey);
       } catch (_) {}
     });
   }
@@ -965,23 +1005,21 @@ function renderDossierForm(params) {
     try {
       if (isNew) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
-        // Standaard-kostenposten meteen aan dit nieuwe dossier hangen,
-        // zodat het kosten-overzicht direct compleet is. Gebruiker kan
-        // ze in het dossier aanpassen of verwijderen.
+        // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
         try {
-          await Promise.all((KOSTEN_PRESETS || []).map(p => DB.insert(KEYS.KOSTEN, {
+          await Promise.all((kostenBuffer || []).map(p => DB.insert(KEYS.KOSTEN, {
             dossier_id: created.id,
             omschrijving: p.omschrijving,
             categorie: p.categorie,
             bedrag: p.bedrag,
-            aantal: 1,
-            betaald: false,
+            aantal: p.aantal || 1,
+            betaald: !!p.betaald,
           })));
         } catch (kErr) {
-          console.warn('Standaard-kostenposten toevoegen mislukt:', kErr);
+          console.warn('Kostenposten toevoegen mislukt:', kErr);
         }
         localStorage.removeItem(draftKey);
-        try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
+        try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); localStorage.removeItem(kostenBufKey); } catch (_) {}
         Router.go('/dossiers/' + created.id);
       } else {
         await DB.update(KEYS.DOSSIERS, dossier.id, data);
