@@ -2276,3 +2276,13 @@ fieldset[data-step][hidden] { display: none !important; }
   border-radius: 6px; font: inherit;
 }
 .wizard-kosten-add #wk-omschrijving { flex: 1; min-width: 180px; }
+
+/* Kist-pagina: banner voor actief dossier-concept */
+.kist-draft-banner {
+  display: flex; gap: .65rem; align-items: center; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.kist-draft-banner select {
+  padding: .35rem .55rem; border: 1px solid var(--border);
+  border-radius: 6px; font: inherit;
+}

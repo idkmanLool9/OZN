@@ -165,7 +165,7 @@ function renderDossierForm(params) {
                 <option value="nee" ${sel('kinderen_status','nee')}>Nee</option>
               </select>
             </label>
-            <label><span>Minderjarige kinderen?</span>
+            <label id="minderjarige-row" ${v('kinderen_status') === 'ja' ? '' : 'hidden'}><span>Minderjarige kinderen?</span>
               <select name="minderjarige_kinderen" id="minderjarige-kinderen-select">
                 <option value="">—</option>
                 <option value="ja" ${sel('minderjarige_kinderen','ja')}>Ja</option>
@@ -244,7 +244,7 @@ function renderDossierForm(params) {
             <label><span>Type graf</span>
               <select name="graf_type" id="graf-type-select">
                 <option value="">—</option>
-                ${['oude begraafplaats','algemeen graf','familiegraf'].map(x =>
+                ${['oude begraafplaats','algemeen graf','familiegraf','priester graf'].map(x =>
                   `<option value="${esc(x)}" ${sel('graf_type', x)}>${esc(x)}</option>`).join('')}
               </select>
             </label>
@@ -789,17 +789,28 @@ function renderDossierForm(params) {
   edSelect.addEventListener('change', updateEdPreview);
   updateEdPreview();
 
-  // ─── Namen kinderen tonen + popup bij minderjarig=ja ─────────────────
+  // ─── Kinderen-status → minderjarige-vraag tonen/verbergen ────────────
+  const kinderenSel = $('#kinderen-status-select');
+  const minderjarigRow = $('#minderjarige-row');
   const minderjarigSel = $('#minderjarige-kinderen-select');
   const kindRow = $('#kinderen-namen-row');
-  let minderjarigPopupShown = (dossier.minderjarige_kinderen === 'ja'); // niet opnieuw tonen voor bestaand dossier
-  function updateMinderjarigVisibility() {
-    const isJa = minderjarigSel?.value === 'ja';
-    if (kindRow) kindRow.hidden = !isJa;
+  let minderjarigPopupShown = (dossier.minderjarige_kinderen === 'ja');
+  function updateKinderenVisibility() {
+    const kinderenJa = kinderenSel?.value === 'ja';
+    if (minderjarigRow) minderjarigRow.hidden = !kinderenJa;
+    // Bij "Nee, geen kinderen" → reset minderjarig-veld en namen
+    if (!kinderenJa && minderjarigSel) {
+      if (minderjarigSel.value) minderjarigSel.value = '';
+    }
+    const minderjarigJa = kinderenJa && minderjarigSel?.value === 'ja';
+    if (kindRow) kindRow.hidden = !minderjarigJa;
+  }
+  if (kinderenSel) {
+    kinderenSel.addEventListener('change', updateKinderenVisibility);
   }
   if (minderjarigSel) {
     minderjarigSel.addEventListener('change', () => {
-      updateMinderjarigVisibility();
+      updateKinderenVisibility();
       if (minderjarigSel.value === 'ja' && !minderjarigPopupShown) {
         minderjarigPopupShown = true;
         Modal.show({
@@ -809,8 +820,8 @@ function renderDossierForm(params) {
         });
       }
     });
-    updateMinderjarigVisibility();
   }
+  updateKinderenVisibility();
 
   // ─── Parochie kiezen → priester (abuna) automatisch invullen ────────
   const parochieInp = $('#parochie-input');

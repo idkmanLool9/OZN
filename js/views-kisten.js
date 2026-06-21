@@ -1,8 +1,43 @@
 // Kistenbeheer: per Unigra-model een echte foto uploaden
 
+// Detecteer alle actieve dossier-drafts in localStorage zodat we direct
+// een kist kunnen koppelen aan een dossier-in-bewerking.
+function _activeDossierDrafts() {
+  const drafts = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('sok_draft_')) continue;
+      let data = null;
+      try { data = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) {}
+      if (!data) continue;
+      const idPart = key.slice('sok_draft_'.length);
+      const isNew = idPart === 'new';
+      const naam = [data.voornaam, data.achternaam].filter(Boolean).join(' ').trim()
+        || (isNew ? 'Nieuw dossier (concept)' : ('Dossier #' + idPart));
+      drafts.push({
+        key, isNew, id: isNew ? null : idPart, naam,
+        kist: data.kist_type || '',
+      });
+    }
+  } catch (_) {}
+  return drafts;
+}
+
+function _setKistInDraft(key, kistNaam) {
+  try {
+    const cur = JSON.parse(localStorage.getItem(key) || '{}');
+    cur.kist_type = kistNaam;
+    localStorage.setItem(key, JSON.stringify(cur));
+    return true;
+  } catch (_) { return false; }
+}
+
 function renderKistenBeheer(msg) {
   const items = KISTEN_CATALOGUS.slice().sort((a, b) => a.bedrag - b.bedrag);
   const adminMode = !!Settings.get('catalog_admin_mode');
+  const drafts = _activeDossierDrafts();
+  const hasDraft = drafts.length > 0;
 
   $('#view').innerHTML = `
     <div class="page">
@@ -15,6 +50,14 @@ function renderKistenBeheer(msg) {
       </div>
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
+      ${hasDraft ? `
+        <div class="alert alert-info kist-draft-banner">
+          <strong>💡 Actief dossier:</strong>
+          ${drafts.length === 1
+            ? `<span>${esc(drafts[0].naam)}${drafts[0].kist ? ' — huidige kist: <em>' + esc(drafts[0].kist) + '</em>' : ''}</span>`
+            : `<select id="kist-draft-picker">${drafts.map((d, i) => `<option value="${i}">${esc(d.naam)}${d.kist ? ' — ' + esc(d.kist) : ''}</option>`).join('')}</select>`}
+          <span class="muted small">— klik op de "Kies"-knop bij een kist om hem in het dossier te zetten</span>
+        </div>` : ''}
       <div class="kist-grid">
         ${items.map(k => {
           const url = KistFotos.urlVoor(k.naam);
@@ -31,6 +74,10 @@ function renderKistenBeheer(msg) {
                 <span class="muted small">${esc(k.materiaal)}</span>
                 <span class="kist-price">${fmtEUR(k.bedrag)}</span>
               </div>
+              ${hasDraft ? `
+                <div class="kist-card-actions">
+                  <button type="button" class="btn btn-sm btn-primary" data-pick-kist="${esc(k.naam)}">✓ Kies voor dossier</button>
+                </div>` : ''}
               ${adminMode ? `
                 <div class="kist-card-actions">
                   <label class="btn btn-sm">${url ? 'Vervang foto' : 'Foto uploaden'}
@@ -72,6 +119,33 @@ function renderKistenBeheer(msg) {
   };
 
   $('#view').onclick = async e => {
+    // Kies kist voor actief dossier
+    const pickBtn = e.target.closest('button[data-pick-kist]');
+    if (pickBtn) {
+      const kistNaam = pickBtn.getAttribute('data-pick-kist');
+      const picker = $('#kist-draft-picker');
+      const idx = picker ? parseInt(picker.value, 10) : 0;
+      const target = drafts[idx];
+      if (!target) return;
+      const ok = _setKistInDraft(target.key, kistNaam);
+      if (!ok) {
+        Modal.show({ type: 'error', title: 'Niet gelukt', message: 'Kon de kist niet in het dossier zetten.' });
+        return;
+      }
+      const confirmGo = await Modal.confirm({
+        type: 'success',
+        title: `"${kistNaam}" gekoppeld`,
+        message: `Toegevoegd aan dossier ${target.naam}. Wil je nu terug naar dat dossier?`,
+        confirmText: 'Ja, ga terug',
+        cancelText: 'Blijf hier',
+      });
+      if (confirmGo) {
+        Router.go(target.isNew ? '/dossiers/nieuw' : '/dossiers/' + target.id + '/bewerken');
+      } else {
+        renderKistenBeheer({ success: `Kist "${kistNaam}" gekoppeld aan ${target.naam}.` });
+      }
+      return;
+    }
     // Klik op afbeelding → lightbox
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
