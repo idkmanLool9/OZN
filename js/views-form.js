@@ -109,6 +109,26 @@ function renderDossierForm(params) {
                 <option value="onbekend" ${sel('syrisch_orthodox_lid','onbekend')}>Onbekend</option>
               </select>
             </label>
+            <label><span>Parochie</span>
+              ${(() => {
+                const lijst = Settings.get('parochies') || [];
+                const huidig = v('parochie');
+                const inLijst = lijst.some(p => (p.naam || p) === huidig);
+                return `
+                <select name="parochie" id="parochie-input">
+                  <option value="">— kies een parochie —</option>
+                  ${lijst.map(p => {
+                    const naam = p.naam || p;
+                    return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
+                  }).join('')}
+                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
+                </select>
+                ${lijst.length === 0
+                  ? '<span class="muted small">Nog geen parochies ingesteld — voeg toe in <a href="#/account#parochies">Account → Parochies &amp; priesters</a>.</span>'
+                  : '<span class="muted small">Beheren in <a href="#/account#parochies">Account</a>.</span>'}
+                `;
+              })()}
+            </label>
             <label class="span-3"><span>Naam (ex)partner</span>
               <input type="text" name="partner_naam" value="${v('partner_naam')}" placeholder="naam echtgeno(o)t(e), partner of ex-partner (optioneel)">
             </label>
@@ -152,26 +172,6 @@ function renderDossierForm(params) {
         <fieldset class="card" data-step="2">
           <legend>Uitvaart</legend>
           <div class="grid-3">
-            <label><span>Parochie</span>
-              ${(() => {
-                const lijst = Settings.get('parochies') || [];
-                const huidig = v('parochie');
-                const inLijst = lijst.some(p => (p.naam || p) === huidig);
-                return `
-                <select name="parochie" id="parochie-input">
-                  <option value="">— kies een parochie —</option>
-                  ${lijst.map(p => {
-                    const naam = p.naam || p;
-                    return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
-                  }).join('')}
-                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
-                </select>
-                ${lijst.length === 0
-                  ? '<span class="muted small">Nog geen parochies ingesteld — voeg toe in <a href="#/account#parochies">Account → Parochies &amp; priesters</a>.</span>'
-                  : '<span class="muted small">Beheren in <a href="#/account#parochies">Account</a>.</span>'}
-                `;
-              })()}
-            </label>
             <label><span>Priester / Abuna</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
             <label><span>Type uitvaart</span>
               <select name="uitvaart_type">
@@ -188,14 +188,14 @@ function renderDossierForm(params) {
             <label class="span-2"><span>Begraafplaats</span>
               <input type="text" name="begraafplaats" value="${esc(v('begraafplaats') || (isNew ? (Settings.get('default_begraafplaats') || 'St. Ephrem') : ''))}">
             </label>
-            <label><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
-            <label class="span-3"><span>Type graf</span>
-              <select name="graf_type">
+            <label><span>Type graf</span>
+              <select name="graf_type" id="graf-type-select">
                 <option value="">—</option>
                 ${['oude begraafplaats','algemeen graf','familiegraf'].map(x =>
                   `<option value="${esc(x)}" ${sel('graf_type', x)}>${esc(x)}</option>`).join('')}
               </select>
             </label>
+            <label id="grafnummer-row" ${v('graf_type') ? '' : 'hidden'}><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
           </div>
         </fieldset>
 
@@ -311,8 +311,9 @@ function renderDossierForm(params) {
   const STEP_FIELDS = {
     1: ['voornaam','achternaam','geboortedatum','overlijdensdatum',
         'adres_overledene','postcode_overledene','woonplaats_overledene',
+        'parochie',
         'contact_naam','contact_voornaam','contact_telefoon','contact_relatie'],
-    2: ['parochie','priester','uitvaart_type','uitvaart_datum',
+    2: ['priester','uitvaart_type','uitvaart_datum',
         'uitvaart_tijd','kerk_locatie','begraafplaats'],
     3: ['kist_type'],
     // 4 = speciale logica (verzekering-toggle)
@@ -407,6 +408,18 @@ function renderDossierForm(params) {
       updateStepColors();
     });
     updateVerzekeringRow();
+  }
+
+  // Graf-type → grafnummer pas tonen na keuze
+  const grafTypeSel = document.getElementById('graf-type-select');
+  const grafNrRow = document.getElementById('grafnummer-row');
+  const updateGrafnummerRow = () => {
+    if (!grafTypeSel || !grafNrRow) return;
+    grafNrRow.hidden = !grafTypeSel.value;
+  };
+  if (grafTypeSel) {
+    grafTypeSel.addEventListener('change', updateGrafnummerRow);
+    updateGrafnummerRow();
   }
 
   // Live kleuren bijwerken bij élke input-wijziging (debounced)
