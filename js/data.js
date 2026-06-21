@@ -194,7 +194,6 @@ const AANBEVOLEN_VELDEN = [
   { name: 'uitvaart_datum',        label: 'Datum uitvaart' },
   { name: 'kerk_locatie',          label: 'Kerk / dienstlocatie' },
   { name: 'begraafplaats',         label: 'Begraafplaats' },
-  { name: 'verzekering_status',    label: 'Verzekering ja/nee' },
 ];
 
 const DOSSIER_VELDEN = [
