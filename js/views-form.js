@@ -129,6 +129,7 @@ function renderDossierForm(params) {
                 `;
               })()}
             </label>
+            <label><span>Priester / Abuna</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
             <label class="span-3"><span>Naam (ex)partner</span>
               <input type="text" name="partner_naam" value="${v('partner_naam')}" placeholder="naam echtgeno(o)t(e), partner of ex-partner (optioneel)">
             </label>
@@ -172,7 +173,6 @@ function renderDossierForm(params) {
         <fieldset class="card" data-step="2">
           <legend>Uitvaart</legend>
           <div class="grid-3">
-            <label><span>Priester / Abuna</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
             <label><span>Type uitvaart</span>
               <select name="uitvaart_type">
                 <option value="">—</option>
@@ -300,20 +300,30 @@ function renderDossierForm(params) {
   // ─── Wizard: stappen tonen één voor één ──────────────────────────────
   const TOTAL_STEPS = 6;
   const stepKey = `sok_wizard_step_${isNew ? 'nieuw' : dossier.id}`;
+  const maxKey  = `sok_wizard_max_${isNew ? 'nieuw' : dossier.id}`;
   let currentStep = (() => {
     try {
       const saved = parseInt(localStorage.getItem(stepKey), 10);
       return (saved >= 1 && saved <= TOTAL_STEPS) ? saved : 1;
     } catch (_) { return 1; }
   })();
+  // Tot welke stap is de gebruiker geweest? Stappen >= maxStepReached
+  // hebben nog geen kleur — alleen stappen die de gebruiker echt voorbij
+  // is gelopen tonen rood/oranje/groen.
+  let maxStepReached = (() => {
+    try {
+      const saved = parseInt(localStorage.getItem(maxKey), 10);
+      return (saved >= 1 && saved <= TOTAL_STEPS) ? saved : currentStep;
+    } catch (_) { return currentStep; }
+  })();
 
   // Aanbevolen velden per stap — bepalen kleur (rood/oranje/groen)
   const STEP_FIELDS = {
     1: ['voornaam','achternaam','geboortedatum','overlijdensdatum',
         'adres_overledene','postcode_overledene','woonplaats_overledene',
-        'parochie',
+        'parochie','priester',
         'contact_naam','contact_voornaam','contact_telefoon','contact_relatie'],
-    2: ['priester','uitvaart_type','uitvaart_datum',
+    2: ['uitvaart_type','uitvaart_datum',
         'uitvaart_tijd','kerk_locatie','begraafplaats'],
     3: ['kist_type'],
     // 4 = speciale logica (verzekering-toggle)
@@ -364,14 +374,19 @@ function renderDossierForm(params) {
   const updateStepColors = () => {
     document.querySelectorAll('.wizard-step').forEach(el => {
       const step = parseInt(el.dataset.go, 10);
-      const state = fillStateForStep(step);
       el.classList.remove('fill-empty','fill-partial','fill-complete');
-      el.classList.add('fill-' + state);
+      // Alleen stappen die de gebruiker écht voorbij is laten kleuren.
+      // De huidige stap en alle stappen daarna blijven grijs (default).
+      if (step < maxStepReached) {
+        el.classList.add('fill-' + fillStateForStep(step));
+      }
     });
   };
 
   const showStep = (n) => {
     currentStep = Math.max(1, Math.min(TOTAL_STEPS, n));
+    // Markeer als "voorbij" zodra een hogere stap geopend wordt
+    if (currentStep > maxStepReached) maxStepReached = currentStep;
     document.querySelectorAll('#dossier-form fieldset[data-step]').forEach(fs => {
       const step = parseInt(fs.dataset.step, 10);
       fs.hidden = (step !== currentStep);
@@ -385,7 +400,10 @@ function renderDossierForm(params) {
     document.getElementById('btn-wizard-submit').hidden = (currentStep !== TOTAL_STEPS);
     const form = document.getElementById('dossier-form');
     if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    try { localStorage.setItem(stepKey, String(currentStep)); } catch (_) {}
+    try {
+      localStorage.setItem(stepKey, String(currentStep));
+      localStorage.setItem(maxKey,  String(maxStepReached));
+    } catch (_) {}
     updateStepColors();
   };
 
@@ -684,7 +702,10 @@ function renderDossierForm(params) {
   if (cancelLink) {
     cancelLink.addEventListener('click', () => {
       localStorage.removeItem(draftKey);
-      try { localStorage.removeItem(stepKey); } catch (_) {}
+      try {
+        localStorage.removeItem(stepKey);
+        localStorage.removeItem(maxKey);
+      } catch (_) {}
     });
   }
 
@@ -769,12 +790,12 @@ function renderDossierForm(params) {
           console.warn('Standaard-kostenposten toevoegen mislukt:', kErr);
         }
         localStorage.removeItem(draftKey);
-        try { localStorage.removeItem(stepKey); } catch (_) {}
+        try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
         Router.go('/dossiers/' + created.id);
       } else {
         await DB.update(KEYS.DOSSIERS, dossier.id, data);
         localStorage.removeItem(draftKey);
-        try { localStorage.removeItem(stepKey); } catch (_) {}
+        try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
         Router.go('/dossiers/' + dossier.id);
       }
     } catch (err) {

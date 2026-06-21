@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 71;
-const APP_VERSION    = '5.9.1';
+const APP_BUILD      = 72;
+const APP_VERSION    = '5.9.2';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -902,7 +902,7 @@ Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
       // Alle draft-keys (per-dossier intake-formulier autosave) ook weg
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('sok_draft_') || k.startsWith('sok_wizard_step_'))) localStorage.removeItem(k);
+        if (k && (k.startsWith('sok_draft_') || k.startsWith('sok_wizard_step_') || k.startsWith('sok_wizard_max_'))) localStorage.removeItem(k);
       }
     } catch (_) {}
   }
