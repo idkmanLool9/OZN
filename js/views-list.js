@@ -398,7 +398,7 @@ function renderAccount(msg) {
 
       <section class="card narrow" id="parochies">
         <h2>Parochies &amp; priesters</h2>
-        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Aboona) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
+        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Abuna) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
         ${(() => {
           const lijst = Settings.get('parochies') || [];
           return `

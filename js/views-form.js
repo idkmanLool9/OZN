@@ -172,7 +172,7 @@ function renderDossierForm(params) {
                 `;
               })()}
             </label>
-            <label><span>Priester / Aboona</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
+            <label><span>Priester / Abuna</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
             <label><span>Type uitvaart</span>
               <select name="uitvaart_type">
                 <option value="">—</option>
@@ -468,7 +468,7 @@ function renderDossierForm(params) {
     updateMinderjarigVisibility();
   }
 
-  // ─── Parochie kiezen → priester (aboona) automatisch invullen ────────
+  // ─── Parochie kiezen → priester (abuna) automatisch invullen ────────
   const parochieInp = $('#parochie-input');
   const priesterInp = $('#priester-input');
   if (parochieInp) {
