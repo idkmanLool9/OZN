@@ -10,7 +10,6 @@ const KEYS = {
   NOTITIES: 'notities',
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
   BLOEMEN: 'bloemen_catalogus',
-  ETEN_DRINKEN: 'eten_drinken_catalogus',
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -53,19 +52,18 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [] },
   loaded: false,
   offline: false,
 
   async loadAll() {
     try {
-      const [d, k, n, kim, blm, ed] = await Promise.all([
+      const [d, k, n, kim, blm] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
         sb.from('kosten').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
         sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
-        sb.from('eten_drinken_catalogus').select('*').order('naam', { ascending: true }),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
@@ -73,7 +71,6 @@ const Cloud = {
       Cloud.cache.notities = (n.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
       Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
-      Cloud.cache.eten_drinken_catalogus = (ed.data || []).map(normBloem);
       Cloud.loaded = true;
       Cloud.offline = false;
       try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}
@@ -157,7 +154,7 @@ function normKosten(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedr
 function normBloem(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
 function normalize(tbl, row) {
   if (tbl === 'kosten') return normKosten(row);
-  if (tbl === 'bloemen_catalogus' || tbl === 'eten_drinken_catalogus') return normBloem(row);
+  if (tbl === 'bloemen_catalogus') return normBloem(row);
   return row;
 }
 
@@ -424,57 +421,6 @@ const BloemenFotos = {
   async removeFoto(b) {
     if (b && b.storage_pad) {
       await sb.storage.from('bloemen').remove([b.storage_pad]).catch(() => {});
-    }
-  },
-};
-
-// ─── Eten & drinken-catalogus + foto's (publieke bucket) ────────────────────
-const EtenDrinkenFotos = {
-  slug(naam) {
-    return naam.toLowerCase()
-      .replace(/[\s/]+/g, '-')
-      .replace(/[^a-z0-9._-]/g, '')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-  },
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('eten_drinken').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  byNaam(naam) {
-    return (Cloud.cache.eten_drinken_catalogus || []).find(b => b.naam === naam);
-  },
-  urlVoor(naam) {
-    const r = EtenDrinkenFotos.byNaam(naam);
-    if (!r || !r.storage_pad) return null;
-    const base = EtenDrinkenFotos.publicUrl(r.storage_pad);
-    if (!base) return null;
-    const ts = r.updated_at ? new Date(r.updated_at).getTime() : Date.now();
-    return base + '?v=' + ts;
-  },
-  async uploadFoto(naam, file) {
-    file = await compressImage(file, 1600, 0.85);
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const path = `${EtenDrinkenFotos.slug(naam)}.${ext}`;
-    const oude = (Cloud.cache.eten_drinken_catalogus || []).filter(b => b.naam === naam);
-    for (const o of oude) {
-      if (o.storage_pad && o.storage_pad !== path) {
-        await sb.storage.from('eten_drinken').remove([o.storage_pad]).catch(() => {});
-      }
-    }
-    const { error: upErr } = await sb.storage.from('eten_drinken').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (upErr) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: upErr.message });
-      throw upErr;
-    }
-    return path;
-  },
-  async removeFoto(b) {
-    if (b && b.storage_pad) {
-      await sb.storage.from('eten_drinken').remove([b.storage_pad]).catch(() => {});
     }
   },
 };

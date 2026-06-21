@@ -24,7 +24,6 @@ const KOSTEN_CATEGORIEEN = [
   { id: 'begraafplaats', label: 'Begraafplaats & graf', icon: '🪦' },
   { id: 'bloemen',       label: 'Bloemen',              icon: '💐' },
   { id: 'rouwkaarten',   label: 'Rouwkaarten',          icon: '✉️' },
-  { id: 'catering',      label: 'Catering',             icon: '🍽️' },
   { id: 'schoonmaak',    label: 'Schoonmaak',           icon: '🧹' },
   { id: 'administratie', label: 'Administratie',        icon: '📝' },
   { id: 'overig',        label: 'Overig',               icon: '•'   },
@@ -64,14 +63,6 @@ const KOSTEN_PRESETS = [
   { categorie: 'begraafplaats', omschrijving: 'Onderhoudskosten',                                    bedrag: 600.00 },
   // Administratie
   { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                                 bedrag:  17.80 },
-  // Catering
-  { categorie: 'catering',      omschrijving: 'Smiet broodje',          bedrag:   0.80, perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Duitse broodje wit incl. kaas', bedrag:   0,    perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Duits broodje bruin incl. kaas', bedrag:   0,    perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Warme maaltijd: rijst met kipfilet & kebab + koolsalade', bedrag: 0, perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Warme maaltijd: rijst met visfilet + koolsalade', bedrag: 0, perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Koffie / thee / water',  bedrag:   0,    perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Papier op tafels',       bedrag:  60.00 },
   // Overig
   { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                           bedrag: 100.00 },
 ];
@@ -210,7 +201,7 @@ const DOSSIER_VELDEN = [
   'uitvaart_type','uitvaart_datum','uitvaart_tijd','kerk_locatie',
   'begraafplaats','graf_type',
   'kist_type','rouwauto','aantal_volgauto','dragers','bloemstukken',
-  'rouwkaarten_aantal','condoleance_locatie','catering',
+  'rouwkaarten_aantal','condoleance_locatie',
   'verzekering_status','verzekering_maatschappij','polisnummer',
   'verzekering_polishouder','verzekering_dekking','verzekering_pakket',
   'verzekering_aanmelding_status','verzekering_contact_naam','verzekering_contact_telefoon',

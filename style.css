@@ -2286,3 +2286,11 @@ fieldset[data-step][hidden] { display: none !important; }
   padding: .35rem .55rem; border: 1px solid var(--border);
   border-radius: 6px; font: inherit;
 }
+
+/* Grote dossier-level betaald-status toggle */
+.kost-toggle-big {
+  padding: .55rem 1.1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+}

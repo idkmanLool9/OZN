@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 77;
-const APP_VERSION    = '5.11.2';
+const APP_BUILD      = 78;
+const APP_VERSION    = '5.12.0';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -106,7 +106,6 @@ const Settings = {
           begraafplaats: { max: 800, gedekt: true  },  // alleen algemeen graf
           bloemen:       { max:   0, gedekt: false },  // via Geldverzekering
           rouwkaarten:   { max: 250, gedekt: true  },
-          catering:      { max:   0, gedekt: false },  // via Geldverzekering
           schoonmaak:    { max:   0, gedekt: false },
           administratie: { max:  50, gedekt: true  },
           overig:        { max: 657, gedekt: true  },
@@ -772,7 +771,6 @@ Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
 Router.add('/begraafplaats', () => renderBegraafplaats());
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
-Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
 Router.add('/account', () => renderAccount());
 Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
 
@@ -892,7 +890,7 @@ Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
   function cleanSessionStorage() {
     ActiveProfile.clear();
-    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] };
+    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [] };
     Cloud.loaded = false;
     // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
     // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet

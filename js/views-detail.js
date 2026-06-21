@@ -123,7 +123,6 @@ function renderDossierDetail(params) {
           ${dlRow('Bloemstukken', d.bloemstukken ? bloemRowValue(d.bloemstukken) : '')}
           ${dlRow('Rouwkaarten', d.rouwkaarten_aantal)}
           ${dlRow('Condoleance', d.condoleance_locatie)}
-          ${dlRow('Eten & drinken', d.catering ? edRowValue(d.catering) : '')}
         </dl>
         <h3>Verzekering & betaling</h3>
         <dl class="dl">
@@ -210,7 +209,6 @@ function renderDossierDetail(params) {
                     <col class="kc-col-aantal">
                     <col class="kc-col-bedrag">
                     ${dekkingInfo.mode === 'categorie' ? '<col class="kc-col-dekking">' : ''}
-                    <col class="kc-col-status">
                     <col class="kc-col-del">
                   </colgroup>
                   <tbody>
@@ -224,7 +222,6 @@ function renderDossierDetail(params) {
                       <td class="kc-aantal"><input type="number" class="kc-aantal-input" data-id="${k.id}" data-stuk="${stuk}" value="${esc(aantal)}" min="0" step="1" inputmode="numeric"></td>
                       <td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>
                       ${dekkingInfo.mode === 'categorie' ? `<td class="kc-dekking num small">${dekt > 0 ? `<span class="dekking-deel">🛡 ${fmtEUR(dekt)}</span>${familieDeel > 0 ? `<br><span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>` : ''}` : `<span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>`}</td>` : ''}
-                      <td class="kc-status center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-action="toggle-kosten" data-id="${k.id}" title="Klik om te wisselen">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
                       <td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
                     </tr>`;
                     }).join('')}
@@ -235,17 +232,16 @@ function renderDossierDetail(params) {
           </div>
           <div class="kosten-totals">
             <div class="kosten-total-row">
-              <span>Totaal kosten</span>
+              <span>Totaal factuur</span>
               <strong class="num">${fmtEUR(totaal)}</strong>
             </div>
-            <div class="kosten-total-row muted small">
-              <span>Waarvan al betaald</span>
-              <span class="num">${fmtEUR(betaald)}</span>
-            </div>
-            <div class="kosten-total-row total-open">
-              <span>Moet nog betaald worden</span>
-              <strong class="num">${fmtEUR(moetNogBetalen)}</strong>
-            </div>
+            ${kosten.length > 0 ? `
+              <div class="kosten-total-row">
+                <span>Status</span>
+                <button type="button" class="kost-toggle kost-toggle-big ${moetNogBetalen === 0 ? 'on-betaald' : 'off-betaald'}" data-action="toggle-factuur-betaald" title="Klik om te wisselen">
+                  ${moetNogBetalen === 0 ? '✓ Volledig betaald' : '○ Nog open'}
+                </button>
+              </div>` : ''}
             ${verzekerd ? `
               <div class="kosten-totals-divider"></div>
               ${dekking === 0 && verzDekking === 0 ? `
@@ -468,7 +464,6 @@ function buildDossierEmail(d) {
     ['Bloemstukken', d.bloemstukken],
     ['Rouwkaarten', d.rouwkaarten_aantal],
     ['Condoleance', d.condoleance_locatie],
-    ['Eten & drinken', d.catering],
   ]));
 
   if (d.verzekering_status === 'met verzekering') {
@@ -639,19 +634,6 @@ function bloemRowValue(bloemNaam) {
          (meta ? ` <span class="muted small">— ${esc(meta)}</span>` : '');
 }
 
-function edRowValue(naam) {
-  const b = DB.list(KEYS.ETEN_DRINKEN).find(x => x.naam === naam);
-  if (!b) return esc(naam);
-  const fotoUrl = EtenDrinkenFotos.urlVoor(b.naam);
-  const thumb = fotoUrl
-    ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
-    : (typeof edSVG === 'function' ? edSVG() : '');
-  const meta = [b.omschrijving, b.bedrag ? fmtEUR(b.bedrag) : null].filter(Boolean).join(' — ');
-  return `<span class="kist-thumb-inline">${thumb}</span>` +
-         `<strong>${esc(b.naam)}</strong>` +
-         (meta ? ` <span class="muted small">— ${esc(meta)}</span>` : '');
-}
-
 function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
   $('#btn-print').addEventListener('click', () => window.print());
@@ -807,9 +789,13 @@ function bindDetailEvents(id) {
     const action = btn.getAttribute('data-action');
     const tid = parseInt(btn.getAttribute('data-id'), 10);
     try {
-      if (action === 'toggle-kosten') {
-        const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
-        await DB.update(KEYS.KOSTEN, tid, { betaald: !k.betaald });
+      if (action === 'toggle-factuur-betaald') {
+        const kostenList = DB.where(KEYS.KOSTEN, k => k.dossier_id === id);
+        const allesBetaald = kostenList.length > 0 && kostenList.every(k => k.betaald);
+        const nieuw = !allesBetaald;
+        await Promise.all(kostenList.map(k =>
+          DB.update(KEYS.KOSTEN, k.id, { betaald: nieuw })
+        ));
         await DB.touchDossier(id); renderDossierDetail({ id });
       } else if (action === 'toggle-gedekt') {
         const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;

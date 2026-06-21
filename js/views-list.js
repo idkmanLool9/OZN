@@ -553,7 +553,6 @@ function renderAccount(msg) {
             notities: DB.list(KEYS.NOTITIES).length,
             kisten_fotos: DB.list(KEYS.KIST_AFBEELDINGEN).length,
             bloemen: DB.list(KEYS.BLOEMEN).length,
-            eten_drinken: DB.list(KEYS.ETEN_DRINKEN).length,
           };
           return `
           <div class="alert ${offline ? 'alert-error' : 'alert-success'}" style="margin-bottom:.75rem;">
@@ -570,7 +569,6 @@ function renderAccount(msg) {
             <div><dt>Kostenposten</dt><dd>${cnt.kosten}</dd></div>
             <div><dt>Notities</dt><dd>${cnt.notities}</dd></div>
             <div><dt>Bloemstukken</dt><dd>${cnt.bloemen}</dd></div>
-            <div><dt>Eten &amp; drinken</dt><dd>${cnt.eten_drinken}</dd></div>
             <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
             <div style="grid-column:span 2;"><dt>Laatst gesynchroniseerd</dt><dd>${lastSync ? lastSync.toLocaleString('nl-NL') : '—'}</dd></div>
           </dl>

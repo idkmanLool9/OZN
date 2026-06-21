@@ -282,19 +282,6 @@ function renderDossierForm(params) {
                 <div class="kist-preview" id="bloem-preview" aria-live="polite"></div>
               </div>
             </label>
-            <label class="span-3"><span>Eten &amp; drinken (catalogus) <a href="#/eten-drinken" class="muted small" style="margin-left:.5rem;">beheren →</a></span>
-              <div class="kist-picker">
-                <select name="catering" id="ed-select">
-                  <option value="">— niet gekozen —</option>
-                  ${DB.list(KEYS.ETEN_DRINKEN).slice().sort((a,b) => a.naam.localeCompare(b.naam)).map(b => {
-                    const label = `${b.naam}${b.bedrag ? ' — ' + fmtEUR(b.bedrag) : ''}`;
-                    return `<option value="${esc(b.naam)}" ${dossier.catering === b.naam ? 'selected' : ''}>${esc(label)}</option>`;
-                  }).join('')}
-                  <option value="anders" ${sel('catering','anders')}>Anders / handmatig</option>
-                </select>
-                <div class="kist-preview" id="ed-preview" aria-live="polite"></div>
-              </div>
-            </label>
           </div>
 
           <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
@@ -508,24 +495,25 @@ function renderDossierForm(params) {
     const betaald = kosten.filter(k => k.betaald).reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const open = Math.max(0, totaal - betaald);
 
+    const allesBetaald = kosten.length > 0 && kosten.every(k => k.betaald);
     mount.innerHTML = `
       ${kosten.length === 0 ? '<p class="muted small">Nog geen kostenposten. Voeg toe via een snelknop of handmatig hieronder.</p>' : `
       <table class="table wizard-kosten-table">
-        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th><th></th></tr></thead>
         <tbody>
           ${kosten.map(k => `<tr>
             <td>${esc(k.omschrijving)}</td>
             <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
             <td class="num">${fmtEUR(k.bedrag)}</td>
-            <td class="center"><button type="button" class="kost-toggle ${k.betaald ? 'on-betaald' : 'off-betaald'}" data-wk-toggle="${k.id}">${k.betaald ? '✓ Betaald' : '○ Open'}</button></td>
             <td><button type="button" class="btn-icon" data-wk-del="${k.id}" title="Verwijderen">×</button></td>
           </tr>`).join('')}
         </tbody>
       </table>
       <div class="wizard-kosten-totals">
-        <span>Totaal <strong>${fmtEUR(totaal)}</strong></span>
-        <span class="muted">betaald ${fmtEUR(betaald)}</span>
-        <span style="color:#b34;">open <strong>${fmtEUR(open)}</strong></span>
+        <span>Totaal factuur: <strong>${fmtEUR(totaal)}</strong></span>
+        <button type="button" class="kost-toggle kost-toggle-big ${allesBetaald ? 'on-betaald' : 'off-betaald'}" id="wk-status-toggle">
+          ${allesBetaald ? '✓ Volledig betaald' : '○ Nog open'}
+        </button>
       </div>`}
       ${isNew && kosten.length === 0 ? '<button type="button" class="btn btn-sm btn-ghost" id="wk-fill-standaard" style="margin-top:.5rem;">+ Alle standaardposten toevoegen</button>' : ''}
 
@@ -549,18 +537,19 @@ function renderDossierForm(params) {
         <button type="button" class="btn btn-sm" id="wk-add-btn">+ Toevoegen</button>
       </div>`;
 
-    // ── Acties: toggle betaald ──
-    mount.querySelectorAll('[data-wk-toggle]').forEach(b => {
-      b.addEventListener('click', async () => {
-        const id = b.dataset.wkToggle;
-        if (isNew) {
-          const i = parseInt(id.replace('_buf_', ''), 10);
-          if (kostenBuffer[i]) { kostenBuffer[i].betaald = !kostenBuffer[i].betaald; saveBuffer(); renderWizardKosten(); }
-        } else {
-          const k = DB.byId(KEYS.KOSTEN, parseInt(id, 10)); if (!k) return;
-          try { await DB.update(KEYS.KOSTEN, k.id, { betaald: !k.betaald }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
-        }
-      });
+    // ── Actie: dossier-level betaald-status (toggle alle posten ineens) ──
+    const statusBtn = mount.querySelector('#wk-status-toggle');
+    if (statusBtn) statusBtn.addEventListener('click', async () => {
+      const nieuw = !allesBetaald;
+      if (isNew) {
+        kostenBuffer.forEach(k => { k.betaald = nieuw; });
+        saveBuffer(); renderWizardKosten();
+      } else {
+        try {
+          await Promise.all(kosten.map(k => DB.update(KEYS.KOSTEN, k.id, { betaald: nieuw })));
+          await DB.touchDossier(dossier.id); renderWizardKosten();
+        } catch (_) {}
+      }
     });
     // ── Acties: verwijderen ──
     mount.querySelectorAll('[data-wk-del]').forEach(b => {
@@ -763,31 +752,6 @@ function renderDossierForm(params) {
     const status = $(`[data-status="${id}"]`);
     if (status) { status.textContent = 'nog niet ondertekend'; status.classList.remove('signed'); }
   });
-
-  // Eten & drinken-preview live bijwerken
-  const edSelect = $('#ed-select');
-  const edPreview = $('#ed-preview');
-  function updateEdPreview() {
-    const v = edSelect.value;
-    if (!v) { edPreview.innerHTML = '<div class="kist-preview-empty">Niet gekozen</div>'; return; }
-    if (v === 'anders') { edPreview.innerHTML = '<div class="kist-preview-empty">Handmatig / anders</div>'; return; }
-    const b = DB.list(KEYS.ETEN_DRINKEN).find(x => x.naam === v);
-    if (!b) { edPreview.innerHTML = ''; return; }
-    const fotoUrl = EtenDrinkenFotos.urlVoor(b.naam);
-    const beeld = fotoUrl
-      ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
-      : (typeof edSVG === 'function' ? edSVG() : '');
-    edPreview.innerHTML = `
-      <div class="kist-img">${beeld}</div>
-      <div class="kist-meta">
-        <strong>${esc(b.naam)}</strong>
-        ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
-        ${b.bedrag ? `<span class="kist-price">${fmtEUR(b.bedrag)}</span>` : ''}
-        ${fotoUrl ? '' : '<span class="muted small"><a href="#/eten-drinken">Foto uploaden</a></span>'}
-      </div>`;
-  }
-  edSelect.addEventListener('change', updateEdPreview);
-  updateEdPreview();
 
   // ─── Kinderen-status → minderjarige-vraag tonen/verbergen ────────────
   const kinderenSel = $('#kinderen-status-select');
