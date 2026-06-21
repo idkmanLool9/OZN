@@ -301,6 +301,16 @@ function renderDossierForm(params) {
   const TOTAL_STEPS = 6;
   const stepKey = `sok_wizard_step_${isNew ? 'nieuw' : dossier.id}`;
   const maxKey  = `sok_wizard_max_${isNew ? 'nieuw' : dossier.id}`;
+  // Als er géén concept (draft) bewaard is, wissen we eerder onthouden
+  // stap-voortgang — een vers formulier hoort weer met grijze cirkels te
+  // beginnen. Bij wél een draft (resumed sessie) blijven de cirkels staan.
+  const _draftKeyEarly = dossierDraftKey(isNew, dossier.id);
+  if (!localStorage.getItem(_draftKeyEarly)) {
+    try {
+      localStorage.removeItem(stepKey);
+      localStorage.removeItem(maxKey);
+    } catch (_) {}
+  }
   let currentStep = (() => {
     try {
       const saved = parseInt(localStorage.getItem(stepKey), 10);
