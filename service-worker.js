@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-80';
+const CACHE_VERSION = 'sok-uitvaart-build-81';
 const SHELL = [
   './',
   './index.html',
@@ -34,9 +34,19 @@ const SHELL = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_VERSION)
-      .then(c => c.addAll(SHELL).catch(err => {
-        console.warn('SW: kon shell niet helemaal cachen', err);
-      }))
+      .then(async c => {
+        // Forceer 'reload' zodat we de HTTP-cache van de browser overslaan.
+        // Anders cacht de nieuwe SW stilletjes de oude bestanden en blijft
+        // de gebruiker een versie achterlopen.
+        await Promise.all(SHELL.map(async url => {
+          try {
+            const resp = await fetch(url, { cache: 'reload' });
+            if (resp && resp.ok) await c.put(url, resp);
+          } catch (err) {
+            console.warn('SW shell fetch faalde:', url, err);
+          }
+        }));
+      })
       .then(() => self.skipWaiting())
   );
 });
@@ -102,7 +112,11 @@ self.addEventListener('fetch', e => {
 
 async function networkFirst(req) {
   try {
-    const resp = await fetch(req);
+    // 'no-cache' = altijd revalideren bij server (ETag/If-Modified-Since).
+    // Zo krijgen we nooit een oude HTTP-cache-versie terwijl er een
+    // nieuwere file klaarstaat op de server.
+    const freshReq = new Request(req, { cache: 'no-cache' });
+    const resp = await fetch(freshReq);
     if (resp && resp.ok && resp.type === 'basic') {
       const c = await caches.open(CACHE_VERSION);
       c.put(req, resp.clone());

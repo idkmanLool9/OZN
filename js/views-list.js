@@ -835,10 +835,10 @@ function renderAccount(msg) {
         const r = await Updater.check();
         if (r.hasUpdate) {
           result.innerHTML = `<div class="alert alert-info">Nieuwe versie beschikbaar: <strong>${esc(r.remoteVersion)}</strong> (jij draait ${esc(r.currentVersion)}). De pagina wordt over enkele seconden ververst.</div>`;
-          setTimeout(() => Updater.reloadHard(), 1800);
+          setTimeout(() => Updater.reloadHard(), 700);
         } else if (r.swUpdated) {
           result.innerHTML = `<div class="alert alert-success">Service-worker bijgewerkt naar de laatste versie. Pagina wordt ververst...</div>`;
-          setTimeout(() => Updater.reloadHard(), 1200);
+          setTimeout(() => Updater.reloadHard(), 500);
         } else {
           result.innerHTML = `<div class="alert alert-success">Je draait al de laatste versie (<strong>${esc(r.currentVersion)}</strong>).</div>`;
           updBtn.disabled = false; updBtn.textContent = orig;

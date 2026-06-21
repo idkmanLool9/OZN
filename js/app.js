@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 80;
-const APP_VERSION    = '5.13.0';
+const APP_BUILD      = 81;
+const APP_VERSION    = '5.13.1';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -674,8 +674,15 @@ const Updater = {
       try {
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
+          // VOOR de update-trigger al een controllerchange-listener opzetten,
+          // anders missen we de event omdat-ie direct na SKIP_WAITING vuurt
+          const controllerChange = new Promise(resolve => {
+            navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+          });
+
           await reg.update();
-          // Wacht eerst tot een eventueel installerende SW de installed-fase haalt
+
+          // Wacht tot een eventueel installerende SW de installed-fase haalt
           if (reg.installing) {
             await new Promise(resolve => {
               const sw = reg.installing;
@@ -686,11 +693,21 @@ const Updater = {
                 }
               };
               sw.addEventListener('statechange', onchange);
-              setTimeout(resolve, 5000); // safety timeout
+              setTimeout(resolve, 5000);
             });
           }
+
           if (reg.waiting) {
             reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            // Wacht tot de nieuwe SW de pagina overneemt vóór we returnen.
+            // Race met 3s safety zodat we niet eeuwig blokkeren.
+            await Promise.race([
+              controllerChange,
+              new Promise(resolve => setTimeout(resolve, 3000)),
+            ]);
+            swReady = true;
+          } else if (reg.active) {
+            // SW al actief en niets in waiting — niets te doen
             swReady = true;
           }
         }
@@ -727,29 +744,13 @@ const Updater = {
     location.replace(u.toString());
   },
 
-  // Reload pas wanneer de NIEUWE service-worker daadwerkelijk de pagina
-  // overneemt (controllerchange). Voorkomt de "1 build per klik"-bug
-  // waarbij de oude SW nog reload-requests serveert vanuit zijn oude cache.
+  // Reload de pagina met cache-buster. Updater.check() wacht inmiddels al
+  // op controllerchange dus tegen de tijd dat dit wordt aangeroepen is
+  // de nieuwe SW al in control en zal de reload verse files ophalen.
   async reloadHard() {
-    const doReload = () => {
-      // Cache-buster query param zodat eventuele edge/CDN-caches deze
-      // ene navigatie ook overslaan
-      const u = new URL(location.href);
-      u.searchParams.set('_v', Date.now());
-      location.replace(u.toString());
-    };
-
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      doReload();
-      return;
-    }
-
-    let reloaded = false;
-    const reloadOnce = () => { if (!reloaded) { reloaded = true; doReload(); } };
-
-    navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
-    // Safety: als controllerchange te lang uitblijft, gewoon reloaden
-    setTimeout(reloadOnce, 3500);
+    const u = new URL(location.href);
+    u.searchParams.set('_v', Date.now());
+    location.replace(u.toString());
   },
 };
 
