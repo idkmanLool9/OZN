@@ -215,9 +215,6 @@ function renderDossierForm(params) {
                 <div class="kist-preview" id="kist-preview" aria-live="polite"></div>
               </div>
             </label>
-            <label><span>Rouwauto</span><input type="text" name="rouwauto" value="${v('rouwauto')}"></label>
-            <label><span>Aantal volgauto's</span><input type="number" name="aantal_volgauto" value="${v('aantal_volgauto')}" min="0"></label>
-            <label><span>Dragers</span><input type="text" name="dragers" value="${v('dragers')}" placeholder="aantal en namen"></label>
             <label class="span-3"><span>Bloemstuk (eigen catalogus) <a href="#/bloemen" class="muted small" style="margin-left:.5rem;">beheren →</a></span>
               <div class="kist-picker">
                 <select name="bloemstukken" id="bloem-select">
@@ -231,8 +228,6 @@ function renderDossierForm(params) {
                 <div class="kist-preview" id="bloem-preview" aria-live="polite"></div>
               </div>
             </label>
-            <label><span>Aantal rouwkaarten</span><input type="number" name="rouwkaarten_aantal" value="${v('rouwkaarten_aantal')}" min="0"></label>
-            <label class="span-2"><span>Locatie condoleance</span><input type="text" name="condoleance_locatie" value="${v('condoleance_locatie')}"></label>
             <label class="span-3"><span>Eten &amp; drinken (catalogus) <a href="#/eten-drinken" class="muted small" style="margin-left:.5rem;">beheren →</a></span>
               <div class="kist-picker">
                 <select name="catering" id="ed-select">
@@ -252,6 +247,15 @@ function renderDossierForm(params) {
         <fieldset class="card" data-step="4">
           <legend>Verzekering</legend>
           <div class="grid-2">
+            <label class="span-2"><span>Is er een verzekering?</span>
+              <select name="verzekering_status" id="verzekering-status-select">
+                <option value="">— nog niet bekend —</option>
+                <option value="met verzekering" ${sel('verzekering_status','met verzekering')}>Ja, met verzekering</option>
+                <option value="zonder verzekering" ${sel('verzekering_status','zonder verzekering')}>Nee, geen verzekering</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid-2" id="verzekering-polis-row" hidden>
             <label><span>Polisnummer</span><input type="text" name="polisnummer" value="${v('polisnummer')}"></label>
             <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
           </div>
@@ -303,36 +307,115 @@ function renderDossierForm(params) {
     } catch (_) { return 1; }
   })();
 
+  // Aanbevolen velden per stap — bepalen kleur (rood/oranje/groen)
+  const STEP_FIELDS = {
+    1: ['voornaam','achternaam','geboortedatum','overlijdensdatum',
+        'adres_overledene','postcode_overledene','woonplaats_overledene',
+        'contact_naam','contact_voornaam','contact_telefoon','contact_relatie'],
+    2: ['parochie','priester','uitvaart_type','uitvaart_datum',
+        'uitvaart_tijd','kerk_locatie','begraafplaats'],
+    3: ['kist_type'],
+    // 4 = speciale logica (verzekering-toggle)
+    5: [],  // bijzonderheden is volledig optioneel
+    6: [],  // handtekeningen apart
+  };
+
+  const fillStateForStep = (step) => {
+    const form = document.getElementById('dossier-form');
+    if (!form) return 'empty';
+    const fd = new FormData(form);
+    const isFilled = name => {
+      const v = fd.get(name);
+      return v != null && String(v).trim() !== '';
+    };
+
+    // Stap 4 — speciale logica voor verzekering
+    if (step === 4) {
+      const status = (fd.get('verzekering_status') || '').trim();
+      if (!status) return 'empty';
+      if (status === 'zonder verzekering') return 'complete';
+      const polis = isFilled('polisnummer');
+      const gezin = isFilled('gezinsnummer');
+      if (polis && gezin) return 'complete';
+      if (polis || gezin) return 'partial';
+      return 'partial'; // alleen 'ja' aangegeven, nog niets ingevuld
+    }
+
+    // Stap 6 — handtekeningen, check via Settings + bestaande dossier-data
+    if (step === 6) {
+      const verplicht = (Settings.get('signature_fields') || []).filter(f => f.required);
+      if (verplicht.length === 0) return 'complete';
+      const sigs = dossier.handtekeningen || {};
+      const gevuld = verplicht.filter(f => sigs[f.id]).length;
+      if (gevuld === 0) return 'empty';
+      if (gevuld < verplicht.length) return 'partial';
+      return 'complete';
+    }
+
+    const fields = STEP_FIELDS[step] || [];
+    if (fields.length === 0) return 'complete';
+    const filled = fields.filter(isFilled).length;
+    if (filled === 0) return 'empty';
+    if (filled === fields.length) return 'complete';
+    return 'partial';
+  };
+
+  const updateStepColors = () => {
+    document.querySelectorAll('.wizard-step').forEach(el => {
+      const step = parseInt(el.dataset.go, 10);
+      const state = fillStateForStep(step);
+      el.classList.remove('fill-empty','fill-partial','fill-complete');
+      el.classList.add('fill-' + state);
+    });
+  };
+
   const showStep = (n) => {
     currentStep = Math.max(1, Math.min(TOTAL_STEPS, n));
-    // Toon alleen fieldsets van deze stap
     document.querySelectorAll('#dossier-form fieldset[data-step]').forEach(fs => {
       const step = parseInt(fs.dataset.step, 10);
       fs.hidden = (step !== currentStep);
     });
-    // Update stappen-balk
     document.querySelectorAll('.wizard-step').forEach(el => {
       const step = parseInt(el.dataset.go, 10);
       el.classList.toggle('active', step === currentStep);
-      el.classList.toggle('completed', step < currentStep);
     });
-    // Knoppen-state
     document.getElementById('btn-wizard-prev').hidden = (currentStep === 1);
     document.getElementById('btn-wizard-next').hidden = (currentStep === TOTAL_STEPS);
     document.getElementById('btn-wizard-submit').hidden = (currentStep !== TOTAL_STEPS);
-    // Scroll naar boven van form
     const form = document.getElementById('dossier-form');
     if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // Onthoud
     try { localStorage.setItem(stepKey, String(currentStep)); } catch (_) {}
+    updateStepColors();
   };
 
-  // Stappen-balk klikbaar
   document.querySelectorAll('.wizard-step').forEach(el => {
     el.addEventListener('click', () => showStep(parseInt(el.dataset.go, 10)));
   });
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
+
+  // Verzekering-toggle: polis/gezin-rij tonen alleen bij 'met verzekering'
+  const verzSel = document.getElementById('verzekering-status-select');
+  const polisRow = document.getElementById('verzekering-polis-row');
+  const updateVerzekeringRow = () => {
+    if (!verzSel || !polisRow) return;
+    polisRow.hidden = verzSel.value !== 'met verzekering';
+  };
+  if (verzSel) {
+    verzSel.addEventListener('change', () => {
+      updateVerzekeringRow();
+      updateStepColors();
+    });
+    updateVerzekeringRow();
+  }
+
+  // Live kleuren bijwerken bij élke input-wijziging (debounced)
+  let colorTimer = null;
+  document.getElementById('dossier-form').addEventListener('input', () => {
+    clearTimeout(colorTimer);
+    colorTimer = setTimeout(updateStepColors, 200);
+  });
+  document.getElementById('dossier-form').addEventListener('change', updateStepColors);
 
   showStep(currentStep);
 

@@ -2213,15 +2213,17 @@ body { -webkit-overflow-scrolling: touch; }
   background: #fff;
   color: var(--primary, #6b1e2a);
 }
-.wizard-step.completed {
-  color: #1e6b34;
-}
-.wizard-step.completed .num {
-  background: #2a7a3a;
-  color: #fff;
-}
-.wizard-step.completed .num::before { content: '✓'; }
-.wizard-step.completed .num > * { display: none; }
+/* Fill-state kleuren — data-gedreven (rood/oranje/groen) */
+.wizard-step.fill-empty .num    { background: #c94545; color: #fff; }
+.wizard-step.fill-partial .num  { background: #e89538; color: #fff; }
+.wizard-step.fill-complete .num { background: #2a7a3a; color: #fff; }
+.wizard-step.fill-complete .num::before { content: '✓'; }
+.wizard-step.fill-complete .num > * { display: none; }
+
+/* Actieve stap behoudt zijn primaire styling, kleur in cirkel blijft wel zichtbaar */
+.wizard-step.active.fill-empty .num    { background: #c94545; color: #fff; }
+.wizard-step.active.fill-partial .num  { background: #e89538; color: #fff; }
+.wizard-step.active.fill-complete .num { background: #2a7a3a; color: #fff; }
 
 fieldset[data-step][hidden] { display: none !important; }
 
