@@ -33,11 +33,25 @@ function _setKistInDraft(key, kistNaam) {
   } catch (_) { return false; }
 }
 
+let _kistFilter = '';
+let _kistPrijsMax = '';
+
 function renderKistenBeheer(msg) {
-  const items = KISTEN_CATALOGUS.slice().sort((a, b) => a.bedrag - b.bedrag);
   const adminMode = !!Settings.get('catalog_admin_mode');
   const drafts = _activeDossierDrafts();
   const hasDraft = drafts.length > 0;
+
+  const q = (_kistFilter || '').trim().toLowerCase();
+  const max = parseFloat(String(_kistPrijsMax).replace(',', '.')) || 0;
+  const items = KISTEN_CATALOGUS
+    .slice()
+    .filter(k => {
+      if (q && !((k.naam || '').toLowerCase().includes(q) || (k.materiaal || '').toLowerCase().includes(q))) return false;
+      if (max > 0 && Number(k.bedrag) > max) return false;
+      return true;
+    })
+    .sort((a, b) => a.bedrag - b.bedrag);
+  const totaalCount = KISTEN_CATALOGUS.length;
 
   $('#view').innerHTML = `
     <div class="page">
@@ -48,6 +62,21 @@ function renderKistenBeheer(msg) {
         </div>
         ${adminMode ? '<span class="badge badge-amber">Beheermodus aan</span>' : ''}
       </div>
+
+      <section class="card catalog-filter-card">
+        <div class="catalog-filter">
+          <label class="catalog-filter-inline">
+            <span class="muted small">Zoek op naam of materiaal</span>
+            <input type="search" id="kist-filter-q" value="${esc(_kistFilter)}" placeholder="bv. natuur, eiken, populieren" autocomplete="off">
+          </label>
+          <label class="catalog-filter-inline">
+            <span class="muted small">Max. prijs (€)</span>
+            <input type="text" id="kist-filter-max" value="${esc(_kistPrijsMax)}" placeholder="bv. 1000" inputmode="decimal">
+          </label>
+          ${(_kistFilter || _kistPrijsMax) ? '<button type="button" class="btn btn-sm btn-ghost" id="kist-filter-clear">Wis filter</button>' : ''}
+          <span class="muted small catalog-filter-count">${items.length} van ${totaalCount}</span>
+        </div>
+      </section>
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
       ${hasDraft ? `
@@ -93,6 +122,49 @@ function renderKistenBeheer(msg) {
           Foto's vervangen of verwijderen? Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a>.
         </p>`}
     </div>`;
+
+  // Filter handlers (live, met kleine debounce)
+  let _kistFilterT = null;
+  const filterQ = $('#kist-filter-q');
+  const filterMax = $('#kist-filter-max');
+  const filterClear = $('#kist-filter-clear');
+  if (filterQ) {
+    filterQ.addEventListener('input', () => {
+      _kistFilter = filterQ.value;
+      clearTimeout(_kistFilterT);
+      _kistFilterT = setTimeout(() => {
+        const focusInput = document.activeElement === filterQ;
+        const pos = focusInput ? filterQ.selectionStart : null;
+        renderKistenBeheer();
+        if (focusInput) {
+          const newInp = $('#kist-filter-q');
+          if (newInp) { newInp.focus(); if (pos != null) newInp.setSelectionRange(pos, pos); }
+        }
+      }, 150);
+    });
+  }
+  if (filterMax) {
+    filterMax.addEventListener('input', () => {
+      _kistPrijsMax = filterMax.value;
+      clearTimeout(_kistFilterT);
+      _kistFilterT = setTimeout(() => {
+        const focusInput = document.activeElement === filterMax;
+        const pos = focusInput ? filterMax.selectionStart : null;
+        renderKistenBeheer();
+        if (focusInput) {
+          const newInp = $('#kist-filter-max');
+          if (newInp) { newInp.focus(); if (pos != null) newInp.setSelectionRange(pos, pos); }
+        }
+      }, 150);
+    });
+  }
+  if (filterClear) {
+    filterClear.addEventListener('click', () => {
+      _kistFilter = '';
+      _kistPrijsMax = '';
+      renderKistenBeheer();
+    });
+  }
 
   $('#view').onchange = async e => {
     const inp = e.target.closest('input[data-upload]');

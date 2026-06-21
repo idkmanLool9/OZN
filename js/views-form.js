@@ -478,6 +478,9 @@ function renderDossierForm(params) {
     if (!isNew) return null;
     try { return JSON.parse(localStorage.getItem(kostenBufKey) || '[]'); } catch (_) { return []; }
   })();
+  // Onthoud of de 'Snel toevoegen'-lijst openstaat zodat hij niet
+  // dichtklapt na elke klik op een preset (re-render)
+  let presetsOpen = false;
   const saveBuffer = () => {
     if (!isNew) return;
     try { localStorage.setItem(kostenBufKey, JSON.stringify(kostenBuffer)); } catch (_) {}
@@ -517,7 +520,7 @@ function renderDossierForm(params) {
       </div>`}
       ${isNew && kosten.length === 0 ? '<button type="button" class="btn btn-sm btn-ghost" id="wk-fill-standaard" style="margin-top:.5rem;">+ Alle standaardposten toevoegen</button>' : ''}
 
-      <details class="wizard-kosten-presets" style="margin-top:.85rem;">
+      <details class="wizard-kosten-presets" id="wk-presets-details" ${presetsOpen ? 'open' : ''} style="margin-top:.85rem;">
         <summary>+ Snel toevoegen uit standaardlijst</summary>
         <div class="wizard-preset-grid">
           ${KOSTEN_PRESETS.map((p, i) => `
@@ -579,6 +582,13 @@ function renderDossierForm(params) {
         const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)]; if (p) addPreset(p);
       });
     });
+    // Onthoud open/dicht-stand van de presets-details
+    const presetsDetails = mount.querySelector('#wk-presets-details');
+    if (presetsDetails) {
+      presetsDetails.addEventListener('toggle', () => {
+        presetsOpen = presetsDetails.open;
+      });
+    }
     // ── Acties: alle standaardposten in één keer (alleen nieuw) ──
     const fillBtn = mount.querySelector('#wk-fill-standaard');
     if (fillBtn) fillBtn.addEventListener('click', () => {

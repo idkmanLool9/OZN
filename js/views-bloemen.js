@@ -1,6 +1,8 @@
 // Bloemen-catalogus: gebruiker beheert eigen bloemstukken (naam, omschrijving, prijs, foto)
 
 let _bloemEditing = null; // null = nieuw formulier dicht; 'new' = nieuw; <id> = bewerken
+let _bloemFilter = '';
+let _bloemPrijsMax = '';
 
 function bloemSVG() {
   return `
@@ -38,11 +40,20 @@ function bloemSVG() {
 }
 
 function renderBloemenBeheer(msg) {
-  const items = DB.list(KEYS.BLOEMEN).slice().sort((a, b) => a.naam.localeCompare(b.naam));
+  const alle = DB.list(KEYS.BLOEMEN).slice().sort((a, b) => a.naam.localeCompare(b.naam));
   const adminMode = !!Settings.get('catalog_admin_mode');
 
+  const q = (_bloemFilter || '').trim().toLowerCase();
+  const max = parseFloat(String(_bloemPrijsMax).replace(',', '.')) || 0;
+  const items = alle.filter(b => {
+    if (q && !((b.naam || '').toLowerCase().includes(q) || (b.omschrijving || '').toLowerCase().includes(q))) return false;
+    if (max > 0 && Number(b.bedrag) > max) return false;
+    return true;
+  });
+  const totaalCount = alle.length;
+
   const editing = _bloemEditing === 'new' ? { naam: '', omschrijving: '', bedrag: '' }
-                : (_bloemEditing != null ? items.find(x => x.id === _bloemEditing) : null);
+                : (_bloemEditing != null ? alle.find(x => x.id === _bloemEditing) : null);
 
   $('#view').innerHTML = `
     <div class="page">
@@ -55,6 +66,22 @@ function renderBloemenBeheer(msg) {
       </div>
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
+
+      ${editing ? '' : `
+        <section class="card catalog-filter-card">
+          <div class="catalog-filter">
+            <label class="catalog-filter-inline">
+              <span class="muted small">Zoek op naam of omschrijving</span>
+              <input type="search" id="bloem-filter-q" value="${esc(_bloemFilter)}" placeholder="bv. rozen, krans" autocomplete="off">
+            </label>
+            <label class="catalog-filter-inline">
+              <span class="muted small">Max. prijs (€)</span>
+              <input type="text" id="bloem-filter-max" value="${esc(_bloemPrijsMax)}" placeholder="bv. 250" inputmode="decimal">
+            </label>
+            ${(_bloemFilter || _bloemPrijsMax) ? '<button type="button" class="btn btn-sm btn-ghost" id="bloem-filter-clear">Wis filter</button>' : ''}
+            <span class="muted small catalog-filter-count">${items.length} van ${totaalCount}</span>
+          </div>
+        </section>`}
 
       ${editing ? `
         <section class="card narrow">
@@ -99,6 +126,41 @@ function renderBloemenBeheer(msg) {
           </div>
           ${adminMode ? '' : `<p class="muted small center" style="margin-top:1.5rem;">Toevoegen of bewerken? Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a>.</p>`}`}
     </div>`;
+
+  // Filter handlers (live, met debounce + focus-behoud)
+  let _bloemFilterT = null;
+  const filterQ = $('#bloem-filter-q');
+  const filterMax = $('#bloem-filter-max');
+  const filterClear = $('#bloem-filter-clear');
+  const reRenderFilter = (focusId) => {
+    const pos = focusId ? document.getElementById(focusId)?.selectionStart : null;
+    renderBloemenBeheer();
+    if (focusId) {
+      const inp = document.getElementById(focusId);
+      if (inp) { inp.focus(); if (pos != null) inp.setSelectionRange(pos, pos); }
+    }
+  };
+  if (filterQ) {
+    filterQ.addEventListener('input', () => {
+      _bloemFilter = filterQ.value;
+      clearTimeout(_bloemFilterT);
+      _bloemFilterT = setTimeout(() => reRenderFilter('bloem-filter-q'), 150);
+    });
+  }
+  if (filterMax) {
+    filterMax.addEventListener('input', () => {
+      _bloemPrijsMax = filterMax.value;
+      clearTimeout(_bloemFilterT);
+      _bloemFilterT = setTimeout(() => reRenderFilter('bloem-filter-max'), 150);
+    });
+  }
+  if (filterClear) {
+    filterClear.addEventListener('click', () => {
+      _bloemFilter = '';
+      _bloemPrijsMax = '';
+      renderBloemenBeheer();
+    });
+  }
 
   const newBtn = $('#btn-nieuw-bloem');
   if (newBtn) newBtn.addEventListener('click', () => { _bloemEditing = 'new'; renderBloemenBeheer(); });

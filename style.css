@@ -2294,3 +2294,18 @@ fieldset[data-step][hidden] { display: none !important; }
   font-weight: 700;
   border-radius: 10px;
 }
+
+/* Catalogus-filter (Kisten + Bloemen) */
+.catalog-filter-card { padding: .75rem 1rem; margin-bottom: 1rem; }
+.catalog-filter {
+  display: flex; gap: .85rem; align-items: flex-end; flex-wrap: wrap;
+}
+.catalog-filter-inline {
+  display: flex; flex-direction: column; gap: .15rem;
+  flex: 1; min-width: 180px; max-width: 300px;
+}
+.catalog-filter-inline input {
+  padding: .5rem .65rem; border: 1px solid var(--border);
+  border-radius: 6px; font: inherit; background: #fff;
+}
+.catalog-filter-count { margin-left: auto; }
