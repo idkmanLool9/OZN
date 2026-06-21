@@ -71,10 +71,10 @@ function renderDossierForm(params) {
         <input type="hidden" name="status" value="${esc(dossier.status || 'nieuw')}">
 
         <nav class="wizard-nav" id="wizard-nav" aria-label="Voortgang">
-          <button type="button" class="wizard-step" data-go="1"><span class="num">1</span><span class="lbl">Personen</span></button>
-          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Kerkelijk & uitvaart</span></button>
-          <button type="button" class="wizard-step" data-go="3"><span class="num">3</span><span class="lbl">Logistiek</span></button>
-          <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Verzekering & betaling</span></button>
+          <button type="button" class="wizard-step" data-go="1"><span class="num">1</span><span class="lbl">NAW gegevens</span></button>
+          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Uitvaart</span></button>
+          <button type="button" class="wizard-step" data-go="3"><span class="num">3</span><span class="lbl">Kosten</span></button>
+          <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Verzekering</span></button>
           <button type="button" class="wizard-step" data-go="5"><span class="num">5</span><span class="lbl">Bijzonderheden</span></button>
           <button type="button" class="wizard-step" data-go="6"><span class="num">6</span><span class="lbl">Handtekeningen</span></button>
         </nav>
@@ -146,12 +146,11 @@ function renderDossierForm(params) {
             <label><span>Telefoon</span><input type="tel" name="contact_telefoon" value="${v('contact_telefoon')}"></label>
             <label class="span-2"><span>E-mail</span><input type="email" name="contact_email" value="${v('contact_email')}"></label>
             <label><span>Relatie tot overledene</span><input type="text" name="contact_relatie" value="${v('contact_relatie')}" placeholder="echtgenoot, zoon, dochter..."></label>
-            <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
           </div>
         </fieldset>
 
         <fieldset class="card" data-step="2">
-          <legend>Kerkelijk &amp; uitvaartdienst</legend>
+          <legend>Uitvaart</legend>
           <div class="grid-3">
             <label><span>Parochie</span>
               ${(() => {
@@ -174,13 +173,10 @@ function renderDossierForm(params) {
               })()}
             </label>
             <label><span>Priester / Aboona</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
-            <label><span>Huisbezoek datum</span><input type="date" name="huisbezoek_datum" value="${v('huisbezoek_datum')}"></label>
-            <label><span>Huisbezoek tijd</span><input type="time" name="huisbezoek_tijd" value="${v('huisbezoek_tijd')}"></label>
             <label><span>Type uitvaart</span>
               <select name="uitvaart_type">
                 <option value="">—</option>
                 <option value="begrafenis" ${sel('uitvaart_type','begrafenis')}>Begrafenis</option>
-                <option value="crematie" ${sel('uitvaart_type','crematie')}>Crematie</option>
                 <option value="repatriëring" ${sel('uitvaart_type','repatriëring')}>Repatriëring</option>
               </select>
             </label>
@@ -196,7 +192,7 @@ function renderDossierForm(params) {
             <label class="span-3"><span>Type graf</span>
               <select name="graf_type">
                 <option value="">—</option>
-                ${['eigen graf','algemeen graf','familiegraf'].map(x =>
+                ${['oude begraafplaats','algemeen graf','familiegraf'].map(x =>
                   `<option value="${esc(x)}" ${sel('graf_type', x)}>${esc(x)}</option>`).join('')}
               </select>
             </label>
@@ -204,7 +200,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="3">
-          <legend>Logistiek</legend>
+          <legend>Kosten</legend>
           <div class="grid-3">
             <label class="span-3"><span>Kistmodel (Unigra catalogus)</span>
               <div class="kist-picker">
@@ -254,76 +250,10 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="4">
-          <legend>Verzekering & betaling</legend>
-          <div class="grid-3">
-            <label><span>Verzekering</span>
-              <select name="verzekering_status" id="verzekering-status-select">
-                <option value="">— nog niet bekend —</option>
-                <option value="met verzekering" ${sel('verzekering_status','met verzekering')}>Met verzekering</option>
-                <option value="zonder verzekering" ${sel('verzekering_status','zonder verzekering')}>Zonder verzekering</option>
-              </select>
-            </label>
-          </div>
-
-          <div id="verzekering-met-fields" hidden>
-            <h3>Verzekeringsgegevens</h3>
-            <div class="grid-3">
-              <label><span>Maatschappij</span>
-                <input type="text" name="verzekering_maatschappij" value="${v('verzekering_maatschappij')}" list="ms-list" autocomplete="off">
-                <datalist id="ms-list">
-                  ${(Settings.get('verzekering_maatschappijen') || []).map(m => `<option value="${esc(m)}">`).join('')}
-                </datalist>
-              </label>
-              <label><span>Polisnummer</span><input type="text" name="polisnummer" value="${v('polisnummer')}"></label>
-              <label><span>Polishouder</span><input type="text" name="verzekering_polishouder" value="${v('verzekering_polishouder')}" placeholder="indien anders dan overledene"></label>
-              <label><span>Dekkingsbedrag (€)</span><input type="text" name="verzekering_dekking" id="verzekering-dekking-input" value="${v('verzekering_dekking')}" inputmode="decimal" placeholder="0,00"></label>
-              <label><span>Pakket / uitvoering</span>
-                <input type="text" name="verzekering_pakket" id="verzekering-pakket-input" value="${v('verzekering_pakket')}" list="pakket-list" autocomplete="off">
-                <datalist id="pakket-list">
-                  ${(Settings.get('verzekering_pakketten') || []).map(p => `<option value="${esc(p.naam || p)}">`).join('')}
-                </datalist>
-              </label>
-              <label><span>Aanmelding-status</span>
-                <select name="verzekering_aanmelding_status">
-                  <option value="">—</option>
-                  ${['niet aangemeld','ingediend','akkoord','uitbetaald'].map(x =>
-                    `<option value="${esc(x)}" ${sel('verzekering_aanmelding_status', x)}>${esc(x)}</option>`).join('')}
-                </select>
-              </label>
-              <label><span>Contactpersoon verzekeraar</span><input type="text" name="verzekering_contact_naam" value="${v('verzekering_contact_naam')}"></label>
-              <label><span>Telefoon contactpersoon</span><input type="tel" name="verzekering_contact_telefoon" value="${v('verzekering_contact_telefoon')}"></label>
-            </div>
-          </div>
-
-          <div id="verzekering-zonder-fields" hidden>
-            <h3>Betalingsafspraken</h3>
-            <div class="grid-3">
-              <label><span>Betalingsmethode</span>
-                <select name="betaalwijze">
-                  <option value="">—</option>
-                  ${['contant','overboeking','verdeeld','via opdrachtgever'].map(x =>
-                    `<option value="${esc(x)}" ${sel('betaalwijze', x)}>${esc(x)}</option>`).join('')}
-                </select>
-              </label>
-              <label><span>Aanbetaling (€)</span><input type="text" name="aanbetaling_bedrag" value="${v('aanbetaling_bedrag')}" inputmode="decimal" placeholder="0,00"></label>
-              <label><span>Aanbetaling op</span><input type="date" name="aanbetaling_datum" value="${v('aanbetaling_datum')}"></label>
-              <label><span>Eindafrekening (€)</span><input type="text" name="eindafrekening_bedrag" value="${v('eindafrekening_bedrag')}" inputmode="decimal" placeholder="0,00"></label>
-              <label><span>Eindafrekening status</span>
-                <select name="eindafrekening_status">
-                  <option value="">—</option>
-                  ${['open','voldaan','deels voldaan','te laat'].map(x =>
-                    `<option value="${esc(x)}" ${sel('eindafrekening_status', x)}>${esc(x)}</option>`).join('')}
-                </select>
-              </label>
-              <label><span>Betalingstermijn</span><input type="text" name="betalingstermijn" value="${v('betalingstermijn')}" placeholder="bv. 14 dagen na uitvaart"></label>
-              <label class="span-3"><span>Verantwoordelijke persoon</span><input type="text" name="verantwoordelijke_persoon" value="${v('verantwoordelijke_persoon')}" placeholder="wie betaalt — kan ook meerdere familieleden zijn"></label>
-            </div>
-          </div>
-
-          <h3>Opdrachtgever</h3>
-          <div class="grid-3">
-            <label class="span-2"><span>Opdrachtgever</span><input type="text" name="opdrachtgever_naam" value="${v('opdrachtgever_naam')}"></label>
-            <label><span>Telefoon opdrachtgever</span><input type="tel" name="opdrachtgever_telefoon" value="${v('opdrachtgever_telefoon')}"></label>
+          <legend>Verzekering</legend>
+          <div class="grid-2">
+            <label><span>Polisnummer</span><input type="text" name="polisnummer" value="${v('polisnummer')}"></label>
+            <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
           </div>
         </fieldset>
 
@@ -515,18 +445,6 @@ function renderDossierForm(params) {
   edSelect.addEventListener('change', updateEdPreview);
   updateEdPreview();
 
-  // Verzekering: secties conditioneel tonen
-  const vsel = $('#verzekering-status-select');
-  const metFields = $('#verzekering-met-fields');
-  const zonderFields = $('#verzekering-zonder-fields');
-  function updateVerzekeringSections() {
-    const v = vsel.value;
-    metFields.hidden = v !== 'met verzekering';
-    zonderFields.hidden = v !== 'zonder verzekering';
-  }
-  vsel.addEventListener('change', updateVerzekeringSections);
-  updateVerzekeringSections();
-
   // ─── Namen kinderen tonen + popup bij minderjarig=ja ─────────────────
   const minderjarigSel = $('#minderjarige-kinderen-select');
   const kindRow = $('#kinderen-namen-row');
@@ -566,26 +484,6 @@ function renderDossierForm(params) {
       const nieuw = (match && match.priester) ? match.priester : '';
       if (nieuw && nieuw !== had) priesterInp.value = nieuw;
     });
-  }
-
-  // ─── Pakket kiezen → standaard-dekkingsbedrag automatisch invullen ────
-  const pakketInp = $('#verzekering-pakket-input');
-  const dekkingInp = $('#verzekering-dekking-input');
-  if (pakketInp && dekkingInp) {
-    const tryFillDekking = () => {
-      const naam = (pakketInp.value || '').trim();
-      if (!naam) return;
-      const lijst = Settings.get('verzekering_pakketten') || [];
-      const match = lijst.find(p => (typeof p === 'string' ? p : p.naam) === naam);
-      if (!match || typeof match === 'string') return;
-      const def = String(match.dekking || '').trim();
-      if (!def) return;
-      // Alleen invullen als het veld leeg is — overschrijf nooit een
-      // handmatig getypt bedrag
-      if (!dekkingInp.value.trim()) dekkingInp.value = def;
-    };
-    pakketInp.addEventListener('change', tryFillDekking);
-    pakketInp.addEventListener('input',  tryFillDekking);
   }
 
   // ─── Adres-autocomplete via PDOK Locatieserver ───────────────────────
