@@ -2167,3 +2167,78 @@ body { -webkit-overflow-scrolling: touch; }
   outline-offset: -1px !important;
   z-index: 4;
 }
+
+/* ─── Wizard / multi-step dossier-form ─────────────────────────────── */
+.wizard-nav {
+  display: flex; gap: .35rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+  padding: .65rem;
+  background: var(--bg, #f7f3ee);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.wizard-step {
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .45rem .75rem;
+  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 500;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+.wizard-step:hover { background: rgba(107, 30, 42, .08); color: var(--text); }
+.wizard-step .num {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #d6d2cb;
+  color: #fff;
+  font-weight: 700;
+  font-size: .75rem;
+  flex-shrink: 0;
+  transition: background .15s, color .15s;
+}
+.wizard-step.active {
+  background: var(--primary, #6b1e2a);
+  color: #fff;
+}
+.wizard-step.active:hover { background: var(--primary, #6b1e2a); }
+.wizard-step.active .num {
+  background: #fff;
+  color: var(--primary, #6b1e2a);
+}
+.wizard-step.completed {
+  color: #1e6b34;
+}
+.wizard-step.completed .num {
+  background: #2a7a3a;
+  color: #fff;
+}
+.wizard-step.completed .num::before { content: '✓'; }
+.wizard-step.completed .num > * { display: none; }
+
+fieldset[data-step][hidden] { display: none !important; }
+
+.wizard-actions {
+  display: flex; justify-content: space-between; gap: .5rem;
+  align-items: center; flex-wrap: wrap;
+}
+.wizard-actions-right { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .wizard-step .lbl { display: none; }
+  .wizard-step { padding: .45rem .5rem; }
+  .wizard-step.active .lbl { display: inline; }
+}
+
+/* Bij printen: alle steps zichtbaar */
+@media print {
+  fieldset[data-step] { display: block !important; }
+  .wizard-nav, .wizard-actions { display: none !important; }
+}

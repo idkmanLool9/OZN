@@ -70,7 +70,16 @@ function renderDossierForm(params) {
 
         <input type="hidden" name="status" value="${esc(dossier.status || 'nieuw')}">
 
-        <fieldset class="card">
+        <nav class="wizard-nav" id="wizard-nav" aria-label="Voortgang">
+          <button type="button" class="wizard-step" data-go="1"><span class="num">1</span><span class="lbl">Personen</span></button>
+          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Kerkelijk & uitvaart</span></button>
+          <button type="button" class="wizard-step" data-go="3"><span class="num">3</span><span class="lbl">Logistiek</span></button>
+          <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Verzekering & betaling</span></button>
+          <button type="button" class="wizard-step" data-go="5"><span class="num">5</span><span class="lbl">Bijzonderheden</span></button>
+          <button type="button" class="wizard-step" data-go="6"><span class="num">6</span><span class="lbl">Handtekeningen</span></button>
+        </nav>
+
+        <fieldset class="card" data-step="1">
           <legend>Gegevens overledene</legend>
           <div class="grid-3">
             <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}"></label>
@@ -123,7 +132,7 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <fieldset class="card">
+        <fieldset class="card" data-step="1">
           <legend>Contactpersoon</legend>
           <div class="grid-3">
             <label><span>BSN</span><input type="text" name="contact_bsn" value="${v('contact_bsn')}"></label>
@@ -141,7 +150,7 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <fieldset class="card">
+        <fieldset class="card" data-step="2">
           <legend>Kerkelijk &amp; uitvaartdienst</legend>
           <div class="grid-3">
             <label><span>Parochie</span>
@@ -194,7 +203,7 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <fieldset class="card">
+        <fieldset class="card" data-step="3">
           <legend>Logistiek</legend>
           <div class="grid-3">
             <label class="span-3"><span>Kistmodel (Unigra catalogus)</span>
@@ -244,7 +253,7 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <fieldset class="card">
+        <fieldset class="card" data-step="4">
           <legend>Verzekering & betaling</legend>
           <div class="grid-3">
             <label><span>Verzekering</span>
@@ -318,14 +327,14 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <fieldset class="card">
+        <fieldset class="card" data-step="5">
           <legend>Bijzonderheden</legend>
           <label class="full"><span>Notities / wensen familie</span>
             <textarea name="bijzonderheden" rows="5">${v('bijzonderheden')}</textarea>
           </label>
         </fieldset>
 
-        <fieldset class="card">
+        <fieldset class="card" data-step="6">
           <legend>Handtekeningen <a href="#/account#handtekeningen" class="muted small" style="margin-left:.5rem;text-transform:none;letter-spacing:0;">velden beheren →</a></legend>
           <div class="signatures-grid">
             ${(Settings.get('signature_fields') || []).map(f => `
@@ -343,12 +352,59 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <div class="form-actions">
+        <div class="form-actions wizard-actions">
           <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-cancel-form">Annuleren</a>
-          <button type="submit" class="btn btn-primary">${isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan'}</button>
+          <div class="wizard-actions-right">
+            <button type="button" class="btn btn-ghost" id="btn-wizard-prev" hidden>← Vorige</button>
+            <button type="button" class="btn btn-primary" id="btn-wizard-next">Verder →</button>
+            <button type="submit" class="btn btn-primary" id="btn-wizard-submit" hidden>${isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan'}</button>
+          </div>
         </div>
       </form>
     </div>`;
+
+  // ─── Wizard: stappen tonen één voor één ──────────────────────────────
+  const TOTAL_STEPS = 6;
+  const stepKey = `sok_wizard_step_${isNew ? 'nieuw' : dossier.id}`;
+  let currentStep = (() => {
+    try {
+      const saved = parseInt(localStorage.getItem(stepKey), 10);
+      return (saved >= 1 && saved <= TOTAL_STEPS) ? saved : 1;
+    } catch (_) { return 1; }
+  })();
+
+  const showStep = (n) => {
+    currentStep = Math.max(1, Math.min(TOTAL_STEPS, n));
+    // Toon alleen fieldsets van deze stap
+    document.querySelectorAll('#dossier-form fieldset[data-step]').forEach(fs => {
+      const step = parseInt(fs.dataset.step, 10);
+      fs.hidden = (step !== currentStep);
+    });
+    // Update stappen-balk
+    document.querySelectorAll('.wizard-step').forEach(el => {
+      const step = parseInt(el.dataset.go, 10);
+      el.classList.toggle('active', step === currentStep);
+      el.classList.toggle('completed', step < currentStep);
+    });
+    // Knoppen-state
+    document.getElementById('btn-wizard-prev').hidden = (currentStep === 1);
+    document.getElementById('btn-wizard-next').hidden = (currentStep === TOTAL_STEPS);
+    document.getElementById('btn-wizard-submit').hidden = (currentStep !== TOTAL_STEPS);
+    // Scroll naar boven van form
+    const form = document.getElementById('dossier-form');
+    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Onthoud
+    try { localStorage.setItem(stepKey, String(currentStep)); } catch (_) {}
+  };
+
+  // Stappen-balk klikbaar
+  document.querySelectorAll('.wizard-step').forEach(el => {
+    el.addEventListener('click', () => showStep(parseInt(el.dataset.go, 10)));
+  });
+  document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
+  document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
+
+  showStep(currentStep);
 
   // Kist-preview live bijwerken
   const kistSelect = $('#kist-select');
@@ -632,7 +688,10 @@ function renderDossierForm(params) {
   // Concept verwerpen bij annuleren
   const cancelLink = $('#btn-cancel-form');
   if (cancelLink) {
-    cancelLink.addEventListener('click', () => { localStorage.removeItem(draftKey); });
+    cancelLink.addEventListener('click', () => {
+      localStorage.removeItem(draftKey);
+      try { localStorage.removeItem(stepKey); } catch (_) {}
+    });
   }
 
   $('#dossier-form').addEventListener('submit', async e => {
@@ -716,10 +775,12 @@ function renderDossierForm(params) {
           console.warn('Standaard-kostenposten toevoegen mislukt:', kErr);
         }
         localStorage.removeItem(draftKey);
+        try { localStorage.removeItem(stepKey); } catch (_) {}
         Router.go('/dossiers/' + created.id);
       } else {
         await DB.update(KEYS.DOSSIERS, dossier.id, data);
         localStorage.removeItem(draftKey);
+        try { localStorage.removeItem(stepKey); } catch (_) {}
         Router.go('/dossiers/' + dossier.id);
       }
     } catch (err) {
