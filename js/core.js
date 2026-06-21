@@ -1034,6 +1034,41 @@ function showProfilePicker() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = false;
   $('#app').hidden = true;
+  // Vul de greeting in op basis van tijd van de dag
+  const greetEl = $('#profile-greeting');
+  if (greetEl) {
+    const h = new Date().getHours();
+    greetEl.textContent =
+      h < 6  ? 'Goedenacht' :
+      h < 12 ? 'Goedemorgen' :
+      h < 18 ? 'Goedemiddag' :
+               'Goedenavond';
+  }
+  // Render alle profielen dynamisch uit Settings
+  const mount = $('#profile-options-mount');
+  if (mount) {
+    const profielen = ActiveProfile.list();
+    if (profielen.length === 0) {
+      mount.innerHTML = `
+        <div class="profile-empty">
+          <p class="muted">Nog geen profielen ingesteld.</p>
+          <a href="#/account#profielen" class="btn btn-primary btn-sm">+ Profiel toevoegen</a>
+        </div>`;
+    } else {
+      mount.innerHTML = profielen.map(p => {
+        const letter = (p.name || '?').trim().charAt(0).toUpperCase();
+        const c = p.color || '#6b1e2a';
+        return `
+          <button type="button" class="profile-option" data-profile="${esc(p.id)}">
+            <span class="profile-avatar-wrap">
+              <span class="profile-avatar-ring" style="--ring-color:${esc(c)};"></span>
+              <span class="profile-avatar" style="background:${esc(c)};">${esc(letter)}</span>
+            </span>
+            <span class="profile-name">${esc(p.name)}</span>
+          </button>`;
+      }).join('');
+    }
+  }
 }
 function showApp() {
   $('#login-screen').hidden = true;
@@ -1043,21 +1078,25 @@ function showApp() {
   ActiveProfile.renderChip();
 }
 
-// ─── Actief profiel (Rume / Robert) — onthouden in localStorage ───
+// ─── Actief profiel — beheerd in Settings.profielen, onthouden in localStorage ───
 const ActiveProfile = {
-  PROFILES: {
-    rume:   { id: 'rume',   name: 'Rume',   role: 'Uitvaartleider', color: '#6b1e2a' },
-    robert: { id: 'robert', name: 'Robert', role: 'Uitvaartleider', color: '#2a5d6b' },
-  },
   STORAGE_KEY: 'sok_active_profile',
+  list() {
+    const arr = (typeof Settings !== 'undefined' && Array.isArray(Settings.get('profielen')))
+      ? Settings.get('profielen') : [];
+    return arr.filter(p => p && p.id && p.name);
+  },
+  byId(id) {
+    return ActiveProfile.list().find(p => p.id === id) || null;
+  },
   current() {
     try {
       const id = localStorage.getItem(ActiveProfile.STORAGE_KEY);
-      return id && ActiveProfile.PROFILES[id] ? ActiveProfile.PROFILES[id] : null;
+      return id ? ActiveProfile.byId(id) : null;
     } catch (_) { return null; }
   },
   set(id) {
-    if (!ActiveProfile.PROFILES[id]) return;
+    if (!ActiveProfile.byId(id)) return;
     try { localStorage.setItem(ActiveProfile.STORAGE_KEY, id); } catch (_) {}
   },
   clear() {
@@ -1068,6 +1107,6 @@ const ActiveProfile = {
     const chip = $('#btn-active-profile');
     if (!chip || !p) return;
     $('#active-profile-name').textContent = p.name;
-    $('#active-profile-dot').style.background = p.color;
+    $('#active-profile-dot').style.background = p.color || '#6b1e2a';
   },
 };

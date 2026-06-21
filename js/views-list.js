@@ -396,6 +396,30 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="profielen">
+        <h2>Profielen — "Wie werkt vandaag?"</h2>
+        <p class="muted small">De namen die verschijnen op het profielkeuze-scherm. Wijzigingen in de naam blijven bij bestaande dossiers behouden (tracking-velden veranderen niet met terugwerkende kracht).</p>
+        ${(() => {
+          const lijst = (Settings.get('profielen') || []);
+          return `
+          <form id="profielen-form" class="form" autocomplete="off">
+            <div id="profielen-rows" class="profielen-rows">
+              ${lijst.map((p, i) => `
+                <div class="profielen-row" data-idx="${i}">
+                  <span class="profielen-avatar" style="background:${esc(p.color || '#6b1e2a')};">${esc((p.name || '?').charAt(0).toUpperCase())}</span>
+                  <input type="text" class="profielen-naam" value="${esc(p.name || '')}" placeholder="bv. Rume" maxlength="40">
+                  <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
+                  <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
+                </div>`).join('')}
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-profiel">+ Profiel toevoegen</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="parochies">
         <h2>Parochies &amp; priesters</h2>
         <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Abuna) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
@@ -912,6 +936,89 @@ function renderAccount(msg) {
       } catch (e) {
         Modal.show({ type: 'error', title: 'Test mislukt', message: e.message || String(e) });
       }
+    });
+  }
+
+  // ─── Profielen-beheer (Wie werkt vandaag?) ───────────────────
+  const profielenForm = $('#profielen-form');
+  if (profielenForm) {
+    const slugify = s => String(s || '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'profiel';
+
+    function makeProfielRow(naam = '', kleur = '#6b1e2a') {
+      const rows = $('#profielen-rows');
+      const idx = rows.querySelectorAll('.profielen-row').length;
+      const letter = (naam || '?').charAt(0).toUpperCase() || '?';
+      const div = document.createElement('div');
+      div.className = 'profielen-row';
+      div.dataset.idx = idx;
+      div.innerHTML = `
+        <span class="profielen-avatar" style="background:${esc(kleur)};">${esc(letter)}</span>
+        <input type="text" class="profielen-naam" value="${esc(naam)}" placeholder="bv. Rume" maxlength="40">
+        <input type="color" class="profielen-kleur" value="${esc(kleur)}" title="Kleur van de avatar">
+        <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${idx}" title="Verwijderen">×</button>`;
+      rows.appendChild(div);
+      bindRowEvents(div);
+    }
+    function bindRowEvents(row) {
+      const naamInp = row.querySelector('.profielen-naam');
+      const kleurInp = row.querySelector('.profielen-kleur');
+      const avatar = row.querySelector('.profielen-avatar');
+      naamInp.addEventListener('input', () => {
+        const c = (naamInp.value || '?').trim().charAt(0).toUpperCase() || '?';
+        avatar.textContent = c;
+      });
+      kleurInp.addEventListener('input', () => {
+        avatar.style.background = kleurInp.value;
+      });
+    }
+    profielenForm.querySelectorAll('.profielen-row').forEach(bindRowEvents);
+
+    $('#btn-add-profiel').addEventListener('click', () => makeProfielRow('', '#6b1e2a'));
+
+    profielenForm.addEventListener('click', e => {
+      const del = e.target.closest('[data-action="del-profiel"]');
+      if (!del) return;
+      const row = del.closest('.profielen-row');
+      if (!row) return;
+      const blijft = profielenForm.querySelectorAll('.profielen-row').length - 1;
+      if (blijft < 1) {
+        Modal.show({ type: 'warning', title: 'Minstens één profiel nodig', message: 'Voeg eerst een nieuw profiel toe voordat je dit verwijdert.' });
+        return;
+      }
+      row.remove();
+    });
+
+    profielenForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const rows = profielenForm.querySelectorAll('.profielen-row');
+      const huidigLijst = Settings.get('profielen') || [];
+      const profielen = [];
+      const gebruikteIds = new Set();
+      rows.forEach((r, idx) => {
+        const naam = r.querySelector('.profielen-naam').value.trim();
+        if (!naam) return;
+        const kleur = r.querySelector('.profielen-kleur').value || '#6b1e2a';
+        // Behoud het oude id als de naam overeenkomt; anders genereer een nieuwe
+        let id = huidigLijst[idx]?.id;
+        if (!id || gebruikteIds.has(id)) {
+          let base = slugify(naam);
+          id = base;
+          let n = 2;
+          while (gebruikteIds.has(id)) id = base + '_' + (n++);
+        }
+        gebruikteIds.add(id);
+        profielen.push({ id, name: naam, color: kleur });
+      });
+      if (profielen.length === 0) {
+        Modal.show({ type: 'warning', title: 'Geen profielen', message: 'Voeg minstens één profiel toe.' });
+        return;
+      }
+      Settings.set({ profielen });
+      // Als het actieve profiel niet meer bestaat: wissen
+      const actiefId = (ActiveProfile.current() || {}).id;
+      if (actiefId && !profielen.some(p => p.id === actiefId)) ActiveProfile.clear();
+      renderAccount({ success: 'Profielen opgeslagen.' });
     });
   }
 

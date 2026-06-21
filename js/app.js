@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 79;
-const APP_VERSION    = '5.12.1';
+const APP_BUILD      = 80;
+const APP_VERSION    = '5.13.0';
 const APP_BUILD_DATE = '2026-06-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -57,6 +57,11 @@ const Settings = {
     push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
     // Begraafplaats-plattegrond (PNG/JPG, getoond bovenaan begraafplaats-view)
     cemetery_map_url: '',
+    // Profielen — Wie werkt vandaag? Beheer in Account
+    profielen: [
+      { id: 'rume',   name: 'Rume',   color: '#6b1e2a' },
+      { id: 'robert', name: 'Robert', color: '#2a5d6b' },
+    ],
     // E-mail-footer (handtekening onderaan elke verzonden mail)
     email_footer_enabled: true,
     email_footer_terms_url:     '',
@@ -905,12 +910,13 @@ Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
     } catch (_) {}
   }
 
-  document.querySelectorAll('#profile-screen .profile-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-profile');
-      ActiveProfile.set(id);
-      Router.handle();
-    });
+  // Event delegation — profielknoppen worden dynamisch gerenderd per opening
+  document.getElementById('profile-screen').addEventListener('click', e => {
+    const btn = e.target.closest('.profile-option[data-profile]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-profile');
+    ActiveProfile.set(id);
+    Router.handle();
   });
   document.getElementById('profile-logout').addEventListener('click', async () => {
     await Auth.logout();

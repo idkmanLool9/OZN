@@ -124,22 +124,20 @@
 
   <!-- Wie werkt vandaag? -->
   <section id="profile-screen" class="profile-screen" hidden>
+    <div class="profile-bg-orb profile-bg-orb-1" aria-hidden="true"></div>
+    <div class="profile-bg-orb profile-bg-orb-2" aria-hidden="true"></div>
+    <div class="profile-bg-orb profile-bg-orb-3" aria-hidden="true"></div>
     <div class="profile-card">
+      <div class="profile-greeting" id="profile-greeting">Goedendag</div>
       <h1 class="profile-title">Wie werkt er vandaag?</h1>
-      <p class="profile-subtitle">Kies hieronder met wie je bent ingelogd — zo blijft duidelijk wie wat heeft bijgewerkt in de dossiers.</p>
-      <div class="profile-options">
-        <button type="button" class="profile-option" data-profile="rume">
-          <span class="profile-avatar" style="background:#6b1e2a;">R</span>
-          <span class="profile-name">Rume</span>
-          <span class="profile-role">Uitvaartleider</span>
-        </button>
-        <button type="button" class="profile-option" data-profile="robert">
-          <span class="profile-avatar" style="background:#2a5d6b;">R</span>
-          <span class="profile-name">Robert</span>
-          <span class="profile-role">Uitvaartleider</span>
-        </button>
+      <p class="profile-subtitle">Tik op je naam — zo blijft duidelijk wie wat heeft bijgewerkt in de dossiers.</p>
+      <div class="profile-options" id="profile-options-mount">
+        <!-- gevuld door app.js uit Settings.get('profielen') -->
       </div>
-      <button type="button" id="profile-logout" class="btn btn-ghost btn-sm" style="margin-top:1.5rem;">Uitloggen</button>
+      <div class="profile-foot">
+        <a href="#/account#profielen" id="profile-manage-link" class="profile-manage-link">⚙ Beheren in Account</a>
+        <button type="button" id="profile-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
+      </div>
     </div>
   </section>
 
