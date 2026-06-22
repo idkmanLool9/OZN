@@ -612,6 +612,81 @@ function renderDossierForm(params) {
   }
   renderWizardKosten();
 
+  // ─── Kist/Bloem auto-syncen naar kosten ─────────────────────────────
+  // Bij wijziging van de dropdown verwijderen we de oude auto-post en
+  // voegen de nieuwe toe. Werkt op buffer (nieuw) én DB (bestaand).
+  const KIST_PREFIX = 'Kist: ';
+  const BLOEM_PREFIX = 'Bloemstuk: ';
+
+  async function syncAutoKost(prefix, categorie, naam, bedrag) {
+    if (isNew) {
+      // Verwijder eerdere auto-post uit buffer
+      kostenBuffer = kostenBuffer.filter(k => !(k.omschrijving || '').startsWith(prefix));
+      if (naam && naam !== 'anders' && bedrag != null) {
+        kostenBuffer.push({
+          omschrijving: prefix + naam,
+          categorie,
+          bedrag,
+          aantal: 1,
+          betaald: false,
+        });
+      }
+      saveBuffer();
+      renderWizardKosten();
+    } else {
+      // Bestaand dossier: oude auto-posten verwijderen uit DB
+      const oude = DB.where(KEYS.KOSTEN, k =>
+        k.dossier_id === dossier.id && (k.omschrijving || '').startsWith(prefix));
+      for (const k of oude) {
+        try { await DB.remove(KEYS.KOSTEN, k.id); } catch (_) {}
+      }
+      if (naam && naam !== 'anders' && bedrag != null) {
+        try {
+          await DB.insert(KEYS.KOSTEN, {
+            dossier_id: dossier.id,
+            omschrijving: prefix + naam,
+            categorie,
+            bedrag,
+            aantal: 1,
+            betaald: false,
+          });
+        } catch (_) {}
+      }
+      try { await DB.touchDossier(dossier.id); } catch (_) {}
+      renderWizardKosten();
+    }
+  }
+
+  function syncAutoKostKist(naam) {
+    if (!naam || naam === 'anders') { syncAutoKost(KIST_PREFIX, 'kist', null, null); return; }
+    const k = KISTEN_CATALOGUS.find(x => x.naam === naam);
+    syncAutoKost(KIST_PREFIX, 'kist', naam, k ? Number(k.bedrag) : null);
+  }
+  function syncAutoKostBloem(naam) {
+    if (!naam || naam === 'anders') { syncAutoKost(BLOEM_PREFIX, 'bloemen', null, null); return; }
+    const b = DB.list(KEYS.BLOEMEN).find(x => x.naam === naam);
+    syncAutoKost(BLOEM_PREFIX, 'bloemen', naam, b ? Number(b.bedrag) : null);
+  }
+
+  // Eerste-keer init: als er al een kist/bloem geselecteerd is bij open
+  // van de form, en er nog geen auto-post bestaat, hem alvast toevoegen
+  (function initAutoKosten() {
+    const huidigeKist = $('#kist-select')?.value;
+    if (huidigeKist && huidigeKist !== 'anders') {
+      const lijst = isNew ? kostenBuffer
+                          : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
+      const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(KIST_PREFIX));
+      if (!alAanwezig) syncAutoKostKist(huidigeKist);
+    }
+    const huidigeBloem = $('#bloem-select')?.value;
+    if (huidigeBloem && huidigeBloem !== 'anders') {
+      const lijst = isNew ? kostenBuffer
+                          : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
+      const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(BLOEM_PREFIX));
+      if (!alAanwezig) syncAutoKostBloem(huidigeBloem);
+    }
+  })();
+
   // Artsverklaring scan/upload
   const avInput = document.getElementById('artsverklaring-input');
   const avHidden = document.querySelector('input[name="artsverklaring_pad"]');
@@ -707,7 +782,10 @@ function renderDossierForm(params) {
         ${fotoUrl ? '' : '<span class="muted small"><a href="#/kisten">Foto uploaden</a></span>'}
       </div>`;
   }
-  kistSelect.addEventListener('change', updateKistPreview);
+  kistSelect.addEventListener('change', () => {
+    updateKistPreview();
+    syncAutoKostKist(kistSelect.value);
+  });
   updateKistPreview();
 
   // Bloem-preview live bijwerken
@@ -732,7 +810,10 @@ function renderDossierForm(params) {
         ${fotoUrl ? '' : '<span class="muted small"><a href="#/bloemen">Foto uploaden</a></span>'}
       </div>`;
   }
-  bloemSelect.addEventListener('change', updateBloemPreview);
+  bloemSelect.addEventListener('change', () => {
+    updateBloemPreview();
+    syncAutoKostBloem(bloemSelect.value);
+  });
   updateBloemPreview();
 
   // ─── Handtekeningen activeren ──────────────────────────────────────────
@@ -1013,9 +1094,9 @@ function renderDossierForm(params) {
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
       }
 
-      // ─── Auto-mail dossier naar klooster (best-effort) ──────────────
+      // ─── Auto-mail dossier naar klooster bij eerste aanmaak (best-effort) ──
       const klooster = (Settings.get('auto_send_dossier_email') || '').trim();
-      if (klooster && EmailService.isConfigured() && navigator.onLine && savedDossier) {
+      if (isNew && klooster && EmailService.isConfigured() && navigator.onLine && savedDossier) {
         try {
           const subj = `Uitvaartdossier ${savedDossier.dossier_nummer || ''} — ${fullName(savedDossier) || ''}`.trim();
           const body = buildDossierEmail(savedDossier);

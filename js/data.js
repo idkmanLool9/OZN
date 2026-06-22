@@ -48,8 +48,7 @@ const KOSTEN_PRESETS = [
   { categorie: 'kist',          omschrijving: 'Basismodel kist (incl. opbaardekentje)',              bedrag: 615.40 },
   // Aula & verzorging
   { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                                bedrag: 446.00 },
-  { categorie: 'verzorging',    omschrijving: 'Verzorging door extern bedrijf',                      bedrag: 111.00 },
-  { categorie: 'verzorging',    omschrijving: 'Inkisten',                                            bedrag:  63.00 },
+  { categorie: 'verzorging',    omschrijving: 'Verzorging & Inkisten',                               bedrag: 174.00 },
   // Kerk
   { categorie: 'kerk',          omschrijving: 'Gebruik Kerk en Dolabani Zaal',                       bedrag: 500.00 },
   { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                            bedrag:  31.00 },
