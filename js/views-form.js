@@ -315,7 +315,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <div class="form-actions wizard-actions">
-          <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-cancel-form">Annuleren</a>
+          <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-back-form" title="Terug — je concept blijft bewaard">← Terug naar dossiers</a>
           <div class="wizard-actions-right">
             <button type="button" class="btn btn-ghost" id="btn-wizard-prev" hidden>← Vorige</button>
             <button type="button" class="btn btn-primary" id="btn-wizard-next">Verder →</button>
@@ -964,6 +964,11 @@ function renderDossierForm(params) {
           });
           if (!ok) return;
           localStorage.removeItem(draftKey);
+          try {
+            localStorage.removeItem(stepKey);
+            localStorage.removeItem(maxKey);
+            if (isNew) localStorage.removeItem(kostenBufKey);
+          } catch (_) {}
           renderDossierForm(params);
         });
         // Previews bijwerken na herstel
@@ -993,18 +998,10 @@ function renderDossierForm(params) {
   formEl.addEventListener('input', scheduleSave);
   formEl.addEventListener('change', scheduleSave);
 
-  // Concept verwerpen bij annuleren
-  const cancelLink = $('#btn-cancel-form');
-  if (cancelLink) {
-    cancelLink.addEventListener('click', () => {
-      localStorage.removeItem(draftKey);
-      try {
-        localStorage.removeItem(stepKey);
-        localStorage.removeItem(maxKey);
-        localStorage.removeItem(kostenBufKey);
-      } catch (_) {}
-    });
-  }
+  // De 'Terug naar dossiers'-knop laat het concept ONGEMOEID — bij
+  // ongelukken (verkeerd klikken) blijft alle voortgang bewaard.
+  // Conceptkan alleen expliciet worden verwijderd via de 'Concept
+  // verwerpen'-link in de gele banner bovenaan.
 
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
