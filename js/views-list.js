@@ -302,6 +302,11 @@ function renderAccount(msg) {
             <label><span>EmailJS Public Key</span><input type="text" name="emailjs_public_key" value="${esc(s.emailjs_public_key)}" placeholder="bv. xK_abc123..."></label>
             <label><span>EmailJS Service ID</span><input type="text" name="emailjs_service_id" value="${esc(s.emailjs_service_id)}" placeholder="bv. service_abc123"></label>
             <label><span>EmailJS Template ID</span><input type="text" name="emailjs_template_id" value="${esc(s.emailjs_template_id)}" placeholder="bv. template_abc123"></label>
+            <label>
+              <span>📧 Auto-mail dossier naar klooster bij opslaan</span>
+              <input type="email" name="auto_send_dossier_email" value="${esc(s.auto_send_dossier_email)}" placeholder="leeg = uit">
+              <span class="muted small">Elke keer dat een dossier wordt aangemaakt of bewerkt, wordt er automatisch een kopie verstuurd naar dit adres. Laat leeg om uit te schakelen.</span>
+            </label>
             <label><span>Test-e-mailadres (voor verificatie)</span><input type="email" name="email_test_to" placeholder="bv. je eigen e-mail"></label>
             <div id="email-test-result"></div>
             <div class="form-actions" style="justify-content:space-between;">
@@ -770,6 +775,7 @@ function renderAccount(msg) {
         emailjs_public_key: f.emailjs_public_key.value.trim(),
         emailjs_service_id: f.emailjs_service_id.value.trim(),
         emailjs_template_id: f.emailjs_template_id.value.trim(),
+        auto_send_dossier_email: f.auto_send_dossier_email.value.trim(),
       });
       renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
     });

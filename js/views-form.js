@@ -988,8 +988,10 @@ function renderDossierForm(params) {
     btn.textContent = 'Bezig met opslaan...';
 
     try {
+      let savedDossier;
       if (isNew) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
+        savedDossier = created;
         // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
         try {
           await Promise.all((kostenBuffer || []).map(p => DB.insert(KEYS.KOSTEN, {
@@ -1005,13 +1007,26 @@ function renderDossierForm(params) {
         }
         localStorage.removeItem(draftKey);
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); localStorage.removeItem(kostenBufKey); } catch (_) {}
-        Router.go('/dossiers/' + created.id);
       } else {
-        await DB.update(KEYS.DOSSIERS, dossier.id, data);
+        savedDossier = await DB.update(KEYS.DOSSIERS, dossier.id, data);
         localStorage.removeItem(draftKey);
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
-        Router.go('/dossiers/' + dossier.id);
       }
+
+      // ─── Auto-mail dossier naar klooster (best-effort) ──────────────
+      const klooster = (Settings.get('auto_send_dossier_email') || '').trim();
+      if (klooster && EmailService.isConfigured() && navigator.onLine && savedDossier) {
+        try {
+          const subj = `Uitvaartdossier ${savedDossier.dossier_nummer || ''} — ${fullName(savedDossier) || ''}`.trim();
+          const body = buildDossierEmail(savedDossier);
+          await EmailService.send(klooster, subj, body);
+        } catch (mailErr) {
+          // Niet blokkerend — gewoon loggen en doorgaan
+          console.warn('Auto-mail naar klooster mislukt:', mailErr);
+        }
+      }
+
+      Router.go('/dossiers/' + (isNew ? savedDossier.id : dossier.id));
     } catch (err) {
       btn.disabled = false; btn.textContent = oldText;
     }
