@@ -462,9 +462,6 @@ function renderDossierForm(params) {
     if (!isNew) return null;
     try { return JSON.parse(localStorage.getItem(kostenBufKey) || '[]'); } catch (_) { return []; }
   })();
-  // Onthoud of de 'Snel toevoegen'-lijst openstaat zodat hij niet
-  // dichtklapt na elke klik op een preset (re-render)
-  let presetsOpen = false;
   const saveBuffer = () => {
     if (!isNew) return;
     try { localStorage.setItem(kostenBufKey, JSON.stringify(kostenBuffer)); } catch (_) {}
@@ -505,9 +502,9 @@ function renderDossierForm(params) {
       </div>`}
       ${isNew && kosten.length === 0 ? '<button type="button" class="btn btn-sm btn-ghost" id="wk-fill-standaard" style="margin-top:.5rem;">+ Alle standaardposten toevoegen</button>' : ''}
 
-      <details class="wizard-kosten-presets" id="wk-presets-details" ${presetsOpen ? 'open' : ''} style="margin-top:.85rem;">
-        <summary>+ Snel toevoegen uit standaardlijst</summary>
-        ${adminMode ? '<p class="muted small" style="margin:.5rem 0 0;">Beheermodus aan — klik op het potlood om een prijs aan te passen of op de prullenbak om een post uit de lijst te verbergen.</p>' : ''}
+      <section class="wizard-kosten-presets" id="wk-presets-details" style="margin-top:.85rem;">
+        <h4 class="wizard-kosten-presets-title">Snel toevoegen uit standaardlijst</h4>
+        ${adminMode ? '<p class="muted small" style="margin:.25rem 0 0;">Beheermodus aan — klik op het potlood om een prijs aan te passen of op de prullenbak om een post uit de lijst te verbergen.</p>' : ''}
         <div class="wizard-preset-grid">
           ${effectieveKostenPresets({ includeHidden: adminMode }).map((p, i) => {
             const cls = 'btn btn-sm btn-ghost wizard-preset-btn'
@@ -533,7 +530,7 @@ function renderDossierForm(params) {
             </span>`;
           }).join('')}
         </div>
-      </details>
+      </section>
 
       <div class="wizard-kosten-add">
         <input type="text" id="wk-omschrijving" placeholder="Omschrijving">
@@ -679,13 +676,6 @@ function renderDossierForm(params) {
         renderWizardKosten();
       });
     });
-    // Onthoud open/dicht-stand van de presets-details
-    const presetsDetails = mount.querySelector('#wk-presets-details');
-    if (presetsDetails) {
-      presetsDetails.addEventListener('toggle', () => {
-        presetsOpen = presetsDetails.open;
-      });
-    }
     // ── Acties: alle standaardposten in één keer (alleen nieuw) ──
     const fillBtn = mount.querySelector('#wk-fill-standaard');
     if (fillBtn) fillBtn.addEventListener('click', () => {

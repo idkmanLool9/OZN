@@ -2353,6 +2353,9 @@ fieldset[data-step][hidden] { display: none !important; }
 .wizard-kosten-presets summary {
   cursor: pointer; color: var(--primary); font-weight: 600; font-size: .9rem;
 }
+.wizard-kosten-presets-title {
+  margin: 0; color: var(--primary); font-weight: 600; font-size: .9rem;
+}
 .wizard-preset-grid {
   /* Eén tegel per regel — gebruiker wil ze recht onder elkaar (Word-stijl).
      De volgorde komt overeen met de vaste volgorde in KOSTEN_PRESETS. */
