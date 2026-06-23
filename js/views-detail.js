@@ -180,11 +180,33 @@ function renderDossierDetail(params) {
         </button>
         <div id="kosten-body" class="kosten-body">
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' : (() => {
-          // Groepeer per categorie in vaste volgorde
+          // Groepeer per categorie in vaste volgorde, en sorteer ITEMS
+          // binnen elke groep volgens KOSTEN_PRESETS-volgorde (zodat de
+          // lijst dezelfde rangschikking volgt als 'Snel toevoegen').
+          const presetIdx = new Map();
+          KOSTEN_PRESETS.forEach((p, i) => { if (!p.nav) presetIdx.set(p.omschrijving, i); });
+          const KIST_TAG = 'Kist: ', BLOEM_TAG = '🌸 ', ETEN_TAG = '🍽 ';
+          const navIdx = {
+            [KIST_TAG]:  KOSTEN_PRESETS.findIndex(p => p.nav === 'kist'),
+            [BLOEM_TAG]: KOSTEN_PRESETS.findIndex(p => p.nav === 'bloemen'),
+            [ETEN_TAG]:  KOSTEN_PRESETS.findIndex(p => p.nav === 'eten'),
+          };
+          const presetRank = (oms) => {
+            if (presetIdx.has(oms)) return presetIdx.get(oms) * 10;
+            for (const tag in navIdx) if (oms.startsWith(tag)) return navIdx[tag] * 10 + 5;
+            return KOSTEN_PRESETS.length * 10 + 100;
+          };
           const buckets = {};
           kosten.forEach(k => {
             const cat = k.categorie || 'overig';
             (buckets[cat] = buckets[cat] || []).push(k);
+          });
+          Object.keys(buckets).forEach(cat => {
+            buckets[cat].sort((a, b) => {
+              const ra = presetRank(a.omschrijving || '');
+              const rb = presetRank(b.omschrijving || '');
+              return ra !== rb ? ra - rb : (a.id - b.id);
+            });
           });
           const orderIds = KOSTEN_CATEGORIEEN.map(c => c.id);
           const orderedCats = orderIds.filter(id => buckets[id])

@@ -464,10 +464,38 @@ function renderDossierForm(params) {
     if (!mount) return;
     const adminMode = !!Settings.get('catalog_admin_mode');
 
-    // Bron: buffer (nieuw) of live DB (bestaand)
-    const kosten = isNew
+    // Bron: buffer (nieuw) of live DB (bestaand). Sorteren op de vaste
+    // KOSTEN_PRESETS-volgorde (zelfde als 'Snel toevoegen'-lijst).
+    // Posten zonder match (kist, bloemen, eten, extra) sorteren op basis
+    // van prefix-categorie; alles wat daar niet bij past achter aan
+    // op insert-volgorde (id).
+    const presetIndex = new Map();
+    KOSTEN_PRESETS.forEach((p, i) => { if (!p.nav) presetIndex.set(p.omschrijving, i); });
+    const KIST_TAG = 'Kist: ', BLOEM_TAG = '🌸 ', ETEN_TAG = '🍽 ';
+    const NAV_AFTER = {
+      [KIST_TAG]:  KOSTEN_PRESETS.findIndex(p => p.nav === 'kist'),
+      [BLOEM_TAG]: KOSTEN_PRESETS.findIndex(p => p.nav === 'bloemen'),
+      [ETEN_TAG]:  KOSTEN_PRESETS.findIndex(p => p.nav === 'eten'),
+    };
+    function sortRank(k) {
+      const oms = k.omschrijving || '';
+      if (presetIndex.has(oms)) return [presetIndex.get(oms) * 10, 0];
+      for (const tag in NAV_AFTER) {
+        if (oms.startsWith(tag)) return [NAV_AFTER[tag] * 10 + 5, 0];
+      }
+      // Onbekende handmatige posten helemaal aan het eind, in insert-volgorde
+      const id = typeof k.id === 'string' ? parseInt(k.id.replace('_buf_', ''), 10) : Number(k.id) || 0;
+      return [KOSTEN_PRESETS.length * 10 + 100, id];
+    }
+    const kostenRaw = isNew
       ? kostenBuffer.map((k, i) => Object.assign({ id: '_buf_' + i }, k))
-      : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id).sort((a,b) => a.id - b.id);
+      : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
+    const kosten = kostenRaw
+      .map(k => Object.assign({}, k, { _rank: sortRank(k) }))
+      .sort((a, b) => {
+        if (a._rank[0] !== b._rank[0]) return a._rank[0] - b._rank[0];
+        return a._rank[1] - b._rank[1];
+      });
     const totaal = kosten.reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const betaald = kosten.filter(k => k.betaald).reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const open = Math.max(0, totaal - betaald);
@@ -476,14 +504,19 @@ function renderDossierForm(params) {
     mount.innerHTML = `
       ${kosten.length === 0 ? '<p class="muted small">Nog geen kostenposten. Voeg toe via een snelknop of handmatig hieronder.</p>' : `
       <table class="table wizard-kosten-table">
-        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Bedrag</th><th></th></tr></thead>
+        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Aantal</th><th class="num">Bedrag</th><th></th></tr></thead>
         <tbody>
-          ${kosten.map(k => `<tr>
-            <td>${esc(k.omschrijving)}</td>
-            <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
-            <td class="num">${fmtEUR(k.bedrag)}</td>
-            <td><button type="button" class="btn-icon" data-wk-del="${k.id}" title="Verwijderen">×</button></td>
-          </tr>`).join('')}
+          ${kosten.map(k => {
+            const aantal = Number(k.aantal) || 1;
+            const stuk = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
+            return `<tr>
+              <td>${esc(k.omschrijving)}${aantal !== 1 ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}</td>
+              <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
+              <td class="num">${aantal}</td>
+              <td class="num">${fmtEUR(k.bedrag)}</td>
+              <td><button type="button" class="btn-icon" data-wk-del="${k.id}" title="Verwijderen">×</button></td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
       <div class="wizard-kosten-totals">
