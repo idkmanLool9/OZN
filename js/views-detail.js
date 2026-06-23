@@ -844,7 +844,7 @@ function bindDetailEvents(id) {
         const cur = Object.assign({}, Settings.get('kosten_overrides') || {});
         const entry = Object.assign({}, cur[p.omschrijving] || {});
         if (action === 'edit-preset') {
-          const huidig = p.bedrag != null ? String(p.bedrag).replace('.', ',') : '';
+          const huidig = p.bedrag != null ? (Number(p.bedrag) || 0).toFixed(2).replace('.', ',') : '';
           const input = window.prompt(
             `Nieuwe prijs voor "${p.omschrijving}" (€).\nLaat leeg en druk OK om de standaardprijs te herstellen.`,
             huidig

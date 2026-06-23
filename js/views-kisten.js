@@ -122,7 +122,7 @@ function renderKistenBeheer(msg) {
                 <div class="kist-card-actions catalog-edit-row">
                   <label class="catalog-price-edit">
                     <span class="muted small">Prijs €</span>
-                    <input type="text" inputmode="decimal" data-edit-price="${esc(k.naam)}" value="${esc(String(k.bedrag).replace('.', ','))}" placeholder="0,00">
+                    <input type="text" inputmode="decimal" data-edit-price="${esc(k.naam)}" value="${esc((Number(k.bedrag) || 0).toFixed(2).replace('.', ','))}" placeholder="0,00">
                   </label>
                   <button type="button" class="btn btn-sm" data-save-price="${esc(k.naam)}">Opslaan</button>
                   ${k._customBedrag ? `<button type="button" class="btn btn-sm btn-ghost" data-reset-price="${esc(k.naam)}" title="Terug naar standaardprijs">↺ Reset</button>` : ''}
@@ -225,13 +225,27 @@ function renderKistenBeheer(msg) {
       const naam = savePriceBtn.getAttribute('data-save-price');
       const inp = $(`input[data-edit-price="${CSS.escape(naam)}"]`);
       if (!inp) return;
-      const bedrag = parseEUR(inp.value);
+      const raw = (inp.value || '').trim();
+      let bedrag = parseEUR(raw);
       if (!isFinite(bedrag) || bedrag < 0) {
         Modal.show({ type: 'warning', title: 'Ongeldige prijs', message: 'Vul een geldig bedrag in (bv. 1234,56).' });
         return;
       }
+      // Vangnet: geen komma/punt getypt + onrealistisch hoog → wschl. cent
+      // ingevoerd (62540 i.p.v. 625,40). Stel auto-correctie voor.
+      if (!/[.,]/.test(raw) && bedrag > 9999) {
+        const guess = bedrag / 100;
+        const ok = await Modal.confirm({
+          type: 'warning',
+          title: 'Bedoel je €' + guess.toFixed(2).replace('.', ',') + '?',
+          message: `Je vulde "${raw}" in zonder komma. Dat lijkt erg veel voor een kist. Klik "Ja" om door te gaan met €${guess.toFixed(2).replace('.', ',')}, of "Nee, ${bedrag.toFixed(2).replace('.', ',')}" om de letterlijke waarde te gebruiken.`,
+          confirmText: 'Ja, €' + guess.toFixed(2).replace('.', ','),
+          cancelText: 'Nee, ' + bedrag.toFixed(2).replace('.', ','),
+        });
+        if (ok) bedrag = +guess.toFixed(2);
+      }
       _patchKistOverride(naam, { bedrag });
-      renderKistenBeheer({ success: `Prijs van "${naam}" opgeslagen.` });
+      renderKistenBeheer({ success: `Prijs van "${naam}" opgeslagen: ${fmtEUR(bedrag)}.` });
       return;
     }
     const resetPriceBtn = e.target.closest('button[data-reset-price]');

@@ -10,7 +10,38 @@ function esc(v) {
 }
 function fmt(v) { return v && String(v).trim() ? v : '—'; }
 function fmtEUR(n) { return '€ ' + (Number(n) || 0).toFixed(2).replace('.', ','); }
-function parseEUR(s) { return parseFloat(String(s || '').replace(/[€\s.]/g, '').replace(',', '.')) || 0; }
+// Parseer een door de gebruiker getypt bedrag — robuust tegen verschillende
+// notaties (EU komma-decimaal, US punt-decimaal, EU duizend-scheiding):
+//   "625,40"       → 625.40
+//   "625.40"       → 625.40  (punt-decimaal, 1-2 cijfers na)
+//   "1.234,56"     → 1234.56 (EU: punt = duizend, komma = decimaal)
+//   "1,234.56"     → 1234.56 (US: komma = duizend, punt = decimaal)
+//   "62.540"       → 62540   (geen komma → punt = duizend-sep)
+//   "62540"        → 62540
+function parseEUR(s) {
+  if (s == null) return 0;
+  let str = String(s).replace(/[€\s]/g, '').trim();
+  if (!str) return 0;
+  const hasComma = str.includes(',');
+  const hasDot   = str.includes('.');
+  if (hasComma && hasDot) {
+    // Beide aanwezig: laatste van de twee is de decimaal-scheiding.
+    if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+      str = str.replace(/\./g, '').replace(',', '.');         // EU
+    } else {
+      str = str.replace(/,/g, '');                            // US
+    }
+  } else if (hasComma) {
+    str = str.replace(',', '.');                              // EU decimaal
+  } else if (hasDot) {
+    // Eén of meer punten zonder komma. Als het patroon precies één punt
+    // is gevolgd door 1-2 cijfers tot het eind → punt-decimaal. Anders
+    // (bv. "1.234" of "1.234.567") → duizend-scheiding.
+    if (!/^\d+\.\d{1,2}$/.test(str)) str = str.replace(/\./g, '');
+  }
+  const n = parseFloat(str);
+  return isFinite(n) ? n : 0;
+}
 function fmtDate(iso) {
   if (!iso) return '';
   if (typeof iso === 'string' && iso.length === 10) return iso.split('-').reverse().join('-');

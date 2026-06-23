@@ -634,7 +634,7 @@ function renderDossierForm(params) {
         e.preventDefault(); e.stopPropagation();
         const p = presetList[parseInt(b.dataset.wkEdit, 10)];
         if (!p) return;
-        const huidig = p.bedrag != null ? String(p.bedrag).replace('.', ',') : '';
+        const huidig = p.bedrag != null ? (Number(p.bedrag) || 0).toFixed(2).replace('.', ',') : '';
         const input = window.prompt(
           `Nieuwe prijs voor "${p.omschrijving}" (€).\nLaat leeg en druk OK om de standaardprijs te herstellen.`,
           huidig
