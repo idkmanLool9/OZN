@@ -308,7 +308,7 @@ function renderDossierDetail(params) {
                 : '';
               return `<span class="preset-wrap">
                 <button type="button" class="${cls}" data-action="add-preset" data-preset="${i}" ${p._hidden ? 'disabled' : ''}>
-                  <span>${esc(p.omschrijving)}</span>
+                  <span>${esc(p.omschrijving)}${p.food ? ' <span class="badge badge-amber" title="Aantal wordt gevraagd bij toevoegen">×N</span>' : ''}</span>
                   ${trailing}
                 </button>
                 ${adminCtrls}
@@ -892,6 +892,23 @@ function bindDetailEvents(id) {
           }
           return;
         }
+        // Voor 'eten'-items vragen we eerst aantal — totaal = aantal × prijs.
+        let aantalPreset = 1;
+        let bedragPreset = p.bedrag;
+        if (p.food) {
+          const stuk = Number(p.bedrag) || 0;
+          const input = window.prompt(
+            `Hoeveel ${p.omschrijving}? (prijs per stuk: ${fmtEUR(stuk)})`,
+            '1'
+          );
+          if (input == null) return;
+          aantalPreset = parseInt(String(input).trim(), 10);
+          if (!isFinite(aantalPreset) || aantalPreset < 1) {
+            Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' });
+            return;
+          }
+          bedragPreset = +((stuk * aantalPreset).toFixed(2));
+        }
         // Bestaat al een rij met dezelfde omschrijving + categorie?
         // Dan aantal ophogen en bedrag bijtellen (geen dubbele rij).
         const existing = DB.where(KEYS.KOSTEN, k =>
@@ -901,11 +918,11 @@ function bindDetailEvents(id) {
         );
         if (existing.length > 0) {
           const e = existing[0];
-          const newAantal = (Number(e.aantal) || 1) + 1;
-          const newBedrag = +((Number(e.bedrag) || 0) + (Number(p.bedrag) || 0)).toFixed(2);
+          const newAantal = (Number(e.aantal) || 1) + aantalPreset;
+          const newBedrag = +((Number(e.bedrag) || 0) + bedragPreset).toFixed(2);
           await DB.update(KEYS.KOSTEN, e.id, { aantal: newAantal, bedrag: newBedrag });
         } else {
-          await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false });
+          await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: bedragPreset, aantal: aantalPreset, betaald: false });
         }
         await DB.touchDossier(id); renderDossierDetail({ id });
       }

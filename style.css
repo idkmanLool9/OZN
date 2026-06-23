@@ -2354,9 +2354,32 @@ fieldset[data-step][hidden] { display: none !important; }
   cursor: pointer; color: var(--primary); font-weight: 600; font-size: .9rem;
 }
 .wizard-preset-grid {
-  display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem;
+  /* Eén tegel per regel — gebruiker wil ze recht onder elkaar (Word-stijl).
+     De volgorde komt overeen met de vaste volgorde in KOSTEN_PRESETS. */
+  display: flex; flex-direction: column; gap: .35rem; margin-top: .65rem;
 }
-.wizard-preset-btn { text-align: left; }
+.wizard-preset-wrap { width: 100%; }
+.wizard-preset-btn {
+  text-align: left; width: 100%;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: .75rem; padding: .55rem .75rem;
+}
+.wizard-preset-btn .wizard-preset-omschrijving { flex: 1; }
+
+/* Eten & drinken snel-toevoegen in stap 4 */
+.eten-table th, .eten-table td { padding: .35rem .5rem; font-size: .85rem; }
+.eten-add {
+  display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+  margin-top: .85rem; padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.eten-add input {
+  padding: .5rem .65rem; border: 1px solid var(--border);
+  border-radius: 6px; font: inherit;
+}
+.eten-add #eten-oms    { flex: 1; min-width: 12em; }
+.eten-add #eten-aantal { width: 5.5em; }
+.eten-add #eten-stuk   { width: 7em; }
 
 /* Beheermodus: admin-tools naast preset-tegel */
 .wizard-preset-wrap,
