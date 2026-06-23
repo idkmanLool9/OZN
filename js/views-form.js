@@ -535,8 +535,11 @@ function renderDossierForm(params) {
             const cls = 'btn btn-sm btn-ghost wizard-preset-btn'
               + (p.nav ? ' wizard-preset-nav wizard-preset-nav-' + p.nav : '')
               + (p._hidden ? ' is-hidden-preset' : '');
+            const prijsTekst = p.vraagPrijs
+              ? `± ${fmtEUR(p.bedrag || 0)}`
+              : `${fmtEUR(p.bedrag)}${p._customBedrag ? ' ✏️' : ''}`;
             const prijs = (p.bedrag != null && p.bedrag !== '')
-              ? `<span class="muted small">${fmtEUR(p.bedrag)}${p._customBedrag ? ' ✏️' : ''}</span>`
+              ? `<span class="muted small">${prijsTekst}</span>`
               : (p.nav ? '<span class="muted small">→</span>' : '');
             const adminCtrls = (adminMode && !p.nav)
               ? `<span class="wizard-preset-admin">
@@ -548,7 +551,7 @@ function renderDossierForm(params) {
               : '';
             return `<span class="wizard-preset-wrap">
               <button type="button" class="${cls}" data-wk-preset="${i}" ${p._hidden ? 'disabled' : ''}>
-                <span class="wizard-preset-omschrijving">${esc(p.omschrijving)}${p.food ? ' <span class="badge badge-amber" title="Aantal wordt gevraagd bij toevoegen">×N</span>' : ''}</span>
+                <span class="wizard-preset-omschrijving">${esc(p.omschrijving)}${p.food ? ' <span class="badge badge-amber" title="Aantal wordt gevraagd bij toevoegen">×N</span>' : ''}${p.vraagPrijs ? ' <span class="badge badge-amber" title="Richtprijs — werkelijk bedrag wordt gevraagd">±</span>' : ''}</span>
                 ${prijs}
               </button>
               ${adminCtrls}
@@ -600,8 +603,21 @@ function renderDossierForm(params) {
     const addPreset = async (p) => {
       let aantal = 1;
       let bedrag = p.bedrag;
-      // Voor 'eten'-items vragen we eerst hoeveel — totaal = aantal × prijs.
-      if (p.food) {
+      // 'vraagPrijs'-items (zoals Koffie/thee/water) hebben een richtprijs
+      // die per dossier verschilt — vraag het werkelijke bedrag.
+      if (p.vraagPrijs) {
+        const input = window.prompt(
+          `Wat heeft "${p.omschrijving}" gekost? (richtprijs — vul het werkelijke bedrag in €)`,
+          ''
+        );
+        if (input == null) return;
+        bedrag = parseEUR(input);
+        if (!isFinite(bedrag) || bedrag < 0) {
+          Modal.show({ type: 'warning', title: 'Ongeldig bedrag', message: 'Vul een geldig bedrag in (bv. 45,00).' });
+          return;
+        }
+      } else if (p.food) {
+        // Voor 'eten'-items vragen we eerst hoeveel — totaal = aantal × prijs.
         const stuk = Number(p.bedrag) || 0;
         const input = window.prompt(
           `Hoeveel ${p.omschrijving}? (prijs per stuk: ${fmtEUR(stuk)})`,

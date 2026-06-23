@@ -63,7 +63,9 @@ const KOSTEN_PRESETS = [
   // Items met food: true vragen om een aantal bij toevoegen (totaal = aantal × prijs)
   { food: true, categorie: 'overig', omschrijving: 'Simit',                                       bedrag:   0.80 },
   { categorie: 'overig',        omschrijving: 'Papier op tafels',                                 bedrag:  60.00 },
-  { food: true, categorie: 'overig', omschrijving: 'Koffie / thee / water',                       bedrag:   0    },
+  // vraagPrijs: bij toevoegen vraagt de app om het werkelijke bedrag
+  // (richtprijs — varieert per dossier). Geen aantal-prompt.
+  { vraagPrijs: true, categorie: 'overig', omschrijving: 'Koffie / thee / water',                 bedrag:   0    },
   { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                       bedrag: 100.00 },
   { nav: 'extra',    categorie: 'overig',        omschrijving: '＋ Extra uitgave (zelf invullen)', bedrag: null },
 ];
