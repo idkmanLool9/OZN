@@ -37,33 +37,33 @@ function categorieIcon(id) {
   return c ? c.icon : '•';
 }
 
+// Volgorde komt 1-op-1 overeen met de gewenste volgorde van de
+// gebruiker. Items met een 'nav'-veld zijn navigatie-tegels die in de
+// wizard naar een andere pagina linken (Kisten/Bloemen) of het formulier
+// voor 'eigen invoer' openen ('extra').
 const KOSTEN_PRESETS = [
-  // Aanname & uitvoering
-  { categorie: 'aannametarief', omschrijving: 'Aannametarief — benodigd personeel en uitvoering', bedrag: 622.00 },
-  // Vervoer
-  { categorie: 'vervoer',       omschrijving: 'Ziekenhuismortuarium (Almelo / Enschede)',           bedrag: 146.00 },
-  { categorie: 'vervoer',       omschrijving: 'Overbrengen overledene (0–40 km vanaf Oldenzaal)',   bedrag: 231.00 },
-  { categorie: 'vervoer',       omschrijving: 'Rouwauto op de dag van de uitvaart',                  bedrag: 242.00 },
-  // Kist
-  { categorie: 'kist',          omschrijving: 'Basismodel kist (incl. opbaardekentje)',              bedrag: 615.40 },
-  // Aula & verzorging
-  { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                                bedrag: 446.00 },
-  { categorie: 'verzorging',    omschrijving: 'Verzorging & Inkisten',                               bedrag: 174.00 },
-  // Kerk
-  { categorie: 'kerk',          omschrijving: 'Gebruik Kerk en Dolabani Zaal',                       bedrag: 500.00 },
-  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                            bedrag:  31.00 },
-  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud koper',                              bedrag:  31.00 },
-  // Begraafplaats / graf
-  { categorie: 'begraafplaats', omschrijving: 'Algemeen graf',                                       bedrag: 1250.00 },
+  { categorie: 'aannametarief', omschrijving: 'Benodigd personeel en uitvoering',                bedrag: 622.00 },
+  { categorie: 'vervoer',       omschrijving: 'Kosten ziekenhuismortuarium (Almelo / Enschede)', bedrag: 146.00 },
+  { categorie: 'vervoer',       omschrijving: 'Transport overledene (0–40 km vanaf Oldenzaal)',  bedrag: 231.00 },
+  { nav: 'kist',     categorie: 'kist',          omschrijving: '🪦 Kist — kies in catalogus',     bedrag: null   },
+  { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                            bedrag: 446.00 },
+  { categorie: 'verzorging',    omschrijving: 'Verzorging & Inkisten',                           bedrag: 174.00 },
+  { categorie: 'kerk',          omschrijving: 'Gebruik Kerk en Dolabani Zaal',                   bedrag: 500.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Openen graf',                                     bedrag: 250.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Naamsteen',                                       bedrag: 295.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Onderhoudskosten',                                bedrag: 600.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Algemeen graf',                                   bedrag: 1250.00 },
   { categorie: 'begraafplaats', omschrijving: 'Grafmonument verwijderen en terugplaatsen incl. tekst + foto', bedrag: 1368.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Graf delven',                                         bedrag: 410.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Openen graf',                                         bedrag: 250.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Naamsteen',                                           bedrag: 295.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Onderhoudskosten',                                    bedrag: 600.00 },
-  // Administratie
-  { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                                 bedrag:  17.80 },
-  // Overig
-  { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                           bedrag: 100.00 },
+  { categorie: 'begraafplaats', omschrijving: 'Graf delven',                                     bedrag: 410.00 },
+  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                        bedrag:  31.00 },
+  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud koper',                          bedrag:  31.00 },
+  { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                             bedrag:  17.80 },
+  { nav: 'bloemen',  categorie: 'bloemen',       omschrijving: '💐 Bloemen — kies in catalogus', bedrag: null   },
+  { categorie: 'overig',        omschrijving: 'Simit',                                           bedrag:   0.80 },
+  { categorie: 'overig',        omschrijving: 'Papier op tafels',                                bedrag:  60.00 },
+  { categorie: 'overig',        omschrijving: 'Koffie / thee / water',                           bedrag:   0    },
+  { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                       bedrag: 100.00 },
+  { nav: 'extra',    categorie: 'overig',        omschrijving: '＋ Extra uitgave (zelf invullen)', bedrag: null },
 ];
 
 // Unigra kistencatalogus (adviesprijzen per nov 2025)

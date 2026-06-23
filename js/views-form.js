@@ -255,36 +255,12 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="3">
           <legend>Kosten</legend>
-          <div class="grid-3">
-            <label class="span-3"><span>Kistmodel (Unigra catalogus)</span>
-              <div class="kist-picker">
-                <select name="kist_type" id="kist-select">
-                  <option value="">— niet gekozen —</option>
-                  ${KISTEN_CATALOGUS.map(k => {
-                    const label = `${k.naam} — ${k.materiaal} — ${fmtEUR(k.bedrag)}`;
-                    return `<option value="${esc(k.naam)}" ${dossier.kist_type === k.naam ? 'selected' : ''}>${esc(label)}</option>`;
-                  }).join('')}
-                  <option value="anders" ${sel('kist_type','anders')}>Anders / handmatig</option>
-                </select>
-                <div class="kist-preview" id="kist-preview" aria-live="polite"></div>
-              </div>
-            </label>
-            <label class="span-3"><span>Bloemstuk (eigen catalogus) <a href="#/bloemen" class="muted small" style="margin-left:.5rem;">beheren →</a></span>
-              <div class="kist-picker">
-                <select name="bloemstukken" id="bloem-select">
-                  <option value="">— niet gekozen —</option>
-                  ${DB.list(KEYS.BLOEMEN).slice().sort((a,b) => a.naam.localeCompare(b.naam)).map(b => {
-                    const label = `${b.naam}${b.bedrag ? ' — ' + fmtEUR(b.bedrag) : ''}`;
-                    return `<option value="${esc(b.naam)}" ${dossier.bloemstukken === b.naam ? 'selected' : ''}>${esc(label)}</option>`;
-                  }).join('')}
-                  <option value="anders" ${sel('bloemstukken','anders')}>Anders / handmatig</option>
-                </select>
-                <div class="kist-preview" id="bloem-preview" aria-live="polite"></div>
-              </div>
-            </label>
-          </div>
+          <!-- Kist & bloemen worden gekozen via de catalogus-pagina's
+               (snel-toevoegen tegel hieronder). Hidden inputs houden de
+               keuze in het dossier-record. -->
+          <input type="hidden" name="kist_type"    value="${esc(v('kist_type'))}">
+          <input type="hidden" name="bloemstukken" value="${esc(v('bloemstukken'))}">
 
-          <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
           <h3 style="margin:0 0 .5rem;">Kostenoverzicht</h3>
           <div id="wizard-kosten-mount"></div>
         </fieldset>
@@ -363,7 +339,7 @@ function renderDossierForm(params) {
         'contact_naam','contact_voornaam','contact_telefoon','contact_relatie'],
     2: ['uitvaart_type','uitvaart_datum',
         'uitvaart_tijd','kerk_locatie','begraafplaats'],
-    3: ['kist_type'],
+    3: [], // kosten + kist/bloemen via catalogus-pagina, geen verplichte velden
     4: [],  // bijzonderheden is volledig optioneel
     // 5 = handtekeningen, speciale logica
   };
@@ -523,10 +499,16 @@ function renderDossierForm(params) {
       <details class="wizard-kosten-presets" id="wk-presets-details" ${presetsOpen ? 'open' : ''} style="margin-top:.85rem;">
         <summary>+ Snel toevoegen uit standaardlijst</summary>
         <div class="wizard-preset-grid">
-          ${KOSTEN_PRESETS.map((p, i) => `
-            <button type="button" class="btn btn-sm btn-ghost wizard-preset-btn" data-wk-preset="${i}">
-              ${esc(p.omschrijving)} ${p.bedrag ? '<span class="muted small">' + fmtEUR(p.bedrag) + '</span>' : ''}
-            </button>`).join('')}
+          ${KOSTEN_PRESETS.map((p, i) => {
+            const cls = 'btn btn-sm btn-ghost wizard-preset-btn'
+              + (p.nav ? ' wizard-preset-nav wizard-preset-nav-' + p.nav : '');
+            const prijs = (p.bedrag != null && p.bedrag !== '')
+              ? '<span class="muted small">' + fmtEUR(p.bedrag) + '</span>'
+              : (p.nav ? '<span class="muted small">→</span>' : '');
+            return `<button type="button" class="${cls}" data-wk-preset="${i}">
+              ${esc(p.omschrijving)} ${prijs}
+            </button>`;
+          }).join('')}
         </div>
       </details>
 
@@ -579,7 +561,21 @@ function renderDossierForm(params) {
     };
     mount.querySelectorAll('[data-wk-preset]').forEach(b => {
       b.addEventListener('click', () => {
-        const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)]; if (p) addPreset(p);
+        const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)];
+        if (!p) return;
+        // Navigatie-tegels (Kist / Bloemen / Extra) hebben geen vaste prijs;
+        // ze leiden de gebruiker naar een andere pagina of focussen het
+        // 'eigen invoer'-veld.
+        if (p.nav === 'kist')    { Router.go('/kisten');  return; }
+        if (p.nav === 'bloemen') { Router.go('/bloemen'); return; }
+        if (p.nav === 'extra') {
+          const oms = mount.querySelector('#wk-omschrijving');
+          const add = mount.querySelector('.wizard-kosten-add');
+          if (add) add.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (oms) setTimeout(() => { try { oms.focus(); } catch (_) {} }, 250);
+          return;
+        }
+        addPreset(p);
       });
     });
     // Onthoud open/dicht-stand van de presets-details
@@ -592,7 +588,9 @@ function renderDossierForm(params) {
     // ── Acties: alle standaardposten in één keer (alleen nieuw) ──
     const fillBtn = mount.querySelector('#wk-fill-standaard');
     if (fillBtn) fillBtn.addEventListener('click', () => {
-      KOSTEN_PRESETS.forEach(p => kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }));
+      // Navigatie-tegels (kist/bloemen/extra) overslaan — die hebben geen prijs
+      KOSTEN_PRESETS.filter(p => !p.nav).forEach(p =>
+        kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }));
       saveBuffer(); renderWizardKosten();
     });
     // ── Acties: handmatig toevoegen ──
@@ -668,24 +666,53 @@ function renderDossierForm(params) {
     syncAutoKost(BLOEM_PREFIX, 'bloemen', naam, b ? Number(b.bedrag) : null);
   }
 
-  // Eerste-keer init: als er al een kist/bloem geselecteerd is bij open
-  // van de form, en er nog geen auto-post bestaat, hem alvast toevoegen
+  // Eerste-keer init: als er al een kist/bloem in het dossier (hidden
+  // inputs) staat, en er nog geen auto-post bestaat, hem alvast toevoegen.
+  // De waarden komen uit Kisten/Bloemen-pagina via _setKistInDraft /
+  // _setBloemInDraft → applyDossierDraft.
+  function _kistHiddenVal()  { return ($('input[name="kist_type"]')?.value || '').trim(); }
+  function _bloemHiddenVal() { return ($('input[name="bloemstukken"]')?.value || '').trim(); }
   (function initAutoKosten() {
-    const huidigeKist = $('#kist-select')?.value;
-    if (huidigeKist && huidigeKist !== 'anders') {
+    const huidigeKist = _kistHiddenVal();
+    if (huidigeKist) {
       const lijst = isNew ? kostenBuffer
                           : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
       const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(KIST_PREFIX));
       if (!alAanwezig) syncAutoKostKist(huidigeKist);
     }
-    const huidigeBloem = $('#bloem-select')?.value;
-    if (huidigeBloem && huidigeBloem !== 'anders') {
+    const huidigeBloem = _bloemHiddenVal();
+    if (huidigeBloem) {
       const lijst = isNew ? kostenBuffer
                           : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
       const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(BLOEM_PREFIX));
       if (!alAanwezig) syncAutoKostBloem(huidigeBloem);
     }
   })();
+  // Wanneer een 'sok_draft_…' van buitenaf wordt aangepast (bijv. via de
+  // Kisten- of Bloemen-pagina die het hidden veld in de draft schrijft),
+  // herladen we de auto-koppeling.
+  window.addEventListener('storage', (e) => {
+    if (!e.key || !e.key.startsWith('sok_draft_')) return;
+    const draftKey = dossierDraftKey(isNew, dossier.id);
+    if (e.key !== draftKey) return;
+    try {
+      const draft = JSON.parse(e.newValue || '{}');
+      if (draft.kist_type) {
+        const kistInp = $('input[name="kist_type"]');
+        if (kistInp && kistInp.value !== draft.kist_type) {
+          kistInp.value = draft.kist_type;
+          syncAutoKostKist(draft.kist_type);
+        }
+      }
+      if (draft.bloemstukken) {
+        const bInp = $('input[name="bloemstukken"]');
+        if (bInp && bInp.value !== draft.bloemstukken) {
+          bInp.value = draft.bloemstukken;
+          syncAutoKostBloem(draft.bloemstukken);
+        }
+      }
+    } catch (_) {}
+  });
 
   // Artsverklaring scan/upload
   const avInput = document.getElementById('artsverklaring-input');
@@ -753,68 +780,6 @@ function renderDossierForm(params) {
   document.getElementById('dossier-form').addEventListener('change', updateStepColors);
 
   showStep(currentStep);
-
-  // Kist-preview live bijwerken
-  const kistSelect = $('#kist-select');
-  const kistPreview = $('#kist-preview');
-  function updateKistPreview() {
-    const v = kistSelect.value;
-    if (!v) {
-      kistPreview.innerHTML = '<div class="kist-preview-empty">Geen kist gekozen</div>';
-      return;
-    }
-    if (v === 'anders') {
-      kistPreview.innerHTML = '<div class="kist-preview-empty">Handmatig / anders gekozen</div>';
-      return;
-    }
-    const k = KISTEN_CATALOGUS.find(x => x.naam === v);
-    if (!k) { kistPreview.innerHTML = ''; return; }
-    const fotoUrl = KistFotos.urlVoor(k.naam);
-    const beeld = fotoUrl
-      ? `<img src="${esc(fotoUrl)}" alt="${esc(k.naam)}" loading="lazy">`
-      : kistSVG(k.materiaal);
-    kistPreview.innerHTML = `
-      <div class="kist-img">${beeld}</div>
-      <div class="kist-meta">
-        <strong>${esc(k.naam)}</strong>
-        <span class="muted small">${esc(k.materiaal)}</span>
-        <span class="kist-price">${fmtEUR(k.bedrag)}</span>
-        ${fotoUrl ? '' : '<span class="muted small"><a href="#/kisten">Foto uploaden</a></span>'}
-      </div>`;
-  }
-  kistSelect.addEventListener('change', () => {
-    updateKistPreview();
-    syncAutoKostKist(kistSelect.value);
-  });
-  updateKistPreview();
-
-  // Bloem-preview live bijwerken
-  const bloemSelect = $('#bloem-select');
-  const bloemPreview = $('#bloem-preview');
-  function updateBloemPreview() {
-    const v = bloemSelect.value;
-    if (!v) { bloemPreview.innerHTML = '<div class="kist-preview-empty">Geen bloemstuk gekozen</div>'; return; }
-    if (v === 'anders') { bloemPreview.innerHTML = '<div class="kist-preview-empty">Handmatig / anders</div>'; return; }
-    const b = DB.list(KEYS.BLOEMEN).find(x => x.naam === v);
-    if (!b) { bloemPreview.innerHTML = ''; return; }
-    const fotoUrl = BloemenFotos.urlVoor(b.naam);
-    const beeld = fotoUrl
-      ? `<img src="${esc(fotoUrl)}" alt="${esc(b.naam)}" loading="lazy">`
-      : (typeof bloemSVG === 'function' ? bloemSVG() : '');
-    bloemPreview.innerHTML = `
-      <div class="kist-img">${beeld}</div>
-      <div class="kist-meta">
-        <strong>${esc(b.naam)}</strong>
-        ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
-        ${b.bedrag ? `<span class="kist-price">${fmtEUR(b.bedrag)}</span>` : ''}
-        ${fotoUrl ? '' : '<span class="muted small"><a href="#/bloemen">Foto uploaden</a></span>'}
-      </div>`;
-  }
-  bloemSelect.addEventListener('change', () => {
-    updateBloemPreview();
-    syncAutoKostBloem(bloemSelect.value);
-  });
-  updateBloemPreview();
 
   // ─── Handtekeningen activeren ──────────────────────────────────────────
   const sigPads = {};
@@ -971,9 +936,13 @@ function renderDossierForm(params) {
           } catch (_) {}
           renderDossierForm(params);
         });
-        // Previews bijwerken na herstel
-        updateKistPreview();
-        updateBloemPreview();
+        // Bij herstel uit een draft (bv. na navigatie vanuit /kisten of
+        // /bloemen) de auto-kosten verversen. syncAutoKost verwijdert
+        // oude auto-posten en voegt de nieuwe toe — idempotent.
+        const kHidden = $('input[name="kist_type"]')?.value;
+        if (kHidden) syncAutoKostKist(kHidden);
+        const bHidden = $('input[name="bloemstukken"]')?.value;
+        if (bHidden) syncAutoKostBloem(bHidden);
       }
     }
   } catch (_) {}

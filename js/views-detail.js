@@ -286,11 +286,16 @@ function renderDossierDetail(params) {
         <h3 style="margin-top:1rem;">Snel toevoegen uit catalogus</h3>
         <p class="muted small">Klik om een vast tarief direct toe te voegen.</p>
         <div class="preset-grid">
-          ${KOSTEN_PRESETS.map((p, i) => `
-            <button type="button" class="btn preset-btn" data-action="add-preset" data-preset="${i}">
+          ${KOSTEN_PRESETS.map((p, i) => {
+            const cls = 'btn preset-btn' + (p.nav ? ' preset-nav preset-nav-' + p.nav : '');
+            const trailing = (p.bedrag != null && p.bedrag !== '')
+              ? `<strong>${fmtEUR(p.bedrag)}</strong>`
+              : (p.nav ? '<strong class="muted">→</strong>' : '');
+            return `<button type="button" class="${cls}" data-action="add-preset" data-preset="${i}">
               <span>${esc(p.omschrijving)}</span>
-              <strong>${fmtEUR(p.bedrag)}</strong>
-            </button>`).join('')}
+              ${trailing}
+            </button>`;
+          }).join('')}
         </div>
         <h3 style="margin-top:1rem;">Of voeg handmatig toe</h3>
         <form id="add-kosten" class="row-form">
@@ -815,6 +820,18 @@ function bindDetailEvents(id) {
       } else if (action === 'add-preset') {
         const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
         if (!p) return;
+        // Navigatie-tegels: open de juiste catalogus-pagina of focus
+        // het handmatige invoer-formulier.
+        if (p.nav === 'kist')    { Router.go('/kisten');  return; }
+        if (p.nav === 'bloemen') { Router.go('/bloemen'); return; }
+        if (p.nav === 'extra') {
+          const oms = document.querySelector('#add-kosten input[name="omschrijving"]');
+          if (oms) {
+            oms.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => { try { oms.focus(); } catch (_) {} }, 250);
+          }
+          return;
+        }
         // Bestaat al een rij met dezelfde omschrijving + categorie?
         // Dan aantal ophogen en bedrag bijtellen (geen dubbele rij).
         const existing = DB.where(KEYS.KOSTEN, k =>

@@ -4,6 +4,40 @@ let _bloemEditing = null; // null = nieuw formulier dicht; 'new' = nieuw; <id> =
 let _bloemFilter = '';
 let _bloemPrijsMax = '';
 
+// Actieve dossier-drafts uit localStorage (zoals views-kisten.js).
+// Hiermee kan de gebruiker een bloemstuk direct in een lopend
+// dossier-concept koppelen.
+function _activeDossierDraftsBloem() {
+  const drafts = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('sok_draft_')) continue;
+      let data = null;
+      try { data = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) {}
+      if (!data) continue;
+      const idPart = key.slice('sok_draft_'.length);
+      const isNew = idPart === 'new';
+      const naam = [data.voornaam, data.achternaam].filter(Boolean).join(' ').trim()
+        || (isNew ? 'Nieuw dossier (concept)' : ('Dossier #' + idPart));
+      drafts.push({
+        key, isNew, id: isNew ? null : idPart, naam,
+        bloem: data.bloemstukken || '',
+      });
+    }
+  } catch (_) {}
+  return drafts;
+}
+
+function _setBloemInDraft(key, bloemNaam) {
+  try {
+    const cur = JSON.parse(localStorage.getItem(key) || '{}');
+    cur.bloemstukken = bloemNaam;
+    localStorage.setItem(key, JSON.stringify(cur));
+    return true;
+  } catch (_) { return false; }
+}
+
 function bloemSVG() {
   return `
     <svg viewBox="0 0 240 130" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
@@ -42,6 +76,8 @@ function bloemSVG() {
 function renderBloemenBeheer(msg) {
   const alle = DB.list(KEYS.BLOEMEN).slice().sort((a, b) => a.naam.localeCompare(b.naam));
   const adminMode = !!Settings.get('catalog_admin_mode');
+  const drafts = _activeDossierDraftsBloem();
+  const hasDraft = drafts.length > 0;
 
   const q = (_bloemFilter || '').trim().toLowerCase();
   const max = parseFloat(String(_bloemPrijsMax).replace(',', '.')) || 0;
@@ -66,6 +102,14 @@ function renderBloemenBeheer(msg) {
       </div>
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
+      ${(!editing && hasDraft) ? `
+        <div class="alert alert-info kist-draft-banner">
+          <strong>💡 Actief dossier:</strong>
+          ${drafts.length === 1
+            ? `<span>${esc(drafts[0].naam)}${drafts[0].bloem ? ' — huidige bloem: <em>' + esc(drafts[0].bloem) + '</em>' : ''}</span>`
+            : `<select id="bloem-draft-picker">${drafts.map((d, i) => `<option value="${i}">${esc(d.naam)}${d.bloem ? ' — ' + esc(d.bloem) : ''}</option>`).join('')}</select>`}
+          <span class="muted small">— klik op de "Kies"-knop bij een bloemstuk om hem in het dossier te zetten</span>
+        </div>` : ''}
 
       ${editing ? '' : `
         <section class="card catalog-filter-card">
@@ -116,6 +160,10 @@ function renderBloemenBeheer(msg) {
                     ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
                     <span class="kist-price">${fmtEUR(b.bedrag)}</span>
                   </div>
+                  ${hasDraft ? `
+                    <div class="kist-card-actions">
+                      <button type="button" class="btn btn-sm btn-primary" data-pick-bloem="${esc(b.naam)}">✓ Kies voor dossier</button>
+                    </div>` : ''}
                   ${adminMode ? `
                     <div class="kist-card-actions">
                       <button type="button" class="btn btn-sm" data-edit="${b.id}">Bewerken</button>
@@ -202,6 +250,33 @@ function renderBloemenBeheer(msg) {
   }
 
   $('#view').onclick = async e => {
+    // Kies bloemstuk voor actief dossier-concept
+    const pickBtn = e.target.closest('button[data-pick-bloem]');
+    if (pickBtn) {
+      const bloemNaam = pickBtn.getAttribute('data-pick-bloem');
+      const picker = $('#bloem-draft-picker');
+      const idx = picker ? parseInt(picker.value, 10) : 0;
+      const target = drafts[idx];
+      if (!target) return;
+      const ok = _setBloemInDraft(target.key, bloemNaam);
+      if (!ok) {
+        Modal.show({ type: 'error', title: 'Niet gelukt', message: 'Kon het bloemstuk niet in het dossier zetten.' });
+        return;
+      }
+      const confirmGo = await Modal.confirm({
+        type: 'success',
+        title: `"${bloemNaam}" gekoppeld`,
+        message: `Toegevoegd aan dossier ${target.naam}. Wil je nu terug naar dat dossier?`,
+        confirmText: 'Ja, ga terug',
+        cancelText: 'Blijf hier',
+      });
+      if (confirmGo) {
+        Router.go(target.isNew ? '/dossiers/nieuw' : '/dossiers/' + target.id + '/bewerken');
+      } else {
+        renderBloemenBeheer({ success: `Bloemstuk "${bloemNaam}" gekoppeld aan ${target.naam}.` });
+      }
+      return;
+    }
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
       const id = parseInt(zoom.getAttribute('data-id'), 10);

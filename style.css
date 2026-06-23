@@ -2357,6 +2357,24 @@ fieldset[data-step][hidden] { display: none !important; }
   display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem;
 }
 .wizard-preset-btn { text-align: left; }
+/* Navigatie-tegels (Kist / Bloemen / Extra) onderscheiden zich met
+   een licht gekleurde achtergrond zodat ze opvallen tussen de presets. */
+.wizard-preset-nav,
+.preset-nav {
+  background: linear-gradient(135deg, #fff7e0, #fde6c2);
+  border: 1px solid #e3b977;
+  color: #6b4218;
+  font-weight: 600;
+}
+.wizard-preset-nav:hover,
+.preset-nav:hover { background: linear-gradient(135deg, #fff1d0, #f8d59c); }
+.wizard-preset-nav-extra,
+.preset-nav-extra {
+  background: linear-gradient(135deg, #e6f4ec, #cbe9d4);
+  border-color: #7fb795; color: #2f5a3d;
+}
+.wizard-preset-nav-extra:hover,
+.preset-nav-extra:hover { background: linear-gradient(135deg, #dbeee2, #b8dfc4); }
 .wizard-kosten-add {
   display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
   margin-top: .85rem; padding-top: .85rem;
