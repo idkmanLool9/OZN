@@ -29,13 +29,42 @@ function _activeDossierDraftsBloem() {
   return drafts;
 }
 
-function _setBloemInDraft(key, bloemNaam) {
-  try {
-    const cur = JSON.parse(localStorage.getItem(key) || '{}');
-    cur.bloemstukken = bloemNaam;
-    localStorage.setItem(key, JSON.stringify(cur));
-    return true;
-  } catch (_) { return false; }
+// Voeg een bloem-kostpost toe aan een actief dossier. Voor nieuwe dossiers
+// gaat het in de localStorage-kostenbuffer; voor bestaande direct in de DB.
+// Als dezelfde bloem al bestaat, hogen we aantal+bedrag op zodat 'meerdere
+// keren klikken' samenvoegt tot één rij met hoger aantal.
+async function _addBloemAanDossier(target, naam, aantal, stuk) {
+  const oms = '🌸 ' + naam;
+  const cat = 'bloemen';
+  const extraBedrag = +(stuk * aantal).toFixed(2);
+  if (target.isNew) {
+    const bufKey = 'sok_kosten_buffer_nieuw';
+    let buf = [];
+    try { buf = JSON.parse(localStorage.getItem(bufKey) || '[]') || []; } catch (_) {}
+    const i = buf.findIndex(k => (k.omschrijving || '') === oms && (k.categorie || null) === cat);
+    if (i >= 0) {
+      buf[i].aantal = (Number(buf[i].aantal) || 1) + aantal;
+      buf[i].bedrag = +(((Number(buf[i].bedrag) || 0) + extraBedrag)).toFixed(2);
+    } else {
+      buf.push({ omschrijving: oms, categorie: cat, bedrag: extraBedrag, aantal, betaald: false });
+    }
+    try { localStorage.setItem(bufKey, JSON.stringify(buf)); } catch (_) {}
+  } else {
+    const existing = DB.where(KEYS.KOSTEN, k =>
+      k.dossier_id === target.id &&
+      k.omschrijving === oms &&
+      (k.categorie || null) === cat
+    );
+    if (existing.length > 0) {
+      const e = existing[0];
+      const nieuwAantal = (Number(e.aantal) || 1) + aantal;
+      const nieuwBedrag = +((Number(e.bedrag) || 0) + extraBedrag).toFixed(2);
+      try { await DB.update(KEYS.KOSTEN, e.id, { aantal: nieuwAantal, bedrag: nieuwBedrag }); } catch (_) {}
+    } else {
+      try { await DB.insert(KEYS.KOSTEN, { dossier_id: target.id, omschrijving: oms, categorie: cat, bedrag: extraBedrag, aantal, betaald: false }); } catch (_) {}
+    }
+    try { await DB.touchDossier(target.id); } catch (_) {}
+  }
 }
 
 function bloemSVG() {
@@ -250,30 +279,40 @@ function renderBloemenBeheer(msg) {
   }
 
   $('#view').onclick = async e => {
-    // Kies bloemstuk voor actief dossier-concept
+    // Kies bloemstuk voor actief dossier-concept (additief — vraagt aantal,
+    // klikken op meerdere bloemen of dezelfde bloem stapelt netjes op).
     const pickBtn = e.target.closest('button[data-pick-bloem]');
     if (pickBtn) {
       const bloemNaam = pickBtn.getAttribute('data-pick-bloem');
+      const item = DB.list(KEYS.BLOEMEN).find(x => x.naam === bloemNaam);
+      const stuk = Number(item?.bedrag) || 0;
       const picker = $('#bloem-draft-picker');
       const idx = picker ? parseInt(picker.value, 10) : 0;
       const target = drafts[idx];
       if (!target) return;
-      const ok = _setBloemInDraft(target.key, bloemNaam);
-      if (!ok) {
-        Modal.show({ type: 'error', title: 'Niet gelukt', message: 'Kon het bloemstuk niet in het dossier zetten.' });
+      const input = window.prompt(
+        `Hoeveel "${bloemNaam}"? (prijs per stuk: ${fmtEUR(stuk)})`,
+        '1'
+      );
+      if (input == null) return;
+      const aantal = parseInt(String(input).trim(), 10);
+      if (!isFinite(aantal) || aantal < 1) {
+        Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' });
         return;
       }
+      await _addBloemAanDossier(target, bloemNaam, aantal, stuk);
+      const totaal = +(stuk * aantal).toFixed(2);
       const confirmGo = await Modal.confirm({
         type: 'success',
-        title: `"${bloemNaam}" gekoppeld`,
-        message: `Toegevoegd aan dossier ${target.naam}. Wil je nu terug naar dat dossier?`,
+        title: `${aantal}× ${bloemNaam} toegevoegd`,
+        message: `Totaal: ${fmtEUR(totaal)} bij dossier ${target.naam}. Klik nog een keer op een bloem om er meer toe te voegen, of ga terug naar het dossier.`,
         confirmText: 'Ja, ga terug',
         cancelText: 'Blijf hier',
       });
       if (confirmGo) {
         Router.go(target.isNew ? '/dossiers/nieuw' : '/dossiers/' + target.id + '/bewerken');
       } else {
-        renderBloemenBeheer({ success: `Bloemstuk "${bloemNaam}" gekoppeld aan ${target.naam}.` });
+        renderBloemenBeheer({ success: `${aantal}× ${bloemNaam} (${fmtEUR(totaal)}) toegevoegd aan ${target.naam}.` });
       }
       return;
     }

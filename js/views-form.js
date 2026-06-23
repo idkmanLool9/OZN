@@ -698,11 +698,11 @@ function renderDossierForm(params) {
   }
   renderWizardKosten();
 
-  // ─── Kist/Bloem auto-syncen naar kosten ─────────────────────────────
-  // Bij wijziging van de dropdown verwijderen we de oude auto-post en
-  // voegen de nieuwe toe. Werkt op buffer (nieuw) én DB (bestaand).
+  // ─── Kist auto-syncen naar kosten ───────────────────────────────────
+  // Kist = single-select per dossier; bij wijziging vervangen we de
+  // oude auto-post door de nieuwe. Bloemen werken additief en gaan
+  // rechtstreeks via /bloemen in de kostenposten.
   const KIST_PREFIX = 'Kist: ';
-  const BLOEM_PREFIX = 'Bloemstuk: ';
 
   async function syncAutoKost(prefix, categorie, naam, bedrag) {
     if (isNew) {
@@ -748,18 +748,10 @@ function renderDossierForm(params) {
     const k = vindKist(naam);
     syncAutoKost(KIST_PREFIX, 'kist', naam, k ? Number(k.bedrag) : null);
   }
-  function syncAutoKostBloem(naam) {
-    if (!naam || naam === 'anders') { syncAutoKost(BLOEM_PREFIX, 'bloemen', null, null); return; }
-    const b = DB.list(KEYS.BLOEMEN).find(x => x.naam === naam);
-    syncAutoKost(BLOEM_PREFIX, 'bloemen', naam, b ? Number(b.bedrag) : null);
-  }
-
-  // Eerste-keer init: als er al een kist/bloem in het dossier (hidden
-  // inputs) staat, en er nog geen auto-post bestaat, hem alvast toevoegen.
-  // De waarden komen uit Kisten/Bloemen-pagina via _setKistInDraft /
-  // _setBloemInDraft → applyDossierDraft.
+  // Eerste-keer init voor de KIST (single-select sync via hidden input).
+  // Bloemen werken additief en gaan rechtstreeks via /bloemen in de
+  // kostenposten — geen sync nodig.
   function _kistHiddenVal()  { return ($('input[name="kist_type"]')?.value || '').trim(); }
-  function _bloemHiddenVal() { return ($('input[name="bloemstukken"]')?.value || '').trim(); }
   (function initAutoKosten() {
     const huidigeKist = _kistHiddenVal();
     if (huidigeKist) {
@@ -768,17 +760,8 @@ function renderDossierForm(params) {
       const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(KIST_PREFIX));
       if (!alAanwezig) syncAutoKostKist(huidigeKist);
     }
-    const huidigeBloem = _bloemHiddenVal();
-    if (huidigeBloem) {
-      const lijst = isNew ? kostenBuffer
-                          : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
-      const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(BLOEM_PREFIX));
-      if (!alAanwezig) syncAutoKostBloem(huidigeBloem);
-    }
   })();
-  // Wanneer een 'sok_draft_…' van buitenaf wordt aangepast (bijv. via de
-  // Kisten- of Bloemen-pagina die het hidden veld in de draft schrijft),
-  // herladen we de auto-koppeling.
+  // Storage-event: alleen kist-veld syncen (bloem is additief).
   window.addEventListener('storage', (e) => {
     if (!e.key || !e.key.startsWith('sok_draft_')) return;
     const draftKey = dossierDraftKey(isNew, dossier.id);
@@ -790,13 +773,6 @@ function renderDossierForm(params) {
         if (kistInp && kistInp.value !== draft.kist_type) {
           kistInp.value = draft.kist_type;
           syncAutoKostKist(draft.kist_type);
-        }
-      }
-      if (draft.bloemstukken) {
-        const bInp = $('input[name="bloemstukken"]');
-        if (bInp && bInp.value !== draft.bloemstukken) {
-          bInp.value = draft.bloemstukken;
-          syncAutoKostBloem(draft.bloemstukken);
         }
       }
     } catch (_) {}
@@ -1024,13 +1000,11 @@ function renderDossierForm(params) {
           } catch (_) {}
           renderDossierForm(params);
         });
-        // Bij herstel uit een draft (bv. na navigatie vanuit /kisten of
-        // /bloemen) de auto-kosten verversen. syncAutoKost verwijdert
-        // oude auto-posten en voegt de nieuwe toe — idempotent.
+        // Bij herstel uit een draft (bv. na navigatie vanuit /kisten)
+        // de kist-auto-kost verversen. syncAutoKostKist verwijdert oude
+        // auto-posten en voegt de nieuwe toe — idempotent.
         const kHidden = $('input[name="kist_type"]')?.value;
         if (kHidden) syncAutoKostKist(kHidden);
-        const bHidden = $('input[name="bloemstukken"]')?.value;
-        if (bHidden) syncAutoKostBloem(bHidden);
       }
     }
   } catch (_) {}
