@@ -1172,11 +1172,14 @@ function renderDossierForm(params) {
       }
 
       // ─── Auto-mail dossier naar klooster bij eerste aanmaak (best-effort) ──
+      // Inclusief kostenoverzicht — net opgeslagen kostenposten staan al
+      // in de cloud-cache via de DB.insert hierboven.
       const klooster = (Settings.get('auto_send_dossier_email') || '').trim();
       if (isNew && klooster && EmailService.isConfigured() && navigator.onLine && savedDossier) {
         try {
+          const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === savedDossier.id);
           const subj = `Uitvaartdossier ${savedDossier.dossier_nummer || ''} — ${fullName(savedDossier) || ''}`.trim();
-          const body = buildDossierEmail(savedDossier);
+          const body = buildDossierEmail(savedDossier, kostenLijst);
           await EmailService.send(klooster, subj, body);
         } catch (mailErr) {
           // Niet blokkerend — gewoon loggen en doorgaan

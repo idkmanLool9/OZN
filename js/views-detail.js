@@ -452,7 +452,29 @@ function buildEmailFooter() {
     </div>`;
 }
 
-function buildDossierEmail(d) {
+// Sorteer kosten volgens KOSTEN_PRESETS-volgorde (zelfde rangschikking
+// als de 'Snel toevoegen'-lijst en het kostenoverzicht in het formulier).
+function _kostenInPresetVolgorde(kosten) {
+  const presetIdx = new Map();
+  KOSTEN_PRESETS.forEach((p, i) => { if (!p.nav) presetIdx.set(p.omschrijving, i); });
+  const tagAfter = {
+    'Kist: ':  KOSTEN_PRESETS.findIndex(p => p.nav === 'kist'),
+    '🌸 ':     KOSTEN_PRESETS.findIndex(p => p.nav === 'bloemen'),
+    '🍽 ':     KOSTEN_PRESETS.findIndex(p => p.nav === 'eten'),
+  };
+  const rank = (k) => {
+    const oms = k.omschrijving || '';
+    if (presetIdx.has(oms)) return [presetIdx.get(oms) * 10, 0];
+    for (const tag in tagAfter) if (oms.startsWith(tag)) return [tagAfter[tag] * 10 + 5, 0];
+    return [KOSTEN_PRESETS.length * 10 + 100, Number(k.id) || 0];
+  };
+  return kosten.slice().sort((a, b) => {
+    const ra = rank(a), rb = rank(b);
+    return ra[0] !== rb[0] ? ra[0] - rb[0] : ra[1] - rb[1];
+  });
+}
+
+function buildDossierEmail(d, kosten) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
   const adresC = [[d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '), d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
   const huis = [fmtDate(d.huisbezoek_datum), d.huisbezoek_tijd].filter(Boolean).join(' ');
@@ -541,6 +563,53 @@ function buildDossierEmail(d) {
     ['Naam', d.opdrachtgever_naam],
     ['Telefoon', d.opdrachtgever_telefoon],
   ]));
+
+  // ─── Kostenoverzicht ──────────────────────────────────────────────────
+  const kostenLijst = Array.isArray(kosten) ? _kostenInPresetVolgorde(kosten) : [];
+  const totaalKost = kostenLijst.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const betaaldKost = kostenLijst.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const openKost = Math.max(0, totaalKost - betaaldKost);
+  parts.push(emH3('Kostenoverzicht'));
+  if (kostenLijst.length === 0) {
+    parts.push(`<p style="color:#6f6a62;font-style:italic;margin:6px 0 14px;">Geen kostenposten geregistreerd.</p>`);
+  } else {
+    parts.push(`<table cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:6px 0 14px;font-size:13px;">
+      <thead>
+        <tr style="background:#f6f4ef;">
+          <th align="left"  style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Omschrijving</th>
+          <th align="left"  style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Categorie</th>
+          <th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Aantal</th>
+          <th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Bedrag</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${kostenLijst.map(k => {
+          const aantal = Number(k.aantal) || 1;
+          const stuk = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
+          return `<tr>
+            <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${esc(k.omschrijving)}${aantal !== 1 ? ` <span style="color:#8a847b;font-size:11px;">(${esc(fmtEUR(stuk))} per stuk)</span>` : ''}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;color:#6f6a62;">${esc(categorieLabel(k.categorie))}</td>
+            <td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${aantal}</td>
+            <td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${esc(fmtEUR(k.bedrag))}${k.betaald ? ' <span style="color:#2a7a3a;font-size:11px;">✓</span>' : ''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" align="right" style="padding:8px 10px;font-weight:600;border-top:2px solid #d8d4ca;">Totaal</td>
+          <td align="right" style="padding:8px 10px;font-weight:600;font-variant-numeric:tabular-nums;border-top:2px solid #d8d4ca;">${esc(fmtEUR(totaalKost))}</td>
+        </tr>
+        ${betaaldKost > 0 ? `<tr>
+          <td colspan="3" align="right" style="padding:6px 10px;color:#2a7a3a;">Reeds betaald</td>
+          <td align="right" style="padding:6px 10px;color:#2a7a3a;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(betaaldKost))}</td>
+        </tr>` : ''}
+        ${openKost > 0 ? `<tr>
+          <td colspan="3" align="right" style="padding:8px 10px;font-weight:700;color:#b34;">Open saldo</td>
+          <td align="right" style="padding:8px 10px;font-weight:700;color:#b34;font-variant-numeric:tabular-nums;">${esc(fmtEUR(openKost))}</td>
+        </tr>` : ''}
+      </tfoot>
+    </table>`);
+  }
 
   if (d.bijzonderheden) {
     parts.push(emH3('Bijzonderheden'));
@@ -724,11 +793,12 @@ function bindDetailEvents(id) {
   if (emailDosBtn) {
     emailDosBtn.addEventListener('click', () => {
       const d = DB.byId(KEYS.DOSSIERS, id); if (!d) return;
+      const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id);
       MailComposer.open({
         dossier: d,
         type: 'dossier',
         subject: `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim(),
-        body: buildDossierEmail(d),
+        body: buildDossierEmail(d, kostenLijst),
       });
     });
   }
