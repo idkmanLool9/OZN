@@ -356,11 +356,15 @@ DECLARE
   volgnr INT;
 BEGIN
   IF NEW.dossier_nummer IS NULL OR NEW.dossier_nummer = '' THEN
+    -- Hoogste volgnummer over BEIDE oude en nieuwe notatie
+    -- (oud: 'SOK-YYYY-XXXX', nieuw: 'YYYY-XXXX'), zodat we
+    -- nooit een dubbel nummer uitgeven binnen hetzelfde jaar.
     SELECT COALESCE(MAX(CAST(SUBSTRING(dossier_nummer FROM '[0-9]+$') AS INT)), 0) + 1
       INTO volgnr
       FROM public.dossiers
-     WHERE dossier_nummer LIKE 'SOK-' || jaar || '-%';
-    NEW.dossier_nummer := 'SOK-' || jaar || '-' || LPAD(volgnr::TEXT, 4, '0');
+     WHERE dossier_nummer LIKE jaar || '-%'
+        OR dossier_nummer LIKE 'SOK-' || jaar || '-%';
+    NEW.dossier_nummer := jaar || '-' || LPAD(volgnr::TEXT, 4, '0');
   END IF;
   RETURN NEW;
 END;
