@@ -43,7 +43,10 @@ function renderKistenBeheer(msg) {
 
   const q = (_kistFilter || '').trim().toLowerCase();
   const max = parseFloat(String(_kistPrijsMax).replace(',', '.')) || 0;
-  const items = KISTEN_CATALOGUS
+  // In beheermodus tonen we ook verborgen kisten (met een 'verborgen'-label)
+  // zodat ze terug zichtbaar gemaakt kunnen worden.
+  const bron = effectieveKistenCatalogus({ includeHidden: adminMode });
+  const items = bron
     .slice()
     .filter(k => {
       if (q && !((k.naam || '').toLowerCase().includes(q) || (k.materiaal || '').toLowerCase().includes(q))) return false;
@@ -51,7 +54,7 @@ function renderKistenBeheer(msg) {
       return true;
     })
     .sort((a, b) => a.bedrag - b.bedrag);
-  const totaalCount = KISTEN_CATALOGUS.length;
+  const totaalCount = bron.length;
 
   $('#view').innerHTML = `
     <div class="page">
@@ -90,20 +93,22 @@ function renderKistenBeheer(msg) {
       <div class="kist-grid">
         ${items.map(k => {
           const url = KistFotos.urlVoor(k.naam);
+          const hidden = !!k._hidden;
           return `
-            <div class="kist-card" data-naam="${esc(k.naam)}">
+            <div class="kist-card ${hidden ? 'is-hidden-catalog' : ''}" data-naam="${esc(k.naam)}">
               <button type="button" class="kist-card-img kist-card-img-btn" data-action="zoom" data-naam="${esc(k.naam)}" aria-label="Vergroot ${esc(k.naam)}">
                 ${url
                   ? `<img src="${esc(url)}" alt="${esc(k.naam)}" loading="lazy">`
                   : `<div class="kist-card-svg">${kistSVG(k.materiaal)}</div>
                      <div class="kist-card-no-img">geen foto</div>`}
+                ${hidden ? '<span class="kist-hidden-badge">verborgen</span>' : ''}
               </button>
               <div class="kist-card-meta">
                 <strong>${esc(k.naam)}</strong>
                 <span class="muted small">${esc(k.materiaal)}</span>
-                <span class="kist-price">${fmtEUR(k.bedrag)}</span>
+                <span class="kist-price">${fmtEUR(k.bedrag)} ${k._customBedrag ? '<span class="badge badge-amber" title="Eigen prijs">✏️</span>' : ''}</span>
               </div>
-              ${hasDraft ? `
+              ${hasDraft && !hidden ? `
                 <div class="kist-card-actions">
                   <button type="button" class="btn btn-sm btn-primary" data-pick-kist="${esc(k.naam)}">✓ Kies voor dossier</button>
                 </div>` : ''}
@@ -112,7 +117,18 @@ function renderKistenBeheer(msg) {
                   <label class="btn btn-sm">${url ? 'Vervang foto' : 'Foto uploaden'}
                     <input type="file" accept="image/*" data-upload="${esc(k.naam)}" hidden>
                   </label>
-                  ${url ? `<button type="button" class="btn btn-sm btn-ghost" data-remove="${esc(k.naam)}">Verwijder</button>` : ''}
+                  ${url ? `<button type="button" class="btn btn-sm btn-ghost" data-remove-foto="${esc(k.naam)}">Foto weg</button>` : ''}
+                </div>
+                <div class="kist-card-actions catalog-edit-row">
+                  <label class="catalog-price-edit">
+                    <span class="muted small">Prijs €</span>
+                    <input type="text" inputmode="decimal" data-edit-price="${esc(k.naam)}" value="${esc(String(k.bedrag).replace('.', ','))}" placeholder="0,00">
+                  </label>
+                  <button type="button" class="btn btn-sm" data-save-price="${esc(k.naam)}">Opslaan</button>
+                  ${k._customBedrag ? `<button type="button" class="btn btn-sm btn-ghost" data-reset-price="${esc(k.naam)}" title="Terug naar standaardprijs">↺ Reset</button>` : ''}
+                  ${hidden
+                    ? `<button type="button" class="btn btn-sm btn-ghost" data-show-kist="${esc(k.naam)}">👁 Toon weer</button>`
+                    : `<button type="button" class="btn btn-sm btn-ghost" data-hide-kist="${esc(k.naam)}">🗑 Verberg uit catalogus</button>`}
                 </div>` : ''}
             </div>`;
         }).join('')}
@@ -190,7 +206,62 @@ function renderKistenBeheer(msg) {
     }
   };
 
+  // Helper: muteer Settings.kisten_overrides[naam]
+  function _patchKistOverride(naam, patch) {
+    const cur = Object.assign({}, Settings.get('kisten_overrides') || {});
+    const entry = Object.assign({}, cur[naam] || {}, patch);
+    // Cleanup: lege eigenschappen weghalen
+    if (entry.bedrag == null) delete entry.bedrag;
+    if (!entry.hidden)        delete entry.hidden;
+    if (Object.keys(entry).length === 0) delete cur[naam];
+    else                                  cur[naam] = entry;
+    Settings.set({ kisten_overrides: cur });
+  }
+
   $('#view').onclick = async e => {
+    // ── Beheermodus: prijs / verberg / toon-weer / reset ──
+    const savePriceBtn = e.target.closest('button[data-save-price]');
+    if (savePriceBtn) {
+      const naam = savePriceBtn.getAttribute('data-save-price');
+      const inp = $(`input[data-edit-price="${CSS.escape(naam)}"]`);
+      if (!inp) return;
+      const bedrag = parseEUR(inp.value);
+      if (!isFinite(bedrag) || bedrag < 0) {
+        Modal.show({ type: 'warning', title: 'Ongeldige prijs', message: 'Vul een geldig bedrag in (bv. 1234,56).' });
+        return;
+      }
+      _patchKistOverride(naam, { bedrag });
+      renderKistenBeheer({ success: `Prijs van "${naam}" opgeslagen.` });
+      return;
+    }
+    const resetPriceBtn = e.target.closest('button[data-reset-price]');
+    if (resetPriceBtn) {
+      const naam = resetPriceBtn.getAttribute('data-reset-price');
+      _patchKistOverride(naam, { bedrag: null });
+      renderKistenBeheer({ success: `Standaardprijs voor "${naam}" hersteld.` });
+      return;
+    }
+    const hideBtn = e.target.closest('button[data-hide-kist]');
+    if (hideBtn) {
+      const naam = hideBtn.getAttribute('data-hide-kist');
+      const ok = await Modal.confirm({
+        title: 'Kist verbergen?',
+        message: `"${naam}" verdwijnt uit de catalogus. Bestaande dossiers die deze kist gekozen hebben blijven werken; je kunt hem later weer zichtbaar maken in beheermodus.`,
+        confirmText: 'Verbergen',
+      });
+      if (!ok) return;
+      _patchKistOverride(naam, { hidden: true });
+      renderKistenBeheer({ success: `"${naam}" verborgen uit de catalogus.` });
+      return;
+    }
+    const showBtn = e.target.closest('button[data-show-kist]');
+    if (showBtn) {
+      const naam = showBtn.getAttribute('data-show-kist');
+      _patchKistOverride(naam, { hidden: false });
+      renderKistenBeheer({ success: `"${naam}" weer zichtbaar in de catalogus.` });
+      return;
+    }
+
     // Kies kist voor actief dossier
     const pickBtn = e.target.closest('button[data-pick-kist]');
     if (pickBtn) {
@@ -222,7 +293,7 @@ function renderKistenBeheer(msg) {
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
       const naam = zoom.getAttribute('data-naam');
-      const k = KISTEN_CATALOGUS.find(x => x.naam === naam); if (!k) return;
+      const k = vindKist(naam); if (!k) return;
       Lightbox.show({
         src: KistFotos.urlVoor(k.naam) || null,
         svgFallback: kistSVG(k.materiaal),
@@ -232,9 +303,9 @@ function renderKistenBeheer(msg) {
       });
       return;
     }
-    const btn = e.target.closest('button[data-remove]');
+    const btn = e.target.closest('button[data-remove-foto]');
     if (!btn) return;
-    const naam = btn.getAttribute('data-remove');
+    const naam = btn.getAttribute('data-remove-foto');
     const ok = await Modal.confirm({ title: 'Foto verwijderen?', message: `De foto van "${naam}" wordt definitief verwijderd.`, confirmText: 'Verwijderen' });
     if (!ok) return;
     try {

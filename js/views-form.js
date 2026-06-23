@@ -465,6 +465,7 @@ function renderDossierForm(params) {
   function renderWizardKosten() {
     const mount = document.getElementById('wizard-kosten-mount');
     if (!mount) return;
+    const adminMode = !!Settings.get('catalog_admin_mode');
 
     // Bron: buffer (nieuw) of live DB (bestaand)
     const kosten = isNew
@@ -498,16 +499,29 @@ function renderDossierForm(params) {
 
       <details class="wizard-kosten-presets" id="wk-presets-details" ${presetsOpen ? 'open' : ''} style="margin-top:.85rem;">
         <summary>+ Snel toevoegen uit standaardlijst</summary>
+        ${adminMode ? '<p class="muted small" style="margin:.5rem 0 0;">Beheermodus aan — klik op het potlood om een prijs aan te passen of op de prullenbak om een post uit de lijst te verbergen.</p>' : ''}
         <div class="wizard-preset-grid">
-          ${KOSTEN_PRESETS.map((p, i) => {
+          ${effectieveKostenPresets({ includeHidden: adminMode }).map((p, i) => {
             const cls = 'btn btn-sm btn-ghost wizard-preset-btn'
-              + (p.nav ? ' wizard-preset-nav wizard-preset-nav-' + p.nav : '');
+              + (p.nav ? ' wizard-preset-nav wizard-preset-nav-' + p.nav : '')
+              + (p._hidden ? ' is-hidden-preset' : '');
             const prijs = (p.bedrag != null && p.bedrag !== '')
-              ? '<span class="muted small">' + fmtEUR(p.bedrag) + '</span>'
+              ? `<span class="muted small">${fmtEUR(p.bedrag)}${p._customBedrag ? ' ✏️' : ''}</span>`
               : (p.nav ? '<span class="muted small">→</span>' : '');
-            return `<button type="button" class="${cls}" data-wk-preset="${i}">
-              ${esc(p.omschrijving)} ${prijs}
-            </button>`;
+            const adminCtrls = (adminMode && !p.nav)
+              ? `<span class="wizard-preset-admin">
+                  <button type="button" class="wizard-preset-edit" data-wk-edit="${i}" title="Prijs aanpassen">✏️</button>
+                  ${p._hidden
+                    ? `<button type="button" class="wizard-preset-show" data-wk-show="${i}" title="Toon weer">👁</button>`
+                    : `<button type="button" class="wizard-preset-hide" data-wk-hide="${i}" title="Verberg uit lijst">🗑</button>`}
+                </span>`
+              : '';
+            return `<span class="wizard-preset-wrap">
+              <button type="button" class="${cls}" data-wk-preset="${i}" ${p._hidden ? 'disabled' : ''}>
+                ${esc(p.omschrijving)} ${prijs}
+              </button>
+              ${adminCtrls}
+            </span>`;
           }).join('')}
         </div>
       </details>
@@ -559,9 +573,10 @@ function renderDossierForm(params) {
         try { await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
       }
     };
+    const presetList = effectieveKostenPresets({ includeHidden: adminMode });
     mount.querySelectorAll('[data-wk-preset]').forEach(b => {
       b.addEventListener('click', () => {
-        const p = KOSTEN_PRESETS[parseInt(b.dataset.wkPreset, 10)];
+        const p = presetList[parseInt(b.dataset.wkPreset, 10)];
         if (!p) return;
         // Navigatie-tegels (Kist / Bloemen / Extra) hebben geen vaste prijs;
         // ze leiden de gebruiker naar een andere pagina of focussen het
@@ -576,6 +591,64 @@ function renderDossierForm(params) {
           return;
         }
         addPreset(p);
+      });
+    });
+    // ── Beheermodus: prijs aanpassen, verbergen, weer tonen ──
+    function _patchKostOverride(omschrijving, patch) {
+      const cur = Object.assign({}, Settings.get('kosten_overrides') || {});
+      const entry = Object.assign({}, cur[omschrijving] || {}, patch);
+      if (entry.bedrag == null) delete entry.bedrag;
+      if (!entry.hidden)        delete entry.hidden;
+      if (Object.keys(entry).length === 0) delete cur[omschrijving];
+      else                                  cur[omschrijving] = entry;
+      Settings.set({ kosten_overrides: cur });
+    }
+    mount.querySelectorAll('[data-wk-edit]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const p = presetList[parseInt(b.dataset.wkEdit, 10)];
+        if (!p) return;
+        const huidig = p.bedrag != null ? String(p.bedrag).replace('.', ',') : '';
+        const input = window.prompt(
+          `Nieuwe prijs voor "${p.omschrijving}" (€).\nLaat leeg en druk OK om de standaardprijs te herstellen.`,
+          huidig
+        );
+        if (input == null) return; // Annuleren
+        if (input.trim() === '') {
+          _patchKostOverride(p.omschrijving, { bedrag: null });
+        } else {
+          const bedrag = parseEUR(input);
+          if (!isFinite(bedrag) || bedrag < 0) {
+            Modal.show({ type: 'warning', title: 'Ongeldige prijs', message: 'Vul een geldig bedrag in (bv. 1234,56).' });
+            return;
+          }
+          _patchKostOverride(p.omschrijving, { bedrag });
+        }
+        renderWizardKosten();
+      });
+    });
+    mount.querySelectorAll('[data-wk-hide]').forEach(b => {
+      b.addEventListener('click', async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const p = presetList[parseInt(b.dataset.wkHide, 10)];
+        if (!p) return;
+        const ok = await Modal.confirm({
+          title: 'Verbergen uit lijst?',
+          message: `"${p.omschrijving}" verdwijnt uit de snel-toevoeg-lijst. Bestaande kostenposten blijven staan; je kunt 'm later weer tonen via beheermodus.`,
+          confirmText: 'Verbergen',
+        });
+        if (!ok) return;
+        _patchKostOverride(p.omschrijving, { hidden: true });
+        renderWizardKosten();
+      });
+    });
+    mount.querySelectorAll('[data-wk-show]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const p = presetList[parseInt(b.dataset.wkShow, 10)];
+        if (!p) return;
+        _patchKostOverride(p.omschrijving, { hidden: false });
+        renderWizardKosten();
       });
     });
     // Onthoud open/dicht-stand van de presets-details
@@ -657,7 +730,7 @@ function renderDossierForm(params) {
 
   function syncAutoKostKist(naam) {
     if (!naam || naam === 'anders') { syncAutoKost(KIST_PREFIX, 'kist', null, null); return; }
-    const k = KISTEN_CATALOGUS.find(x => x.naam === naam);
+    const k = vindKist(naam);
     syncAutoKost(KIST_PREFIX, 'kist', naam, k ? Number(k.bedrag) : null);
   }
   function syncAutoKostBloem(naam) {

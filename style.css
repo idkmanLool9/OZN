@@ -2357,6 +2357,55 @@ fieldset[data-step][hidden] { display: none !important; }
   display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem;
 }
 .wizard-preset-btn { text-align: left; }
+
+/* Beheermodus: admin-tools naast preset-tegel */
+.wizard-preset-wrap,
+.preset-wrap {
+  display: inline-flex; align-items: stretch; gap: 0;
+}
+.wizard-preset-admin,
+.preset-admin {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid var(--border); border-left: 0;
+  border-radius: 0 6px 6px 0; overflow: hidden;
+  background: #fafaf6;
+}
+.wizard-preset-wrap .wizard-preset-btn,
+.preset-wrap .preset-btn {
+  border-radius: 6px 0 0 6px;
+}
+.wizard-preset-wrap > .wizard-preset-btn:only-child,
+.preset-wrap > .preset-btn:only-child {
+  border-radius: 6px;
+}
+.wizard-preset-admin button,
+.preset-admin button {
+  border: 0; background: transparent; padding: 0 .5rem;
+  cursor: pointer; font-size: .9rem;
+  border-left: 1px solid var(--border);
+}
+.wizard-preset-admin button:hover,
+.preset-admin button:hover { background: #fde6c2; }
+.is-hidden-preset {
+  opacity: .55; text-decoration: line-through;
+}
+
+/* Verborgen kist-kaart */
+.kist-card.is-hidden-catalog { opacity: .6; }
+.kist-hidden-badge {
+  position: absolute; top: .4rem; left: .4rem;
+  background: #b3261e; color: #fff; padding: .15rem .45rem;
+  border-radius: 4px; font-size: .7rem; font-weight: 700;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.kist-card-img { position: relative; }
+.catalog-edit-row { flex-wrap: wrap; align-items: center; }
+.catalog-price-edit { display: inline-flex; align-items: center; gap: .35rem; }
+.catalog-price-edit input {
+  width: 6em; padding: .3rem .45rem;
+  border: 1px solid var(--border); border-radius: 5px;
+  font: inherit; text-align: right;
+}
 /* Navigatie-tegels (Kist / Bloemen / Extra) onderscheiden zich met
    een licht gekleurde achtergrond zodat ze opvallen tussen de presets. */
 .wizard-preset-nav,

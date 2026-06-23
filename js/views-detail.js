@@ -284,18 +284,37 @@ function renderDossierDetail(params) {
           </div>`;
         })()}
         <h3 style="margin-top:1rem;">Snel toevoegen uit catalogus</h3>
-        <p class="muted small">Klik om een vast tarief direct toe te voegen.</p>
+        <p class="muted small">Klik om een vast tarief direct toe te voegen.${(() => {
+          const adminMode = !!Settings.get('catalog_admin_mode');
+          return adminMode ? ' <em>Beheermodus aan — gebruik ✏️ om de prijs aan te passen, 🗑 om te verbergen.</em>' : '';
+        })()}</p>
         <div class="preset-grid">
-          ${KOSTEN_PRESETS.map((p, i) => {
-            const cls = 'btn preset-btn' + (p.nav ? ' preset-nav preset-nav-' + p.nav : '');
-            const trailing = (p.bedrag != null && p.bedrag !== '')
-              ? `<strong>${fmtEUR(p.bedrag)}</strong>`
-              : (p.nav ? '<strong class="muted">→</strong>' : '');
-            return `<button type="button" class="${cls}" data-action="add-preset" data-preset="${i}">
-              <span>${esc(p.omschrijving)}</span>
-              ${trailing}
-            </button>`;
-          }).join('')}
+          ${(() => {
+            const adminMode = !!Settings.get('catalog_admin_mode');
+            return effectieveKostenPresets({ includeHidden: adminMode }).map((p, i) => {
+              const cls = 'btn preset-btn'
+                + (p.nav ? ' preset-nav preset-nav-' + p.nav : '')
+                + (p._hidden ? ' is-hidden-preset' : '');
+              const trailing = (p.bedrag != null && p.bedrag !== '')
+                ? `<strong>${fmtEUR(p.bedrag)}${p._customBedrag ? ' ✏️' : ''}</strong>`
+                : (p.nav ? '<strong class="muted">→</strong>' : '');
+              const adminCtrls = (adminMode && !p.nav)
+                ? `<span class="preset-admin">
+                    <button type="button" class="preset-edit" data-action="edit-preset" data-preset="${i}" title="Prijs aanpassen">✏️</button>
+                    ${p._hidden
+                      ? `<button type="button" class="preset-show" data-action="show-preset" data-preset="${i}" title="Toon weer">👁</button>`
+                      : `<button type="button" class="preset-hide" data-action="hide-preset" data-preset="${i}" title="Verberg uit lijst">🗑</button>`}
+                  </span>`
+                : '';
+              return `<span class="preset-wrap">
+                <button type="button" class="${cls}" data-action="add-preset" data-preset="${i}" ${p._hidden ? 'disabled' : ''}>
+                  <span>${esc(p.omschrijving)}</span>
+                  ${trailing}
+                </button>
+                ${adminCtrls}
+              </span>`;
+            }).join('');
+          })()}
         </div>
         <h3 style="margin-top:1rem;">Of voeg handmatig toe</h3>
         <form id="add-kosten" class="row-form">
@@ -817,8 +836,49 @@ function bindDetailEvents(id) {
       } else if (action === 'del-portaal-item') {
         const row = btn.closest('.portaal-item');
         if (row) row.remove();
+      } else if (action === 'edit-preset' || action === 'hide-preset' || action === 'show-preset') {
+        const adminMode = !!Settings.get('catalog_admin_mode');
+        const list = effectieveKostenPresets({ includeHidden: adminMode });
+        const p = list[parseInt(btn.getAttribute('data-preset'), 10)];
+        if (!p || p.nav) return;
+        const cur = Object.assign({}, Settings.get('kosten_overrides') || {});
+        const entry = Object.assign({}, cur[p.omschrijving] || {});
+        if (action === 'edit-preset') {
+          const huidig = p.bedrag != null ? String(p.bedrag).replace('.', ',') : '';
+          const input = window.prompt(
+            `Nieuwe prijs voor "${p.omschrijving}" (€).\nLaat leeg en druk OK om de standaardprijs te herstellen.`,
+            huidig
+          );
+          if (input == null) return;
+          if (input.trim() === '') delete entry.bedrag;
+          else {
+            const bedrag = parseEUR(input);
+            if (!isFinite(bedrag) || bedrag < 0) {
+              Modal.show({ type: 'warning', title: 'Ongeldige prijs', message: 'Vul een geldig bedrag in (bv. 1234,56).' });
+              return;
+            }
+            entry.bedrag = bedrag;
+          }
+        } else if (action === 'hide-preset') {
+          const ok = await Modal.confirm({
+            title: 'Verbergen uit lijst?',
+            message: `"${p.omschrijving}" verdwijnt uit de snel-toevoeg-lijst. Bestaande kostenposten blijven staan.`,
+            confirmText: 'Verbergen',
+          });
+          if (!ok) return;
+          entry.hidden = true;
+        } else if (action === 'show-preset') {
+          delete entry.hidden;
+        }
+        if (Object.keys(entry).length === 0) delete cur[p.omschrijving];
+        else                                  cur[p.omschrijving] = entry;
+        Settings.set({ kosten_overrides: cur });
+        renderDossierDetail({ id });
+        return;
       } else if (action === 'add-preset') {
-        const p = KOSTEN_PRESETS[parseInt(btn.getAttribute('data-preset'), 10)];
+        const adminMode = !!Settings.get('catalog_admin_mode');
+        const list = effectieveKostenPresets({ includeHidden: adminMode });
+        const p = list[parseInt(btn.getAttribute('data-preset'), 10)];
         if (!p) return;
         // Navigatie-tegels: open de juiste catalogus-pagina of focus
         // het handmatige invoer-formulier.

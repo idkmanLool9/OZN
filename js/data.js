@@ -66,6 +66,48 @@ const KOSTEN_PRESETS = [
   { nav: 'extra',    categorie: 'overig',        omschrijving: '＋ Extra uitgave (zelf invullen)', bedrag: null },
 ];
 
+// Beheermodus-overrides: prijzen + verberg-vlag worden in Settings
+// opgeslagen. Helpers passen ze toe op de "view" van de catalogus
+// zonder de constante zelf te muteren — zo blijven de fabrieksprijzen
+// bewaard en kan een gebruiker eenvoudig terugzetten.
+function effectieveKostenPresets({ includeHidden = false } = {}) {
+  const ov = (typeof Settings !== 'undefined' && Settings.get('kosten_overrides')) || {};
+  return KOSTEN_PRESETS
+    .filter(p => p.nav || includeHidden || !(ov[p.omschrijving] && ov[p.omschrijving].hidden))
+    .map(p => {
+      if (p.nav) return p;
+      const o = ov[p.omschrijving];
+      if (!o) return p;
+      const out = Object.assign({}, p);
+      if (o.bedrag != null) { out.bedrag = Number(o.bedrag); out._customBedrag = true; }
+      if (o.hidden) out._hidden = true;
+      return out;
+    });
+}
+function effectieveKistenCatalogus({ includeHidden = false } = {}) {
+  const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};
+  return KISTEN_CATALOGUS
+    .filter(k => includeHidden || !(ov[k.naam] && ov[k.naam].hidden))
+    .map(k => {
+      const o = ov[k.naam];
+      if (!o) return k;
+      const out = Object.assign({}, k);
+      if (o.bedrag != null) { out.bedrag = Number(o.bedrag); out._customBedrag = true; }
+      if (o.hidden) out._hidden = true;
+      return out;
+    });
+}
+function vindKist(naam) {
+  // Lookup-by-naam met override toegepast (ook voor verborgen kisten —
+  // zodat oude dossiers nog correct hun kist-prijs vertonen).
+  const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};
+  const k = KISTEN_CATALOGUS.find(x => x.naam === naam);
+  if (!k) return null;
+  const o = ov[naam];
+  if (!o || o.bedrag == null) return k;
+  return Object.assign({}, k, { bedrag: Number(o.bedrag), _customBedrag: true });
+}
+
 // Unigra kistencatalogus (adviesprijzen per nov 2025)
 const KISTEN_CATALOGUS = [
   { naam: 'Natuurkist',                 materiaal: 'Massief populieren, natuur',  bedrag: 1054.00 },
