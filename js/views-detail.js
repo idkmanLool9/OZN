@@ -524,17 +524,6 @@ function buildDossierEmail(d, kosten) {
     ['Begraafplaats', grafstuk],
   ]));
 
-  parts.push(emH3('Logistiek'));
-  parts.push(emTable([
-    ['Kist', d.kist_type],
-    ['Rouwauto', d.rouwauto],
-    ["Volgauto's", d.aantal_volgauto],
-    ['Dragers', d.dragers],
-    ['Bloemstukken', d.bloemstukken],
-    ['Rouwkaarten', d.rouwkaarten_aantal],
-    ['Condoleance', d.condoleance_locatie],
-  ]));
-
   if (d.verzekering_status === 'met verzekering') {
     parts.push(emH3('Verzekering'));
     parts.push(emTable([
