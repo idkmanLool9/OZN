@@ -520,8 +520,8 @@ function renderDossierForm(params) {
               ? `<span class="wizard-preset-admin">
                   <button type="button" class="wizard-preset-edit" data-wk-edit="${i}" title="Prijs aanpassen">✏️</button>
                   ${p._hidden
-                    ? `<button type="button" class="wizard-preset-show" data-wk-show="${i}" title="Toon weer">👁</button>`
-                    : `<button type="button" class="wizard-preset-hide" data-wk-hide="${i}" title="Verberg uit lijst">🗑</button>`}
+                    ? `<button type="button" class="wizard-preset-show" data-wk-show="${i}" title="Herstel kostenpost">↺</button>`
+                    : `<button type="button" class="wizard-preset-hide" data-wk-hide="${i}" title="Verwijder uit lijst">🗑</button>`}
                 </span>`
               : '';
             return `<span class="wizard-preset-wrap">
@@ -659,9 +659,11 @@ function renderDossierForm(params) {
         const p = presetList[parseInt(b.dataset.wkHide, 10)];
         if (!p) return;
         const ok = await Modal.confirm({
-          title: 'Verbergen uit lijst?',
-          message: `"${p.omschrijving}" verdwijnt uit de snel-toevoeg-lijst. Bestaande kostenposten blijven staan; je kunt 'm later weer tonen via beheermodus.`,
-          confirmText: 'Verbergen',
+          type: 'warning',
+          title: 'Kostenpost verwijderen?',
+          message: `"${p.omschrijving}" wordt definitief uit de snel-toevoeg-lijst verwijderd. Bestaande kostenposten in dossiers blijven staan. Je kunt 'm later eventueel herstellen via de "↺"-knop in beheermodus.`,
+          confirmText: 'Verwijderen',
+          cancelText: 'Annuleren',
         });
         if (!ok) return;
         _patchKostOverride(p.omschrijving, { hidden: true });

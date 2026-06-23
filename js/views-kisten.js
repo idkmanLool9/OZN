@@ -101,7 +101,7 @@ function renderKistenBeheer(msg) {
                   ? `<img src="${esc(url)}" alt="${esc(k.naam)}" loading="lazy">`
                   : `<div class="kist-card-svg">${kistSVG(k.materiaal)}</div>
                      <div class="kist-card-no-img">geen foto</div>`}
-                ${hidden ? '<span class="kist-hidden-badge">verborgen</span>' : ''}
+                ${hidden ? '<span class="kist-hidden-badge">verwijderd</span>' : ''}
               </button>
               <div class="kist-card-meta">
                 <strong>${esc(k.naam)}</strong>
@@ -127,8 +127,8 @@ function renderKistenBeheer(msg) {
                   <button type="button" class="btn btn-sm" data-save-price="${esc(k.naam)}">Opslaan</button>
                   ${k._customBedrag ? `<button type="button" class="btn btn-sm btn-ghost" data-reset-price="${esc(k.naam)}" title="Terug naar standaardprijs">↺ Reset</button>` : ''}
                   ${hidden
-                    ? `<button type="button" class="btn btn-sm btn-ghost" data-show-kist="${esc(k.naam)}">👁 Toon weer</button>`
-                    : `<button type="button" class="btn btn-sm btn-ghost" data-hide-kist="${esc(k.naam)}">🗑 Verberg uit catalogus</button>`}
+                    ? `<button type="button" class="btn btn-sm btn-ghost" data-show-kist="${esc(k.naam)}">↺ Herstel kist</button>`
+                    : `<button type="button" class="btn btn-sm btn-ghost btn-danger" data-hide-kist="${esc(k.naam)}">🗑 Verwijder kist</button>`}
                 </div>` : ''}
             </div>`;
         }).join('')}
@@ -245,20 +245,22 @@ function renderKistenBeheer(msg) {
     if (hideBtn) {
       const naam = hideBtn.getAttribute('data-hide-kist');
       const ok = await Modal.confirm({
-        title: 'Kist verbergen?',
-        message: `"${naam}" verdwijnt uit de catalogus. Bestaande dossiers die deze kist gekozen hebben blijven werken; je kunt hem later weer zichtbaar maken in beheermodus.`,
-        confirmText: 'Verbergen',
+        type: 'warning',
+        title: 'Kist verwijderen?',
+        message: `"${naam}" wordt definitief uit de catalogus verwijderd. Bestaande dossiers die deze kist gekozen hebben blijven werken. Je kunt verwijderde kisten later eventueel herstellen via de "↺ Herstel"-knop in beheermodus.`,
+        confirmText: 'Verwijderen',
+        cancelText: 'Annuleren',
       });
       if (!ok) return;
       _patchKistOverride(naam, { hidden: true });
-      renderKistenBeheer({ success: `"${naam}" verborgen uit de catalogus.` });
+      renderKistenBeheer({ success: `"${naam}" verwijderd uit de catalogus.` });
       return;
     }
     const showBtn = e.target.closest('button[data-show-kist]');
     if (showBtn) {
       const naam = showBtn.getAttribute('data-show-kist');
       _patchKistOverride(naam, { hidden: false });
-      renderKistenBeheer({ success: `"${naam}" weer zichtbaar in de catalogus.` });
+      renderKistenBeheer({ success: `"${naam}" hersteld in de catalogus.` });
       return;
     }
 

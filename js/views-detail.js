@@ -302,8 +302,8 @@ function renderDossierDetail(params) {
                 ? `<span class="preset-admin">
                     <button type="button" class="preset-edit" data-action="edit-preset" data-preset="${i}" title="Prijs aanpassen">✏️</button>
                     ${p._hidden
-                      ? `<button type="button" class="preset-show" data-action="show-preset" data-preset="${i}" title="Toon weer">👁</button>`
-                      : `<button type="button" class="preset-hide" data-action="hide-preset" data-preset="${i}" title="Verberg uit lijst">🗑</button>`}
+                      ? `<button type="button" class="preset-show" data-action="show-preset" data-preset="${i}" title="Herstel kostenpost">↺</button>`
+                      : `<button type="button" class="preset-hide" data-action="hide-preset" data-preset="${i}" title="Verwijder uit lijst">🗑</button>`}
                   </span>`
                 : '';
               return `<span class="preset-wrap">
@@ -861,9 +861,11 @@ function bindDetailEvents(id) {
           }
         } else if (action === 'hide-preset') {
           const ok = await Modal.confirm({
-            title: 'Verbergen uit lijst?',
-            message: `"${p.omschrijving}" verdwijnt uit de snel-toevoeg-lijst. Bestaande kostenposten blijven staan.`,
-            confirmText: 'Verbergen',
+            type: 'warning',
+            title: 'Kostenpost verwijderen?',
+            message: `"${p.omschrijving}" wordt definitief uit de snel-toevoeg-lijst verwijderd. Bestaande kostenposten in dit dossier blijven staan.`,
+            confirmText: 'Verwijderen',
+            cancelText: 'Annuleren',
           });
           if (!ok) return;
           entry.hidden = true;
