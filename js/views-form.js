@@ -270,14 +270,6 @@ function renderDossierForm(params) {
           <label class="full"><span>Notities / wensen familie</span>
             <textarea name="bijzonderheden" rows="5">${v('bijzonderheden')}</textarea>
           </label>
-
-          <hr style="border:none;border-top:1px solid var(--border);margin:1.25rem 0;">
-          <h3 style="margin:0 0 .35rem;">Eten &amp; drinken — vrije kostenpost</h3>
-          <p class="muted small" style="margin:0 0 .65rem;">
-            Klooster voegt vaak los eten/drinken toe (bv. extra simit, baklava, frisdrank).
-            Vul omschrijving + aantal + prijs per stuk in — wordt automatisch in de kosten gezet.
-          </p>
-          <div id="eten-mount"></div>
         </fieldset>
 
         <fieldset class="card" data-step="5">
@@ -538,7 +530,8 @@ function renderDossierForm(params) {
           <option value="">Categorie</option>
           ${KOSTEN_CATEGORIEEN.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
         </select>
-        <input type="text" id="wk-bedrag" placeholder="0,00" inputmode="decimal" style="max-width:110px;">
+        <input type="number" id="wk-aantal" placeholder="Aantal" min="1" step="1" inputmode="numeric" value="1" style="max-width:80px;">
+        <input type="text" id="wk-bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">
         <button type="button" class="btn btn-sm" id="wk-add-btn">+ Toevoegen</button>
       </div>`;
 
@@ -606,6 +599,7 @@ function renderDossierForm(params) {
         // 'eigen invoer'-veld.
         if (p.nav === 'kist')    { Router.go('/kisten');  return; }
         if (p.nav === 'bloemen') { Router.go('/bloemen'); return; }
+        if (p.nav === 'eten')    { Router.go('/eten');    return; }
         if (p.nav === 'extra') {
           const oms = mount.querySelector('#wk-omschrijving');
           const add = mount.querySelector('.wizard-kosten-add');
@@ -684,101 +678,25 @@ function renderDossierForm(params) {
         kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }));
       saveBuffer(); renderWizardKosten();
     });
-    // ── Acties: handmatig toevoegen ──
+    // ── Acties: handmatig toevoegen (met aantal × prijs per stuk) ──
     const addBtn = mount.querySelector('#wk-add-btn');
     if (addBtn) addBtn.addEventListener('click', async () => {
       const oms = mount.querySelector('#wk-omschrijving').value.trim();
       if (!oms) { Modal.show({ type: 'warning', title: 'Omschrijving nodig', message: 'Vul een omschrijving in.' }); return; }
       const cat = mount.querySelector('#wk-categorie').value || null;
-      const bedrag = parseEUR(mount.querySelector('#wk-bedrag').value);
+      const aantal = parseInt(mount.querySelector('#wk-aantal').value, 10);
+      if (!isFinite(aantal) || aantal < 1) { Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' }); return; }
+      const stuk = parseEUR(mount.querySelector('#wk-bedrag').value);
+      const bedrag = +(stuk * aantal).toFixed(2);
       if (isNew) {
-        kostenBuffer.push({ omschrijving: oms, categorie: cat, bedrag, aantal: 1, betaald: false });
+        kostenBuffer.push({ omschrijving: oms, categorie: cat, bedrag, aantal, betaald: false });
         saveBuffer(); renderWizardKosten();
       } else {
-        try { await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: oms, categorie: cat, bedrag, aantal: 1, betaald: false }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
+        try { await DB.insert(KEYS.KOSTEN, { dossier_id: dossier.id, omschrijving: oms, categorie: cat, bedrag, aantal, betaald: false }); await DB.touchDossier(dossier.id); renderWizardKosten(); } catch (_) {}
       }
     });
   }
   renderWizardKosten();
-
-  // ─── Eten & drinken snel-toevoegen in stap 4 (Bijzonderheden) ──────────
-  // Eten-posten herken je aan het 🍽-prefix in de omschrijving.
-  const ETEN_CAT = 'overig';
-  const ETEN_TAG = '🍽 ';
-  function _etenPosten() {
-    const lijst = isNew
-      ? kostenBuffer.map((k, i) => Object.assign({ id: '_buf_' + i }, k))
-      : DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id);
-    return lijst.filter(k => (k.omschrijving || '').startsWith(ETEN_TAG));
-  }
-  function renderEtenSectie() {
-    const mount = document.getElementById('eten-mount');
-    if (!mount) return;
-    const items = _etenPosten();
-    mount.innerHTML = `
-      ${items.length === 0 ? '<p class="muted small" style="margin:.25rem 0 .65rem;">Nog niets toegevoegd.</p>' : `
-      <table class="table eten-table">
-        <thead><tr><th>Omschrijving</th><th class="num">Aantal</th><th class="num">Per stuk</th><th class="num">Totaal</th><th></th></tr></thead>
-        <tbody>
-          ${items.map(k => {
-            const aantal = Number(k.aantal) || 1;
-            const stuk = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
-            const naam = (k.omschrijving || '').replace(ETEN_TAG, '');
-            return `<tr>
-              <td>${esc(naam)}</td>
-              <td class="num">${aantal}</td>
-              <td class="num">${fmtEUR(stuk)}</td>
-              <td class="num">${fmtEUR(k.bedrag)}</td>
-              <td><button type="button" class="btn-icon" data-eten-del="${k.id}" title="Verwijderen">×</button></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>`}
-      <div class="eten-add">
-        <input type="text"   id="eten-oms"    placeholder="Omschrijving (bv. baklava)">
-        <input type="number" id="eten-aantal" placeholder="Aantal"      min="1" step="1" inputmode="numeric" value="1">
-        <input type="text"   id="eten-stuk"   placeholder="Per stuk €"  inputmode="decimal">
-        <button type="button" class="btn btn-sm" id="eten-add-btn">+ Toevoegen aan kosten</button>
-      </div>`;
-
-    mount.querySelectorAll('[data-eten-del]').forEach(b => {
-      b.addEventListener('click', async () => {
-        const id = b.dataset.etenDel;
-        if (isNew) {
-          const i = parseInt(id.replace('_buf_', ''), 10);
-          kostenBuffer.splice(i, 1); saveBuffer();
-          renderEtenSectie(); renderWizardKosten();
-        } else {
-          try {
-            await DB.remove(KEYS.KOSTEN, parseInt(id, 10));
-            await DB.touchDossier(dossier.id);
-            renderEtenSectie(); renderWizardKosten();
-          } catch (_) {}
-        }
-      });
-    });
-    const addBtn = mount.querySelector('#eten-add-btn');
-    if (addBtn) addBtn.addEventListener('click', async () => {
-      const oms = mount.querySelector('#eten-oms').value.trim();
-      if (!oms) { Modal.show({ type: 'warning', title: 'Omschrijving nodig', message: 'Vul in wát je toevoegt (bv. baklava, cola).' }); return; }
-      const aantal = parseInt(mount.querySelector('#eten-aantal').value, 10);
-      if (!isFinite(aantal) || aantal < 1) { Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' }); return; }
-      const stuk = parseEUR(mount.querySelector('#eten-stuk').value);
-      if (!isFinite(stuk) || stuk < 0) { Modal.show({ type: 'warning', title: 'Ongeldige prijs', message: 'Vul een prijs per stuk in.' }); return; }
-      const bedrag = +(stuk * aantal).toFixed(2);
-      const post = { omschrijving: ETEN_TAG + oms, categorie: ETEN_CAT, bedrag, aantal, betaald: false };
-      if (isNew) {
-        kostenBuffer.push(post); saveBuffer();
-      } else {
-        try {
-          await DB.insert(KEYS.KOSTEN, Object.assign({ dossier_id: dossier.id }, post));
-          await DB.touchDossier(dossier.id);
-        } catch (_) { return; }
-      }
-      renderEtenSectie(); renderWizardKosten();
-    });
-  }
-  renderEtenSectie();
 
   // ─── Kist/Bloem auto-syncen naar kosten ─────────────────────────────
   // Bij wijziging van de dropdown verwijderen we de oude auto-post en

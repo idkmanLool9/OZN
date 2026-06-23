@@ -324,7 +324,8 @@ function renderDossierDetail(params) {
             ${KOSTEN_CATEGORIEEN.map(c =>
               `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
           </select>
-          <input type="text" name="bedrag" placeholder="0,00" inputmode="decimal">
+          <input type="number" name="aantal" placeholder="Aantal" min="1" step="1" inputmode="numeric" value="1" style="max-width:80px;">
+          <input type="text" name="bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">
           <label class="checkbox-inline"><input type="checkbox" name="betaald"> betaald</label>
           <button type="submit" class="btn">+ Toevoegen</button>
         </form>
@@ -769,8 +770,12 @@ function bindDetailEvents(id) {
     e.preventDefault();
     const f = e.target;
     const omsch = f.omschrijving.value.trim(); if (!omsch) return;
+    const aantal = parseInt(f.aantal.value, 10);
+    if (!isFinite(aantal) || aantal < 1) { Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' }); return; }
+    const stuk = parseEUR(f.bedrag.value);
+    const bedrag = +(stuk * aantal).toFixed(2);
     try {
-      await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag: parseEUR(f.bedrag.value), aantal: 1, betaald: f.betaald.checked });
+      await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag, aantal, betaald: f.betaald.checked });
       await DB.touchDossier(id);
       renderDossierDetail({ id });
     } catch (_) {}
@@ -886,6 +891,7 @@ function bindDetailEvents(id) {
         // het handmatige invoer-formulier.
         if (p.nav === 'kist')    { Router.go('/kisten');  return; }
         if (p.nav === 'bloemen') { Router.go('/bloemen'); return; }
+        if (p.nav === 'eten')    { Router.go('/eten');    return; }
         if (p.nav === 'extra') {
           const oms = document.querySelector('#add-kosten input[name="omschrijving"]');
           if (oms) {
