@@ -406,6 +406,11 @@ function renderDossierForm(params) {
       localStorage.setItem(maxKey,  String(maxStepReached));
     } catch (_) {}
     updateStepColors();
+    // SignaturePads pas initialiseren wanneer stap 5 zichtbaar is —
+    // anders is de canvas 0×0 en kan er niet getekend worden.
+    if (currentStep === 5 && typeof initSigPadsIfNeeded === 'function') {
+      requestAnimationFrame(initSigPadsIfNeeded);
+    }
   };
 
   document.querySelectorAll('.wizard-step').forEach(el => {
@@ -894,23 +899,33 @@ function renderDossierForm(params) {
 
   showStep(currentStep);
 
-  // ─── Handtekeningen activeren ──────────────────────────────────────────
+  // ─── Handtekeningen activeren (lazy — pas zodra stap 5 zichtbaar) ─────
+  // De canvas heeft pas geldige getBoundingClientRect-afmetingen wanneer
+  // het bijbehorende fieldset zichtbaar is. Daarom initialiseren we de
+  // SignaturePads pas in showStep wanneer currentStep === 5.
   const sigPads = {};
   const existingSigs = (dossier.handtekeningen && typeof dossier.handtekeningen === 'object') ? dossier.handtekeningen : {};
-  $$('.signature-pad').forEach(canvas => {
-    const id = canvas.getAttribute('data-sigid');
-    const pad = new SignaturePad(canvas);
-    sigPads[id] = pad;
-    if (existingSigs[id] && existingSigs[id].data) {
-      pad.fromDataURL(existingSigs[id].data);
-      const status = $(`[data-status="${id}"]`);
-      if (status) {
-        const when = existingSigs[id].signed_at ? ' op ' + new Date(existingSigs[id].signed_at).toLocaleString('nl-NL') : '';
-        status.textContent = 'Ondertekend' + when;
-        status.classList.add('signed');
+  function initSigPadsIfNeeded() {
+    $$('.signature-pad').forEach(canvas => {
+      const id = canvas.getAttribute('data-sigid');
+      if (sigPads[id]) return; // al geïnitialiseerd
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return; // nog niet zichtbaar
+      const pad = new SignaturePad(canvas);
+      sigPads[id] = pad;
+      if (existingSigs[id] && existingSigs[id].data) {
+        pad.fromDataURL(existingSigs[id].data);
+        const status = $(`[data-status="${id}"]`);
+        if (status) {
+          const when = existingSigs[id].signed_at ? ' op ' + new Date(existingSigs[id].signed_at).toLocaleString('nl-NL') : '';
+          status.textContent = 'Ondertekend' + when;
+          status.classList.add('signed');
+        }
       }
-    }
-  });
+    });
+  }
+  // Als de wizard meteen op stap 5 opent (resumed sessie) ook initialiseren
+  if (currentStep === 5) requestAnimationFrame(initSigPadsIfNeeded);
   $('#dossier-form').addEventListener('click', e => {
     const btn = e.target.closest('button[data-action="clear-sig"]');
     if (!btn) return;
