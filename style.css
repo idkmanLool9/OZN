@@ -2706,3 +2706,18 @@ select.dossiers-control {
 /* Statusbadge met icoon (✓ Voltooid) */
 .status { display: inline-flex; align-items: center; gap: .3rem; }
 .status-ico { font-size: .85em; line-height: 1; }
+
+/* ─── Account: snelnavigatie naar instellingen-secties ───────────────────── */
+.account-nav {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+  margin: -.25rem 0 1.5rem;
+}
+.account-nav a {
+  font-size: .85rem; padding: .42rem .85rem;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text); text-decoration: none;
+  white-space: nowrap;
+}
+.account-nav a:hover { background: var(--bg); text-decoration: none; border-color: var(--primary); color: var(--primary); }
+/* Anker-secties netjes onder een eventuele sticky bovenbalk laten landen */
+.card[id] { scroll-margin-top: 1.25rem; }

@@ -922,7 +922,11 @@ const Router = {
         // de bovenbalk; op de overige pagina's juist andersom.
         const inDossier = /^\/dossiers\/.+/.test(path);
         document.body.classList.toggle('in-dossier', inDossier);
-        window.scrollTo(0, 0);
+        // Naar een sectie-anker scrollen (bv. #/account#parochies); anders boven.
+        const anchor = (fullHash.split('#')[1] || '').split('?')[0];
+        const anchorEl = anchor ? document.getElementById(anchor) : null;
+        if (anchorEl) anchorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else window.scrollTo(0, 0);
         return;
       }
     }

@@ -274,6 +274,7 @@ function renderBloemenBeheer(msg) {
     });
   }
 
+  $('#view').onchange = null; // eventuele stale handler van een ander scherm wissen
   $('#view').onclick = async e => {
     // Favoriet
     const favBtn = e.target.closest('[data-fav]');

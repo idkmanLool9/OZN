@@ -111,7 +111,25 @@ function renderAccount(msg) {
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head"><h1>Mijn account</h1></div>
-      <section class="card narrow">
+
+      <nav class="account-nav" aria-label="Snelnavigatie instellingen">
+        <a href="#/account#acc-versie">App &amp; updates</a>
+        <a href="#/account#acc-gegevens">Mijn gegevens</a>
+        <a href="#/account#acc-wachtwoord">Wachtwoord</a>
+        <a href="#/account#acc-weergave">Weergave</a>
+        <a href="#/account#acc-branding">Branding</a>
+        <a href="#/account#login-instellingen">Loginscherm</a>
+        <a href="#/account#acc-welkom">Welkomscherm</a>
+        <a href="#/account#email-instellingen">E-mail</a>
+        <a href="#/account#push-instellingen">Push-notificaties</a>
+        <a href="#/account#profielen">Profielen</a>
+        <a href="#/account#parochies">Parochies</a>
+        <a href="#/account#verzekeringen">Verzekeringen</a>
+        <a href="#/account#handtekeningen">Handtekeningen</a>
+        <a href="#/account#acc-data">Data &amp; sync</a>
+      </nav>
+
+      <section class="card narrow" id="acc-versie">
         <h2>App-versie &amp; updates</h2>
         <dl class="dl">
           <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
@@ -128,7 +146,7 @@ function renderAccount(msg) {
         </p>
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-gegevens">
         <h2>Mijn gegevens</h2>
         <form id="profile-form" class="form" autocomplete="off">
           <label>
@@ -149,7 +167,7 @@ function renderAccount(msg) {
           </div>
         </form>
       </section>
-      <section class="card narrow">
+      <section class="card narrow" id="acc-wachtwoord">
         <h2>Wachtwoord wijzigen</h2>
         ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
         ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
@@ -159,7 +177,7 @@ function renderAccount(msg) {
           <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
         </form>
       </section>
-      <section class="card narrow">
+      <section class="card narrow" id="acc-branding">
         <h2>Branding</h2>
         <p class="muted small">Logo, naam en kleuren van de app aanpassen.</p>
         ${(() => {
@@ -258,7 +276,7 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-weergave">
         <h2>Weergave</h2>
         ${(() => {
           const s = Settings.all();
@@ -559,7 +577,7 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-welkom">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
         ${(() => {
@@ -616,7 +634,7 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-data">
         <h2>Data &amp; synchronisatie</h2>
         ${(() => {
           const m = (() => { try { return JSON.parse(localStorage.getItem('sok_mirror') || '{}'); } catch (_) { return {}; } })();
