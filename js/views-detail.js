@@ -398,7 +398,7 @@ function emTable(rows) {
   </table>`;
 }
 function emH3(t) {
-  return `<h3 style="margin:18px 0 4px;font-family:inherit;font-size:15px;font-weight:600;color:#6b1e2a;border-bottom:1px solid #e5e2da;padding-bottom:4px;">${esc(t)}</h3>`;
+  return `<h3 style="margin:18px 0 4px;font-family:inherit;font-size:15px;font-weight:600;color:#2563eb;border-bottom:1px solid #e5e2da;padding-bottom:4px;">${esc(t)}</h3>`;
 }
 
 // E-mail-footer: donker balkje met links + socials + adres,
@@ -671,8 +671,8 @@ function buildFactuurEmail(d, kosten) {
             <td align="right" style="padding:6px 10px;color:#6f6a62;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(gedekt))}</td>
           </tr>
           <tr style="background:#f5e8ea;">
-            <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Door familie te betalen</td>
-            <td align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;font-variant-numeric:tabular-nums;">${esc(fmtEUR(familie))}</td>
+            <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;color:#2563eb;">Door familie te betalen</td>
+            <td align="right" style="padding:8px 10px;font-weight:600;color:#2563eb;font-variant-numeric:tabular-nums;">${esc(fmtEUR(familie))}</td>
           </tr>` : ''}
         ${aanbet > 0 ? `
           <tr>
@@ -680,8 +680,8 @@ function buildFactuurEmail(d, kosten) {
             <td align="right" style="padding:6px 10px;color:#6f6a62;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(aanbet))}</td>
           </tr>
           <tr style="background:#f5e8ea;">
-            <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;">Nog te voldoen</td>
-            <td align="right" style="padding:8px 10px;font-weight:600;color:#6b1e2a;font-variant-numeric:tabular-nums;">${esc(fmtEUR(teBetalen))}</td>
+            <td colspan="2" align="right" style="padding:8px 10px;font-weight:600;color:#2563eb;">Nog te voldoen</td>
+            <td align="right" style="padding:8px 10px;font-weight:600;color:#2563eb;font-variant-numeric:tabular-nums;">${esc(fmtEUR(teBetalen))}</td>
           </tr>` : ''}
       </tfoot>
     </table>`);

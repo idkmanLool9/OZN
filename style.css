@@ -5,7 +5,7 @@
   --hairline: rgba(0, 0, 0, 0.06);
   --text: #2a2724;
   --muted: #6f6a62;
-  --primary: #6b1e2a;
+  --primary: #2563eb;
   --primary-dark: color-mix(in srgb, var(--primary) 70%, black);
   --primary-soft: color-mix(in srgb, var(--primary) 12%, white);
   --accent: #c9a24a;
@@ -412,7 +412,7 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
   filter: blur(80px); opacity: .35;
   animation: profile-orb-float 18s ease-in-out infinite;
 }
-.profile-bg-orb-1 { width: 320px; height: 320px; background: #6b1e2a; top: 8%; left: 6%; }
+.profile-bg-orb-1 { width: 320px; height: 320px; background: #2563eb; top: 8%; left: 6%; }
 .profile-bg-orb-2 { width: 380px; height: 380px; background: #2a5d6b; bottom: 6%; right: 8%; animation-delay: -6s; }
 .profile-bg-orb-3 { width: 240px; height: 240px; background: #c9a24a; top: 45%; right: 22%; animation-delay: -12s; opacity: .22; }
 @keyframes profile-orb-float {
@@ -434,7 +434,7 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
   display: inline-block;
   font-size: .82rem; font-weight: 600; letter-spacing: .12em;
   text-transform: uppercase;
-  color: var(--primary, #6b1e2a);
+  color: var(--primary, #2563eb);
   background: rgba(107, 30, 42, .08);
   padding: .35rem .9rem; border-radius: 999px;
   margin-bottom: 1rem;
@@ -482,9 +482,9 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 .profile-avatar-ring {
   position: absolute; inset: -4px; border-radius: 50%;
   background: conic-gradient(from 0deg,
-    var(--ring-color, #6b1e2a),
+    var(--ring-color, #2563eb),
     rgba(255,255,255,.4),
-    var(--ring-color, #6b1e2a));
+    var(--ring-color, #2563eb));
   opacity: .25; transition: opacity .18s ease, transform .25s ease;
 }
 .profile-option:hover .profile-avatar-ring {
@@ -1827,7 +1827,7 @@ body { -webkit-overflow-scrolling: touch; }
   line-height: 1.55;
 }
 .fp-header {
-  background: #6b1e2a;
+  background: #2563eb;
   color: #fff;
   padding: 1.5rem 1.25rem;
   border-radius: 0 0 12px 12px;
@@ -1870,7 +1870,7 @@ body { -webkit-overflow-scrolling: touch; }
 .fp-dot { color: #b8b3aa; }
 .fp-card h2 {
   margin: 0 0 .85rem; font-size: 1.05rem; font-weight: 600;
-  color: #6b1e2a; border: none; padding: 0; background: none;
+  color: #2563eb; border: none; padding: 0; background: none;
 }
 .fp-dl {
   display: grid; grid-template-columns: 1fr; gap: .55rem;
@@ -1896,7 +1896,7 @@ body { -webkit-overflow-scrolling: touch; }
 }
 .fp-check-mark {
   font-size: 1.3rem; line-height: 1; flex-shrink: 0;
-  color: #6b1e2a; margin-top: .15rem;
+  color: #2563eb; margin-top: .15rem;
 }
 .fp-checklist strong {
   display: block; font-weight: 600; font-size: .98rem;
@@ -2081,9 +2081,9 @@ body { -webkit-overflow-scrolling: touch; }
 .graven-svg-cell.graven-beschikbaar  { fill: #ffffff; stroke: #c7c0b3; }
 .graven-svg-cell.graven-gereserveerd { fill: #fadc7b; stroke: #d9b34a; }
 .graven-svg-cell.graven-bezet        { fill: #ef6b67; stroke: #c44c47; }
-.graven-svg-cell.graven-has-dossier  { stroke: #6b1e2a; stroke-width: 1.5; }
+.graven-svg-cell.graven-has-dossier  { stroke: #2563eb; stroke-width: 1.5; }
 .graven-svg-cell:hover {
-  stroke: #6b1e2a;
+  stroke: #2563eb;
   stroke-width: 1.5;
   filter: brightness(1.05) drop-shadow(0 1px 2px rgba(0,0,0,.18));
 }
@@ -2106,12 +2106,12 @@ body { -webkit-overflow-scrolling: touch; }
 .graven-cell-mini.graven-beschikbaar  { background: #fff; }
 .graven-cell-mini.graven-gereserveerd { background: #fadc7b; border-color: #d9b34a; }
 .graven-cell-mini.graven-bezet        { background: #ef6b67; border-color: #c44c47; }
-.graven-cell-mini.graven-has-dossier-mini { background: #fff; border-color: #6b1e2a; border-width: 2px; }
+.graven-cell-mini.graven-has-dossier-mini { background: #fff; border-color: #2563eb; border-width: 2px; }
 
 /* Filter — zoom slider styling */
 #graven-zoom {
   width: 110px;
-  accent-color: var(--primary, #6b1e2a);
+  accent-color: var(--primary, #2563eb);
 }
 
 /* SVG cells: tekst in elk graf */
@@ -2132,7 +2132,7 @@ body { -webkit-overflow-scrolling: touch; }
 .graven-decor { pointer-events: none; }
 .graven-cell-group { cursor: pointer; }
 .graven-cell-group:hover .graven-svg-cell {
-  stroke: #6b1e2a;
+  stroke: #2563eb;
   stroke-width: 1.8;
 }
 
@@ -2247,7 +2247,7 @@ body { -webkit-overflow-scrolling: touch; }
 }
 /* Met dossier: extra outline */
 .overlay-cell.graven-has-dossier {
-  outline: 2px solid #6b1e2a;
+  outline: 2px solid #2563eb;
   outline-offset: -2px;
 }
 /* Filter dimming */
@@ -2255,7 +2255,7 @@ body { -webkit-overflow-scrolling: touch; }
 .overlay-cell.overlay-match {
   background: rgba(107, 30, 42, 0.35) !important;
   border-color: rgba(107, 30, 42, 0.95) !important;
-  outline: 2px solid #6b1e2a !important;
+  outline: 2px solid #2563eb !important;
   outline-offset: -1px !important;
   z-index: 4;
 }
@@ -2297,13 +2297,13 @@ body { -webkit-overflow-scrolling: touch; }
   transition: background .15s, color .15s;
 }
 .wizard-step.active {
-  background: var(--primary, #6b1e2a);
+  background: var(--primary, #2563eb);
   color: #fff;
 }
-.wizard-step.active:hover { background: var(--primary, #6b1e2a); }
+.wizard-step.active:hover { background: var(--primary, #2563eb); }
 .wizard-step.active .num {
   background: #fff;
-  color: var(--primary, #6b1e2a);
+  color: var(--primary, #2563eb);
 }
 /* Fill-state kleuren — data-gedreven (rood/oranje/groen) */
 .wizard-step.fill-empty .num    { background: #c94545; color: #fff; }
