@@ -2479,3 +2479,109 @@ fieldset[data-step][hidden] { display: none !important; }
   border-radius: 6px; font: inherit; background: #fff;
 }
 .catalog-filter-count { margin-left: auto; }
+
+/* ─── Catalogus-galerij nieuw ontwerp (Kisten) ───────────────────────────── */
+.catalog-zoekbalk {
+  display: flex; gap: .75rem; align-items: stretch; margin-bottom: .85rem;
+}
+.catalog-search {
+  flex: 1; display: flex; align-items: center; gap: .6rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 0 1rem;
+}
+.catalog-search-icon { opacity: .5; font-size: .95rem; }
+.catalog-search input {
+  flex: 1; border: none; background: transparent; font: inherit;
+  padding: .9rem 0; outline: none;
+}
+.catalog-filters-toggle {
+  border-radius: 14px; white-space: nowrap;
+}
+
+.catalog-chips {
+  display: flex; gap: .55rem; align-items: center; flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+.catalog-chips.is-collapsed > .catalog-chip,
+.catalog-chips.is-collapsed > .catalog-wis { display: none; }
+.catalog-chip {
+  appearance: none; -webkit-appearance: none;
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 999px; padding: .5rem 1.9rem .5rem 1rem;
+  font: inherit; font-size: .88rem; cursor: pointer; color: var(--text);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .8rem center;
+}
+.catalog-chip-toggle {
+  padding: .5rem 1rem; background-image: none;
+}
+.catalog-chip-toggle.is-on {
+  background: color-mix(in srgb, var(--primary) 12%, #fff);
+  border-color: var(--primary); color: var(--primary); font-weight: 600;
+}
+.catalog-wis {
+  border: none; background: transparent; color: var(--primary);
+  font: inherit; font-size: .85rem; cursor: pointer; padding: .4rem .2rem;
+}
+.catalog-count { margin-left: auto; color: var(--muted); font-size: .85rem; }
+.catalog-view {
+  display: inline-flex; border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+}
+.catalog-view-btn {
+  border: none; background: var(--surface); cursor: pointer;
+  padding: .45rem .7rem; font-size: 1rem; color: var(--muted);
+}
+.catalog-view-btn.is-on { background: color-mix(in srgb, var(--primary) 12%, #fff); color: var(--primary); }
+
+/* Kaart-extra's: hart, badge, foot-rij */
+.kist-card-imgwrap { position: relative; }
+.kist-fav {
+  position: absolute; top: .55rem; right: .55rem;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: none; cursor: pointer; font-size: 1.05rem; line-height: 1;
+  background: rgba(255,255,255,.92); color: #b33; box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  display: flex; align-items: center; justify-content: center;
+}
+.kist-fav.is-fav { color: #e0245e; }
+.kist-badge-top {
+  position: absolute; bottom: .55rem; left: .55rem;
+  background: rgba(40,30,15,.82); color: #ffd479;
+  font-size: .72rem; font-weight: 600; padding: .2rem .55rem;
+  border-radius: 6px; letter-spacing: .02em;
+}
+.kist-card-body { padding: .7rem .85rem .85rem; display: flex; flex-direction: column; gap: .2rem; }
+.kist-card-naam { font-size: .95rem; }
+.kist-card-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; margin-top: .5rem;
+}
+.kist-card-foot .kist-price { font-size: .95rem; }
+.kist-kies-btn { white-space: nowrap; }
+
+/* Lijstweergave */
+.kist-grid.is-list { grid-template-columns: 1fr; gap: .6rem; }
+.kist-grid.is-list .kist-card { flex-direction: row; align-items: stretch; }
+.kist-grid.is-list .kist-card-imgwrap { width: 150px; flex: none; }
+.kist-grid.is-list .kist-card-img { aspect-ratio: 4 / 3; height: 100%; }
+.kist-grid.is-list .kist-card-body { flex: 1; justify-content: center; }
+.kist-grid.is-list .kist-badge-top,
+.kist-grid.is-list .kist-fav { transform: scale(.9); }
+
+/* Paginering */
+.catalog-paginering {
+  display: flex; gap: .35rem; justify-content: center; align-items: center;
+  margin-top: 1.5rem; flex-wrap: wrap;
+}
+.cat-page, .cat-page-nav {
+  min-width: 38px; height: 38px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  cursor: pointer; font: inherit; color: var(--text);
+}
+.cat-page.is-on { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+.cat-page-nav:disabled { opacity: .4; cursor: default; }
+
+@media (max-width: 640px) {
+  .catalog-zoekbalk { flex-wrap: wrap; }
+  .catalog-count { width: 100%; margin-left: 0; order: 5; }
+}
