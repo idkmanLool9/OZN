@@ -2645,3 +2645,44 @@ fieldset[data-step][hidden] { display: none !important; }
 @media (max-width: 980px) {
   .sidebar { display: none; }
 }
+
+/* ─── Dossiers-pagina ────────────────────────────────────────────────────── */
+.dossiers-filterbar {
+  display: flex; gap: .75rem; align-items: stretch;
+  margin-bottom: 1.25rem; flex-wrap: wrap;
+}
+.dossiers-filterbar .catalog-search { flex: 1; min-width: 260px; }
+.dossiers-control {
+  appearance: none; -webkit-appearance: none;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; font: inherit; color: var(--text); cursor: pointer;
+  display: inline-flex; align-items: center; gap: .5rem;
+  padding: .85rem 1.1rem; white-space: nowrap;
+}
+select.dossiers-control {
+  padding-right: 2.4rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 1rem center;
+}
+.dossiers-control:hover { background: var(--bg); }
+.dossiers-wis {
+  align-self: center; color: var(--primary); font-size: .85rem;
+  white-space: nowrap; padding: 0 .25rem;
+}
+
+.dossiers-kaart {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; overflow-x: auto;
+}
+.dossiers-kaart .table { background: transparent; min-width: 820px; }
+.dossiers-kaart .table th { padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.dossiers-kaart .table td { padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.dossiers-kaart .table tbody tr:last-child td { border-bottom: none; }
+.dossiers-kaart .table tbody tr { cursor: pointer; transition: background .12s; }
+.dossiers-kaart .table tbody tr:hover { background: var(--bg); }
+.dossier-link { color: var(--primary); font-weight: 600; }
+.dossiers-chevron { color: var(--muted); text-align: right; font-size: 1.25rem; width: 1.5rem; }
+
+/* Statusbadge met icoon (✓ Voltooid) */
+.status { display: inline-flex; align-items: center; gap: .3rem; }
+.status-ico { font-size: .85em; line-height: 1; }

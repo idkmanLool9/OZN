@@ -1,5 +1,13 @@
 // Dossierlijst, account, 404
 
+// Statusbadge met passend icoon (✓ Voltooid, etc.)
+function dossierStatusBadge(st) {
+  const s = st || 'nieuw';
+  const ico = { nieuw: '✦', in_behandeling: '◷', voltooid: '✓', geannuleerd: '✕' };
+  const lbl = { nieuw: 'Nieuw', in_behandeling: 'In behandeling', voltooid: 'Voltooid', geannuleerd: 'Geannuleerd' };
+  return `<span class="status status-${esc(s)}"><span class="status-ico">${ico[s] || ''}</span>${esc(lbl[s] || s.replace('_', ' '))}</span>`;
+}
+
 function renderDossierList(params, path) {
   const url = new URL(location.href);
   const q = (url.hash.split('?')[1] ? new URLSearchParams(url.hash.split('?')[1]).get('q') : '') || '';
@@ -25,47 +33,76 @@ function renderDossierList(params, path) {
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head">
-        <h1>Dossiers</h1>
-        <div class="page-actions">
-          <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
+        <div>
+          <h1>Dossiers</h1>
+          <p class="muted">Beheer en overzicht van alle dossiers.</p>
         </div>
+        <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
       </div>
-      <form class="filter-bar" id="filter-form">
-        <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon..." />
-        <select name="status">
+
+      <form class="dossiers-filterbar" id="filter-form">
+        <div class="catalog-search">
+          <span class="catalog-search-icon">🔍</span>
+          <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon…" autocomplete="off">
+        </div>
+        <select name="status" class="dossiers-control" id="dossiers-status">
           <option value="">Alle statussen</option>
           <option value="nieuw" ${status==='nieuw'?'selected':''}>Nieuw</option>
           <option value="in_behandeling" ${status==='in_behandeling'?'selected':''}>In behandeling</option>
           <option value="voltooid" ${status==='voltooid'?'selected':''}>Voltooid</option>
           <option value="geannuleerd" ${status==='geannuleerd'?'selected':''}>Geannuleerd</option>
         </select>
-        <button type="submit" class="btn">Filteren</button>
-        ${q || status ? '<a href="#/dossiers" class="btn btn-ghost">Wissen</a>' : ''}
+        <button type="submit" class="dossiers-control dossiers-filter-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+          Filteren
+        </button>
+        ${q || status ? '<a href="#/dossiers" class="dossiers-wis">↺ Wis</a>' : ''}
       </form>
-      ${dossiers.length === 0 ? '<div class="card"><p class="muted">Geen dossiers gevonden.</p></div>' :
-      `<table class="table"><thead><tr>
-        <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th>
-      </tr></thead><tbody>
-        ${dossiers.map(d => `<tr>
-          <td><a href="#/dossiers/${d.id}">${esc(d.dossier_nummer)}</a></td>
-          <td><strong>${esc(fullName(d) || '—')}</strong></td>
-          <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
-          <td>${esc(d.gezinsnummer || '—')}</td>
-          <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
-          <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
-          <td><span class="status status-${esc(d.status||'nieuw')}">${esc((d.status||'nieuw').replace('_',' '))}</span></td>
-          <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? ' · ' + esc(d.bijgewerkt_door) : ''}</span></td>
-        </tr>`).join('')}
-      </tbody></table>`}
+
+      ${dossiers.length === 0
+        ? '<div class="dossiers-kaart"><p class="muted center" style="padding:2.5rem;">Geen dossiers gevonden.</p></div>'
+        : `<div class="dossiers-kaart">
+            <table class="table dossiers-table">
+              <thead><tr>
+                <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th><th aria-hidden="true"></th>
+              </tr></thead>
+              <tbody>
+                ${dossiers.map(d => `<tr data-id="${d.id}">
+                  <td><a href="#/dossiers/${d.id}" class="dossier-link">${esc(d.dossier_nummer)}</a></td>
+                  <td><strong>${esc(fullName(d) || '—')}</strong></td>
+                  <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
+                  <td>${esc(d.gezinsnummer || '—')}</td>
+                  <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
+                  <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
+                  <td>${dossierStatusBadge(d.status)}</td>
+                  <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? '<br>- ' + esc(d.bijgewerkt_door) : ''}</span></td>
+                  <td class="dossiers-chevron" aria-hidden="true">›</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`}
     </div>`;
 
-  $('#filter-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const f = e.target;
+  const navigeerFilter = (f) => {
     const params = new URLSearchParams();
     if (f.q.value) params.set('q', f.q.value);
     if (f.status.value) params.set('status', f.status.value);
     location.hash = '#/dossiers' + (params.toString() ? '?' + params.toString() : '');
+  };
+  $('#filter-form').addEventListener('submit', e => {
+    e.preventDefault();
+    navigeerFilter(e.target);
+  });
+  // Statuskeuze meteen toepassen
+  const statusSel = $('#dossiers-status');
+  if (statusSel) statusSel.addEventListener('change', () => navigeerFilter(statusSel.form));
+
+  // Hele rij klikbaar → naar dossier-detail (behalve op links/knoppen)
+  $$('#view tr[data-id]').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if (e.target.closest('a, button')) return;
+      Router.go('/dossiers/' + tr.getAttribute('data-id'));
+    });
   });
 }
 
