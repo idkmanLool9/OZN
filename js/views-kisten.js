@@ -38,7 +38,6 @@ let _kistFilter = '';      // zoekterm
 let _kistMateriaal = '';   // materiaalgroep
 let _kistKleur = '';       // kleurgroep
 let _kistPrijs = '';       // prijs-range key
-let _kistEco = false;      // alleen eco/duurzaam
 let _kistPagina = 1;       // huidige pagina
 let _kistWeergave = 'grid';// 'grid' | 'lijst'
 const KISTEN_PER_PAGINA = 12;
@@ -76,11 +75,6 @@ function _kistKleurGroep(materiaal) {
   if (m.includes('eiken'))      return 'Eikenbruin';
   return 'Naturel';
 }
-function _kistIsEco(materiaal) {
-  const m = (materiaal || '').toLowerCase();
-  return m.includes('eco') || m.includes('rotan') || m.includes('bamboe')
-      || m.includes('wilgen') || m.includes('manilla') || m.includes('abaca') || m.includes('hennep');
-}
 
 // Favorieten (persoonlijk, in localStorage)
 function _kistFavs() {
@@ -107,7 +101,7 @@ function _meestGekozenKist() {
 }
 
 function _kistFiltersActief() {
-  return !!(_kistFilter || _kistMateriaal || _kistKleur || _kistPrijs || _kistEco);
+  return !!(_kistFilter || _kistMateriaal || _kistKleur || _kistPrijs);
 }
 
 function renderKistenBeheer(msg) {
@@ -127,7 +121,6 @@ function renderKistenBeheer(msg) {
     if (_kistMateriaal && _kistMateriaalGroep(k.materiaal) !== _kistMateriaal) return false;
     if (_kistKleur && _kistKleurGroep(k.materiaal) !== _kistKleur) return false;
     if (prijsRange && !prijsRange.test(Number(k.bedrag))) return false;
-    if (_kistEco && !_kistIsEco(k.materiaal)) return false;
     return true;
   }).sort((a, b) => a.bedrag - b.bedrag);
 
@@ -222,7 +215,6 @@ function renderKistenBeheer(msg) {
           <option value="">Prijs</option>
           ${KIST_PRIJS_RANGES.map(r => `<option value="${esc(r.key)}" ${_kistPrijs === r.key ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}
         </select>
-        <button type="button" class="catalog-chip catalog-chip-toggle ${_kistEco ? 'is-on' : ''}" id="kist-f-eco">🌿 Eco / Duurzaam</button>
         ${_kistFiltersActief() ? '<button type="button" class="catalog-wis" id="kist-filter-clear">↺ Wis filters</button>' : ''}
         <span class="catalog-count">${gefilterd.length} resultaten</span>
         <div class="catalog-view">
@@ -321,11 +313,9 @@ function renderKistenBeheer(msg) {
 
   $('#view').onclick = async e => {
     // ── Filters: eco-toggle, wis, weergave, paginering, favoriet ──
-    const ecoBtn = e.target.closest('#kist-f-eco');
-    if (ecoBtn) { _kistEco = !_kistEco; _kistPagina = 1; renderKistenBeheer(); return; }
     const wisBtn = e.target.closest('#kist-filter-clear');
     if (wisBtn) {
-      _kistFilter = ''; _kistMateriaal = ''; _kistKleur = ''; _kistPrijs = ''; _kistEco = false; _kistPagina = 1;
+      _kistFilter = ''; _kistMateriaal = ''; _kistKleur = ''; _kistPrijs = ''; _kistPagina = 1;
       renderKistenBeheer(); return;
     }
     const filtersToggle = e.target.closest('#kist-filters-toggle');

@@ -1,10 +1,12 @@
-// Eten & drinken-catalogus: zelfde patroon als bloemen, maar bij
-// 'Kies voor dossier' wordt eerst een aantal gevraagd en als losse
-// kostenpost (aantal × prijs) aan het actieve dossier toegevoegd.
+// Eten & drinken-catalogus: galerij-stijl (zoals Kisten/Bloemen). Bij
+// 'Kies + aantal' wordt een aantal gevraagd en als losse kostenpost
+// (aantal × prijs) aan het actieve dossier toegevoegd.
 
 let _etenEditing = null; // null = dicht; 'new' = nieuw; <id> = bewerken
 let _etenFilter = '';
-let _etenPrijsMax = '';
+let _etenPagina = 1;
+let _etenWeergave = 'grid';
+const ETEN_PER_PAGINA = 12;
 
 function _activeDossierDraftsEten() {
   const drafts = [];
@@ -19,16 +21,13 @@ function _activeDossierDraftsEten() {
       const isNew = idPart === 'new';
       const naam = [data.voornaam, data.achternaam].filter(Boolean).join(' ').trim()
         || (isNew ? 'Nieuw dossier (concept)' : ('Dossier #' + idPart));
-      drafts.push({
-        key, isNew, id: isNew ? null : parseInt(idPart, 10), naam,
-      });
+      drafts.push({ key, isNew, id: isNew ? null : parseInt(idPart, 10), naam });
     }
   } catch (_) {}
   return drafts;
 }
 
-// Voeg een eten-kostpost toe aan een actief dossier. Voor nieuwe dossiers
-// gaat het in de localStorage-kostenbuffer; voor bestaande direct in DB.
+// Voeg een eten-kostpost toe aan een actief dossier.
 async function _addEtenAanDossier(target, omschrijving, aantal, stuk) {
   const bedrag = +(stuk * aantal).toFixed(2);
   const post = { omschrijving: '🍽 ' + omschrijving, categorie: 'overig', bedrag, aantal, betaald: false };
@@ -44,6 +43,17 @@ async function _addEtenAanDossier(target, omschrijving, aantal, stuk) {
       await DB.touchDossier(target.id);
     } catch (_) {}
   }
+}
+
+// Favorieten (persoonlijk, in localStorage)
+function _etenFavs() {
+  try { return JSON.parse(localStorage.getItem('sok_eten_favs') || '[]'); } catch (_) { return []; }
+}
+function _toggleEtenFav(naam) {
+  const f = _etenFavs();
+  const i = f.indexOf(naam);
+  if (i >= 0) f.splice(i, 1); else f.push(naam);
+  try { localStorage.setItem('sok_eten_favs', JSON.stringify(f)); } catch (_) {}
 }
 
 function etenSVG() {
@@ -74,28 +84,78 @@ function renderEtenBeheer(msg) {
   const adminMode = !!Settings.get('catalog_admin_mode');
   const drafts = _activeDossierDraftsEten();
   const hasDraft = drafts.length > 0;
+  const favs = _etenFavs();
 
   const q = (_etenFilter || '').trim().toLowerCase();
-  const max = parseFloat(String(_etenPrijsMax).replace(',', '.')) || 0;
-  const items = alle.filter(b => {
+  const gefilterd = alle.filter(b => {
     if (q && !((b.naam || '').toLowerCase().includes(q) || (b.omschrijving || '').toLowerCase().includes(q))) return false;
-    if (max > 0 && Number(b.bedrag) > max) return false;
     return true;
   });
-  const totaalCount = alle.length;
+
+  const totPaginas = Math.max(1, Math.ceil(gefilterd.length / ETEN_PER_PAGINA));
+  if (_etenPagina > totPaginas) _etenPagina = totPaginas;
+  if (_etenPagina < 1) _etenPagina = 1;
+  const start = (_etenPagina - 1) * ETEN_PER_PAGINA;
+  const pagina = gefilterd.slice(start, start + ETEN_PER_PAGINA);
 
   const editing = _etenEditing === 'new' ? { naam: '', omschrijving: '', bedrag: '' }
                 : (_etenEditing != null ? alle.find(x => x.id === _etenEditing) : null);
+
+  const kaart = (b) => {
+    const url = EtenFotos.urlVoor(b.naam);
+    const isFav = favs.includes(b.naam);
+    return `
+      <div class="kist-card" data-id="${b.id}" data-naam="${esc(b.naam)}">
+        <div class="kist-card-imgwrap">
+          <button type="button" class="kist-card-img kist-card-img-btn" data-action="zoom" data-id="${b.id}" aria-label="Bekijk ${esc(b.naam)}">
+            ${url
+              ? `<img src="${esc(url)}" alt="${esc(b.naam)}" loading="lazy">`
+              : `<div class="kist-card-svg">${etenSVG()}</div><div class="kist-card-no-img">geen foto</div>`}
+          </button>
+          <button type="button" class="kist-fav ${isFav ? 'is-fav' : ''}" data-fav="${esc(b.naam)}" aria-label="Favoriet">${isFav ? '♥' : '♡'}</button>
+        </div>
+        <div class="kist-card-body">
+          <strong class="kist-card-naam">${esc(b.naam)}</strong>
+          ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
+          <div class="kist-card-foot">
+            <span class="kist-price">${b.bedrag ? fmtEUR(b.bedrag) + ' <span class="muted small">p/st</span>' : '—'}</span>
+            <button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-eten="${esc(b.naam)}">Kies + aantal</button>
+          </div>
+          ${adminMode ? `
+            <div class="kist-card-actions">
+              <button type="button" class="btn btn-sm" data-edit="${b.id}">Bewerken</button>
+              <button type="button" class="btn btn-sm btn-ghost" data-delete="${b.id}">Verwijderen</button>
+            </div>` : ''}
+        </div>
+      </div>`;
+  };
 
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head">
         <div>
           <h1>Eten &amp; drinken</h1>
-          <p class="muted">Eigen catalogus van eten- en drinkproducten. Bij kiezen wordt om een aantal gevraagd; totaal = aantal × prijs.</p>
+          <p class="muted">Kies een product en het gewenste aantal. Totaal = aantal × prijs.${adminMode ? ' <strong>Beheermodus aan.</strong>' : ''}</p>
         </div>
         ${editing ? '' : (adminMode ? '<button type="button" class="btn btn-primary" id="btn-nieuw-eten">+ Nieuw product</button>' : '')}
       </div>
+
+      ${editing ? '' : `
+        <div class="catalog-zoekbalk">
+          <div class="catalog-search">
+            <span class="catalog-search-icon">🔍</span>
+            <input type="search" id="eten-filter-q" value="${esc(_etenFilter)}" placeholder="Zoek op naam of omschrijving…" autocomplete="off">
+          </div>
+        </div>
+        <div class="catalog-chips">
+          ${_etenFilter ? '<button type="button" class="catalog-wis" id="eten-filter-clear">↺ Wis filter</button>' : ''}
+          <span class="catalog-count">${gefilterd.length} resultaten</span>
+          <div class="catalog-view">
+            <button type="button" class="catalog-view-btn ${_etenWeergave === 'grid' ? 'is-on' : ''}" data-view="grid" aria-label="Rasterweergave">▦</button>
+            <button type="button" class="catalog-view-btn ${_etenWeergave === 'lijst' ? 'is-on' : ''}" data-view="lijst" aria-label="Lijstweergave">☰</button>
+          </div>
+        </div>`}
+
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
       ${(!editing && hasDraft) ? `
@@ -104,24 +164,8 @@ function renderEtenBeheer(msg) {
           ${drafts.length === 1
             ? `<span>${esc(drafts[0].naam)}</span>`
             : `<select id="eten-draft-picker">${drafts.map((d, i) => `<option value="${i}">${esc(d.naam)}</option>`).join('')}</select>`}
-          <span class="muted small">— klik op "Kies + aantal" om als kostenpost toe te voegen</span>
+          <span class="muted small">— klik op "Kies + aantal" bij een product</span>
         </div>` : ''}
-
-      ${editing ? '' : `
-        <section class="card catalog-filter-card">
-          <div class="catalog-filter">
-            <label class="catalog-filter-inline">
-              <span class="muted small">Zoek op naam of omschrijving</span>
-              <input type="search" id="eten-filter-q" value="${esc(_etenFilter)}" placeholder="bv. baklava, cola" autocomplete="off">
-            </label>
-            <label class="catalog-filter-inline">
-              <span class="muted small">Max. prijs per stuk (€)</span>
-              <input type="text" id="eten-filter-max" value="${esc(_etenPrijsMax)}" placeholder="bv. 10" inputmode="decimal">
-            </label>
-            ${(_etenFilter || _etenPrijsMax) ? '<button type="button" class="btn btn-sm btn-ghost" id="eten-filter-clear">Wis filter</button>' : ''}
-            <span class="muted small catalog-filter-count">${items.length} van ${totaalCount}</span>
-          </div>
-        </section>`}
 
       ${editing ? `
         <section class="card narrow">
@@ -138,75 +182,37 @@ function renderEtenBeheer(msg) {
           </form>
         </section>` : ''}
 
-      ${items.length === 0
-        ? `<div class="card"><p class="muted">Nog geen producten. ${adminMode ? 'Klik rechtsboven op "+ Nieuw product".' : 'Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a> om producten toe te voegen.'}</p></div>`
-        : `<div class="kist-grid">
-            ${items.map(b => {
-              const url = EtenFotos.urlVoor(b.naam);
-              return `
-                <div class="kist-card" data-id="${b.id}">
-                  <button type="button" class="kist-card-img kist-card-img-btn" data-action="zoom" data-id="${b.id}" aria-label="Vergroot ${esc(b.naam)}">
-                    ${url
-                      ? `<img src="${esc(url)}" alt="${esc(b.naam)}" loading="lazy">`
-                      : `<div class="kist-card-svg">${etenSVG()}</div>
-                         <div class="kist-card-no-img">geen foto</div>`}
-                  </button>
-                  <div class="kist-card-meta">
-                    <strong>${esc(b.naam)}</strong>
-                    ${b.omschrijving ? `<span class="muted small">${esc(b.omschrijving)}</span>` : ''}
-                    <span class="kist-price">${fmtEUR(b.bedrag)} <span class="muted small">per stuk</span></span>
-                  </div>
-                  ${hasDraft ? `
-                    <div class="kist-card-actions">
-                      <button type="button" class="btn btn-sm btn-primary" data-pick-eten="${esc(b.naam)}">✓ Kies + aantal</button>
-                    </div>` : ''}
-                  ${adminMode ? `
-                    <div class="kist-card-actions">
-                      <button type="button" class="btn btn-sm" data-edit="${b.id}">Bewerken</button>
-                      <button type="button" class="btn btn-sm btn-ghost" data-delete="${b.id}">Verwijderen</button>
-                    </div>` : ''}
-                </div>`;
-            }).join('')}
-          </div>
-          ${adminMode ? '' : `<p class="muted small center" style="margin-top:1.5rem;">Toevoegen of bewerken? Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a>.</p>`}`}
+      ${editing ? '' : (gefilterd.length === 0
+        ? `<div class="card"><p class="muted center" style="padding:2rem;">Nog geen producten. ${adminMode ? 'Klik rechtsboven op "+ Nieuw product".' : 'Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a> om er toe te voegen.'}</p></div>`
+        : `<div class="kist-grid ${_etenWeergave === 'lijst' ? 'is-list' : ''}">${pagina.map(kaart).join('')}</div>
+          ${totPaginas > 1 ? `
+            <div class="catalog-paginering">
+              <button type="button" class="cat-page-nav" data-page="${_etenPagina - 1}" ${_etenPagina === 1 ? 'disabled' : ''}>‹</button>
+              ${Array.from({ length: totPaginas }, (_, i) => i + 1).map(p => `<button type="button" class="cat-page ${p === _etenPagina ? 'is-on' : ''}" data-page="${p}">${p}</button>`).join('')}
+              <button type="button" class="cat-page-nav" data-page="${_etenPagina + 1}" ${_etenPagina === totPaginas ? 'disabled' : ''}>›</button>
+            </div>` : ''}
+          ${adminMode ? '' : '<p class="muted small center" style="margin-top:1.5rem;">Toevoegen of bewerken? Schakel <strong>Beheermodus</strong> in via <a href="#/account">Account</a>.</p>'}`)}
     </div>`;
 
+  // ─── Zoekveld live (debounce + focusbehoud) ──
   let _etenFilterT = null;
   const filterQ = $('#eten-filter-q');
-  const filterMax = $('#eten-filter-max');
-  const filterClear = $('#eten-filter-clear');
-  const reRenderFilter = (focusId) => {
-    const pos = focusId ? document.getElementById(focusId)?.selectionStart : null;
-    renderEtenBeheer();
-    if (focusId) {
-      const inp = document.getElementById(focusId);
-      if (inp) { inp.focus(); if (pos != null) inp.setSelectionRange(pos, pos); }
-    }
-  };
   if (filterQ) {
     filterQ.addEventListener('input', () => {
       _etenFilter = filterQ.value;
+      _etenPagina = 1;
       clearTimeout(_etenFilterT);
-      _etenFilterT = setTimeout(() => reRenderFilter('eten-filter-q'), 150);
-    });
-  }
-  if (filterMax) {
-    filterMax.addEventListener('input', () => {
-      _etenPrijsMax = filterMax.value;
-      clearTimeout(_etenFilterT);
-      _etenFilterT = setTimeout(() => reRenderFilter('eten-filter-max'), 150);
-    });
-  }
-  if (filterClear) {
-    filterClear.addEventListener('click', () => {
-      _etenFilter = ''; _etenPrijsMax = '';
-      renderEtenBeheer();
+      _etenFilterT = setTimeout(() => {
+        const focus = document.activeElement === filterQ;
+        const pos = focus ? filterQ.selectionStart : null;
+        renderEtenBeheer();
+        if (focus) { const n = $('#eten-filter-q'); if (n) { n.focus(); if (pos != null) n.setSelectionRange(pos, pos); } }
+      }, 150);
     });
   }
 
   const newBtn = $('#btn-nieuw-eten');
   if (newBtn) newBtn.addEventListener('click', () => { _etenEditing = 'new'; renderEtenBeheer(); });
-
   const cancelBtn = $('#btn-cancel-eten');
   if (cancelBtn) cancelBtn.addEventListener('click', () => { _etenEditing = null; renderEtenBeheer(); });
 
@@ -244,19 +250,39 @@ function renderEtenBeheer(msg) {
   }
 
   $('#view').onclick = async e => {
+    // Favoriet
+    const favBtn = e.target.closest('[data-fav]');
+    if (favBtn) { _toggleEtenFav(favBtn.getAttribute('data-fav')); renderEtenBeheer(); return; }
+    // Weergave
+    const viewBtn = e.target.closest('[data-view]');
+    if (viewBtn) { _etenWeergave = viewBtn.getAttribute('data-view'); renderEtenBeheer(); return; }
+    // Paginering
+    const pageBtn = e.target.closest('[data-page]');
+    if (pageBtn && !pageBtn.disabled) {
+      _etenPagina = parseInt(pageBtn.getAttribute('data-page'), 10) || 1;
+      renderEtenBeheer();
+      const top = $('#view .catalog-zoekbalk'); if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    // Wis filter
+    const wisBtn = e.target.closest('#eten-filter-clear');
+    if (wisBtn) { _etenFilter = ''; _etenPagina = 1; renderEtenBeheer(); return; }
+
+    // Kies product voor actief dossier (vraagt aantal)
     const pickBtn = e.target.closest('button[data-pick-eten]');
     if (pickBtn) {
       const naam = pickBtn.getAttribute('data-pick-eten');
+      if (!hasDraft) {
+        Modal.show({ type: 'info', title: 'Open eerst een dossier', message: `Om "${naam}" te koppelen, open of maak eerst een dossier. Bij de kostenstap kun je dan via deze pagina kiezen.` });
+        return;
+      }
       const item = DB.list(KEYS.ETEN).find(x => x.naam === naam);
       const stuk = Number(item?.bedrag) || 0;
       const picker = $('#eten-draft-picker');
       const idx = picker ? parseInt(picker.value, 10) : 0;
       const target = drafts[idx];
       if (!target) return;
-      const input = window.prompt(
-        `Hoeveel ${naam}? (prijs per stuk: ${fmtEUR(stuk)})`,
-        '1'
-      );
+      const input = window.prompt(`Hoeveel ${naam}? (prijs per stuk: ${fmtEUR(stuk)})`, '1');
       if (input == null) return;
       const aantal = parseInt(String(input).trim(), 10);
       if (!isFinite(aantal) || aantal < 1) {
@@ -272,13 +298,12 @@ function renderEtenBeheer(msg) {
         confirmText: 'Ja, ga terug',
         cancelText: 'Blijf hier',
       });
-      if (confirmGo) {
-        Router.go(target.isNew ? '/dossiers/nieuw' : '/dossiers/' + target.id + '/bewerken');
-      } else {
-        renderEtenBeheer({ success: `${aantal}× ${naam} (${fmtEUR(totaal)}) toegevoegd aan ${target.naam}.` });
-      }
+      if (confirmGo) Router.go(target.isNew ? '/dossiers/nieuw' : '/dossiers/' + target.id + '/bewerken');
+      else renderEtenBeheer({ success: `${aantal}× ${naam} (${fmtEUR(totaal)}) toegevoegd aan ${target.naam}.` });
       return;
     }
+
+    // Lightbox
     const zoom = e.target.closest('button[data-action="zoom"]');
     if (zoom) {
       const id = parseInt(zoom.getAttribute('data-id'), 10);
@@ -292,13 +317,10 @@ function renderEtenBeheer(msg) {
       });
       return;
     }
+    // Bewerken / verwijderen
     const ed = e.target.closest('button[data-edit]');
+    if (ed) { _etenEditing = parseInt(ed.getAttribute('data-edit'), 10); renderEtenBeheer(); return; }
     const del = e.target.closest('button[data-delete]');
-    if (ed) {
-      _etenEditing = parseInt(ed.getAttribute('data-edit'), 10);
-      renderEtenBeheer();
-      return;
-    }
     if (del) {
       const id = parseInt(del.getAttribute('data-delete'), 10);
       const b = DB.byId(KEYS.ETEN, id);
