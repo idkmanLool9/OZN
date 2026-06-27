@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 99;
-const APP_VERSION    = '5.20.0';
+const APP_BUILD      = 100;
+const APP_VERSION    = '5.21.0';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -895,12 +895,15 @@ Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
     Router.handle();
   });
 
-  document.getElementById('btn-logout').addEventListener('click', async () => {
+  const doLogout = async () => {
     await Auth.logout();
     cleanSessionStorage();
     location.hash = '';
     Router.handle();
-  });
+  };
+  document.getElementById('btn-logout').addEventListener('click', doLogout);
+  const btnLogoutSide = document.getElementById('btn-logout-side');
+  if (btnLogoutSide) btnLogoutSide.addEventListener('click', doLogout);
 
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
   function cleanSessionStorage() {

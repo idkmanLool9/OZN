@@ -910,7 +910,7 @@ const Router = {
         const params = {};
         r.keys.forEach((k, i) => params[k] = decodeURIComponent(m[i + 1]));
         r.handler(params, fullHash);
-        $$('#topnav a').forEach(a => {
+        $$('[data-route]').forEach(a => {
           const route = a.getAttribute('data-route');
           const active = route === '/dossiers'
             ? (path === '/' || path.startsWith('/dossiers'))
@@ -1101,11 +1101,24 @@ function showProfilePicker() {
     }
   }
 }
+function initialen(naam) {
+  const delen = String(naam || '').trim().split(/\s+/).filter(Boolean);
+  if (delen.length === 0) return '–';
+  if (delen.length === 1) return delen[0].slice(0, 2).toUpperCase();
+  return (delen[0][0] + delen[delen.length - 1][0]).toUpperCase();
+}
 function showApp() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = true;
   $('#app').hidden = false;
-  const s = Auth.current(); if (s) $('#user-name').textContent = s.fullName || s.email;
+  const s = Auth.current();
+  if (s) {
+    const naam = s.fullName || s.email;
+    $('#user-name').textContent = naam;
+    const sn = $('#side-user-name'); if (sn) sn.textContent = naam;
+    const se = $('#side-user-email'); if (se) se.textContent = s.email || '';
+    const av = $('#side-avatar'); if (av) av.textContent = initialen(naam);
+  }
   ActiveProfile.renderChip();
 }
 
