@@ -1,31 +1,45 @@
 # Uitvaartbeheer — SwiftUI (iOS/iPadOS 26)
 
-Eerste native versie van de **Dossiers-pagina** in SwiftUI. Dit is losstaande
-UI-code; de echte data-koppeling (Supabase) komt later.
+Native versie van de app, gebouwd naar het web-ontwerp: een vaste zijbalk
+links (branding · navigatie · gebruiker), een bovenbalk, en rechts het
+**Dossiers-scherm** met een kolomtabel. Primair bedoeld voor iPad/landscape
+(en Mac via Catalyst).
 
 ## Bestanden
 
 | Bestand | Wat het doet |
 |---|---|
-| `Theme.swift` | Klooster-kleuren (bordeaux, teal) |
-| `Dossier.swift` | Datamodel `Dossier` + `DossierStatus` + voorbeelddata |
-| `DossierListView.swift` | De pagina zelf: filter-sidebar · lijst · detail |
+| `UitvaartbeheerApp.swift` | App-startpunt (`@main`) → toont `RootView` |
+| `RootView.swift` | Zijbalk + bovenbalk + sectie-router; ook `Avatar` en `GebruikerKaart` |
+| `DossiersScherm.swift` | Het Dossiers-scherm: kop, zoek/filter-rij, tabelkaart, footer, `StatusBadge` |
+| `Dossier.swift` | Datamodel `Dossier` + `DossierStatus` + datum-helpers + voorbeelddata |
+| `Theme.swift` | Kleuren (merkblauw, statusbadges, randen) |
 
 ## In VS Code bekijken
 
-Open de map `ios-swiftui/` — de `.swift`-bestanden zijn gewone tekst en
-direct leesbaar. Voor syntax-highlighting kun je de **Swift**-extensie van
-Swift Server Work Group installeren (zoek "Swift" in de extensions).
+Open de map `ios-swiftui/`. De `.swift`-bestanden zijn gewone tekst en direct
+leesbaar. Voor highlighting + autocomplete: installeer de **Swift**-extensie
+(Swift Server Work Group) in VS Code.
 
-## Bouwen / live preview
+> Let op: VS Code kan SwiftUI **schrijven** maar niet **uitvoeren**. Compileren
+> en de live preview vereisen **Xcode 26** (macOS) of een cloud-Mac
+> (Codemagic). SwiftUI zelf bestaat alleen in de Apple-SDK.
 
-Compileren en de live preview vereisen **Xcode 26** (macOS). Zonder Mac kan
-dat via Codemagic (zie `../codemagic.yaml`). De preview-blokken onderaan
-`DossierListView.swift` tonen het scherm voor iPhone én iPad.
+## Bouwen / preview
 
-## Layout
+- **Xcode 26:** maak een iOS App-target en voeg deze map als bron toe. De
+  `#Preview`-blokken tonen het scherm voor iPad.
+- **Zonder Mac:** bouwen via `../codemagic.yaml` (cloud-Mac) → TestFlight →
+  op je eigen iPhone/iPad.
 
-- **iPad:** drie-koloms `NavigationSplitView` — statusfilter links,
-  dossierlijst in het midden, detail rechts.
-- **iPhone:** dezelfde structuur klapt automatisch in tot een navigatiestack.
-- Grote titel "Dossiers", `.searchable`-zoekbalk, statusbadges als capsules.
+## Layout (naar het web-ontwerp)
+
+- **Zijbalk:** kerk-icoon + "Uitvaartbeheer", navigatie (Dossiers,
+  Begraafplaats, Kisten, Bloemen, Eten, Account), gebruikerskaart onderaan.
+- **Bovenbalk:** horizontale navigatie + gebruiker rechtsboven.
+- **Dossiers:** grote titel + "Nieuw dossier", zoekbalk + statusfilter +
+  Filteren, en een tabel met kolommen Dossier · Overledene · Contactpersoon ·
+  Gezinsnr. · Overlijden · Uitvaart · Status · Laatst gewijzigd.
+
+Nog geen data-koppeling — de lijst gebruikt voorbeelddata. De Supabase-koppeling
+komt later.
