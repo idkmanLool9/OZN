@@ -917,6 +917,11 @@ const Router = {
             : path === route;
           a.classList.toggle('active', active);
         });
+        // "In een dossier" = detail / intake / bewerken / factuur (alles
+        // ónder /dossiers/…). Dan verbergen we de zijbalk en tonen alleen
+        // de bovenbalk; op de overige pagina's juist andersom.
+        const inDossier = /^\/dossiers\/.+/.test(path);
+        document.body.classList.toggle('in-dossier', inDossier);
         window.scrollTo(0, 0);
         return;
       }

@@ -2641,7 +2641,21 @@ fieldset[data-step][hidden] { display: none !important; }
 .app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .app-main .topbar-inner { max-width: none; }
 
-/* Onder 980px valt de zijbalk weg; de bovenbalk-navigatie blijft. */
+/* Geen horizontale pagina-beweging meer: clip i.p.v. hidden zodat de
+   sticky-zijbalk blijft werken. Brede tabellen scrollen binnen hun kaart. */
+body { overflow-x: clip; }
+.app-main { overflow-x: clip; }
+
+/* Brede schermen (iPad/desktop): de zijbalk verzorgt de navigatie, dus de
+   bovenbalk is verborgen. Binnen een dossier draaien we het om: zijbalk weg,
+   alleen de bovenbalk, en het werkgebied gebruikt de volle breedte. */
+@media (min-width: 981px) {
+  .topbar { display: none; }
+  body.in-dossier .sidebar { display: none; }
+  body.in-dossier .topbar { display: block; }
+}
+
+/* Onder 980px valt de zijbalk altijd weg; de bovenbalk-navigatie blijft. */
 @media (max-width: 980px) {
   .sidebar { display: none; }
 }
