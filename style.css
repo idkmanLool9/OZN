@@ -2660,6 +2660,12 @@ body { overflow-x: clip; }
   .sidebar { display: none; }
 }
 
+/* ─── v1: klassieke bovenbalk-layout (zoals vanouds) ─────────────────────────
+   Geen zijbalk, altijd de bovenbalk — ongeacht schermbreedte of route. */
+body.design-v1 .sidebar { display: none !important; }
+body.design-v1 .topbar { display: block !important; }
+body.design-v1 .app-main .topbar-inner { max-width: 1200px; }
+
 /* ─── Dossiers-pagina ────────────────────────────────────────────────────── */
 .dossiers-filterbar {
   display: flex; gap: .75rem; align-items: stretch;

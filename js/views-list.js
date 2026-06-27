@@ -265,6 +265,15 @@ function renderAccount(msg) {
           return `
           <form id="ui-form" class="form" autocomplete="off">
             <label>
+              <span>Ontwerp</span>
+              <select name="design_version">
+                <option value="v2" ${(s.design_version||'v2')==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
+                <option value="v1" ${s.design_version==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
+              </select>
+              <span class="muted small">Wissel tussen het nieuwe ontwerp met zijbalk (v2) en de vertrouwde bovenbalk-indeling (v1).</span>
+            </label>
+
+            <label>
               <span>Lettertype</span>
               <select name="font_id" id="font-select">
                 ${FONTS.map(f => `<option value="${esc(f.id)}" ${s.font_id===f.id?'selected':''}>${esc(f.label)}</option>`).join('')}
@@ -791,6 +800,7 @@ function renderAccount(msg) {
       e.preventDefault();
       const f = e.target;
       Settings.set({
+        design_version: f.design_version.value,
         compact_mode: f.compact_mode.checked,
         rounded_cards: f.rounded_cards.checked,
         font_id: f.font_id.value,

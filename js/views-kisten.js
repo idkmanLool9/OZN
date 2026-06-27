@@ -166,7 +166,7 @@ function renderKistenBeheer(msg) {
           <strong class="kist-card-naam">${esc(k.naam)}</strong>
           <span class="muted small">${esc(k.materiaal)}</span>
           <div class="kist-card-foot">
-            <span class="kist-price">${fmtEUR(k.bedrag)}${k._customBedrag ? ' <span class="badge badge-amber" title="Eigen prijs">✏️</span>' : ''}</span>
+            <span class="kist-price">${fmtEUR(k.bedrag)}</span>
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
           ${adminMode ? `
