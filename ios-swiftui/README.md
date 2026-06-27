@@ -1,38 +1,31 @@
 # Uitvaartbeheer — SwiftUI (iOS/iPadOS 26)
 
-Native versie van de app, gebouwd naar het web-ontwerp: een vaste zijbalk
-links (branding · navigatie · gebruiker), een bovenbalk, en rechts het
-**Dossiers-scherm** met een kolomtabel. Primair bedoeld voor iPad/landscape
-(en Mac via Catalyst).
+Native versie van de **Dossiers-pagina**, gebouwd naar het web-ontwerp: vaste
+zijbalk links (branding · navigatie · gebruiker), een bovenbalk, en rechts een
+kolomtabel met dossiers.
 
-## Bestanden
+## Eén bestand — `swift.swift`
 
-| Bestand | Wat het doet |
-|---|---|
-| `UitvaartbeheerApp.swift` | App-startpunt (`@main`) → toont `RootView` |
-| `RootView.swift` | Zijbalk + bovenbalk + sectie-router; ook `Avatar` en `GebruikerKaart` |
-| `DossiersScherm.swift` | Het Dossiers-scherm: kop, zoek/filter-rij, tabelkaart, footer, `StatusBadge` |
-| `Dossier.swift` | Datamodel `Dossier` + `DossierStatus` + datum-helpers + voorbeelddata |
-| `Theme.swift` | Kleuren (merkblauw, statusbadges, randen) |
+Alles staat in **`swift.swift`**: één zelfstandig bestand dat je rechtstreeks
+in **Swift Playgrounds op de iPad** kunt plakken en draaien. Zo zie je het
+scherm live, zónder Mac.
+
+### Zo draai je het op je iPad
+
+1. Open de gratis app **Swift Playgrounds**.
+2. Maak een nieuwe **App**.
+3. Verwijder alle bestaande code en plak de **hele** inhoud van `swift.swift`.
+4. Druk op ▶ (Uitvoeren) — de Dossiers-pagina verschijnt live.
+
+> Tip: draai de iPad in **landscape** voor de volledige sidebar + tabel.
 
 ## In VS Code bekijken
 
-Open de map `ios-swiftui/`. De `.swift`-bestanden zijn gewone tekst en direct
-leesbaar. Voor highlighting + autocomplete: installeer de **Swift**-extensie
-(Swift Server Work Group) in VS Code.
+Open `ios-swiftui/swift.swift`. Met de **Swift**-extensie krijg je
+highlighting + autocomplete. VS Code kan SwiftUI wel *schrijven* maar niet
+*uitvoeren* — draaien doe je in Swift Playgrounds (iPad) of Xcode (Mac).
 
-> Let op: VS Code kan SwiftUI **schrijven** maar niet **uitvoeren**. Compileren
-> en de live preview vereisen **Xcode 26** (macOS) of een cloud-Mac
-> (Codemagic). SwiftUI zelf bestaat alleen in de Apple-SDK.
-
-## Bouwen / preview
-
-- **Xcode 26:** maak een iOS App-target en voeg deze map als bron toe. De
-  `#Preview`-blokken tonen het scherm voor iPad.
-- **Zonder Mac:** bouwen via `../codemagic.yaml` (cloud-Mac) → TestFlight →
-  op je eigen iPhone/iPad.
-
-## Layout (naar het web-ontwerp)
+## Layout
 
 - **Zijbalk:** kerk-icoon + "Uitvaartbeheer", navigatie (Dossiers,
   Begraafplaats, Kisten, Bloemen, Eten, Account), gebruikerskaart onderaan.
