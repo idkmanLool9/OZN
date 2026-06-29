@@ -122,6 +122,7 @@ function renderAccount(msg) {
         <a href="#/account#acc-welkom">Welkomscherm</a>
         <a href="#/account#email-instellingen">E-mail</a>
         <a href="#/account#push-instellingen">Push-notificaties</a>
+        <a href="#/account#snelstart-instellingen">SnelStart</a>
         <a href="#/account#profielen">Profielen</a>
         <a href="#/account#parochies">Parochies</a>
         <a href="#/account#verzekeringen">Verzekeringen</a>
@@ -459,6 +460,40 @@ function renderAccount(msg) {
                 <button type="button" class="btn btn-ghost" id="btn-push-disable" hidden>🔕 Uitschakelen</button>
                 <button type="button" class="btn btn-ghost" id="btn-push-test">Test-melding</button>
               </div>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow" id="snelstart-instellingen">
+        <h2>SnelStart-koppeling (boekhouding)</h2>
+        <p class="muted small">
+          Koppel je SnelStart-administratie om straks facturen/boekingen te kunnen versturen.
+          Vraag in je SnelStart-account de <strong>B2B API-sleutels</strong> aan: een
+          <strong>Subscription key</strong> (API-gateway) en een <strong>Client key</strong>
+          (per administratie). Vul ze hieronder in en klik op <strong>Test verbinding</strong>.
+        </p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="snelstart-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="snelstart_actief" ${s.snelstart_actief ? 'checked' : ''}>
+              Koppeling actief
+            </label>
+            <label>
+              <span>Subscription key</span>
+              <input type="password" name="snelstart_subscription_key" value="${esc(s.snelstart_subscription_key)}" placeholder="Ocp-Apim-Subscription-Key" autocomplete="off">
+            </label>
+            <label>
+              <span>Client key</span>
+              <input type="password" name="snelstart_client_key" value="${esc(s.snelstart_client_key)}" placeholder="clientkey van je administratie" autocomplete="off">
+              <span class="muted small">De sleutels worden veilig in de cloud-instellingen bewaard en alleen via een beveiligde server-functie naar SnelStart gestuurd (nooit rechtstreeks vanuit de browser).</span>
+            </label>
+            <div id="snelstart-result"></div>
+            <div class="form-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-ghost" id="btn-snelstart-test">⇄ Test verbinding</button>
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
           </form>`;
@@ -1006,6 +1041,51 @@ function renderAccount(msg) {
         if (!ok) Modal.show({ type: 'warning', title: 'Toestemming nodig', message: 'Sta notificaties toe in de browser.' });
       } catch (e) {
         Modal.show({ type: 'error', title: 'Test mislukt', message: e.message || String(e) });
+      }
+    });
+  }
+
+  // ─── SnelStart-koppeling (boekhouding) ───────────────────────
+  const snelstartForm = $('#snelstart-form');
+  if (snelstartForm) {
+    snelstartForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        snelstart_actief: f.snelstart_actief.checked,
+        snelstart_subscription_key: f.snelstart_subscription_key.value.trim(),
+        snelstart_client_key: f.snelstart_client_key.value.trim(),
+      });
+      renderAccount({ success: 'SnelStart-instellingen opgeslagen.' });
+      location.hash = '#/account#snelstart-instellingen';
+    });
+
+    const testBtn = $('#btn-snelstart-test');
+    if (testBtn) testBtn.addEventListener('click', async () => {
+      const f = snelstartForm;
+      const sub = f.snelstart_subscription_key.value.trim();
+      const cli = f.snelstart_client_key.value.trim();
+      const out = $('#snelstart-result');
+      if (!sub || !cli) {
+        if (out) out.innerHTML = '<div class="alert alert-error">Vul eerst beide sleutels in.</div>';
+        return;
+      }
+      // Sleutels tijdelijk opslaan zodat de test ze meeneemt
+      Settings.set({ snelstart_subscription_key: sub, snelstart_client_key: cli });
+      if (out) out.innerHTML = '<div class="alert">Bezig met testen…</div>';
+      testBtn.disabled = true;
+      try {
+        const res = await SnelStart.test();
+        if (res && res.ok) {
+          if (out) out.innerHTML = `<div class="alert alert-success">✓ ${esc(res.msg || 'Verbinding geslaagd.')}</div>`;
+        } else {
+          const detail = res && (res.msg || res.error) ? (res.msg || res.error) : 'Onbekende fout.';
+          if (out) out.innerHTML = `<div class="alert alert-error">Verbinding mislukt: ${esc(detail)}</div>`;
+        }
+      } catch (err) {
+        if (out) out.innerHTML = `<div class="alert alert-error">Kon de testfunctie niet bereiken: ${esc(err.message || String(err))}</div>`;
+      } finally {
+        testBtn.disabled = false;
       }
     });
   }

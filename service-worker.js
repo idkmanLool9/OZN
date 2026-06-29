@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-106';
+const CACHE_VERSION = 'sok-uitvaart-build-107';
 const SHELL = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const SHELL = [
   './icon.svg',
   './js/config.js',
   './js/supabase-client.js',
+  './js/snelstart.js',
   './js/data.js',
   './js/core.js',
   './js/views-list.js',

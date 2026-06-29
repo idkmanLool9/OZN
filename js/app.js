@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 106;
-const APP_VERSION    = '5.25.0';
+const APP_BUILD      = 107;
+const APP_VERSION    = '5.26.0';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -160,6 +160,10 @@ const Settings = {
     // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
     default_kerk_locatie: 'Maria kathedraal',
     default_begraafplaats: 'St. Ephrem',
+    // SnelStart-koppeling (boekhouding) — sleutels invullen in Account.
+    snelstart_actief: false,
+    snelstart_subscription_key: '',
+    snelstart_client_key: '',
   },
   // Synchrone read uit cache + lokale spiegel
   _localOverrides() {

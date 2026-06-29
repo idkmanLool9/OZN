@@ -12,3 +12,9 @@ project_id = "mpuejmkhmlbkaelqbnae"
 # en stuurt alleen naar reeds geregistreerde subscriptions.
 [functions.send-push]
 verify_jwt = false
+
+# snelstart: auth-proxy naar de SnelStart B2B API. Callable met de anon-key
+# (verify_jwt = false zodat de aanroep niet op een verlopen JWT vastloopt).
+# De functie bevat zelf geen sleutels; die komen mee per aanroep.
+[functions.snelstart]
+verify_jwt = false
