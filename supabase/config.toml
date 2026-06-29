@@ -18,3 +18,8 @@ verify_jwt = false
 # De functie bevat zelf geen sleutels; die komen mee per aanroep.
 [functions.snelstart]
 verify_jwt = false
+
+# snelstart-webhook: ontvangt meldingen van SnelStart. Moet openbaar
+# bereikbaar zijn (SnelStart roept aan zonder Supabase-JWT).
+[functions.snelstart-webhook]
+verify_jwt = false
