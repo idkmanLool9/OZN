@@ -187,6 +187,22 @@ fieldset.card input, fieldset.card select,
   -webkit-appearance: none;
   appearance: none;
 }
+/* Checkboxes & radios: het native vinkje terug (de brede regel hierboven
+   zette appearance:none, waardoor je niet zag of een vinkje aan/uit stond). */
+.form input[type="checkbox"], .form input[type="radio"],
+fieldset.card input[type="checkbox"], fieldset.card input[type="radio"],
+.row-form input[type="checkbox"], .row-form input[type="radio"],
+.checkbox-inline input[type="checkbox"], .checkbox-inline input[type="radio"] {
+  -webkit-appearance: auto;
+  appearance: auto;
+  width: 1.2rem;
+  height: 1.2rem;
+  min-width: 1.2rem;
+  padding: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
 /* Selects krijgen een eigen dropdown-pijl zodat appearance:none geen lege styling geeft */
 .form select, fieldset.card select, .row-form select {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M2 4 L5 7 L8 4' stroke='%236f6a62' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
