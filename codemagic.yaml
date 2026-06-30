@@ -88,7 +88,7 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        APP_STORE_APP_ID: 6786043538  # vervangen na aanmaken in App Store Connect
+        APP_STORE_APP_ID: 6786043538
       node: 20
       xcode: latest
       cocoapods: default
@@ -106,6 +106,9 @@ workflows:
       - name: CocoaPods
         script: |
           cd ios/App && pod install
+      - name: App-icon genereren uit resources/icon.png
+        script: |
+          npm run cap:assets
       - name: Versie + buildnummer
         script: |
           cd ios/App
