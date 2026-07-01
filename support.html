@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2563eb">
+  <title>Support · Uitvaartbeheer SOK</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: #fafaf6; }
+    .privacy-page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+    .privacy-page h1 { font-family: Georgia, serif; color: var(--primary); margin: 0 0 .25rem; }
+    .privacy-page h2 { border: none; padding: 0; margin: 1.75rem 0 .5rem; font-size: 1.15rem; }
+    .privacy-page h3 { color: var(--primary); margin: 1rem 0 .25rem; font-size: 1rem; }
+    .privacy-page p, .privacy-page li { line-height: 1.6; color: var(--text); }
+    .privacy-page ul { padding-left: 1.25rem; }
+    .privacy-page .updated { color: var(--muted); font-size: .85rem; margin-bottom: 2rem; }
+    .privacy-page .lang-toggle { float: right; }
+    .privacy-page .lang-toggle a { padding: .25rem .65rem; border: 1px solid var(--border); border-radius: 4px; margin-left: .25rem; background: #fff; }
+    .privacy-page .lang-toggle a.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .contact-box { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; margin: 1rem 0; }
+    [lang="en"] { display: none; }
+    body.lang-en [lang="nl"] { display: none; }
+    body.lang-en [lang="en"] { display: block; }
+  </style>
+</head>
+<body>
+  <div class="privacy-page">
+    <div class="lang-toggle">
+      <a href="#" data-lang="nl" class="active">NL</a>
+      <a href="#" data-lang="en">EN</a>
+    </div>
+
+    <article lang="nl">
+      <h1>Support</h1>
+      <p class="updated">Uitvaartbeheer — voor parochies en kloosters</p>
+
+      <p>Heb je een vraag over de app, loop je tegen een probleem aan, of
+      wil je een functie voorstellen? Neem gerust contact op.</p>
+
+      <div class="contact-box">
+        <h3>Contact</h3>
+        <p>
+          <strong>E-mail:</strong> <a href="mailto:secretariaat@stephremklooster.nl">secretariaat@stephremklooster.nl</a><br>
+          <strong>Beheerder:</strong> St. Ephrem de Syriër Klooster, Glane
+        </p>
+      </div>
+
+      <h2>Veelgestelde vragen</h2>
+
+      <h3>Ik kan niet inloggen</h3>
+      <p>Controleer of je het juiste e-mailadres gebruikt. Neem contact op
+      met je secretariaat als je wachtwoord niet werkt — accounts worden
+      per parochie beheerd, niet door de gebruiker zelf aangemaakt.</p>
+
+      <h3>Mijn dossiers zijn niet zichtbaar op een ander apparaat</h3>
+      <p>Dossiers worden gesynchroniseerd via de cloud. Controleer je
+      internetverbinding en open de app opnieuw. Blijft het probleem
+      bestaan, mail dan naar bovenstaand adres met een omschrijving.</p>
+
+      <h3>Ik wil een functie voorstellen of een fout melden</h3>
+      <p>Mail een korte omschrijving (en eventueel een schermafbeelding)
+      naar <a href="mailto:secretariaat@stephremklooster.nl">secretariaat@stephremklooster.nl</a>.</p>
+
+      <h2>Privacy</h2>
+      <p>Zie ons <a href="privacy.html">privacybeleid</a> voor informatie
+      over hoe persoonsgegevens worden verwerkt.</p>
+    </article>
+
+    <article lang="en">
+      <h1>Support</h1>
+      <p class="updated">Uitvaartbeheer — funeral administration for parishes and monasteries</p>
+
+      <p>Have a question about the app, run into a problem, or want to
+      suggest a feature? Feel free to get in touch.</p>
+
+      <div class="contact-box">
+        <h3>Contact</h3>
+        <p>
+          <strong>Email:</strong> <a href="mailto:secretariaat@stephremklooster.nl">secretariaat@stephremklooster.nl</a><br>
+          <strong>Administrator:</strong> St. Ephrem the Syrian Monastery, Glane
+        </p>
+      </div>
+
+      <h2>FAQ</h2>
+
+      <h3>I can't log in</h3>
+      <p>Check that you're using the correct email address. Contact your
+      parish secretariat if your password doesn't work — accounts are
+      managed per parish, not self-registered.</p>
+
+      <h3>My case files aren't showing on another device</h3>
+      <p>Case files sync via the cloud. Check your internet connection and
+      reopen the app. If the problem persists, email the address above
+      with a description.</p>
+
+      <h3>I want to suggest a feature or report a bug</h3>
+      <p>Email a short description (and a screenshot if possible) to
+      <a href="mailto:secretariaat@stephremklooster.nl">secretariaat@stephremklooster.nl</a>.</p>
+
+      <h2>Privacy</h2>
+      <p>See our <a href="privacy.html">privacy policy</a> for information
+      on how personal data is processed.</p>
+    </article>
+  </div>
+
+  <script>
+    document.querySelectorAll('.lang-toggle a').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        var lang = this.dataset.lang;
+        document.body.classList.toggle('lang-en', lang === 'en');
+        document.querySelectorAll('.lang-toggle a').forEach(function(x) {
+          x.classList.toggle('active', x.dataset.lang === lang);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
