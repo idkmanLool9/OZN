@@ -118,42 +118,47 @@ Native._dataUrlToFile = async function (dataUrl, naam) {
   return new File([blob], `${naam}-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
 };
 
-// Diagnose: staat de native VisionKit-plugin écht in deze app-build?
-//   'native'      → plugin geladen (echte Apple-scanner beschikbaar)
+// Diagnose: staat de native documentscanner-plugin écht in deze app-build?
+//   'native'      → plugin geladen (echte Apple VisionKit-scanner beschikbaar)
 //   'unavailable' → app, maar plugin zit niet in de build (oude TestFlight-
 //                   build, of pod niet meegecompileerd)
 //   'web'         → geen native app (browser)
-// De plugin krijgt een isAvailable()-methode; faalt die met 'unimplemented'
-// dan weten we zeker dat de native code ontbreekt.
 Native.scannerStatus = async function () {
   if (!Native.isApp()) return 'web';
   try {
-    const DS = Capacitor.registerPlugin('DocumentScanner');
-    const res = await DS.isAvailable();   // slaagt alleen als plugin geladen is
-    // Plugin is geladen. res.available zegt of het toestel het ondersteunt.
-    return (res && res.available === false) ? 'native-unsupported' : 'native';
+    return (Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('DocumentScanner'))
+      ? 'native' : 'unavailable';
   } catch (_) {
     return 'unavailable';
   }
 };
 
-// Apple documentscanner (VisionKit): randherkenning + recht trekken +
-// meerdere pagina's. Geeft de eerste pagina als File terug. Valt terug op
-// de gewone camera als de scanner (nog) niet beschikbaar is.
+// Apple documentscanner via @capgo/capacitor-document-scanner (iOS = Apple
+// VisionKit: randherkenning + recht trekken + meerdere pagina's; Android =
+// ML Kit). Geeft de eerste pagina als File terug. Valt terug op de gewone
+// camera als de scanner (nog) niet in de build zit.
 Native.scanDocument = async function () {
   if (!Native.isApp()) return null;
   try {
     const DS = Capacitor.registerPlugin('DocumentScanner');
-    const res = await DS.scan();
-    const first = res && res.images && res.images[0];
-    if (first) return await Native._dataUrlToFile(first, 'scan');
-    if (res && res.cancelled) return null; // gebruiker annuleerde bewust
+    const res = await DS.scanDocument({
+      responseType: 'base64',   // levert base64 terug i.p.v. bestandspad
+      letUserAdjustCrop: true,  // gebruiker mag de rand nog bijknippen
+      maxNumDocuments: 1,       // artsverklaring = 1 pagina
+      reviewCapturedDocument: true,
+    });
+    if (res && res.status === 'cancel') return null; // bewust geannuleerd
+    const first = res && res.scannedImages && res.scannedImages[0];
+    if (first) {
+      // base64 kan met of zonder data-URL-prefix binnenkomen
+      const dataUrl = /^data:/.test(first) ? first : ('data:image/jpeg;base64,' + first);
+      return await Native._dataUrlToFile(dataUrl, 'scan');
+    }
   } catch (e) {
     // 'unimplemented' = de native plugin zit niet in deze build → val terug
     // op de camera, maar laat het één keer weten zodat het niet stil gebeurt.
     const msg = (e && (e.message || e.code || '')) + '';
-    if (/unimplement|not implemented|niet.*geïmplement/i.test(msg)) {
-      Native._scannerMissingWarned = Native._scannerMissingWarned || false;
+    if (/unimplement|not implemented/i.test(msg)) {
       if (!Native._scannerMissingWarned && typeof Modal !== 'undefined') {
         Native._scannerMissingWarned = true;
         Modal.show({
