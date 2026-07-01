@@ -103,6 +103,13 @@ workflows:
             npx cap add ios
           fi
           npx cap sync ios
+      - name: Export-compliance (standaard HTTPS = vrijgesteld)
+        script: |
+          # Voorkomt de handmatige 'gebruikt je app encryptie?'-vraag en
+          # dat de build daarop blijft hangen bij App Store-verwerking.
+          PLIST=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$PLIST"
       - name: CocoaPods
         script: |
           cd ios/App && pod install
