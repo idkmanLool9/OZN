@@ -133,27 +133,18 @@ Native.scannerStatus = async function () {
   }
 };
 
-// Apple documentscanner via @capgo/capacitor-document-scanner (iOS = Apple
-// VisionKit: randherkenning + recht trekken + meerdere pagina's; Android =
-// ML Kit). Geeft de eerste pagina als File terug. Valt terug op de gewone
+// Apple documentscanner (eigen VisionKit-plugin: randherkenning + recht
+// trekken + meerdere pagina's — dezelfde als "Scan document" in Notities/
+// Bestanden). Geeft de eerste pagina als File terug. Valt terug op de gewone
 // camera als de scanner (nog) niet in de build zit.
 Native.scanDocument = async function () {
   if (!Native.isApp()) return null;
   try {
     const DS = Capacitor.registerPlugin('DocumentScanner');
-    const res = await DS.scanDocument({
-      responseType: 'base64',   // levert base64 terug i.p.v. bestandspad
-      letUserAdjustCrop: true,  // gebruiker mag de rand nog bijknippen
-      maxNumDocuments: 1,       // artsverklaring = 1 pagina
-      reviewCapturedDocument: true,
-    });
-    if (res && res.status === 'cancel') return null; // bewust geannuleerd
-    const first = res && res.scannedImages && res.scannedImages[0];
-    if (first) {
-      // base64 kan met of zonder data-URL-prefix binnenkomen
-      const dataUrl = /^data:/.test(first) ? first : ('data:image/jpeg;base64,' + first);
-      return await Native._dataUrlToFile(dataUrl, 'scan');
-    }
+    const res = await DS.scan();
+    if (res && res.cancelled) return null; // gebruiker annuleerde bewust
+    const first = res && res.images && res.images[0]; // data-URL's (JPEG)
+    if (first) return await Native._dataUrlToFile(first, 'scan');
   } catch (e) {
     // 'unimplemented' = de native plugin zit niet in deze build → val terug
     // op de camera, maar laat het één keer weten zodat het niet stil gebeurt.
