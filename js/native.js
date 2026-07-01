@@ -111,8 +111,20 @@ const Native = {
   },
 };
 
+// Statusbalk: app edge-to-edge tot achter de statusbalk, met donkere
+// tekst (LIGHT-stijl = donkere klok/batterij voor onze lichte balk).
+Native.initStatusBar = function () {
+  if (!Native.isApp()) return;
+  try {
+    const SB = Capacitor.registerPlugin('StatusBar');
+    if (SB.setOverlaysWebView) SB.setOverlaysWebView({ overlay: true }).catch(() => {});
+    if (SB.setStyle) SB.setStyle({ style: 'LIGHT' }).catch(() => {});
+  } catch (_) {}
+};
+
 // Auto: kort na laden + telkens als de app weer op de voorgrond komt.
 if (Native.isApp()) {
+  Native.initStatusBar();
   setTimeout(() => { Native.sync(); }, 4000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') Native.sync();

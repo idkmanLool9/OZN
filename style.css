@@ -2742,3 +2742,17 @@ select.dossiers-control {
 .account-nav a:hover { background: var(--bg); text-decoration: none; border-color: var(--primary); color: var(--primary); }
 /* Anker-secties netjes onder een eventuele sticky bovenbalk laten landen */
 .card[id] { scroll-margin-top: 1.25rem; }
+
+/* ─── Edge-to-edge veilige zones (statusbalk/notch in de native app) ──────────
+   De app loopt tot achter de statusbalk; deze regels vullen die strook met de
+   app-kleur (geen zwart meer) en houden de inhoud eronder vandaan. Op web zijn
+   de env()-waarden 0, dus geen effect daar. */
+html { background: var(--bg); }
+.topbar { padding-top: env(safe-area-inset-top); }
+.sidebar { padding-top: calc(1.25rem + env(safe-area-inset-top)); }
+#login-screen, #profile-screen { padding-top: env(safe-area-inset-top); }
+/* In de zijbalk-layout (bovenbalk verborgen) heeft het werkgebied zelf de
+   veilige marge bovenaan nodig; in de bovenbalk-layout doet de bovenbalk dat. */
+@media (min-width: 981px) {
+  body:not(.design-v1):not(.in-dossier) .app-main { padding-top: env(safe-area-inset-top); }
+}

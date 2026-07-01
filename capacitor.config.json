@@ -4,7 +4,7 @@
   "webDir": "www",
   "ios": {
     "scheme": "Uitvaartbeheer",
-    "contentInset": "automatic",
+    "contentInset": "never",
     "preferredContentMode": "recommended"
   },
   "server": {
