@@ -118,6 +118,25 @@ Native._dataUrlToFile = async function (dataUrl, naam) {
   return new File([blob], `${naam}-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
 };
 
+// Diagnose: staat de native VisionKit-plugin écht in deze app-build?
+//   'native'      → plugin geladen (echte Apple-scanner beschikbaar)
+//   'unavailable' → app, maar plugin zit niet in de build (oude TestFlight-
+//                   build, of pod niet meegecompileerd)
+//   'web'         → geen native app (browser)
+// De plugin krijgt een isAvailable()-methode; faalt die met 'unimplemented'
+// dan weten we zeker dat de native code ontbreekt.
+Native.scannerStatus = async function () {
+  if (!Native.isApp()) return 'web';
+  try {
+    const DS = Capacitor.registerPlugin('DocumentScanner');
+    const res = await DS.isAvailable();   // slaagt alleen als plugin geladen is
+    // Plugin is geladen. res.available zegt of het toestel het ondersteunt.
+    return (res && res.available === false) ? 'native-unsupported' : 'native';
+  } catch (_) {
+    return 'unavailable';
+  }
+};
+
 // Apple documentscanner (VisionKit): randherkenning + recht trekken +
 // meerdere pagina's. Geeft de eerste pagina als File terug. Valt terug op
 // de gewone camera als de scanner (nog) niet beschikbaar is.
@@ -129,7 +148,22 @@ Native.scanDocument = async function () {
     const first = res && res.images && res.images[0];
     if (first) return await Native._dataUrlToFile(first, 'scan');
     if (res && res.cancelled) return null; // gebruiker annuleerde bewust
-  } catch (_) { /* val terug op de camera */ }
+  } catch (e) {
+    // 'unimplemented' = de native plugin zit niet in deze build → val terug
+    // op de camera, maar laat het één keer weten zodat het niet stil gebeurt.
+    const msg = (e && (e.message || e.code || '')) + '';
+    if (/unimplement|not implemented|niet.*geïmplement/i.test(msg)) {
+      Native._scannerMissingWarned = Native._scannerMissingWarned || false;
+      if (!Native._scannerMissingWarned && typeof Modal !== 'undefined') {
+        Native._scannerMissingWarned = true;
+        Modal.show({
+          type: 'info',
+          title: 'Apple-scanner nog niet in deze versie',
+          message: 'Deze app-build bevat de documentscanner nog niet — er wordt nu de gewone camera gebruikt. Maak een nieuwe TestFlight-build om de echte scanner te activeren.',
+        });
+      }
+    }
+  }
   return Native.scanFoto();
 };
 

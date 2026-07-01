@@ -135,6 +135,7 @@ function renderAccount(msg) {
         <dl class="dl">
           <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Apple-documentscanner</dt><dd id="scanner-status" class="muted small">controleren…</dd></div>' : ''}
         </dl>
         <div id="update-result"></div>
         <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;">
@@ -927,6 +928,22 @@ function renderAccount(msg) {
         btn.disabled = false; btn.textContent = orig;
       }
     });
+  }
+
+  // Diagnose: is de native Apple-documentscanner geladen in deze app-build?
+  const scanEl = $('#scanner-status');
+  if (scanEl && typeof Native !== 'undefined' && Native.scannerStatus) {
+    Native.scannerStatus().then(st => {
+      if (st === 'native') {
+        scanEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ actief</span> — echte Apple-scanner beschikbaar';
+      } else if (st === 'native-unsupported') {
+        scanEl.textContent = 'plugin geladen, maar dit toestel ondersteunt de scanner niet';
+      } else if (st === 'unavailable') {
+        scanEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span> — maak een nieuwe TestFlight-build';
+      } else {
+        scanEl.textContent = 'alleen in de app (niet in de browser)';
+      }
+    }).catch(() => { scanEl.textContent = 'kon status niet bepalen'; });
   }
 
   // Update-check

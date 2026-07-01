@@ -12,10 +12,18 @@ public class DocumentScannerPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "DocumentScannerPlugin"
     public let jsName = "DocumentScanner"
     public let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "scan", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "scan", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise)
     ]
 
     private var savedCall: CAPPluginCall?
+
+    // Diagnose: bevestigt dat de native plugin geladen is én of het toestel
+    // de VisionKit-documentscanner ondersteunt. Als deze call slaagt, weet je
+    // zeker dat de plugin in de build zit (anders 'unimplemented').
+    @objc func isAvailable(_ call: CAPPluginCall) {
+        call.resolve(["available": VNDocumentCameraViewController.isSupported])
+    }
 
     @objc func scan(_ call: CAPPluginCall) {
         guard VNDocumentCameraViewController.isSupported else {
