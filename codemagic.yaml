@@ -157,16 +157,20 @@ workflows:
           # -all pakt ook de widget-extensie mee (apple-generic versioning).
           cd ios/App
           agvtool new-version -all "$(date +%s)"
-      - name: Widget-extensie signing (App ID + profiel aanmaken)
+      - name: Widget-extensie signing (App ID + profiel ophalen/aanmaken)
         script: |
           # De widget-extensie (nl.sok.uitvaartbeheer.widget) heeft een eigen
-          # App ID + provisioning-profiel nodig. Codemagic maakt dat niet
-          # automatisch omdat de widget-target pas tijdens de build ontstaat.
-          # --create maakt het App ID én het App-Store-profiel aan als ze nog
-          # niet bestaan (via de App Store Connect API-integratie).
+          # App ID + provisioning-profiel nodig. --create probeert het aan te
+          # maken via de App Store Connect API; lukt dat niet (bv. de API-sleutel
+          # mag geen identifiers aanmaken), dan is het HANDMATIG aanmaken in
+          # Apple Developer nodig — daarna downloadt deze stap het profiel.
+          # Non-fataal: de build gaat door zodat we de diagnose zien.
           app-store-connect fetch-signing-files "nl.sok.uitvaartbeheer.widget" \
-            --platform IOS --type IOS_APP_STORE --create
-          keychain add-certificates
+            --platform IOS --type IOS_APP_STORE --create \
+            || echo "⚠️  Widget-profiel automatisch aanmaken/ophalen lukte niet — maak het handmatig aan in Apple Developer."
+          keychain add-certificates || true
+          echo "=== Geïnstalleerde provisioning-profielen ==="
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" 2>/dev/null || true
       - name: Signed .ipa bouwen
         script: |
           xcode-project use-profiles
