@@ -195,6 +195,32 @@ Native._la = function () {
   catch (_) { return null; }
 };
 
+// Status voor de diagnose in Account:
+//   'web' | 'unavailable' (plugin niet in build) | 'off' (uit in iOS) | 'on'
+Native.liveActivityStatus = async function () {
+  if (!Native.isApp()) return 'web';
+  try {
+    if (!(Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('LiveActivity'))) return 'unavailable';
+    const LA = Native._la();
+    const e = await LA.areEnabled();
+    return (e && e.enabled) ? 'on' : 'off';
+  } catch (_) { return 'unavailable'; }
+};
+
+// Handmatige test: start meteen een demo-Live-Activity (2 uur aftellen), of
+// de eerstvolgende echte uitvaart als die er is. Geeft een uitlegtekst terug.
+Native.testLiveActivity = async function () {
+  const LA = Native._la();
+  if (!LA) throw new Error('Live Activity zit niet in deze app-build.');
+  const en = await LA.areEnabled().catch(() => ({ enabled: false }));
+  if (!en || !en.enabled) throw new Error('Live activiteiten staan uit — zet ze aan bij Instellingen → Uitvaartbeheer.');
+  const eind = new Date(Date.now() + 2 * 3600 * 1000);
+  await LA.endAll().catch(() => {});
+  await LA.start({ naam: 'Testweergave', tijd: 'demo', kerk: 'Voorbeeldlocatie', eindMs: eind.getTime(), status: 'Test' });
+  Native._laStartedFor = -1;
+  return 'Demo gestart. Vergrendel nu je scherm — de widget staat op het vergrendelscherm (2 uur aftellen).';
+};
+
 // Beëindig alle lopende uitvaart-activities.
 Native.endUitvaartActivities = async function () {
   const LA = Native._la();

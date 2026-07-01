@@ -136,7 +136,14 @@ function renderAccount(msg) {
           <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
           ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Apple-documentscanner</dt><dd id="scanner-status" class="muted small">controleren…</dd></div>' : ''}
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Live Activity</dt><dd id="la-status" class="muted small">controleren…</dd></div>' : ''}
         </dl>
+        ${(typeof Native !== 'undefined' && Native.isApp()) ? `
+          <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .75rem;">
+            <button type="button" class="btn btn-sm" id="btn-la-test">▶︎ Test Live Activity</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-la-stop">Stop</button>
+          </div>
+          <div id="la-test-result" class="muted small" style="margin-bottom:.5rem;"></div>` : ''}
         <div id="update-result"></div>
         <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;">
           <button type="button" class="btn btn-primary" id="btn-check-update">Check op updates</button>
@@ -951,6 +958,34 @@ function renderAccount(msg) {
       }
     }).catch(() => { scanEl.textContent = 'kon status niet bepalen'; });
   }
+
+  // Diagnose + test: Live Activity
+  const laEl = $('#la-status');
+  if (laEl && typeof Native !== 'undefined' && Native.liveActivityStatus) {
+    Native.liveActivityStatus().then(st => {
+      if (st === 'on') laEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ aan</span> — widget kan getoond worden';
+      else if (st === 'off') laEl.innerHTML = '<span style="color:#b8860b;font-weight:600;">uit</span> — zet aan bij Instellingen → Uitvaartbeheer → Live activiteiten';
+      else if (st === 'unavailable') laEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span>';
+      else laEl.textContent = 'alleen in de app';
+    }).catch(() => { laEl.textContent = 'kon status niet bepalen'; });
+  }
+  const laTestBtn = $('#btn-la-test');
+  if (laTestBtn) laTestBtn.addEventListener('click', async () => {
+    const res = $('#la-test-result');
+    laTestBtn.disabled = true; const orig = laTestBtn.textContent; laTestBtn.textContent = 'Bezig…';
+    try {
+      const msg = await Native.testLiveActivity();
+      if (res) res.innerHTML = '<span style="color:#1f7a3a;">' + esc(msg) + '</span>';
+    } catch (e) {
+      if (res) res.innerHTML = '<span style="color:#b34;">' + esc(e.message || String(e)) + '</span>';
+    } finally {
+      laTestBtn.disabled = false; laTestBtn.textContent = orig;
+    }
+  });
+  const laStopBtn = $('#btn-la-stop');
+  if (laStopBtn) laStopBtn.addEventListener('click', async () => {
+    try { await Native.endUitvaartActivities(); const r = $('#la-test-result'); if (r) r.textContent = 'Gestopt.'; } catch (_) {}
+  });
 
   // Update-check
   const updBtn = $('#btn-check-update');

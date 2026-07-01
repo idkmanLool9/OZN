@@ -1220,6 +1220,10 @@ function renderDossierForm(params) {
         }
       }
 
+      // Native herinneringen/badge + Live Activity meteen bijwerken (bv.
+      // een uitvaart-datum van vandaag start direct de lockscreen-widget).
+      try { if (typeof Native !== 'undefined' && Native.isApp()) Native.sync(); } catch (_) {}
+
       Router.go('/dossiers/' + (isNew ? savedDossier.id : dossier.id));
     } catch (err) {
       btn.disabled = false; btn.textContent = oldText;
