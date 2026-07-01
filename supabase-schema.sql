@@ -251,7 +251,11 @@ BEGIN
     'condoleance_locatie',condoleance_locatie,
     'familie_checklist',  COALESCE(familie_checklist, '[]'::jsonb),
     'familie_dagplanning',COALESCE(familie_dagplanning, '[]'::jsonb),
-    'familie_welkomtekst',familie_welkomtekst
+    'familie_welkomtekst',familie_welkomtekst,
+    'familie_id_status', (
+      SELECT COALESCE(jsonb_object_agg(slot, uploaded_at), '{}'::jsonb)
+        FROM public.familie_id_uploads WHERE dossier_id = v_dossier_id
+    )
   ) INTO v_result
     FROM public.dossiers
    WHERE id = v_dossier_id;
@@ -262,6 +266,53 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.get_familie_portaal(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_familie_portaal(TEXT) TO authenticated;
+
+-- Optionele ID-kaart-upload door de familie via de portal (voor/achter,
+-- overledene + contactpersoon). Base64, token-beveiligd via RPC.
+CREATE TABLE IF NOT EXISTS public.familie_id_uploads (
+  id BIGSERIAL PRIMARY KEY,
+  dossier_id BIGINT NOT NULL REFERENCES public.dossiers(id) ON DELETE CASCADE,
+  slot TEXT NOT NULL,          -- overledene_voor | overledene_achter | contact_voor | contact_achter
+  data_url TEXT NOT NULL,      -- data:image/jpeg;base64,...
+  uploaded_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (dossier_id, slot)
+);
+CREATE INDEX IF NOT EXISTS familie_id_uploads_dossier_idx
+  ON public.familie_id_uploads(dossier_id);
+ALTER TABLE public.familie_id_uploads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_id_uploads" ON public.familie_id_uploads;
+CREATE POLICY "auth_all_id_uploads" ON public.familie_id_uploads
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION public.familie_portaal_upload_id(
+  p_token TEXT, p_slot TEXT, p_data_url TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_dossier_id BIGINT;
+BEGIN
+  IF p_slot NOT IN ('overledene_voor','overledene_achter','contact_voor','contact_achter') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ongeldige_slot');
+  END IF;
+  IF p_data_url IS NULL OR p_data_url NOT LIKE 'data:image/%'
+     OR length(p_data_url) > 4000000 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ongeldige_afbeelding');
+  END IF;
+  SELECT dossier_id INTO v_dossier_id
+    FROM public.familie_portaal_tokens
+   WHERE token = p_token AND expires_at > now();
+  IF v_dossier_id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ongeldige_link');
+  END IF;
+  INSERT INTO public.familie_id_uploads (dossier_id, slot, data_url, uploaded_at)
+    VALUES (v_dossier_id, p_slot, p_data_url, now())
+  ON CONFLICT (dossier_id, slot) DO UPDATE
+    SET data_url = EXCLUDED.data_url, uploaded_at = now();
+  RETURN jsonb_build_object('ok', true);
+END; $$;
+GRANT EXECUTE ON FUNCTION public.familie_portaal_upload_id(TEXT, TEXT, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.familie_portaal_upload_id(TEXT, TEXT, TEXT) TO authenticated;
 
 -- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
 ALTER TABLE public.dossiers

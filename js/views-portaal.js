@@ -181,6 +181,12 @@ function renderPortaalConfig(d) {
       <button type="button" class="btn btn-ghost btn-sm" id="btn-portaal-check-add" style="margin-top:.5rem;">+ Item toevoegen</button>
     </section>
 
+    <section class="card portaal-idcards">
+      <h2>Identiteitsbewijzen <span class="muted small">(door familie geüpload)</span></h2>
+      <p class="muted small">Optioneel — verschijnt zodra de contactpersoon foto's uploadt via de deel-link (voor/achter, overledene + contactpersoon).</p>
+      <div id="portaal-id-grid" class="portaal-id-grid"><p class="muted small">Laden…</p></div>
+    </section>
+
     <div class="portaal-savebar">
       <button type="button" class="btn btn-ghost" id="btn-portaal-preview">👁 Voorbeeld bekijken</button>
       <button type="button" class="btn btn-primary" id="btn-portaal-save">Opslaan</button>
@@ -227,6 +233,9 @@ async function bindPortaalConfig(d) {
     }
   };
   await refreshStatus();
+
+  // ── Door familie geüploade ID-kaarten laden + tonen ────────────────
+  loadPortaalIdCards(id);
 
   // ── E-mail met de link opstellen + versturen ───────────────────────
   const mailLink = async (url) => {
@@ -423,4 +432,78 @@ async function bindPortaalConfig(d) {
       btn.disabled = false; btn.textContent = orig;
     }
   });
+}
+
+// ─── Door familie geüploade ID-kaarten (beheer-kant) ──────────────────────
+const PORTAAL_ID_SLOTS = [
+  { key: 'overledene_voor',   label: 'Overledene · voorkant' },
+  { key: 'overledene_achter', label: 'Overledene · achterkant' },
+  { key: 'contact_voor',      label: 'Contactpersoon · voorkant' },
+  { key: 'contact_achter',    label: 'Contactpersoon · achterkant' },
+];
+
+async function loadPortaalIdCards(dossierId) {
+  const grid = document.getElementById('portaal-id-grid');
+  if (!grid) return;
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('familie_id_uploads')
+      .select('slot,data_url,uploaded_at').eq('dossier_id', dossierId);
+    if (error) throw error;
+    rows = data || [];
+  } catch (_) {
+    grid.innerHTML = '<p class="muted small">Kon de uploads niet laden.</p>';
+    return;
+  }
+  const bySlot = {};
+  rows.forEach(r => { bySlot[r.slot] = r; });
+
+  grid.innerHTML = PORTAAL_ID_SLOTS.map(s => {
+    const r = bySlot[s.key];
+    if (r && r.data_url) {
+      const when = r.uploaded_at ? new Date(r.uploaded_at).toLocaleString('nl-NL') : '';
+      return `
+        <figure class="portaal-id-card" data-slot="${s.key}">
+          <img src="${r.data_url}" alt="${esc(s.label)}" data-action="id-zoom">
+          <figcaption>
+            <strong>${esc(s.label)}</strong>
+            <span class="muted small">${esc(when)}</span>
+            <span class="portaal-id-acties">
+              <a class="btn btn-sm btn-ghost" href="${r.data_url}" download="id-${s.key}.jpg">⬇︎</a>
+              <button type="button" class="btn btn-sm btn-ghost" data-action="id-del" data-slot="${s.key}" title="Verwijderen">🗑</button>
+            </span>
+          </figcaption>
+        </figure>`;
+    }
+    return `
+      <figure class="portaal-id-card empty">
+        <div class="portaal-id-placeholder">nog niet geüpload</div>
+        <figcaption><strong>${esc(s.label)}</strong></figcaption>
+      </figure>`;
+  }).join('');
+
+  grid.onclick = async (e) => {
+    const zoom = e.target.closest('[data-action="id-zoom"]');
+    if (zoom) { openImageLightbox(zoom.getAttribute('src')); return; }
+    const del = e.target.closest('[data-action="id-del"]');
+    if (del) {
+      const ok = await Modal.confirm({ title: 'Foto verwijderen?', message: 'De familie kan later opnieuw uploaden.', confirmText: 'Verwijderen' });
+      if (!ok) return;
+      try {
+        await sb.from('familie_id_uploads').delete()
+          .eq('dossier_id', dossierId).eq('slot', del.getAttribute('data-slot'));
+        loadPortaalIdCards(dossierId);
+      } catch (_) {
+        Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: 'Probeer het opnieuw.' });
+      }
+    }
+  };
+}
+
+function openImageLightbox(src) {
+  const ov = document.createElement('div');
+  ov.className = 'img-lightbox';
+  ov.innerHTML = `<div class="img-lightbox-backdrop"></div><img src="${src}" alt="">`;
+  ov.addEventListener('click', () => ov.remove());
+  document.body.appendChild(ov);
 }

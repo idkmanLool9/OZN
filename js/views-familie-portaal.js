@@ -3,14 +3,18 @@
 // gevoelige administratie (kosten, BSN, notities).
 
 const FamiliePortaalView = {
+  _token: null,
+
   async render(token) {
     // Volledig overschrijven van de pagina-inhoud — geen app-shell,
-    // geen topbar, geen login-screen. Familie ziet een schoon scherm.
+    // geen zijbalk, geen topbar, geen login-screen. Familie ziet een schoon
+    // scherm (verbergen gebeurt via .familie-portaal-body in de CSS).
+    FamiliePortaalView._token = token;
     document.body.classList.add('familie-portaal-body');
     const root = document.getElementById('view') || document.body;
 
-    // Verberg de admin-app shell (topbar/footer) als die rondhangt
-    document.querySelectorAll('#login-screen, #profile-screen, .topbar, .footer, .splash').forEach(el => el && (el.hidden = true));
+    // Verberg de admin-app shell (zijbalk/topbar/footer) als die rondhangt
+    document.querySelectorAll('#login-screen, #profile-screen, .sidebar, .topbar, .footer, .splash').forEach(el => el && (el.hidden = true));
     const app = document.getElementById('app');
     if (app) app.hidden = false;
 
@@ -139,10 +143,97 @@ const FamiliePortaalView = {
                 `).join('')}
               </ul>
             </section>` : ''}
+
+          ${FamiliePortaalView._idUploadBlock(d)}
         </main>
 
         ${FamiliePortaalView._footerHtml()}
       </div>`;
+
+    FamiliePortaalView._bindUploads();
+  },
+
+  // Optionele ID-kaart-upload: overledene + contactpersoon, voor + achter.
+  _idUploadBlock(d) {
+    const status = (d && d.familie_id_status) || {};
+    const slot = (key, label) => {
+      const done = !!status[key];
+      return `
+        <label class="fp-id-slot ${done ? 'done' : ''}" data-slot="${key}">
+          <span class="fp-id-cam" aria-hidden="true">${done ? '✓' : '📷'}</span>
+          <span class="fp-id-text">
+            <strong>${esc(label)}</strong>
+            <span class="fp-id-status">${done ? 'geüpload — tik om te vervangen' : 'tik om te uploaden'}</span>
+          </span>
+          <input type="file" accept="image/*" capture="environment" hidden>
+        </label>`;
+    };
+    return `
+      <section class="fp-card fp-id">
+        <h2>Identiteitsbewijs <span class="muted small">(optioneel)</span></h2>
+        <p class="muted small">U kunt hier alvast een foto van de identiteitskaart uploaden — voor- en achterkant, van de overledene en van uzelf. Dit hoeft niet, maar scheelt tijd.</p>
+        <div class="fp-id-groep">
+          <h3>Overledene</h3>
+          <div class="fp-id-slots">
+            ${slot('overledene_voor', 'Voorkant')}
+            ${slot('overledene_achter', 'Achterkant')}
+          </div>
+        </div>
+        <div class="fp-id-groep">
+          <h3>Contactpersoon (uzelf)</h3>
+          <div class="fp-id-slots">
+            ${slot('contact_voor', 'Voorkant')}
+            ${slot('contact_achter', 'Achterkant')}
+          </div>
+        </div>
+      </section>`;
+  },
+
+  _bindUploads() {
+    document.querySelectorAll('.fp-id-slot').forEach(label => {
+      const input = label.querySelector('input[type="file"]');
+      const slot = label.getAttribute('data-slot');
+      const statusEl = label.querySelector('.fp-id-status');
+      const camEl = label.querySelector('.fp-id-cam');
+      if (!input) return;
+      input.addEventListener('change', async () => {
+        const file = input.files && input.files[0];
+        input.value = '';
+        if (!file) return;
+        if (!navigator.onLine) { statusEl.textContent = 'geen internet — probeer opnieuw'; return; }
+        label.classList.add('busy');
+        statusEl.textContent = 'bezig met uploaden…';
+        try {
+          const small = (typeof compressImage === 'function') ? await compressImage(file, 1600, 0.72) : file;
+          const dataUrl = await FamiliePortaalView._fileToDataUrl(small);
+          const { data, error } = await sb.rpc('familie_portaal_upload_id', {
+            p_token: FamiliePortaalView._token, p_slot: slot, p_data_url: dataUrl,
+          });
+          if (error) throw error;
+          if (data && data.ok) {
+            label.classList.add('done');
+            camEl.textContent = '✓';
+            statusEl.textContent = 'geüpload — tik om te vervangen';
+          } else {
+            statusEl.textContent = (data && data.error === 'ongeldige_link')
+              ? 'link verlopen — vraag een nieuwe' : 'uploaden mislukt, probeer opnieuw';
+          }
+        } catch (_) {
+          statusEl.textContent = 'uploaden mislukt, probeer opnieuw';
+        } finally {
+          label.classList.remove('busy');
+        }
+      });
+    });
+  },
+
+  _fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
   },
 
   _dagplanningBlock(rows) {

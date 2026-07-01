@@ -1916,6 +1916,8 @@ body { -webkit-overflow-scrolling: touch; }
 .familie-portaal-body {
   background: #f7f3ee;
 }
+/* Volledig kaal: geen zijbalk, topbar of footer — alleen de portal-pagina. */
+.familie-portaal-body .sidebar,
 .familie-portaal-body .topbar,
 .familie-portaal-body .footer,
 .familie-portaal-body #login-screen,
@@ -1923,6 +1925,10 @@ body { -webkit-overflow-scrolling: touch; }
 .familie-portaal-body #splash {
   display: none !important;
 }
+.familie-portaal-body .app-shell { display: block; min-height: 100vh; }
+.familie-portaal-body .app-main { margin: 0; width: 100%; }
+.familie-portaal-body .app-main,
+.familie-portaal-body #view { padding: 0 !important; }
 .fp-page {
   min-height: 100vh;
   max-width: 720px;
@@ -2049,6 +2055,61 @@ body { -webkit-overflow-scrolling: touch; }
 .fp-foot-addr { color: #cfd6e3; margin-bottom: .45rem; }
 .fp-foot-contact { color: #a8b3c6; font-size: .82rem; }
 .fp-foot-contact a { color: #a8b3c6; text-decoration: none; }
+
+/* ID-kaart-upload op de publieke portal */
+.fp-id-groep { margin-top: 1rem; }
+.fp-id-groep h3 { margin: 0 0 .5rem; font-size: .95rem; color: #2a2724; }
+.fp-id-slots { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.fp-id-slot {
+  display: flex; align-items: center; gap: .6rem; cursor: pointer;
+  padding: .8rem .85rem; border: 1.5px dashed #c7cdd8; border-radius: 10px;
+  background: #f7f9fc; transition: border-color .15s, background .15s;
+}
+.fp-id-slot:active { background: #eef2f8; }
+.fp-id-slot.done { border-style: solid; border-color: #2a7a3a; background: #eefaf0; }
+.fp-id-slot.busy { opacity: .65; pointer-events: none; }
+.fp-id-cam { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+.fp-id-slot.done .fp-id-cam { color: #2a7a3a; }
+.fp-id-text { display: flex; flex-direction: column; min-width: 0; }
+.fp-id-text strong { font-size: .95rem; }
+.fp-id-status { font-size: .78rem; color: #6b6760; }
+@media (max-width: 480px) { .fp-id-slots { grid-template-columns: 1fr; } }
+
+/* ID-kaarten aan de beheer-kant (portal-config) */
+.portaal-id-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: .75rem; margin-top: .5rem;
+}
+.portaal-id-card {
+  margin: 0; border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; background: var(--surface);
+}
+.portaal-id-card img {
+  width: 100%; height: 120px; object-fit: cover; display: block; cursor: zoom-in;
+  background: #eee;
+}
+.portaal-id-card.empty .portaal-id-placeholder {
+  height: 120px; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: .82rem; background: var(--bg);
+}
+.portaal-id-card figcaption {
+  padding: .5rem .6rem; display: flex; flex-direction: column; gap: .15rem;
+}
+.portaal-id-card figcaption strong { font-size: .82rem; }
+.portaal-id-acties { display: flex; gap: .35rem; margin-top: .25rem; }
+.portaal-id-acties .btn { padding: .2rem .5rem; }
+
+/* Lightbox voor het groot bekijken van een ID-foto */
+.img-lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+  cursor: zoom-out;
+}
+.img-lightbox-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.85); }
+.img-lightbox img {
+  position: relative; max-width: 100%; max-height: 100%;
+  border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.5);
+}
 
 .fp-error-card {
   background: #fff; border-radius: 12px;
