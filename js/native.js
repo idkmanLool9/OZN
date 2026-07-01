@@ -105,6 +105,9 @@ const Native = {
         if (badge > 0) await p.badge.set({ count: badge });
         else await p.badge.clear();
       } catch (_) {}
+
+      // Live Activity voor een uitvaart van vandaag
+      try { await Native.syncLiveActivity(dossiers, now); } catch (_) {}
     } catch (_) {} finally {
       Native._busy = false;
     }
@@ -183,6 +186,68 @@ Native.scanFoto = async function () {
     const ext = photo.format || 'jpeg';
     return new File([blob], `scan-${Date.now()}.${ext}`, { type: blob.type || `image/${ext}` });
   } catch (_) { return null; }
+};
+
+// ─── Live Activity (lockscreen-aftelwidget voor een uitvaart vandaag) ─────
+Native._la = function () {
+  if (!Native.isApp()) return null;
+  try { if (!Native._laPlugin) Native._laPlugin = Capacitor.registerPlugin('LiveActivity'); return Native._laPlugin; }
+  catch (_) { return null; }
+};
+
+// Beëindig alle lopende uitvaart-activities.
+Native.endUitvaartActivities = async function () {
+  const LA = Native._la();
+  if (!LA) return;
+  try { await LA.endAll(); } catch (_) {}
+  Native._laStartedFor = null;
+};
+
+// Start (of ververs) een Live Activity voor één uitvaart.
+Native.startUitvaartActivity = async function (dsr) {
+  const LA = Native._la();
+  if (!LA || !dsr) return false;
+  const uit = Native._parseDT(dsr.uitvaart_datum, dsr.uitvaart_tijd);
+  if (!uit) return false;
+  const naam = [dsr.voornaam, dsr.achternaam].filter(Boolean).join(' ') || dsr.dossier_nummer || 'Uitvaart';
+  try {
+    await LA.endAll(); // voorkom dubbele widgets
+    await LA.start({
+      naam,
+      tijd: dsr.uitvaart_tijd || '',
+      kerk: dsr.kerk_locatie || dsr.begraafplaats || '',
+      eindMs: uit.getTime(),
+      status: 'Vandaag',
+    });
+    Native._laStartedFor = dsr.id;
+    return true;
+  } catch (_) { return false; }
+};
+
+// Beheer automatisch: is er vandaag een uitvaart (nog in de toekomst, binnen
+// 12 uur), toon dan de widget; anders opruimen. Wordt vanuit sync() geroepen.
+Native.syncLiveActivity = async function (dossiers, now) {
+  const LA = Native._la();
+  if (!LA) return;
+  // Alleen aanzetten als de gebruiker Live Activities toestaat
+  try { const e = await LA.areEnabled(); if (!e || !e.enabled) return; } catch (_) { return; }
+
+  const nu = now || new Date();
+  const grens = new Date(nu.getTime() + 12 * 3600 * 1000);
+  let beste = null, besteT = Infinity;
+  for (const dsr of (dossiers || [])) {
+    if (dsr.status === 'voltooid' || dsr.status === 'geannuleerd') continue;
+    const uit = Native._parseDT(dsr.uitvaart_datum, dsr.uitvaart_tijd);
+    if (!uit) continue;
+    // vandaag + nog in de toekomst + binnen 12 uur
+    if (uit > nu && uit <= grens && uit.getTime() < besteT) { beste = dsr; besteT = uit.getTime(); }
+  }
+
+  if (beste) {
+    if (Native._laStartedFor !== beste.id) await Native.startUitvaartActivity(beste);
+  } else if (Native._laStartedFor != null) {
+    await Native.endUitvaartActivities();
+  }
 };
 
 // Statusbalk: app edge-to-edge tot achter de statusbalk, met donkere

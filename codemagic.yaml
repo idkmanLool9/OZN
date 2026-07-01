@@ -48,6 +48,18 @@ workflows:
       - name: CocoaPods
         script: |
           cd ios/App && pod install
+      - name: Live Activity widget-extensie injecteren
+        script: |
+          # De widget-Swift + Info.plist naar het gegenereerde project kopiëren
+          mkdir -p ios/App/UitvaartWidget
+          cp ios-live-activity/UitvaartWidgetBundle.swift \
+             ios-live-activity/UitvaartLiveActivity.swift \
+             ios-live-activity/UitvaartActivityAttributes.swift \
+             ios-live-activity/Info.plist \
+             ios/App/UitvaartWidget/
+          # Widget-target in het Xcode-project injecteren
+          gem install xcodeproj --no-document
+          ruby scripts/add-widget-extension.rb
       - name: Unsigned .ipa bouwen
         script: |
           cd ios/App
