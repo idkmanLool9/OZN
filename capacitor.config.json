@@ -5,7 +5,7 @@
   "ios": {
     "scheme": "Uitvaartbeheer",
     "contentInset": "automatic",
-    "preferredContentMode": "mobile"
+    "preferredContentMode": "recommended"
   },
   "server": {
     "iosScheme": "uitvaartbeheer",
