@@ -103,7 +103,7 @@ function renderDossierForm(params) {
             <label class="span-3"><span>Artsverklaring (overlijdensverklaring)</span>
               <input type="hidden" name="artsverklaring_pad" value="${esc(v('artsverklaring_pad'))}">
               <div class="artsverklaring-row" id="artsverklaring-row">
-                <button type="button" class="btn btn-sm" id="artsverklaring-scan" hidden>📸 Scan met camera</button>
+                <button type="button" class="btn btn-sm" id="artsverklaring-scan" hidden>📄 Scan document</button>
                 <label class="btn btn-sm" style="cursor:pointer;">
                   📷 Scan / kies bestand
                   <input type="file" id="artsverklaring-input" accept="image/*,application/pdf" capture="environment" hidden>
@@ -879,8 +879,8 @@ function renderDossierForm(params) {
   if (avScan && typeof Native !== 'undefined' && Native.isApp && Native.isApp()) {
     avScan.hidden = false;
     avScan.addEventListener('click', async () => {
-      avStatus.textContent = 'Camera openen...';
-      const file = await Native.scanFoto();
+      avStatus.textContent = 'Scanner openen...';
+      const file = await Native.scanDocument();
       if (!file) { avStatus.textContent = avHidden.value ? '✓ geüpload' : 'nog geen bestand'; return; }
       await doArtsUpload(file);
     });

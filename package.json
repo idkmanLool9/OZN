@@ -20,6 +20,7 @@
     "@capacitor/camera": "^6.1.0",
     "@capacitor/local-notifications": "^6.1.0",
     "@capacitor/status-bar": "^6.0.0",
-    "@capawesome/capacitor-badge": "^6.0.0"
+    "@capawesome/capacitor-badge": "^6.0.0",
+    "capacitor-document-scanner-sok": "file:./local-plugins/document-scanner"
   }
 }

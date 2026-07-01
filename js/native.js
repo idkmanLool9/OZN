@@ -111,6 +111,28 @@ const Native = {
   },
 };
 
+// data-URL (base64) → File
+Native._dataUrlToFile = async function (dataUrl, naam) {
+  const resp = await fetch(dataUrl);
+  const blob = await resp.blob();
+  return new File([blob], `${naam}-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+};
+
+// Apple documentscanner (VisionKit): randherkenning + recht trekken +
+// meerdere pagina's. Geeft de eerste pagina als File terug. Valt terug op
+// de gewone camera als de scanner (nog) niet beschikbaar is.
+Native.scanDocument = async function () {
+  if (!Native.isApp()) return null;
+  try {
+    const DS = Capacitor.registerPlugin('DocumentScanner');
+    const res = await DS.scan();
+    const first = res && res.images && res.images[0];
+    if (first) return await Native._dataUrlToFile(first, 'scan');
+    if (res && res.cancelled) return null; // gebruiker annuleerde bewust
+  } catch (_) { /* val terug op de camera */ }
+  return Native.scanFoto();
+};
+
 // Native camera-scan → geeft een File terug (of null). Opent de native
 // camera met bijsnijden; op web niet beschikbaar.
 Native.scanFoto = async function () {
