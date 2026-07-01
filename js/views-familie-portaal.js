@@ -70,6 +70,7 @@ const FamiliePortaalView = {
     const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
     const naam = [d.voornaam, d.achternaam].filter(Boolean).join(' ') || 'Overledene';
     const checklist = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
+    const dagplanning = Array.isArray(d.familie_dagplanning) ? d.familie_dagplanning : [];
 
     const datumTijd = (dt, t) => {
       if (!dt) return null;
@@ -103,6 +104,8 @@ const FamiliePortaalView = {
               ${d.overlijdensdatum ? '<span>overleden ' + esc(WheelDate.formatLong(d.overlijdensdatum)) + '</span>' : ''}
             </p>
           </section>
+
+          ${FamiliePortaalView._dagplanningBlock(dagplanning)}
 
           ${FamiliePortaalView._infoBlock('De uitvaart', [
             ['Datum & tijd', datumTijd(d.uitvaart_datum, d.uitvaart_tijd)],
@@ -140,6 +143,28 @@ const FamiliePortaalView = {
 
         ${FamiliePortaalView._footerHtml()}
       </div>`;
+  },
+
+  _dagplanningBlock(rows) {
+    const filled = (rows || []).filter(r => r && (r.moment || r.tijd || r.locatie));
+    if (!filled.length) return '';
+    return `
+      <section class="fp-card">
+        <h2>Dagplanning</h2>
+        <p class="muted small">Het tijdschema van de dag.</p>
+        <ol class="fp-timeline">
+          ${filled.map(r => `
+            <li>
+              <span class="fp-time">${esc(r.tijd || '')}</span>
+              <span class="fp-dotline" aria-hidden="true"></span>
+              <div class="fp-moment">
+                <strong>${esc(r.moment || '')}</strong>
+                ${r.locatie ? '<span>' + esc(r.locatie) + '</span>' : ''}
+              </div>
+            </li>
+          `).join('')}
+        </ol>
+      </section>`;
   },
 
   _infoBlock(titel, rijen) {

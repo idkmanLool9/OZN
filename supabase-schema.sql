@@ -186,6 +186,7 @@ CREATE POLICY "auth_own_push" ON public.push_subscriptions
 
 ALTER TABLE public.dossiers
   ADD COLUMN IF NOT EXISTS familie_checklist JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS familie_dagplanning JSONB DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS familie_welkomtekst TEXT;
 
 CREATE TABLE IF NOT EXISTS public.familie_portaal_tokens (
@@ -249,6 +250,7 @@ BEGIN
     'avondwake_locatie',  avondwake_locatie,
     'condoleance_locatie',condoleance_locatie,
     'familie_checklist',  COALESCE(familie_checklist, '[]'::jsonb),
+    'familie_dagplanning',COALESCE(familie_dagplanning, '[]'::jsonb),
     'familie_welkomtekst',familie_welkomtekst
   ) INTO v_result
     FROM public.dossiers
