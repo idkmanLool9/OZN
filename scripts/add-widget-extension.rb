@@ -29,6 +29,13 @@ end
 app_target = project.targets.find { |t| t.name == APP_TARGET }
 abort("App-target '#{APP_TARGET}' niet gevonden") unless app_target
 
+# App Store eist dat de extensie dezelfde versie heeft als de app. Lees de
+# marketing-versie van de app; het buildnummer zetten we via apple-generic
+# versioning zodat `agvtool new-version -all` (na injectie) de widget meepakt.
+app_marketing = app_target.build_configurations
+                          .map { |c| c.build_settings['MARKETING_VERSION'] }
+                          .compact.first || '1.0'
+
 # 1) Nieuwe app-extension-target
 widget = project.new_target(:app_extension, WIDGET_NAME, :ios, DEPLOY_TARGET)
 
@@ -54,7 +61,9 @@ widget.build_configurations.each do |config|
   bs['CODE_SIGN_STYLE'] = 'Automatic'
   bs['GENERATE_INFOPLIST_FILE'] = 'NO'
   bs['SKIP_INSTALL'] = 'NO'
-  bs['MARKETING_VERSION'] = '1.0'
+  # Versie gelijk aan de app; apple-generic zodat agvtool de widget meepakt.
+  bs['VERSIONING_SYSTEM'] = 'apple-generic'
+  bs['MARKETING_VERSION'] = app_marketing
   bs['CURRENT_PROJECT_VERSION'] = '1'
   bs['CLANG_ENABLE_MODULES'] = 'YES'
   bs['LD_RUNPATH_SEARCH_PATHS'] = '$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks'
