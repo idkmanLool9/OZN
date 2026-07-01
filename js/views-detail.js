@@ -1041,8 +1041,39 @@ const FamiliePortaal = {
     return Array.from(bytes, b => alf[b % alf.length]).join('');
   },
 
+  // Publieke basis-URL waar de web-app draait. In de native app is
+  // location.origin een intern scheme (uitvaartbeheer://localhost), dus dan
+  // gebruiken we de ingestelde/bekende publieke URL. Op het web klopt de
+  // huidige oorsprong altijd.
+  publicBase() {
+    let base = '';
+    try { base = (typeof Settings !== 'undefined' && (Settings.get('portaal_base_url') || '')) || ''; } catch (_) {}
+    base = String(base).trim();
+    if (!base && /^https?:$/.test(location.protocol)) {
+      base = location.origin + location.pathname.replace(/[^/]*$/, ''); // map, zonder bestandsnaam
+    }
+    if (!base) base = 'https://uitvaartbeheer.pages.dev/';
+    if (!/\/$/.test(base)) base += '/';
+    return base;
+  },
+
   buildUrl(token) {
-    return `${location.origin}${location.pathname}#/familie/${token}`;
+    return `${FamiliePortaal.publicBase()}#/familie/${token}`;
+  },
+
+  // Sla de echte web-oorsprong op zodra de app in een browser wordt geopend,
+  // zodat de native app (via de gedeelde cloud-instellingen) ook correcte
+  // links maakt. Overschrijft alleen als er nog niets is ingesteld.
+  captureWebBase() {
+    try {
+      if (!/^https?:$/.test(location.protocol)) return;      // niet in native app
+      if (/^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname)) return; // geen dev-URL
+      if (typeof Settings === 'undefined') return;
+      const stored = String(Settings.get('portaal_base_url') || '').trim();
+      if (stored) return;                                     // al ingesteld → respecteren
+      const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+      Settings.set({ portaal_base_url: base });
+    } catch (_) {}
   },
 
   // Haal token voor dit dossier op uit de cloud (cache lokaal even)

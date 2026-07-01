@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 117;
-const APP_VERSION    = '5.31.3';
+const APP_BUILD      = 118;
+const APP_VERSION    = '5.31.4';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -160,6 +160,12 @@ const Settings = {
     // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
     default_kerk_locatie: 'Maria kathedraal',
     default_begraafplaats: 'St. Ephrem',
+    // Publieke web-URL van de app — nodig om familie-portaal-links te maken
+    // die buiten de app werken. In de native app is location.origin een
+    // intern scheme (uitvaartbeheer://localhost), dus daar kan het niet uit
+    // afgeleid worden. Wordt automatisch ingevuld zodra de app in een browser
+    // op de echte URL wordt geopend; handmatig aan te passen in Account.
+    portaal_base_url: '',
     // SnelStart-koppeling (boekhouding) — sleutels invullen in Account.
     snelstart_actief: false,
     snelstart_subscription_key: '',
@@ -220,6 +226,8 @@ const Settings = {
       // Offline of API-fout: gebruik de lokale spiegel
       try { Settings._cache = JSON.parse(localStorage.getItem(Settings.KEY) || '{}'); } catch (_) { Settings._cache = {}; }
     }
+    // Leg de echte web-URL vast (voor correcte familie-portaal-links in de app)
+    try { if (typeof FamiliePortaal !== 'undefined') FamiliePortaal.captureWebBase(); } catch (_) {}
   },
 
   reset() {
