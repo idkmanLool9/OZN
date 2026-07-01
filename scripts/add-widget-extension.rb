@@ -61,6 +61,9 @@ widget.build_configurations.each do |config|
   bs['CODE_SIGN_STYLE'] = 'Automatic'
   bs['GENERATE_INFOPLIST_FILE'] = 'NO'
   bs['SKIP_INSTALL'] = 'NO'
+  # App-extensies moeten een executable zijn (mh_execute); anders mist de
+  # __swift5_entry-sectie (@main-entrypoint) en weigert App Store de upload.
+  bs['MACH_O_TYPE'] = 'mh_execute'
   # Versie gelijk aan de app; apple-generic zodat agvtool de widget meepakt.
   bs['VERSIONING_SYSTEM'] = 'apple-generic'
   bs['MARKETING_VERSION'] = app_marketing
