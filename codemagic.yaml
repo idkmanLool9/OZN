@@ -124,10 +124,12 @@ workflows:
       - name: App-icon genereren uit assets/icon-only.png
         script: |
           npm run cap:assets
-      - name: Versie + buildnummer
+      - name: Versie + buildnummer (uniek via tijdstempel)
         script: |
+          # Buildnummer = Unix-tijdstempel: altijd uniek én hoger dan het
+          # vorige, dus nooit meer "build number already used" bij uploaden.
           cd ios/App
-          agvtool new-version -all $(($BUILD_NUMBER + 100))
+          agvtool new-version -all "$(date +%s)"
       - name: Signed .ipa bouwen
         script: |
           xcode-project use-profiles
