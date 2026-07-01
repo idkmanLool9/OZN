@@ -103,13 +103,21 @@ workflows:
             npx cap add ios
           fi
           npx cap sync ios
-      - name: Export-compliance (standaard HTTPS = vrijgesteld)
+      - name: Info.plist aanvullen (export-compliance, camera, live activity)
         script: |
-          # Voorkomt de handmatige 'gebruikt je app encryptie?'-vraag en
-          # dat de build daarop blijft hangen bij App Store-verwerking.
           PLIST=ios/App/App/Info.plist
-          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" 2>/dev/null || \
-          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" "$PLIST"
+          pb() { /usr/libexec/PlistBuddy -c "$1" "$PLIST" 2>/dev/null; }
+          # Export-compliance: voorkomt de 'gebruikt je app encryptie?'-vraag
+          pb "Add :ITSAppUsesNonExemptEncryption bool false" || pb "Set :ITSAppUsesNonExemptEncryption false"
+          # Camera + fotobibliotheek: VERPLICHT, anders crasht de app bij de scan
+          pb "Add :NSCameraUsageDescription string 'Voor het scannen van de artsverklaring en documenten met de camera.'" \
+            || pb "Set :NSCameraUsageDescription 'Voor het scannen van de artsverklaring en documenten met de camera.'"
+          pb "Add :NSPhotoLibraryUsageDescription string 'Voor het kiezen van een bestaande foto van de artsverklaring of document.'" \
+            || pb "Set :NSPhotoLibraryUsageDescription 'Voor het kiezen van een bestaande foto van de artsverklaring of document.'"
+          pb "Add :NSPhotoLibraryAddUsageDescription string 'Voor het opslaan van gescande documenten.'" \
+            || pb "Set :NSPhotoLibraryAddUsageDescription 'Voor het opslaan van gescande documenten.'"
+          # Live Activities: app mag live-widgets tonen (voor latere lockscreen-widget)
+          pb "Add :NSSupportsLiveActivities bool true" || pb "Set :NSSupportsLiveActivities true"
       - name: CocoaPods
         script: |
           cd ios/App && pod install

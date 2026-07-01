@@ -111,6 +111,28 @@ const Native = {
   },
 };
 
+// Native camera-scan → geeft een File terug (of null). Opent de native
+// camera met bijsnijden; op web niet beschikbaar.
+Native.scanFoto = async function () {
+  if (!Native.isApp()) return null;
+  try {
+    const Camera = Capacitor.registerPlugin('Camera');
+    const photo = await Camera.getPhoto({
+      quality: 85,
+      allowEditing: true,     // bijsnijden na de opname
+      resultType: 'uri',      // levert webPath op
+      source: 'CAMERA',
+      saveToGallery: false,
+      presentationStyle: 'fullscreen',
+    });
+    if (!photo || !photo.webPath) return null;
+    const resp = await fetch(photo.webPath);
+    const blob = await resp.blob();
+    const ext = photo.format || 'jpeg';
+    return new File([blob], `scan-${Date.now()}.${ext}`, { type: blob.type || `image/${ext}` });
+  } catch (_) { return null; }
+};
+
 // Statusbalk: app edge-to-edge tot achter de statusbalk, met donkere
 // tekst (LIGHT-stijl = donkere klok/batterij voor onze lichte balk).
 Native.initStatusBar = function () {

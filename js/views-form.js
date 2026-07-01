@@ -103,6 +103,7 @@ function renderDossierForm(params) {
             <label class="span-3"><span>Artsverklaring (overlijdensverklaring)</span>
               <input type="hidden" name="artsverklaring_pad" value="${esc(v('artsverklaring_pad'))}">
               <div class="artsverklaring-row" id="artsverklaring-row">
+                <button type="button" class="btn btn-sm" id="artsverklaring-scan" hidden>📸 Scan met camera</button>
                 <label class="btn btn-sm" style="cursor:pointer;">
                   📷 Scan / kies bestand
                   <input type="file" id="artsverklaring-input" accept="image/*,application/pdf" capture="environment" hidden>
@@ -837,34 +838,51 @@ function renderDossierForm(params) {
   const avHidden = document.querySelector('input[name="artsverklaring_pad"]');
   const avRow = document.getElementById('artsverklaring-row');
   const avStatus = document.getElementById('artsverklaring-status');
+  const avScan = document.getElementById('artsverklaring-scan');
+
+  // Gedeelde upload — gebruikt door zowel de file-input als de camera-scan.
+  async function doArtsUpload(file) {
+    if (!file) return;
+    if (!navigator.onLine) {
+      Modal.show({ type: 'offline', title: 'Geen internet', message: 'Uploaden kan alleen met internetverbinding.' });
+      return;
+    }
+    avStatus.textContent = 'Bezig met uploaden...';
+    try {
+      const path = await ArtsVerklaring.upload(file);
+      const old = avHidden.value;
+      if (old && old !== path) ArtsVerklaring.remove(old);
+      avHidden.value = path;
+      avHidden.dispatchEvent(new Event('input', { bubbles: true }));
+      avStatus.textContent = '✓ geüpload';
+      if (!document.getElementById('artsverklaring-view')) {
+        avRow.insertAdjacentHTML('beforeend',
+          '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-view">Bekijk</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-remove">Verwijder</button>');
+        bindArtsverklaringButtons();
+      }
+    } catch (_) {
+      avStatus.textContent = 'upload mislukt';
+    }
+  }
+
   if (avInput) {
     avInput.addEventListener('change', async e => {
-      const file = e.target.files[0]; if (!file) return;
-      if (!navigator.onLine) {
-        Modal.show({ type: 'offline', title: 'Geen internet', message: 'Uploaden kan alleen met internetverbinding.' });
-        return;
-      }
-      avStatus.textContent = 'Bezig met uploaden...';
-      try {
-        const path = await ArtsVerklaring.upload(file);
-        // oude verwijderen indien aanwezig
-        const old = avHidden.value;
-        if (old && old !== path) ArtsVerklaring.remove(old);
-        avHidden.value = path;
-        avHidden.dispatchEvent(new Event('input', { bubbles: true }));
-        avStatus.textContent = '✓ geüpload';
-        // Knoppen Bekijk/Verwijder injecteren als ze er nog niet zijn
-        if (!document.getElementById('artsverklaring-view')) {
-          avRow.insertAdjacentHTML('beforeend',
-            '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-view">Bekijk</button>' +
-            '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-remove">Verwijder</button>');
-          bindArtsverklaringButtons();
-        }
-      } catch (_) {
-        avStatus.textContent = 'upload mislukt';
-      } finally {
-        avInput.value = '';
-      }
+      const file = e.target.files[0];
+      await doArtsUpload(file);
+      avInput.value = '';
+    });
+  }
+
+  // Native camera-scan (alleen in de iOS-app): open de native camera met
+  // bijsnijden en upload de foto via dezelfde weg als de file-input.
+  if (avScan && typeof Native !== 'undefined' && Native.isApp && Native.isApp()) {
+    avScan.hidden = false;
+    avScan.addEventListener('click', async () => {
+      avStatus.textContent = 'Camera openen...';
+      const file = await Native.scanFoto();
+      if (!file) { avStatus.textContent = avHidden.value ? '✓ geüpload' : 'nog geen bestand'; return; }
+      await doArtsUpload(file);
     });
   }
   function bindArtsverklaringButtons() {
