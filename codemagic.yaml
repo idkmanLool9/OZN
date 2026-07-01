@@ -106,7 +106,7 @@ workflows:
       - name: CocoaPods
         script: |
           cd ios/App && pod install
-      - name: App-icon genereren uit resources/icon.png
+      - name: App-icon genereren uit assets/icon-only.png
         script: |
           npm run cap:assets
       - name: Versie + buildnummer
