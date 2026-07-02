@@ -922,6 +922,8 @@ const Router = {
         // de bovenbalk; op de overige pagina's juist andersom.
         const inDossier = /^\/dossiers\/.+/.test(path);
         document.body.classList.toggle('in-dossier', inDossier);
+        // Familie-portaal-beheer: kale pagina zonder bovenbalk.
+        document.body.classList.toggle('portaal-page', path === '/portaal');
         // Naar een sectie-anker scrollen (bv. #/account#parochies); anders boven.
         const anchor = (fullHash.split('#')[1] || '').split('?')[0];
         const anchorEl = anchor ? document.getElementById(anchor) : null;

@@ -1828,7 +1828,12 @@ body { -webkit-overflow-scrolling: touch; }
 }
 
 /* ─── Familie-portaal beheer-pagina (eigen pagina /portaal) ─── */
+/* Kale pagina: geen bovenbalk (ook niet op smalle schermen). Navigeren via
+   de terug-link in de pagina en (op brede schermen) de zijbalk. */
+body.portaal-page .topbar { display: none !important; }
+body.portaal-page .app-main { padding-top: env(safe-area-inset-top); }
 .portaal-beheer { padding-bottom: 6rem; }
+.portaal-beheer .back-link { display: inline-block; margin-bottom: .5rem; }
 .portaal-picker label { display: block; margin-bottom: .5rem; }
 .portaal-dossier-select {
   width: 100%; padding: .7rem .8rem;

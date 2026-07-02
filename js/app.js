@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 123;
-const APP_VERSION    = '5.34.0';
+const APP_BUILD      = 124;
+const APP_VERSION    = '5.35.0';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -166,6 +166,25 @@ const Settings = {
     // afgeleid worden. Wordt automatisch ingevuld zodra de app in een browser
     // op de echte URL wordt geopend; handmatig aan te passen in Account.
     portaal_base_url: '',
+    // Standaard familie-portaal-sjabloon: dagplanning + checklist die
+    // automatisch verschijnen bij elk dossier (zolang er nog niets eigen is
+    // opgeslagen). Blijft altijd bewerkbaar per dossier.
+    portaal_default_dagplanning: [
+      { tijd: '11:00', moment: 'Opbaring',                       locatie: 'Kerk' },
+      { tijd: '12:45', moment: 'Balseming & Sluiten van de kist', locatie: 'Kerk' },
+      { tijd: '13:00', moment: 'Start kerkdienst',               locatie: 'Kerk' },
+      { tijd: '13:45', moment: 'Einde kerkdienst',               locatie: 'Kerk' },
+      { tijd: '13:45', moment: 'Ter aarde brengen — begin',      locatie: 'Begraafplaats' },
+      { tijd: '14:15', moment: 'Ter aarde brengen — einde',      locatie: 'Begraafplaats' },
+      { tijd: '14:15', moment: 'Koffie / thee (catering)',       locatie: 'Zaal' },
+    ],
+    portaal_default_checklist: [
+      { titel: 'ID-kaart', beschrijving: 'ID-kaart brengen / appen van overledene én contactpersoon — voor- en achterkant.' },
+      { titel: 'Kleding overledene meenemen', beschrijving: 'Onderkleding, bovenkleding, eventueel schoenen, parfum, accessoires, kafan.' },
+      { titel: 'Nadenken over tekst linten', beschrijving: 'Nadenken over de teksten op de linten van de bloemstukken.' },
+      { titel: 'Foto meenemen', beschrijving: 'Foto meenemen van de overledene in een fotolijst.' },
+      { titel: 'Nadenken over kistdragers', beschrijving: 'Nadenken over wie de kist gaat dragen (welke personen).' },
+    ],
     // SnelStart-koppeling (boekhouding) — sleutels invullen in Account.
     snelstart_actief: false,
     snelstart_subscription_key: '',

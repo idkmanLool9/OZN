@@ -73,8 +73,13 @@ const FamiliePortaalView = {
     const root = document.getElementById('view');
     const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
     const naam = [d.voornaam, d.achternaam].filter(Boolean).join(' ') || 'Overledene';
-    const checklist = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
-    const dagplanning = Array.isArray(d.familie_dagplanning) ? d.familie_dagplanning : [];
+    // Val terug op het standaard-sjabloon als er voor dit dossier nog niets
+    // eigen is opgeslagen (defaults zitten in de meegeleverde app-instellingen).
+    const _def = (key) => { try { return (typeof Settings !== 'undefined' && Settings.get(key)) || []; } catch (_) { return []; } };
+    const savedCheck = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
+    const savedDag = Array.isArray(d.familie_dagplanning) ? d.familie_dagplanning : [];
+    const checklist = savedCheck.length ? savedCheck : _def('portaal_default_checklist');
+    const dagplanning = savedDag.length ? savedDag : _def('portaal_default_dagplanning');
 
     const datumTijd = (dt, t) => {
       if (!dt) return null;

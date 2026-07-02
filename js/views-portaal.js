@@ -81,6 +81,7 @@ function renderPortaalBeheer(fullHash) {
     <div class="page portaal-beheer">
       <div class="page-head">
         <div>
+          <a href="#/dossiers" class="back-link">← Dossiers</a>
           <h1>Familie-portaal</h1>
           <p class="muted">Stel per dossier in wat de contactpersoon online ziet — de dagplanning en wat ze moeten meenemen. Je krijgt een echte deel-link die je kopieert of automatisch mailt.</p>
         </div>
@@ -118,8 +119,12 @@ function renderPortaalBeheer(fullHash) {
 
 function renderPortaalConfig(d) {
   const wrap = $('#portaal-config');
-  const checklist = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
-  const dagplan = Array.isArray(d.familie_dagplanning) ? d.familie_dagplanning : [];
+  // Nog niets eigen opgeslagen? Vul dan het standaard-sjabloon voor (altijd
+  // bewerkbaar; wat je opslaat overschrijft het sjabloon voor dit dossier).
+  const savedChecklist = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
+  const savedDagplan   = Array.isArray(d.familie_dagplanning) ? d.familie_dagplanning : [];
+  const checklist = savedChecklist.length ? savedChecklist : (Settings.get('portaal_default_checklist') || []);
+  const dagplan   = savedDagplan.length   ? savedDagplan   : (Settings.get('portaal_default_dagplanning') || []);
   const contact = d.contact_email || '';
   const contactNaam = [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ');
 
