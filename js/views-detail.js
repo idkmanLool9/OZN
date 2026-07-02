@@ -46,7 +46,7 @@ function renderDossierDetail(params) {
             <summary class="btn btn-ghost" title="Meer acties">⋯</summary>
             <div class="page-actions-menu">
               <button type="button" class="btn btn-ghost btn-block" id="btn-email-dossier">📧 E-mail dossier</button>
-              <button type="button" class="btn btn-ghost btn-block" id="btn-print">🖨️ Print</button>
+              <button type="button" class="btn btn-ghost btn-block" id="btn-print">📄 Opslaan / delen als PDF</button>
               <button type="button" class="btn btn-ghost btn-block" id="btn-copy-nr">⧉ Kopieer dossiernummer</button>
               <button type="button" class="btn btn-danger btn-block" id="btn-delete">🗑 Verwijderen</button>
             </div>
@@ -731,7 +731,18 @@ function bloemRowValue(bloemNaam) {
 
 function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
-  $('#btn-print').addEventListener('click', () => window.print());
+  $('#btn-print').addEventListener('click', async () => {
+    const btn = $('#btn-print');
+    const orig = btn.textContent; btn.disabled = true; btn.textContent = 'PDF maken…';
+    try {
+      const ks = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
+      await PdfGen.deliver(buildDossierEmail(dRow, ks), `dossier-${dRow.dossier_nummer}.pdf`, id);
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'PDF maken mislukt', message: e.message || String(e) });
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
 
   // Artsverklaring bekijken (signed URL)
   const avBtn = $('#btn-view-artsverklaring');

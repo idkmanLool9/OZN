@@ -142,5 +142,9 @@ function renderFactuur(params) {
       pdfBtn.disabled = false; pdfBtn.textContent = orig;
     }
   });
-  $('#btn-factuur-print').addEventListener('click', () => window.print());
+  const printBtn = $('#btn-factuur-print');
+  // In de app werkt window.print() niet; daar dekt de PDF-knop (open in Safari)
+  // het printen af. Verberg de losse Print-knop dus op iOS.
+  if (typeof Native !== 'undefined' && Native.isApp && Native.isApp()) printBtn.hidden = true;
+  printBtn.addEventListener('click', () => window.print());
 }
