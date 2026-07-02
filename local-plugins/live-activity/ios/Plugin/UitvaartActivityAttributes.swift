@@ -5,6 +5,7 @@ import Foundation
 // LET OP: dit bestand moet IDENTIEK zijn aan de kopie in de widget-extensie
 // (ios-live-activity/UitvaartActivityAttributes.swift). ActivityKit koppelt
 // de app-kant en de widget-kant op basis van dit type.
+@available(iOS 16.1, *)
 struct UitvaartActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         // Korte statustekst, bv. "Vandaag" of "Bezig".
