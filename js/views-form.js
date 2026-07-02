@@ -104,7 +104,7 @@ function renderDossierForm(params) {
               <input type="hidden" name="artsverklaring_pad" value="${esc(v('artsverklaring_pad'))}">
               <div class="artsverklaring-row" id="artsverklaring-row">
                 <button type="button" class="btn btn-sm" id="artsverklaring-scan" hidden>📄 Scan document</button>
-                <label class="btn btn-sm" style="cursor:pointer;">
+                <label class="btn btn-sm" id="artsverklaring-filelabel" style="cursor:pointer;">
                   📷 Scan / kies bestand
                   <input type="file" id="artsverklaring-input" accept="image/*,application/pdf" capture="environment" hidden>
                 </label>
@@ -878,6 +878,9 @@ function renderDossierForm(params) {
   // bijsnijden en upload de foto via dezelfde weg als de file-input.
   if (avScan && typeof Native !== 'undefined' && Native.isApp && Native.isApp()) {
     avScan.hidden = false;
+    // In de app alleen de echte Apple-scanner — "Scan / kies bestand" weg.
+    const fileLabel = document.getElementById('artsverklaring-filelabel');
+    if (fileLabel) fileLabel.hidden = true;
     avScan.addEventListener('click', async () => {
       avStatus.textContent = 'Scanner openen...';
       const file = await Native.scanDocument();
