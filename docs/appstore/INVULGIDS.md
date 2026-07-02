@@ -63,6 +63,9 @@ FAMILIE-PORTAAL
 · Optioneel kan de familie een foto van een identiteitsbewijs uploaden
 · Geen inlog nodig en geen gevoelige administratie zichtbaar
 
+VOOR WIE
+Uitvaart Intake is een besloten hulpmiddel voor de uitvaartcoördinatoren en het secretariaat van de parochies van de Syrisch-Orthodoxe Kerk van Antiochië. Toegang is op uitnodiging: accounts worden aangemaakt door het secretariaat, er is geen openbare aanmelding.
+
 PRIVACY
 Alle gegevens worden versleuteld opgeslagen op Europese servers, conform de AVG. Geen advertenties, geen tracking, geen doorverkoop van gegevens.
 
@@ -134,15 +137,32 @@ Wachtwoord: AppleReview2026!
 
 **Notes for Reviewer** (plak in het notitie-veld):
 ```
-This is an internal funeral-administration tool for parishes of the Syriac
-Orthodox Church of Antioch in the Netherlands. Funeral directors use it to
-manage case files, costs, invoices, day schedules and family communication.
+INTENDED AUDIENCE / DISTRIBUTION
+This is an internal business tool for a specific, closed group of users: the
+funeral coordinators and secretariat of the parishes of the Syriac Orthodox
+Church of Antioch in the Netherlands (St. Ephrem the Syrian Monastery, Glane,
+and its affiliated parishes). It is NOT intended for the general public. Access
+is by invitation only: accounts are created by the monastery's secretariat for
+its own staff; there is no public sign-up. We intend to publish this app using
+Unlisted App Distribution so it is only reachable via a direct link by our own
+coordinators, and will submit the Unlisted App Distribution request after
+approval. If you consider this app more appropriate for private distribution
+(Apple Business Manager / Custom Apps), we are happy to move it there — please
+let us know rather than rejecting, as our goal is simply to let our own staff
+install it reliably on their iPads.
 
-A demo account is provided (see credentials). After login you'll see a list
-of fictitious case files. Tap any case to explore the full workflow: intake
-form, costs by category, document scanning, PDF invoice, and the family
-portal share link.
+WHAT THE APP DOES
+Funeral coordinators use it to manage case files, costs, cost estimates, day
+schedules and family communication for funerals within our church community.
 
+HOW TO TEST
+A demo account is provided (see credentials). After login you'll see a list of
+fictitious case files. Tap any case to explore the full workflow: intake form,
+costs by category, document scanning, cost-estimate PDF, and the family portal
+share link. All data shown under this account is fictitious sample data and any
+changes stay local to the session.
+
+PRIVACY / SECURITY
 All personal data is stored on EU-based Supabase infrastructure, encrypted in
 transit and at rest. The app contains no advertising, analytics SDKs, or
 third-party trackers. The camera is used only for on-device document scanning
@@ -150,6 +170,16 @@ third-party trackers. The camera is used only for on-device document scanning
 ```
 
 **Contact Information:** vul je eigen **naam, e-mail en telefoonnummer** in.
+
+> **Waarom deze notitie belangrijk is.** Apple keurt "interne" apps voor één
+> organisatie soms af onder richtlijn 4.2 (te weinig nut voor het algemene
+> publiek) of 4.3. Door in de review-notitie duidelijk te maken dat dit een
+> besloten hulpmiddel is voor je eigen parochies (alleen op uitnodiging, geen
+> openbare aanmelding) én dat je **Unlisted App Distribution** gaat aanvragen,
+> haal je die twijfel grotendeels weg. Wordt hij tóch afgewezen als "te
+> intern", dan is het alternatief **Apple Business Manager → Custom Apps**
+> (volledig privé verspreiden, zonder openbare App Store) — de notitie vraagt
+> Apple expliciet om dat voor te stellen i.p.v. af te wijzen.
 
 ---
 
