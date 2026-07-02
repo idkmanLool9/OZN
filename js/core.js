@@ -1042,26 +1042,35 @@ const PdfGen = {
     return { url: data.signedUrl, path };
   },
 
-  // Genereer een PDF en lever 'm af — werkt op web én in de app:
-  //  · Native app: upload naar Supabase en open de PDF in de in-app Safari
-  //    (bekijken, opslaan in Bestanden, printen, mailen, delen).
-  //  · Web: download het bestand direct.
+  // Genereer een PDF en lever 'm af — betrouwbaar op web én in de app.
+  // We uploaden naar Supabase en openen de https-link:
+  //  · App: in de in-app Safari (bekijken, opslaan in Bestanden, printen, delen).
+  //  · Web: in een nieuw tabblad (waar je 'm kunt bewaren/printen/delen).
+  // Https i.p.v. een blob-URL, want iOS Safari kan blob-downloads niet openen
+  // ("WebKitBlobResource fout 1").
   async deliver(htmlString, filename = 'document.pdf', dossierId = null) {
-    const blob = await PdfGen.fromHTML(htmlString, filename);
     const isApp = typeof Native !== 'undefined' && Native.isApp && Native.isApp();
-    if (isApp && dossierId != null) {
+    // Web: open het tabblad NU (nog binnen de klik-gesture), anders blokkeert
+    // de popup-blokkering het na het async genereren.
+    const win = isApp ? null : window.open('', '_blank');
+    try {
+      const blob = await PdfGen.fromHTML(htmlString, filename);
+      if (!blob || blob.size < 500) throw new Error('De PDF is leeg gebleven — probeer het opnieuw.');
       const naam = String(filename || 'document').replace(/\.pdf$/i, '');
-      const { url } = await PdfGen.uploadAsAttachment(dossierId, blob, naam);
-      if (typeof Native.openUrl === 'function') await Native.openUrl(url);
+      let url;
+      if (dossierId != null) {
+        ({ url } = await PdfGen.uploadAsAttachment(dossierId, blob, naam));
+      } else {
+        url = URL.createObjectURL(blob);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+      if (isApp && typeof Native.openUrl === 'function') await Native.openUrl(url);
+      else if (win) win.location.href = url;
       else window.open(url, '_blank');
-      return;
+    } catch (e) {
+      if (win) win.close();
+      throw e;
     }
-    // Web: download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename || 'document.pdf';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
   },
 };
 
