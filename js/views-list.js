@@ -298,8 +298,8 @@ function renderAccount(msg) {
             <label>
               <span>Ontwerp</span>
               <select name="design_version">
-                <option value="v2" ${(s.design_version||'v2')==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
-                <option value="v1" ${s.design_version==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
+                <option value="v1" ${(s.design_version||'v1')==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
+                <option value="v2" ${s.design_version==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
               </select>
               <span class="muted small">Wissel tussen het nieuwe ontwerp met zijbalk (v2) en de vertrouwde bovenbalk-indeling (v1).</span>
             </label>
@@ -779,6 +779,22 @@ function renderAccount(msg) {
       if (!file) return;
       if (!file.type.startsWith('image/')) return Modal.show({ type: 'warning', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen toegestaan.' });
       if (file.size > 1024 * 1024) return Modal.show({ type: 'warning', title: 'Logo te groot', message: 'Maximaal 1 MB.' });
+      // Demo-/review-account: geen cloud-upload (dat zou het gedeelde app-logo
+      // overschrijven). Lokaal als verkleinde data-URL inlezen — alleen op dit
+      // toestel, en het overleeft een herstart via de demo-instellingen.
+      if (typeof Demo !== 'undefined' && Demo.isActive()) {
+        try {
+          const small = await compressImage(file, 256, 0.85);
+          pendingLogo = await new Promise((res, rej) => {
+            const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(small);
+          });
+          const prev = $('#logo-preview');
+          if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
+        } catch (err) {
+          Modal.show({ type: 'error', title: 'Kon logo niet laden', message: err.message || String(err) });
+        }
+        return;
+      }
       if (!navigator.onLine) return Modal.show({ type: 'offline', title: 'Geen internet', message: 'Logo uploaden kan alleen met een actieve internetverbinding.' });
       const lbl = e.target.closest('label');
       if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
@@ -799,8 +815,10 @@ function renderAccount(msg) {
         pendingLogo = '';
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = '<span>✝</span>';
-        // Bestand uit storage verwijderen (best-effort)
-        if (navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
+        // Bestand uit storage verwijderen (best-effort). Demo-account raakt de
+        // gedeelde storage niet aan.
+        const demo = (typeof Demo !== 'undefined' && Demo.isActive());
+        if (!demo && navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
       });
     }
 

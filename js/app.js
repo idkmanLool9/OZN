@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 149;
-const APP_VERSION    = '5.42.1';
+const APP_BUILD      = 150;
+const APP_VERSION    = '5.42.2';
 const APP_BUILD_DATE = '2026-07-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -32,6 +32,10 @@ const Settings = {
   ],
   SECRET_KEY_PREFIX: 'sok_secrets_',  // + user-id = per-account lokale spiegel
   _secretCache: null,                 // per-account gevoelige overrides
+  // Demo-/review-account bewaart zijn keuzes (lettertype, logo, ontwerp) hier,
+  // uitsluitend lokaal op het toestel — nooit naar de cloud. Zo overleven de
+  // instellingen een herstart, zonder de echte gedeelde instellingen te raken.
+  DEMO_KEY: 'sok_settings_demo',
   defaults: {
     splash_enabled: true,
     splash_duration_ms: 2500,
@@ -50,9 +54,9 @@ const Settings = {
     rounded_cards: true,
     font_id: 'default',
     form_density: 'normaal', // 'compact' | 'normaal' | 'ruim' | 'extraruim'
-    // Ontwerp-versie: 'v2' = nieuwe zijbalk-layout (standaard),
-    // 'v1' = klassieke bovenbalk-layout zoals vanouds.
-    design_version: 'v2',
+    // Ontwerp-versie: 'v1' = klassieke bovenbalk-layout (standaard),
+    // 'v2' = nieuwe zijbalk-layout.
+    design_version: 'v1',
     // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
     // catalogi (kisten, bloemen, eten & drinken)
     catalog_admin_mode: false,
@@ -216,10 +220,12 @@ const Settings = {
     snelstart_subscription_key: '',
     snelstart_client_key: '',
   },
-  // Synchrone read uit cache + lokale spiegel (gedeelde instellingen)
+  // Synchrone read uit cache + lokale spiegel (gedeelde instellingen).
+  // Voor het demo-account: uit de aparte, alleen-lokale demo-spiegel.
   _localOverrides() {
     if (Settings._cache) return Settings._cache;
-    try { return JSON.parse(localStorage.getItem(Settings.KEY) || '{}') || {}; } catch (_) { return {}; }
+    const key = (typeof Demo !== 'undefined' && Demo.isActive()) ? Settings.DEMO_KEY : Settings.KEY;
+    try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (_) { return {}; }
   },
   // Per-account gevoelige overrides (uit cache of per-account lokale spiegel)
   _secretOverrides() {
@@ -249,12 +255,24 @@ const Settings = {
   // Gevoelige sleutels gaan naar de per-account store, de rest naar de
   // gedeelde instellingenrij.
   set(patch) {
+    // Demo-/review-account: alle keuzes (lettertype, logo, ontwerp, enz.) alleen
+    // lokaal op het toestel bewaren zodat ze een herstart overleven — nooit naar
+    // de cloud en niet in de gedeelde/gevoelige stores.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) {
+      const next = Object.assign({}, Settings._localOverrides(), patch);
+      const trimmed = {};
+      for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+      Settings._cache = trimmed;
+      Settings._secretCache = {};
+      try { localStorage.setItem(Settings.DEMO_KEY, JSON.stringify(trimmed)); } catch (_) {}
+      return;
+    }
+
     const secretPatch = {}, sharedPatch = {};
     for (const k in patch) {
       if (Settings.SENSITIVE.indexOf(k) !== -1) secretPatch[k] = patch[k];
       else sharedPatch[k] = patch[k];
     }
-    const demo = (typeof Demo !== 'undefined' && Demo.isActive());
 
     // ── Gedeelde (niet-gevoelige) instellingen ──
     if (Object.keys(sharedPatch).length) {
@@ -265,7 +283,7 @@ const Settings = {
         if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
       }
       Settings._cache = trimmed;
-      if (!demo) { try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {} }
+      try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {}
       Settings._pushCloud(trimmed);
     }
 
@@ -275,7 +293,8 @@ const Settings = {
       const trimmed = {};
       for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
       Settings._secretCache = trimmed;
-      if (!demo) { Settings._persistSecrets(trimmed); Settings._pushSecrets(trimmed); }
+      Settings._persistSecrets(trimmed);
+      Settings._pushSecrets(trimmed);
     }
   },
 
@@ -322,9 +341,11 @@ const Settings = {
     if (!Auth.current()) return;
 
     // Demo-/review-account: nooit de echte gedeelde instellingen of gevoelige
-    // sleutels laden. Alles op standaard; er wordt niets naar de cloud geschreven.
+    // sleutels laden. Wél de eigen, alleen-lokale demo-keuzes terughalen zodat
+    // lettertype/logo/ontwerp een herstart overleven. Niets naar de cloud.
     if (typeof Demo !== 'undefined' && Demo.isActive()) {
-      Settings._cache = {};
+      try { Settings._cache = JSON.parse(localStorage.getItem(Settings.DEMO_KEY) || '{}') || {}; }
+      catch (_) { Settings._cache = {}; }
       Settings._secretCache = {};
       try { if (typeof FamiliePortaal !== 'undefined') FamiliePortaal.captureWebBase(); } catch (_) {}
       return;
@@ -490,8 +511,8 @@ const Branding = {
     document.body.classList.toggle('ui-compact', !!s.compact_mode);
     document.body.classList.toggle('ui-square', !s.rounded_cards);
 
-    // Ontwerp-versie: v1 = klassieke bovenbalk, v2 = nieuwe zijbalk
-    document.body.classList.toggle('design-v1', (s.design_version || 'v2') === 'v1');
+    // Ontwerp-versie: v1 = klassieke bovenbalk (standaard), v2 = nieuwe zijbalk
+    document.body.classList.toggle('design-v1', (s.design_version || 'v1') === 'v1');
 
     // Form-dichtheid
     document.body.classList.remove('density-compact','density-normaal','density-ruim','density-extraruim');
