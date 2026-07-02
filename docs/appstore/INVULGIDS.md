@@ -120,12 +120,17 @@ gebruikersgegenereerde openbare content, enz.). Uitkomst: **4+**.
 
 **Sign-In Required:** ☑️ **Yes** (alles zit achter login → geef demo-account).
 
-**Demo Account** — maak dit vooraf aan in Supabase (Authentication → Add user)
-en vul een paar fictieve dossiers:
+**Demo Account** — maak dit alleen aan in Supabase (Authentication → Add user).
+Je hoeft GEEN dossiers te vullen: dit account toont automatisch 3 volledig
+ingevulde, fictieve demo-dossiers en laat nooit de echte dossiers of gevoelige
+sleutels zien. Alle bewerkingen van de reviewer blijven lokaal (raken de echte
+gegevens niet).
 ```
 E-mail:     reviewer@morephrem.com
 Wachtwoord: AppleReview2026!
 ```
+> Wil je later een extra review-account? Voeg het e-mailadres (kleine letters)
+> toe aan `DEMO_ACCOUNTS` in `js/demo.js`.
 
 **Notes for Reviewer** (plak in het notitie-veld):
 ```

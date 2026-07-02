@@ -35,6 +35,10 @@ const Auth = {
     return null;
   },
   async logout() { await sb.auth.signOut(); _session = null; },
+  // Auth-metadata van de huidige gebruiker (per-account; alleen zichtbaar voor
+  // deze ingelogde gebruiker). Wordt gebruikt voor gevoelige, per-account
+  // instellingen zoals API-sleutels.
+  metadata() { return (_session && _session.user && _session.user.user_metadata) || {}; },
   async changePassword(newPw) {
     const { error } = await sb.auth.updateUser({ password: newPw });
     return error ? error.message : null;
@@ -58,6 +62,8 @@ const Cloud = {
   offline: false,
 
   async loadAll() {
+    // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
       const [d, k, n, kim, blm, etn] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
@@ -170,6 +176,7 @@ const DB = {
   where(tbl, fn) { return (Cloud.cache[tbl] || []).filter(fn); },
 
   async insert(tbl, payload) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.insert(tbl, payload);
     if (!navigator.onLine) {
       Modal.show({
         type: 'offline',
@@ -200,6 +207,7 @@ const DB = {
   },
 
   async update(tbl, id, patch) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.update(tbl, id, patch);
     if (!navigator.onLine) {
       Modal.show({
         type: 'offline',
@@ -223,6 +231,7 @@ const DB = {
   },
 
   async remove(tbl, id) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.remove(tbl, id);
     if (!navigator.onLine) {
       Modal.show({
         type: 'offline',
@@ -240,6 +249,7 @@ const DB = {
   },
 
   async removeWhere(tbl, fn) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.removeWhere(tbl, fn);
     const ids = Cloud.cache[tbl].filter(fn).map(x => x.id);
     if (ids.length === 0) return;
     const { error } = await sb.from(tbl).delete().in('id', ids);

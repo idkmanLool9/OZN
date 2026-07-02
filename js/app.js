@@ -12,16 +12,26 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 147;
-const APP_VERSION    = '5.41.5';
+const APP_BUILD      = 148;
+const APP_VERSION    = '5.42.0';
 const APP_BUILD_DATE = '2026-07-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
-  KEY: 'sok_settings',          // lokale spiegel
+  KEY: 'sok_settings',          // lokale spiegel (gedeelde instellingen)
   TABLE: 'app_instellingen',
-  ROW_ID: 1,                    // single-row model
-  _cache: null,                 // huidige overrides (zonder defaults)
+  ROW_ID: 1,                    // single-row model (gedeeld door hele parochie)
+  _cache: null,                 // huidige gedeelde overrides (zonder defaults)
+  // Gevoelige, PER-ACCOUNT instellingen: API-sleutels e.d. Deze horen NIET in de
+  // gedeelde instellingenrij (dan zou elk ander account ze zien). Ze worden
+  // opgeslagen in de auth-metadata van de ingelogde gebruiker (alleen voor die
+  // gebruiker leesbaar) + een per-account lokale spiegel.
+  SENSITIVE: [
+    'emailjs_public_key', 'emailjs_service_id', 'emailjs_template_id',
+    'snelstart_actief', 'snelstart_subscription_key', 'snelstart_client_key',
+  ],
+  SECRET_KEY_PREFIX: 'sok_secrets_',  // + user-id = per-account lokale spiegel
+  _secretCache: null,                 // per-account gevoelige overrides
   defaults: {
     splash_enabled: true,
     splash_duration_ms: 2500,
@@ -206,28 +216,99 @@ const Settings = {
     snelstart_subscription_key: '',
     snelstart_client_key: '',
   },
-  // Synchrone read uit cache + lokale spiegel
+  // Synchrone read uit cache + lokale spiegel (gedeelde instellingen)
   _localOverrides() {
     if (Settings._cache) return Settings._cache;
     try { return JSON.parse(localStorage.getItem(Settings.KEY) || '{}') || {}; } catch (_) { return {}; }
   },
-  all() { return Object.assign({}, Settings.defaults, Settings._localOverrides()); },
+  // Per-account gevoelige overrides (uit cache of per-account lokale spiegel)
+  _secretOverrides() {
+    if (Settings._secretCache) return Settings._secretCache;
+    const u = (typeof Auth !== 'undefined' && Auth.current()) || null;
+    if (u && u.id) {
+      try {
+        const raw = localStorage.getItem(Settings.SECRET_KEY_PREFIX + u.id);
+        if (raw) return JSON.parse(raw) || {};
+      } catch (_) {}
+    }
+    return {};
+  },
+  // Gevoelige sleutels uit een object filteren (voor de gedeelde rij)
+  _stripSensitive(obj) {
+    const out = {};
+    for (const k in obj) if (Settings.SENSITIVE.indexOf(k) === -1) out[k] = obj[k];
+    return out;
+  },
+  // Defaults + gedeelde overrides + per-account gevoelige overrides
+  all() {
+    return Object.assign({}, Settings.defaults, Settings._localOverrides(), Settings._secretOverrides());
+  },
   get(key) { return Settings.all()[key]; },
 
-  // Synchroon: update cache + lokale spiegel; cloud-push fire-and-forget
+  // Synchroon: update cache + spiegels; cloud-push fire-and-forget.
+  // Gevoelige sleutels gaan naar de per-account store, de rest naar de
+  // gedeelde instellingenrij.
   set(patch) {
-    const cur = Settings._localOverrides();
-    const next = Object.assign({}, cur, patch);
-    // Defaults eruit halen om de tabel klein te houden
-    const trimmed = {};
-    for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
-    Settings._cache = trimmed;
-    try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {}
-    Settings._pushCloud(trimmed); // niet awaiten
+    const secretPatch = {}, sharedPatch = {};
+    for (const k in patch) {
+      if (Settings.SENSITIVE.indexOf(k) !== -1) secretPatch[k] = patch[k];
+      else sharedPatch[k] = patch[k];
+    }
+    const demo = (typeof Demo !== 'undefined' && Demo.isActive());
+
+    // ── Gedeelde (niet-gevoelige) instellingen ──
+    if (Object.keys(sharedPatch).length) {
+      const next = Object.assign({}, Settings._localOverrides(), sharedPatch);
+      const trimmed = {};
+      for (const k in next) {
+        if (Settings.SENSITIVE.indexOf(k) !== -1) continue;           // nooit gevoelig in de gedeelde rij
+        if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+      }
+      Settings._cache = trimmed;
+      if (!demo) { try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {} }
+      Settings._pushCloud(trimmed);
+    }
+
+    // ── Gevoelige (per-account) instellingen ──
+    if (Object.keys(secretPatch).length) {
+      const next = Object.assign({}, Settings._secretOverrides(), secretPatch);
+      const trimmed = {};
+      for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+      Settings._secretCache = trimmed;
+      if (!demo) { Settings._persistSecrets(trimmed); Settings._pushSecrets(trimmed); }
+    }
   },
 
-  // Geluidloos pushen naar Supabase
+  // Per-account lokale spiegel van de gevoelige sleutels
+  _persistSecrets(data) {
+    const u = (typeof Auth !== 'undefined' && Auth.current()) || null;
+    if (!u || !u.id) return;
+    try { localStorage.setItem(Settings.SECRET_KEY_PREFIX + u.id, JSON.stringify(data)); } catch (_) {}
+  },
+  // Gevoelige sleutels opslaan in de auth-metadata van deze gebruiker
+  _pushSecrets(data) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return;
+    if (!navigator.onLine) return;
+    if (!Auth.current()) return;
+    sb.auth.updateUser({ data: { sok_secrets: data } })
+      .then(r => { if (r.error) console.warn('Gevoelige instellingen opslaan faalde:', r.error.message); })
+      .catch(err => console.warn('Gevoelige instellingen opslaan-fout:', err));
+  },
+  // Bij login: gevoelige sleutels uit de auth-metadata halen (bron van waarheid),
+  // met de per-account lokale spiegel als terugval.
+  _loadSecretsFromSession() {
+    let secrets = null;
+    try {
+      const meta = (typeof Auth !== 'undefined' && Auth.metadata()) || {};
+      if (meta.sok_secrets && typeof meta.sok_secrets === 'object') secrets = meta.sok_secrets;
+    } catch (_) {}
+    if (secrets) { Settings._secretCache = secrets; Settings._persistSecrets(secrets); }
+    else { Settings._secretCache = Settings._secretOverrides(); }
+  },
+
+  // Geluidloos pushen naar Supabase (gedeelde instellingenrij)
   _pushCloud(data) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return; // demo schrijft nooit gedeelde instellingen
     if (!navigator.onLine) return;
     if (!Auth.current()) return;
     sb.from(Settings.TABLE)
@@ -239,14 +320,28 @@ const Settings = {
   // Bij login / app-start: haal de gedeelde instellingen op
   async loadFromCloud() {
     if (!Auth.current()) return;
+
+    // Demo-/review-account: nooit de echte gedeelde instellingen of gevoelige
+    // sleutels laden. Alles op standaard; er wordt niets naar de cloud geschreven.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) {
+      Settings._cache = {};
+      Settings._secretCache = {};
+      try { if (typeof FamiliePortaal !== 'undefined') FamiliePortaal.captureWebBase(); } catch (_) {}
+      return;
+    }
+
+    // 1) Per-account gevoelige sleutels uit de auth-metadata van deze gebruiker
+    Settings._loadSecretsFromSession();
+
+    // 2) Gedeelde instellingen uit de cloud (nooit met gevoelige sleutels erin)
     try {
       const { data, error } = await sb.from(Settings.TABLE)
         .select('data').eq('id', Settings.ROW_ID).maybeSingle();
       if (error) throw error;
       const cloud = (data && data.data) ? data.data : null;
       if (cloud === null || Object.keys(cloud).length === 0) {
-        // Cloud is nog leeg — push de lokale overrides (eerste keer migratie)
-        const local = Settings._localOverrides();
+        // Cloud is nog leeg — push de lokale (niet-gevoelige) overrides
+        const local = Settings._stripSensitive(Settings._localOverrides());
         if (Object.keys(local).length > 0) {
           Settings._pushCloud(local);
           Settings._cache = local;
@@ -254,12 +349,30 @@ const Settings = {
           Settings._cache = {};
         }
       } else {
-        Settings._cache = cloud;
-        try { localStorage.setItem(Settings.KEY, JSON.stringify(cloud)); } catch (_) {}
+        // Eenmalige migratie: vroeger stonden gevoelige sleutels in de gedeelde
+        // rij. Neem ze (eenmalig) over in het eigen account en verwijder ze uit
+        // de gedeelde rij, zodat andere accounts ze niet meer kunnen zien.
+        const leaked = {};
+        for (const k of Settings.SENSITIVE) if (cloud[k] !== undefined) leaked[k] = cloud[k];
+        const cleaned = Settings._stripSensitive(cloud);
+        Settings._cache = cleaned;
+        try { localStorage.setItem(Settings.KEY, JSON.stringify(cleaned)); } catch (_) {}
+        if (Object.keys(leaked).length) {
+          if (Object.keys(Settings._secretOverrides()).length === 0) {
+            const trimmed = {};
+            for (const k in leaked) if (leaked[k] !== Settings.defaults[k]) trimmed[k] = leaked[k];
+            Settings._secretCache = trimmed;
+            Settings._persistSecrets(trimmed);
+            Settings._pushSecrets(trimmed);
+            console.info('[uitvaart] Gevoelige API-sleutels overgezet naar je eigen account.');
+          }
+          Settings._pushCloud(cleaned); // gevoelige sleutels uit de gedeelde rij verwijderen
+        }
       }
     } catch (e) {
-      // Offline of API-fout: gebruik de lokale spiegel
-      try { Settings._cache = JSON.parse(localStorage.getItem(Settings.KEY) || '{}'); } catch (_) { Settings._cache = {}; }
+      // Offline of API-fout: gebruik de lokale spiegel (zonder gevoelige sleutels)
+      try { Settings._cache = Settings._stripSensitive(JSON.parse(localStorage.getItem(Settings.KEY) || '{}')); }
+      catch (_) { Settings._cache = {}; }
     }
     // Leg de echte web-URL vast (voor correcte familie-portaal-links in de app)
     try { if (typeof FamiliePortaal !== 'undefined') FamiliePortaal.captureWebBase(); } catch (_) {}
@@ -966,13 +1079,17 @@ Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
     Cloud.loaded = false;
     // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
     // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet
+    // Gevoelige per-account instellingen uit het geheugen halen zodat het
+    // volgende account op dit toestel ze niet ziet (opnieuw geladen bij login).
+    Settings._secretCache = null;
     try {
       const sessieKeys = ['sok_mirror', 'sok_kosten_collapsed', 'sok_last_ping', 'sok_id_show_color'];
       sessieKeys.forEach(k => localStorage.removeItem(k));
-      // Alle draft-keys (per-dossier intake-formulier autosave) ook weg
+      // Alle draft-keys (per-dossier intake-formulier autosave) én de
+      // per-account gevoelige spiegels (sok_secrets_<id>) ook weg
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('sok_draft_') || k.startsWith('sok_wizard_step_') || k.startsWith('sok_wizard_max_'))) localStorage.removeItem(k);
+        if (k && (k.startsWith('sok_draft_') || k.startsWith('sok_wizard_step_') || k.startsWith('sok_wizard_max_') || k.startsWith(Settings.SECRET_KEY_PREFIX))) localStorage.removeItem(k);
       }
     } catch (_) {}
   }
