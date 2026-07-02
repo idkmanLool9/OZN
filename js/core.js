@@ -999,10 +999,12 @@ const PdfGen = {
     return J;
   },
 
-  // Bouw een jsPDF-document uit een spec en geef de PDF-Blob terug.
-  async blobFromSpec(spec) {
+  // Bouw een jsPDF-document en geef de PDF-Blob terug. Accepteert een spec
+  // (via makeDoc) OF een builder-functie die zelf een jsPDF-doc teruggeeft.
+  async blobFromSpec(specOrBuilder) {
     await PdfGen.load();
-    return PdfGen.makeDoc(spec).output('blob');
+    const doc = (typeof specOrBuilder === 'function') ? specOrBuilder() : PdfGen.makeDoc(specOrBuilder);
+    return doc.output('blob');
   },
 
   // Teken een A4-document uit een spec:

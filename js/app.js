@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 139;
-const APP_VERSION    = '5.39.1';
+const APP_BUILD      = 140;
+const APP_VERSION    = '5.40.0';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -185,6 +185,15 @@ const Settings = {
       { titel: 'Foto meenemen', beschrijving: 'Foto meenemen van de overledene in een fotolijst.' },
       { titel: 'Nadenken over kistdragers', beschrijving: 'Nadenken over wie de kist gaat dragen (welke personen).' },
     ],
+    // Factuur-bedrijfsgegevens (kop + betaalgegevens op de PDF-factuur)
+    factuur_bedrijfsnaam: 'Syrisch-Orthodoxe Kerk van Antiochië',
+    factuur_adres: 'Glanerbrugstraat 33\n7585 PK Glane',
+    factuur_telefoon: '+31 53 461 4764',
+    factuur_email: 'monastery@morephrem.com',
+    factuur_iban: 'NL65 RABO 0129 6111 58',
+    factuur_btw: 'NL006544137B01',
+    factuur_kvk: '58679561',
+    factuur_betalingstermijn_dagen: 30,
     // SnelStart-koppeling (boekhouding) — sleutels invullen in Account.
     snelstart_actief: false,
     snelstart_subscription_key: '',

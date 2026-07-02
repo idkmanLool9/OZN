@@ -1425,7 +1425,7 @@ const MailComposer = {
           let pdfBlob;
           const ks = kosten || DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id).sort((a,b)=>a.id-b.id);
           if (type === 'factuur') {
-            pdfBlob = await PdfGen.blobFromSpec(kostenramingSpec(d, ks));
+            pdfBlob = await PdfGen.blobFromSpec(() => buildFactuurPdf(d, ks));
           } else {
             pdfBlob = await PdfGen.blobFromSpec(dossierSpec(d, ks));
           }
