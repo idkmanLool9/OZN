@@ -130,6 +130,19 @@ const Native = {
   },
 };
 
+// Open een URL in een echte in-app Safari (SFSafariViewController) op de app:
+// zoomen, tekst selecteren, Live Text — en geen last van popup-blokkering.
+// Op het web valt het terug op window.open (door openUrlAsync afgehandeld).
+Native.openUrl = async function (url) {
+  if (!url) return false;
+  const B = Native._plugin('Browser');
+  if (B && B.open) {
+    try { await B.open({ url, presentationStyle: 'fullscreen' }); return true; }
+    catch (_) {}
+  }
+  try { window.open(url, '_blank'); return true; } catch (_) { return false; }
+};
+
 // data-URL (base64) → File
 Native._dataUrlToFile = async function (dataUrl, naam) {
   const resp = await fetch(dataUrl);

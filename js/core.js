@@ -101,6 +101,16 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
 // klik-gesture (anders blokkeert de popup-blokkering het na 'await'), en laad
 // de URL erin zodra die klaar is.
 async function openUrlAsync(urlPromise) {
+  // Native app: SFSafariViewController (zoom + tekstselectie + Live Text),
+  // geen popup-blokkering. Geen synchrone-gesture-truc nodig.
+  if (typeof Native !== 'undefined' && Native.isApp && Native.isApp()) {
+    try {
+      const url = await urlPromise;
+      if (url) await Native.openUrl(url);
+    } catch (_) {}
+    return;
+  }
+  // Web: open het tabblad synchroon binnen de klik en laad de URL erin.
   const win = window.open('', '_blank');
   try {
     const url = await urlPromise;
