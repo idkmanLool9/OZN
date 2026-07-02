@@ -464,6 +464,48 @@ function _kostenInPresetVolgorde(kosten) {
   });
 }
 
+// Spec voor de PDF-generator (jsPDF) — volledig dossieroverzicht.
+function dossierSpec(d, kosten) {
+  const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
+  const adresC = [[d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '), d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
+  const kostenLijst = Array.isArray(kosten) ? _kostenInPresetVolgorde(kosten) : [];
+  const totaal = kostenLijst.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+
+  const sections = [
+    { heading: 'Overledene', rows: [
+      ['Naam', fullName(d)], ['Geslacht', d.geslacht],
+      ['Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
+      ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdenstijd && 'om ' + d.overlijdenstijd, d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
+      ['Adres', adresO], ['BSN', d.bsn], ['Nationaliteit', d.nationaliteit], ['Gezinsnummer', d.gezinsnummer],
+    ] },
+    { heading: 'Contactpersoon', rows: [
+      ['Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ')], ['Adres', adresC],
+      ['Telefoon', d.contact_telefoon], ['E-mail', d.contact_email], ['Relatie', d.contact_relatie],
+    ] },
+    { heading: 'Kerkelijk & uitvaartdienst', rows: [
+      ['Parochie', d.parochie], ['Priester', d.priester], ['Type uitvaart', d.uitvaart_type],
+      ['Datum & tijd', [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' ')],
+      ['Kerk', d.kerk_locatie],
+      ['Begraafplaats', [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer].filter(Boolean).join(' — ')],
+    ] },
+  ];
+  if (d.verzekering_status === 'met verzekering') {
+    sections.push({ heading: 'Verzekering', rows: [
+      ['Maatschappij', d.verzekering_maatschappij], ['Polisnummer', d.polisnummer],
+      ['Dekkingsbedrag', d.verzekering_dekking ? fmtEUR(d.verzekering_dekking) : ''], ['Pakket', d.verzekering_pakket],
+    ] });
+  }
+  sections.push({ heading: 'Opdrachtgever', rows: [['Naam', d.opdrachtgever_naam], ['Telefoon', d.opdrachtgever_telefoon]] });
+
+  return {
+    title: 'DOSSIER',
+    meta: ['Dossier: ' + (d.dossier_nummer || ''), 'Datum: ' + new Date().toLocaleDateString('nl-NL')],
+    sections,
+    table: kostenLijst.length ? { heading: 'Kostenoverzicht', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', fmtEUR(k.bedrag)]) } : null,
+    totals: kostenLijst.length ? [['Totaal', fmtEUR(totaal), true]] : [],
+  };
+}
+
 function buildDossierEmail(d, kosten) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
   const adresC = [[d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '), d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', ');
@@ -736,7 +778,7 @@ function bindDetailEvents(id) {
     const orig = btn.textContent; btn.disabled = true; btn.textContent = 'PDF maken…';
     try {
       const ks = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
-      await PdfGen.deliver(buildDossierEmail(dRow, ks), `dossier-${dRow.dossier_nummer}.pdf`, id);
+      await PdfGen.deliver(dossierSpec(dRow, ks), `dossier-${dRow.dossier_nummer}.pdf`, id);
     } catch (e) {
       Modal.show({ type: 'error', title: 'PDF maken mislukt', message: e.message || String(e) });
     } finally {
@@ -1381,11 +1423,11 @@ const MailComposer = {
           status.className = 'mail-status mail-status-info';
           status.textContent = 'PDF wordt gemaakt (~10s bij eerste keer)...';
           let pdfBlob;
+          const ks = kosten || DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id).sort((a,b)=>a.id-b.id);
           if (type === 'factuur') {
-            const ks = kosten || DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id).sort((a,b)=>a.id-b.id);
-            pdfBlob = await PdfGen.fromHTML(buildFactuurDocHTML(d, ks), `factuur-${d.dossier_nummer}.pdf`);
+            pdfBlob = await PdfGen.blobFromSpec(kostenramingSpec(d, ks));
           } else {
-            pdfBlob = await PdfGen.fromHTML(buildDossierDocHTML(d), `dossier-${d.dossier_nummer}.pdf`);
+            pdfBlob = await PdfGen.blobFromSpec(dossierSpec(d, ks));
           }
           sendBtn.textContent = 'Uploaden...';
           const up = await PdfGen.uploadAsAttachment(d.id, pdfBlob, type);

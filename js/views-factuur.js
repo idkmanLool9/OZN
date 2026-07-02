@@ -2,6 +2,53 @@
 
 // HTML-blok van het factuur-document (zonder page-acties). Ook gebruikt
 // door PdfGen om een PDF-bijlage te maken voor de mail-verstuurder.
+// Spec voor de PDF-generator (jsPDF) — voorlopige kostenraming.
+function kostenramingSpec(d, kosten) {
+  const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const verzekerd = d.verzekering_status === 'met verzekering';
+  const dekkingInfo = computeDekking(kosten, d, Settings.all());
+  const gedektTotaal = dekkingInfo.dekking;
+  const familieTotaal = Math.max(0, totaal - gedektTotaal);
+  const aanbetaling = Number(d.aanbetaling_bedrag) || 0;
+  const teBetalen = Math.max(0, familieTotaal - aanbetaling);
+
+  const totals = [['Totaal kosten', fmtEUR(totaal), false]];
+  if (gedektTotaal > 0) totals.push(['Verzekering dekt', '– ' + fmtEUR(gedektTotaal), false]);
+  totals.push(['Door familie te betalen', fmtEUR(familieTotaal), aanbetaling <= 0]);
+  if (aanbetaling > 0) {
+    totals.push(['Reeds aanbetaald', '– ' + fmtEUR(aanbetaling), false]);
+    totals.push(['Nog te betalen', fmtEUR(teBetalen), true]);
+  }
+
+  return {
+    title: 'VOORLOPIGE KOSTENRAMING',
+    meta: ['Dossier: ' + (d.dossier_nummer || ''), 'Datum: ' + new Date().toLocaleDateString('nl-NL')],
+    intro: [
+      { label: 'Voor', lines: [
+        d.opdrachtgever_naam || d.contact_naam || '—',
+        [d.contact_adres, d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(', '),
+        d.opdrachtgever_telefoon ? 'Tel: ' + d.opdrachtgever_telefoon : '',
+      ] },
+      { label: 'Betreft', lines: [
+        'Uitvaart van ' + (fullName(d) || '—'),
+        d.overlijdensdatum ? 'Overleden ' + fmtDate(d.overlijdensdatum) : '',
+        d.uitvaart_datum ? 'Uitvaart ' + fmtDate(d.uitvaart_datum) : '',
+      ] },
+    ],
+    sections: verzekerd ? [{ heading: 'Via verzekering', rows: [
+      ['Maatschappij', d.verzekering_maatschappij], ['Polisnummer', d.polisnummer], ['Pakket', d.verzekering_pakket],
+    ] }] : [],
+    table: {
+      heading: 'Kostenposten',
+      rows: kosten.length
+        ? kosten.map(k => [k.omschrijving || '', k.categorie || '', fmtEUR(k.bedrag)])
+        : [['Nog geen kostenposten geregistreerd.', '', '']],
+    },
+    totals,
+    footer: 'Dit is een voorlopige kostenraming, geen definitieve factuur. Bedragen zijn richtprijzen en kunnen nog wijzigen.',
+  };
+}
+
 function buildFactuurDocHTML(d, kosten) {
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const verzekerd = d.verzekering_status === 'met verzekering';
@@ -135,7 +182,7 @@ function renderFactuur(params) {
     const orig = pdfBtn.textContent;
     pdfBtn.disabled = true; pdfBtn.textContent = 'PDF maken…';
     try {
-      await PdfGen.deliver(buildFactuurDocHTML(d, kosten), `kostenraming-${d.dossier_nummer}.pdf`, d.id);
+      await PdfGen.deliver(kostenramingSpec(d, kosten), `kostenraming-${d.dossier_nummer}.pdf`, d.id);
     } catch (e) {
       Modal.show({ type: 'error', title: 'PDF maken mislukt', message: e.message || String(e) });
     } finally {

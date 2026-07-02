@@ -971,62 +971,140 @@ const Router = {
   },
 };
 
-// ─── PdfGen: HTML → PDF Blob via html2pdf.js (lazy load) ───────────────────
+// ─── PdfGen: PDF-opbouw met jsPDF (tekent tekst/tabellen zelf) ─────────────
+// Geen html2canvas: dat rendert leeg op nieuwe iOS-Safari. jsPDF tekent de
+// PDF direct uit een 'spec' (kop, secties, tabel, totalen) → betrouwbaar op
+// web én app, en de tekst is selecteerbaar.
 const PdfGen = {
   _loadPromise: null,
-  CDN: 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js',
+  CDN: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
 
   load() {
-    if (window.html2pdf) return Promise.resolve();
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
     if (PdfGen._loadPromise) return PdfGen._loadPromise;
     PdfGen._loadPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = PdfGen.CDN;
       s.async = true;
       s.onload  = () => resolve();
-      s.onerror = () => reject(new Error('html2pdf.js kon niet worden geladen — controleer internet.'));
+      s.onerror = () => reject(new Error('PDF-bibliotheek kon niet worden geladen — controleer internet.'));
       document.head.appendChild(s);
     });
     return PdfGen._loadPromise;
   },
 
-  // Render HTML-string naar een offscreen container en converteer naar PDF Blob.
-  async fromHTML(htmlString, filename = 'document.pdf') {
+  _jsPDF() {
+    const J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) throw new Error('PDF-bibliotheek niet geladen.');
+    return J;
+  },
+
+  // Bouw een jsPDF-document uit een spec en geef de PDF-Blob terug.
+  async blobFromSpec(spec) {
     await PdfGen.load();
-    // BELANGRIJK voor html2canvas: het element moet ZICHTBAAR in de flow staan
-    // (geen position:fixed, geen left:-99999px, geen display:none) anders komt
-    // de PDF leeg. We renderen het dus in beeld (linksboven, absolute) en
-    // verbergen het voor de gebruiker met een dek-overlay eroverheen.
-    const wrap = document.createElement('div');
-    wrap.setAttribute('aria-hidden', 'true');
-    wrap.style.cssText = 'position:absolute;left:0;top:0;width:794px;background:#fff;padding:24px;color:#111;font:14px/1.5 -apple-system,system-ui,sans-serif;box-sizing:border-box;';
-    wrap.innerHTML = htmlString;
-    const cover = document.createElement('div');
-    cover.style.cssText = 'position:fixed;inset:0;background:var(--bg,#f7f3ee);z-index:2147483646;';
-    const prevScrollY = window.scrollY;
-    document.body.appendChild(wrap);
-    document.body.appendChild(cover);
-    window.scrollTo(0, 0);
-    try {
-      // Wacht tot eventuele afbeeldingen (logo) geladen zijn, anders missen ze.
-      const imgs = Array.from(wrap.querySelectorAll('img'));
-      await Promise.all(imgs.map(img => (img.complete && img.naturalWidth)
-        ? Promise.resolve()
-        : new Promise(res => { img.onload = res; img.onerror = res; })));
-      const opt = {
-        margin: [10, 10, 14, 10],
-        filename,
-        image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
-      const blob = await window.html2pdf().set(opt).from(wrap).output('blob');
-      return blob;
-    } finally {
-      wrap.remove();
-      cover.remove();
-      window.scrollTo(0, prevScrollY);
+    return PdfGen.makeDoc(spec).output('blob');
+  },
+
+  // Teken een A4-document uit een spec:
+  //   { title, meta:[..], intro:[{label,lines:[..]}], sections:[{heading,rows:[[k,v]]}],
+  //     table:{heading,rows:[[oms,cat,bedrag]]}, totals:[[label,val,bold]], footer }
+  makeDoc(spec) {
+    const J = PdfGen._jsPDF();
+    const doc = new J({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+    const M = 15, W = 210, H = 297, CW = W - 2 * M;
+    const BLUE = [37, 99, 235], GRAY = [110, 110, 110], DARK = [35, 35, 35];
+    let y = M;
+    const ensure = (h) => { if (y + h > H - M) { doc.addPage(); y = M; } };
+    const txt = (t, x, yy, o) => doc.text(String(t == null ? '' : t), x, yy, o);
+
+    // Kop
+    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    txt(s.app_name || 'Uitvaart Intake', M, y + 2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    txt(s.app_tagline || '', M, y + 7);
+    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    txt(spec.title || '', W - M, y + 2, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    (spec.meta || []).forEach((m, i) => txt(m, W - M, y + 7 + i * 4.5, { align: 'right' }));
+    y += 15;
+    doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 7;
+
+    // Intro (twee kolommen: bv. Voor / Betreft)
+    if (spec.intro && spec.intro.length) {
+      const colW = CW / 2, startY = y; let maxY = y;
+      spec.intro.forEach((blk, i) => {
+        const x = M + i * colW; let yy = startY;
+        doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+        txt(blk.label + ':', x, yy); yy += 5;
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(70, 70, 70);
+        (blk.lines || []).filter(l => l && String(l).trim()).forEach(ln => {
+          const w = doc.splitTextToSize(String(ln), colW - 5);
+          txt(w, x, yy); yy += w.length * 4.5;
+        });
+        maxY = Math.max(maxY, yy);
+      });
+      y = maxY + 5;
     }
+
+    // Secties (kop + label/waarde-rijen)
+    (spec.sections || []).forEach(sec => {
+      const rows = (sec.rows || []).filter(r => r[1] != null && String(r[1]).trim() !== '');
+      if (!rows.length) return;
+      ensure(10);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+      txt(sec.heading, M, y); y += 5.5;
+      doc.setFontSize(9.5);
+      rows.forEach(([label, val]) => {
+        const vLines = doc.splitTextToSize(String(val), CW - 45);
+        ensure(vLines.length * 4.6 + 1);
+        doc.setTextColor(...GRAY); doc.setFont('helvetica', 'bold'); txt(label, M, y);
+        doc.setTextColor(...DARK); doc.setFont('helvetica', 'normal'); txt(vLines, M + 43, y);
+        y += Math.max(5, vLines.length * 4.6);
+      });
+      y += 4;
+    });
+
+    // Tabel (Omschrijving / Categorie / Bedrag)
+    if (spec.table && spec.table.rows && spec.table.rows.length) {
+      ensure(12);
+      if (spec.table.heading) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+        txt(spec.table.heading, M, y); y += 6;
+      }
+      const xBedrag = W - M, xCat = W - M - 42;
+      doc.setFontSize(9); doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold');
+      txt('Omschrijving', M, y); txt('Categorie', xCat, y); txt('Bedrag', xBedrag, y, { align: 'right' });
+      y += 1.5; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 4;
+      doc.setFont('helvetica', 'normal');
+      spec.table.rows.forEach(r => {
+        const oms = doc.splitTextToSize(String(r[0] || ''), xCat - M - 3);
+        ensure(oms.length * 4.6 + 1);
+        doc.setTextColor(...DARK); txt(oms, M, y);
+        doc.setTextColor(...GRAY); txt(r[1] || '', xCat, y);
+        doc.setTextColor(...DARK); txt(r[2] || '', xBedrag, y, { align: 'right' });
+        y += Math.max(5, oms.length * 4.6);
+      });
+      y += 1; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 5;
+    }
+
+    // Totalen (rechts uitgelijnd)
+    (spec.totals || []).forEach(([label, val, bold]) => {
+      ensure(6);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(bold ? 11 : 9.5);
+      doc.setTextColor(...(bold ? BLUE : DARK));
+      txt(label, W - M - 45, y, { align: 'right' });
+      txt(val, W - M, y, { align: 'right' });
+      y += bold ? 6.5 : 5.5;
+    });
+
+    if (spec.footer) {
+      ensure(8); y += 3;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
+      const f = doc.splitTextToSize(String(spec.footer), CW);
+      txt(f, M, y);
+    }
+    return doc;
   },
 
   // Upload PDF Blob naar Supabase Storage en geef een tijdelijke download-link
@@ -1048,13 +1126,13 @@ const PdfGen = {
   //  · Web: in een nieuw tabblad (waar je 'm kunt bewaren/printen/delen).
   // Https i.p.v. een blob-URL, want iOS Safari kan blob-downloads niet openen
   // ("WebKitBlobResource fout 1").
-  async deliver(htmlString, filename = 'document.pdf', dossierId = null) {
+  async deliver(spec, filename = 'document.pdf', dossierId = null) {
     const isApp = typeof Native !== 'undefined' && Native.isApp && Native.isApp();
     // Web: open het tabblad NU (nog binnen de klik-gesture), anders blokkeert
     // de popup-blokkering het na het async genereren.
     const win = isApp ? null : window.open('', '_blank');
     try {
-      const blob = await PdfGen.fromHTML(htmlString, filename);
+      const blob = await PdfGen.blobFromSpec(spec);
       if (!blob || blob.size < 500) throw new Error('De PDF is leeg gebleven — probeer het opnieuw.');
       const naam = String(filename || 'document').replace(/\.pdf$/i, '');
       let url;
