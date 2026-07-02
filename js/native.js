@@ -18,13 +18,29 @@ const Native = {
 
   _ln: null, _badge: null, _permAsked: false, _busy: false,
 
-  _plugins() {
+  // Robuuste plugin-accessor. In een app ZONDER bundler is
+  // Capacitor.registerPlugin niet altijd aanwezig op window.Capacitor;
+  // Capacitor.Plugins.<naam> werkt wél voor elke native-geregistreerde
+  // plugin. We proberen eerst Plugins, dan registerPlugin.
+  _plugin(name) {
     if (!Native.isApp()) return null;
     try {
-      if (!Native._ln)    Native._ln    = Capacitor.registerPlugin('LocalNotifications');
-      if (!Native._badge) Native._badge = Capacitor.registerPlugin('Badge');
-      return { ln: Native._ln, badge: Native._badge };
-    } catch (_) { return null; }
+      const C = window.Capacitor;
+      if (!C) return null;
+      if (C.Plugins && C.Plugins[name]) return C.Plugins[name];
+      if (typeof C.registerPlugin === 'function') { const p = C.registerPlugin(name); if (p) return p; }
+      return null;
+    } catch (_) {
+      try { return (window.Capacitor.Plugins || {})[name] || null; } catch (_) { return null; }
+    }
+  },
+
+  _plugins() {
+    if (!Native.isApp()) return null;
+    if (!Native._ln)    Native._ln    = Native._plugin('LocalNotifications');
+    if (!Native._badge) Native._badge = Native._plugin('Badge');
+    if (!Native._ln || !Native._badge) return null;
+    return { ln: Native._ln, badge: Native._badge };
   },
 
   async _ensurePerms(p) {
@@ -128,12 +144,8 @@ Native._dataUrlToFile = async function (dataUrl, naam) {
 //   'web'         → geen native app (browser)
 Native.scannerStatus = async function () {
   if (!Native.isApp()) return 'web';
-  try {
-    return (Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('DocumentScanner'))
-      ? 'native' : 'unavailable';
-  } catch (_) {
-    return 'unavailable';
-  }
+  // Dezelfde accessor als de echte scan, zodat de status klopt met de praktijk.
+  return Native._plugin('DocumentScanner') ? 'native' : 'unavailable';
 };
 
 // Apple documentscanner (eigen VisionKit-plugin: randherkenning + recht
@@ -143,7 +155,8 @@ Native.scannerStatus = async function () {
 Native.scanDocument = async function () {
   if (!Native.isApp()) return null;
   try {
-    const DS = Capacitor.registerPlugin('DocumentScanner');
+    const DS = Native._plugin('DocumentScanner');
+    if (!DS) return Native.scanFoto();
     const res = await DS.scan();
     if (res && res.cancelled) return null; // gebruiker annuleerde bewust
     const first = res && res.images && res.images[0]; // data-URL's (JPEG)
@@ -171,7 +184,8 @@ Native.scanDocument = async function () {
 Native.scanFoto = async function () {
   if (!Native.isApp()) return null;
   try {
-    const Camera = Capacitor.registerPlugin('Camera');
+    const Camera = Native._plugin('Camera');
+    if (!Camera) return null;
     const photo = await Camera.getPhoto({
       quality: 85,
       allowEditing: true,     // bijsnijden na de opname
@@ -191,8 +205,8 @@ Native.scanFoto = async function () {
 // ─── Live Activity (lockscreen-aftelwidget voor een uitvaart vandaag) ─────
 Native._la = function () {
   if (!Native.isApp()) return null;
-  try { if (!Native._laPlugin) Native._laPlugin = Capacitor.registerPlugin('LiveActivity'); return Native._laPlugin; }
-  catch (_) { return null; }
+  if (!Native._laPlugin) Native._laPlugin = Native._plugin('LiveActivity');
+  return Native._laPlugin;
 };
 
 // Status voor de diagnose in Account:
@@ -201,7 +215,13 @@ Native._laLastError = '';
 Native.liveActivityStatus = async function () {
   if (!Native.isApp()) return 'web';
   const LA = Native._la();
-  if (!LA) { Native._laLastError = 'registerPlugin gaf niets terug'; return 'unavailable'; }
+  if (!LA) {
+    // Toon welke native plugins wél geregistreerd zijn — cruciale diagnose.
+    let keys = '?';
+    try { keys = Object.keys(window.Capacitor.Plugins || {}).join(', ') || '(leeg)'; } catch (_) {}
+    Native._laLastError = 'plugins: [' + keys + ']';
+    return 'unavailable';
+  }
   try {
     // Rechtstreeks de plugin aanroepen = de échte test (niet isPluginAvailable,
     // dat auto-ontdekte plugins soms niet correct meldt).
@@ -288,7 +308,8 @@ Native.syncLiveActivity = async function (dossiers, now) {
 Native.initStatusBar = function () {
   if (!Native.isApp()) return;
   try {
-    const SB = Capacitor.registerPlugin('StatusBar');
+    const SB = Native._plugin('StatusBar');
+    if (!SB) return;
     if (SB.setOverlaysWebView) SB.setOverlaysWebView({ overlay: true }).catch(() => {});
     if (SB.setStyle) SB.setStyle({ style: 'LIGHT' }).catch(() => {});
   } catch (_) {}
