@@ -415,6 +415,7 @@ const Postcode = {
     let results = [];
     let abortCtrl = null;
     let debounceT = null;
+    let suppressFetch = false;   // voorkomt her-openen van de lijst na een keuze
 
     const renderList = () => {
       if (!results.length) { ddown.hidden = true; return; }
@@ -433,6 +434,10 @@ const Postcode = {
     };
 
     const pickResult = r => {
+      // Onderdruk de zoek-listener tijdens het programmatisch invullen, anders
+      // heropent het gedispatchte 'input'-event de lijst na ~300ms.
+      suppressFetch = true;
+      clearTimeout(debounceT);
       // Adres-/straat-veld invullen
       if (huisnummerEl) {
         straatEl.value = r.straatnaam || '';
@@ -452,6 +457,9 @@ const Postcode = {
       ddown.hidden = true;
       results = [];
       activeIdx = -1;
+      // Onderdrukking pas opheffen ná het debounce-venster, zodat de door het
+      // invullen veroorzaakte input-events geen nieuwe zoekopdracht starten.
+      setTimeout(() => { suppressFetch = false; }, 400);
     };
 
     const fetchSuggestions = async () => {
@@ -478,6 +486,7 @@ const Postcode = {
     };
 
     const scheduleFetch = () => {
+      if (suppressFetch) return;   // net een adres gekozen → niet opnieuw zoeken
       clearTimeout(debounceT);
       debounceT = setTimeout(fetchSuggestions, 300);
     };
