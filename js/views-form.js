@@ -1204,6 +1204,13 @@ function renderDossierForm(params) {
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
       }
 
+      // ─── Automatisering: overledene koppelen aan de ledenadministratie ────
+      // Voegt de overledene toe als lid (status overleden) aan het gezin met
+      // hetzelfde gezinsnummer — en maakt dat gezin aan als het nog niet bestaat.
+      if (typeof LedenSync !== 'undefined' && savedDossier) {
+        await LedenSync.vanDossierMetMelding(savedDossier);
+      }
+
       // ─── Auto-mail dossier naar klooster bij eerste aanmaak (best-effort) ──
       // Inclusief kostenoverzicht — net opgeslagen kostenposten staan al
       // in de cloud-cache via de DB.insert hierboven.

@@ -240,6 +240,27 @@ const Modal = {
   },
 };
 
+// ─── Toast: korte, niet-blokkerende melding (auto-verdwijnt) ─────────────────
+const Toast = {
+  show(msg, type = 'info') {
+    let host = document.getElementById('toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'toast-host';
+      document.body.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.textContent = msg;
+    host.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('toast-in'));
+    setTimeout(() => {
+      el.classList.remove('toast-in');
+      setTimeout(() => el.remove(), 300);
+    }, 3800);
+  },
+};
+
 // ─── Lightbox: grotere preview van een afbeelding ───────────────────────────
 const Lightbox = {
   show({ src, title = '', subtitle = '', price = '', svgFallback = '' } = {}) {

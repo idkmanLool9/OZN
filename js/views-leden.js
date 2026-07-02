@@ -205,6 +205,11 @@ function renderGezinDetail(params) {
   $('#btn-lid-nieuw').addEventListener('click', () => toonLidForm(g.id, null));
   $$('#view [data-lid-edit]').forEach(b =>
     b.addEventListener('click', () => toonLidForm(g.id, parseInt(b.dataset.lidEdit, 10))));
+  $$('#view [data-lid-dossier]').forEach(b =>
+    b.addEventListener('click', () => {
+      const lid = DB.byId(KEYS.LEDEN, parseInt(b.dataset.lidDossier, 10));
+      if (lid) LedenSync.openOfMaakDossier(lid, g);
+    }));
   $$('#view [data-lid-del]').forEach(b =>
     b.addEventListener('click', async () => {
       const lid = DB.byId(KEYS.LEDEN, parseInt(b.dataset.lidDel, 10));
@@ -236,7 +241,8 @@ function lidCardHTML(l) {
         ${l.notities ? `<div class="muted small" style="margin-top:.25rem;white-space:pre-wrap;">${esc(l.notities)}</div>` : ''}
       </div>
       <div class="lid-card-acties">
-        <button type="button" class="btn btn-sm btn-ghost" data-lid-edit="${l.id}">✎</button>
+        ${l.status === 'overleden' ? `<button type="button" class="btn btn-sm btn-ghost" data-lid-dossier="${l.id}" title="Uitvaartdossier">⚰️</button>` : ''}
+        <button type="button" class="btn btn-sm btn-ghost" data-lid-edit="${l.id}" title="Bewerken">✎</button>
         <button type="button" class="btn btn-sm btn-ghost" data-lid-del="${l.id}" title="Verwijderen">🗑</button>
       </div>
     </div>`;
@@ -326,9 +332,17 @@ function toonLidForm(gezinId, lidId) {
     }
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true; btn.textContent = 'Bezig…';
+    const wasOverleden = l.status === 'overleden';
     try {
-      if (lidId) await DB.update(KEYS.LEDEN, lidId, data);
-      else await DB.insert(KEYS.LEDEN, data);
+      const savedLid = lidId ? await DB.update(KEYS.LEDEN, lidId, data) : await DB.insert(KEYS.LEDEN, data);
+      // Automatisering: net op "overleden" gezet → bied aan meteen een
+      // voorgevuld uitvaartdossier te starten.
+      if (data.status === 'overleden' && !wasOverleden && savedLid) {
+        mount.innerHTML = '';
+        await LedenSync.openOfMaakDossier(savedLid, DB.byId(KEYS.GEZINNEN, gezinId));
+        if (location.hash.startsWith('#/leden/')) renderGezinDetail({ id: gezinId });
+        return;
+      }
       renderGezinDetail({ id: gezinId });
     } catch (_) {
       btn.disabled = false; btn.textContent = lidId ? 'Opslaan' : 'Toevoegen';
@@ -415,8 +429,8 @@ function renderGezinForm(params) {
     }
   });
 
-  const delBtn = $('#btn-gezin-del');
-  if (delBtn) delBtn.addEventListener('click', async () => {
+  const gezinDelBtn = $('#btn-gezin-del');
+  if (gezinDelBtn) gezinDelBtn.addEventListener('click', async () => {
     const n = DB.where(KEYS.LEDEN, l => l.gezin_id === g.id).length;
     const ok = await Modal.confirm({
       title: 'Gezin verwijderen?',
@@ -431,3 +445,131 @@ function renderGezinForm(params) {
     } catch (_) {}
   });
 }
+
+// ─── Automatische koppeling leden ↔ dossiers ─────────────────────────────────
+const LedenSync = {
+  _norm(s) { return String(s == null ? '' : s).trim().toLowerCase(); },
+
+  gezinByNummer(nummer) {
+    const n = LedenSync._norm(nummer);
+    if (!n) return null;
+    return DB.list(KEYS.GEZINNEN).find(g => LedenSync._norm(g.gezinsnummer) === n) || null;
+  },
+  _matchLid(gezinId, voornaam, achternaam) {
+    const vn = LedenSync._norm(voornaam), an = LedenSync._norm(achternaam);
+    return DB.where(KEYS.LEDEN, l => l.gezin_id === gezinId &&
+      LedenSync._norm(l.voornaam) === vn && LedenSync._norm(l.achternaam) === an)[0] || null;
+  },
+  // Bestaat er al een uitvaartdossier voor deze persoon (zelfde gezinsnummer + naam)?
+  dossierVoorLid(lid, gezin) {
+    const gn = LedenSync._norm(gezin && gezin.gezinsnummer);
+    if (!gn) return null;
+    const vn = LedenSync._norm(lid.voornaam), an = LedenSync._norm(lid.achternaam);
+    return DB.list(KEYS.DOSSIERS).find(d =>
+      LedenSync._norm(d.gezinsnummer) === gn &&
+      LedenSync._norm(d.voornaam) === vn && LedenSync._norm(d.achternaam) === an) || null;
+  },
+
+  // Automation 1 — na het opslaan van een dossier: de overledene als lid
+  // (status overleden) in het juiste gezin bijwerken of toevoegen. Bestaat het
+  // gezin nog niet, dan wordt het aangemaakt uit de dossiergegevens. Gebeurt
+  // alleen als het dossier een gezinsnummer heeft (zo houdt de gebruiker regie).
+  async vanDossier(d) {
+    if (!d) return null;
+    const gezinsnummer = (d.gezinsnummer || '').trim();
+    const voornaam = (d.voornaam || '').trim();
+    const achternaam = (d.achternaam || '').trim();
+    if (!gezinsnummer || (!voornaam && !achternaam)) return null;
+
+    let gezin = LedenSync.gezinByNummer(gezinsnummer);
+    let nieuwGezin = false;
+    if (!gezin) {
+      gezin = await DB.insert(KEYS.GEZINNEN, {
+        gezinsnummer,
+        familienaam: achternaam || null,
+        parochie: d.parochie || null,
+        adres: d.adres_overledene || null,
+        postcode: d.postcode_overledene || null,
+        woonplaats: d.woonplaats_overledene || null,
+        status: 'actief',
+      });
+      nieuwGezin = true;
+    }
+
+    const bestaand = LedenSync._matchLid(gezin.id, voornaam, achternaam);
+    if (bestaand) {
+      const patch = { status: 'overleden' };
+      if (d.overlijdensdatum) patch.overlijdensdatum = d.overlijdensdatum;
+      if (!bestaand.doopnaam && d.doopnaam) patch.doopnaam = d.doopnaam;
+      if (!bestaand.geboortedatum && d.geboortedatum) patch.geboortedatum = d.geboortedatum;
+      if (!bestaand.geboorteplaats && d.geboorteplaats) patch.geboorteplaats = d.geboorteplaats;
+      await DB.update(KEYS.LEDEN, bestaand.id, patch);
+      return { gezin, nieuwGezin, nieuwLid: false };
+    }
+    await DB.insert(KEYS.LEDEN, {
+      gezin_id: gezin.id,
+      voornaam: voornaam || null,
+      achternaam: achternaam || null,
+      doopnaam: d.doopnaam || null,
+      geslacht: d.geslacht || null,
+      geboortedatum: d.geboortedatum || null,
+      geboorteplaats: d.geboorteplaats || null,
+      relatie: nieuwGezin ? 'hoofd' : 'overig',
+      status: 'overleden',
+      overlijdensdatum: d.overlijdensdatum || null,
+    });
+    return { gezin, nieuwGezin, nieuwLid: true };
+  },
+
+  // Toast na een dossier-opslag (aangeroepen vanuit het intake-formulier).
+  async vanDossierMetMelding(d) {
+    try {
+      const res = await LedenSync.vanDossier(d);
+      if (!res || typeof Toast === 'undefined') return;
+      const naam = res.gezin.familienaam || (d.gezinsnummer || '');
+      if (res.nieuwGezin) Toast.show(`Gezin ${d.gezinsnummer} aangemaakt en overledene toegevoegd aan de ledenadministratie`, 'success');
+      else if (res.nieuwLid) Toast.show(`Overledene toegevoegd aan gezin ${naam} in de ledenadministratie`, 'success');
+      else Toast.show(`Ledenadministratie bijgewerkt — ${naam}`, 'success');
+    } catch (e) { console.warn('Leden-sync (dossier→lid) mislukt:', e); }
+  },
+
+  // Automation 2 — maak een voorgevuld uitvaartdossier uit een lid + gezin.
+  async dossierVanLid(lid, gezin) {
+    return DB.insert(KEYS.DOSSIERS, {
+      voornaam: lid.voornaam || null,
+      achternaam: lid.achternaam || null,
+      doopnaam: lid.doopnaam || null,
+      geslacht: lid.geslacht || null,
+      geboortedatum: lid.geboortedatum || null,
+      geboorteplaats: lid.geboorteplaats || null,
+      overlijdensdatum: lid.overlijdensdatum || null,
+      gezinsnummer: gezin ? (gezin.gezinsnummer || null) : null,
+      adres_overledene: gezin ? (gezin.adres || null) : null,
+      postcode_overledene: gezin ? (gezin.postcode || null) : null,
+      woonplaats_overledene: gezin ? (gezin.woonplaats || null) : null,
+      parochie: gezin ? (gezin.parochie || null) : null,
+      contact_telefoon: gezin ? (gezin.telefoon || null) : null,
+      contact_email: gezin ? (gezin.email || null) : null,
+      status: 'nieuw',
+    });
+  },
+
+  // Open bestaand dossier of maak (na bevestiging) een nieuw voorgevuld dossier.
+  async openOfMaakDossier(lid, gezin) {
+    const bestaand = LedenSync.dossierVoorLid(lid, gezin);
+    if (bestaand) { Router.go('/dossiers/' + bestaand.id); return; }
+    const ok = await Modal.confirm({
+      title: 'Uitvaartdossier starten?',
+      message: `Een voorgevuld uitvaartdossier aanmaken voor ${lidNaam(lid)}? De persoons- en gezinsgegevens worden automatisch overgenomen.`,
+      confirmText: 'Dossier starten',
+    });
+    if (!ok) return;
+    try {
+      const dossier = await LedenSync.dossierVanLid(lid, gezin);
+      if (typeof Toast !== 'undefined') Toast.show(`Uitvaartdossier ${dossier.dossier_nummer || ''} aangemaakt`, 'success');
+      Router.go('/dossiers/' + dossier.id + '/bewerken');
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'Aanmaken mislukt', message: e.message || String(e) });
+    }
+  },
+};

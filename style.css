@@ -2932,6 +2932,25 @@ select.dossiers-control {
 /* Anker-secties netjes onder een eventuele sticky bovenbalk laten landen */
 .card[id] { scroll-margin-top: 1.25rem; }
 
+/* ─── Toast-meldingen ────────────────────────────────────────────────────── */
+#toast-host {
+  position: fixed; left: 0; right: 0;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  z-index: 3000; pointer-events: none;
+}
+.toast {
+  background: #2b3a4a; color: #fff;
+  padding: .6rem 1rem; border-radius: 10px;
+  font-size: .9rem; line-height: 1.35; max-width: min(90vw, 460px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .25s, transform .25s;
+}
+.toast-in { opacity: 1; transform: none; }
+.toast-success { background: #1c7a43; }
+.toast-error { background: #b3261e; }
+
 /* ─── Ledenadministratie ─────────────────────────────────────────────────── */
 .leden-cards { display: flex; flex-direction: column; gap: .6rem; }
 .lid-card {
