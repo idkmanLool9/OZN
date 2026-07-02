@@ -1431,7 +1431,7 @@ const MailComposer = {
           }
           sendBtn.textContent = 'Uploaden...';
           const up = await PdfGen.uploadAsAttachment(d.id, pdfBlob, type);
-          bodyMetBijlage += `\n\n— Bijlage —\n📎 ${type === 'factuur' ? 'Factuur' : 'Dossier-overzicht'} (PDF): ${up.url}\n(link is 7 dagen geldig)`;
+          bodyMetBijlage += `\n\n— Bijlage —\n📎 ${type === 'factuur' ? 'Kostenraming' : 'Dossier-overzicht'} (PDF): ${up.url}\n(link is 7 dagen geldig)`;
         }
         if (cc.length) {
           bodyMetBijlage += `\n\nDeze e-mail is ook gestuurd naar: ${cc.join(', ')}.`;

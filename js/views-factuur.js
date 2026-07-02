@@ -64,8 +64,9 @@ function factuurNummerVoor(d) {
   return nr;
 }
 
-// Professionele PDF-factuur (jsPDF) volgens het vaste sjabloon: bedrijfskop +
-// betaalgegevens + regeltabel (Aantal/Prijs/Totaal) + btw-overzicht.
+// Professionele PDF-kostenraming (jsPDF) volgens het vaste sjabloon: bedrijfskop
+// + regeltabel (Aantal/Prijs/Totaal) + btw-overzicht. Geen factuurnummer en geen
+// betaalverzoek — het is een indicatieve begroting, geen factuur.
 function buildFactuurPdf(d, kosten) {
   const doc = new (PdfGen._jsPDF())({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const s = Settings.all();
@@ -79,9 +80,8 @@ function buildFactuurPdf(d, kosten) {
 
   const today = new Date();
   const fmtNL = dt => dt.toLocaleDateString('nl-NL');
-  const termijn = Number(s.factuur_betalingstermijn_dagen) || 30;
-  const verval = new Date(today.getTime() + termijn * 86400000);
-  const factuurnr = factuurNummerVoor(d);
+  // Bewust GEEN factuurnummer: een kostenraming is geen factuur en mag het
+  // oplopende factuur-volgnummer niet verbruiken.
   const totaal = (kosten || []).reduce((sum, k) => sum + (Number(k.bedrag) || 0), 0);
 
   // ── Rechterkolom: bedrijf + IBAN/btw/kvk + factuurmeta ──
@@ -102,20 +102,20 @@ function buildFactuurPdf(d, kosten) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8); GRAY(); T(label, RX, ry);
     doc.setFont('helvetica', bold ? 'bold' : 'normal'); DARK(); T(val, RX + 24, ry); ry += 4.6;
   };
-  lvM('Factuurnummer', factuurnr, true);
-  lvM('Factuurdatum', fmtNL(today));
-  lvM('Orderreferentie', 'Uitvaart ' + (fullName(d) || ''), true);
+  lvM('Datum', fmtNL(today));
+  lvM('Referentie', 'Uitvaart ' + (fullName(d) || ''), true);
 
-  // ── Linkerkolom: logo + "Factuur" + ontvanger ──
+  // ── Linkerkolom: logo + "Kostenraming" + ontvanger ──
   let ly = M;
-  if (s.logo_data_url) {
+  const logoUrl = s.factuur_logo_data_url || s.logo_data_url;
+  if (logoUrl) {
     try {
-      const fmt = /jpe?g/i.test(s.logo_data_url) ? 'JPEG' : 'PNG';
-      doc.addImage(s.logo_data_url, fmt, M, ly, 20, 20); ly += 24;
+      const fmt = /jpe?g/i.test(logoUrl) ? 'JPEG' : 'PNG';
+      doc.addImage(logoUrl, fmt, M, ly, 20, 20); ly += 24;
     } catch (_) { ly += 1; }
   }
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(22); DARK();
-  T('Factuur', M, ly + 5); ly += 15;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); DARK();
+  T('Kostenraming', M, ly + 5); ly += 15;
   const ontNaam = d.opdrachtgever_naam || [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' ') || '';
   const ontA1 = [d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' ');
   const ontA2 = [d.contact_postcode, d.contact_woonplaats].filter(Boolean).join('  ');
@@ -124,21 +124,9 @@ function buildFactuurPdf(d, kosten) {
   if (ontA1) { T(ontA1, M, ly); ly += 4.5; }
   if (ontA2) { T(ontA2, M, ly); ly += 4.5; }
 
-  // ── Betaalgegevens-box ──
-  let y = Math.max(ly, ry) + 6;
-  const boxX = M, boxY = y, boxW = 96;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); DARK();
-  T('Betaalgegevens', boxX + 3, y + 5); y += 9;
-  const lvB = (label, val) => {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); GRAY(); T(label, boxX + 3, y);
-    doc.setFont('helvetica', 'bold'); DARK(); T(val, boxX + 27, y); y += 5;
-  };
-  lvB('Te betalen', '€ ' + eur(totaal) + '  (voor ' + fmtNL(verval) + ')');
-  lvB('Naar IBAN', s.factuur_iban);
-  lvB('Op naam van', s.factuur_bedrijfsnaam);
-  lvB('Omschrijving', 'Factuur ' + factuurnr);
-  doc.setDrawColor(220); doc.setLineWidth(0.3); doc.rect(boxX, boxY, boxW, y - boxY + 1);
-  y += 9;
+  // Een kostenraming is een indicatieve begroting, geen betaalverzoek:
+  // daarom geen betaalgegevens-box en geen "te betalen".
+  let y = Math.max(ly, ry) + 8;
 
   // ── Regeltabel ──
   const xOms = M, xAantal = 120, xPrijs = 152, xTot = right;
@@ -173,8 +161,8 @@ function buildFactuurPdf(d, kosten) {
     y += bold ? 7 : 5.5;
   };
   totRow('Totaal excl. btw', totaal);
-  totRow('Totaal btw', 0);
-  totRow('Te betalen', totaal, true);
+  totRow('Btw (vrijgesteld)', 0);
+  totRow('Geschat totaal', totaal, true);
 
   let by = tY;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); GRAY();
@@ -182,6 +170,10 @@ function buildFactuurPdf(d, kosten) {
   doc.setDrawColor(220); doc.line(M, by, M + 68, by); by += 4;
   doc.setFont('helvetica', 'normal'); DARK();
   T('vrij', M, by); T(eur(totaal), M + 22, by); T('0,00', M + 50, by);
+
+  // Disclaimer onderaan: dit is een raming, geen factuur.
+  doc.setFont('helvetica', 'italic'); doc.setFontSize(8); GRAY();
+  T('Dit is een indicatieve kostenraming, geen factuur. Bedragen zijn richtprijzen en kunnen nog wijzigen.', M, 286);
 
   return doc;
 }
@@ -286,7 +278,7 @@ function buildFactuurDocHTML(d, kosten) {
         </div>` : ''}
 
       <p class="factuur-footer muted small">
-        Voor vragen over deze factuur kunt u contact opnemen met de uitvaartleider.
+        Voor vragen over deze kostenraming kunt u contact opnemen met de uitvaartleider.
       </p>
     </div>`;
 }
@@ -319,7 +311,7 @@ function renderFactuur(params) {
     const orig = pdfBtn.textContent;
     pdfBtn.disabled = true; pdfBtn.textContent = 'PDF maken…';
     try {
-      await PdfGen.deliver(() => buildFactuurPdf(d, kosten), `factuur-${d.dossier_nummer}.pdf`, d.id);
+      await PdfGen.deliver(() => buildFactuurPdf(d, kosten), `kostenraming-${d.dossier_nummer}.pdf`, d.id);
     } catch (e) {
       Modal.show({ type: 'error', title: 'PDF maken mislukt', message: e.message || String(e) });
     } finally {
