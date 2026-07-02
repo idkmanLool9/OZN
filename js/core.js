@@ -1016,7 +1016,12 @@ const PdfGen = {
     const BLUE = [37, 99, 235], GRAY = [110, 110, 110], DARK = [35, 35, 35];
     let y = M;
     const ensure = (h) => { if (y + h > H - M) { doc.addPage(); y = M; } };
-    const txt = (t, x, yy, o) => doc.text(String(t == null ? '' : t), x, yy, o);
+    // Emoji/pictogrammen strippen — het standaard jsPDF-lettertype kan ze niet
+    // weergeven en verpest anders de regel (garbled tekens + rare spatiëring).
+    const EMOJI_RX = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{2022}]/gu;
+    const clean = (t) => String(t == null ? '' : t).replace(EMOJI_RX, '').replace(/[ \t]{2,}/g, ' ').replace(/^[ \t]+/, '');
+    const txt = (t, x, yy, o) => doc.text(Array.isArray(t) ? t : clean(t), x, yy, o);
+    const split = (t, w) => doc.splitTextToSize(clean(t), w);
 
     // Kop
     doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
@@ -1039,7 +1044,7 @@ const PdfGen = {
         txt(blk.label + ':', x, yy); yy += 5;
         doc.setFont('helvetica', 'normal'); doc.setTextColor(70, 70, 70);
         (blk.lines || []).filter(l => l && String(l).trim()).forEach(ln => {
-          const w = doc.splitTextToSize(String(ln), colW - 5);
+          const w = split(ln, colW - 5);
           txt(w, x, yy); yy += w.length * 4.5;
         });
         maxY = Math.max(maxY, yy);
@@ -1056,7 +1061,7 @@ const PdfGen = {
       txt(sec.heading, M, y); y += 5.5;
       doc.setFontSize(9.5);
       rows.forEach(([label, val]) => {
-        const vLines = doc.splitTextToSize(String(val), CW - 45);
+        const vLines = split(val, CW - 45);
         ensure(vLines.length * 4.6 + 1);
         doc.setTextColor(...GRAY); doc.setFont('helvetica', 'bold'); txt(label, M, y);
         doc.setTextColor(...DARK); doc.setFont('helvetica', 'normal'); txt(vLines, M + 43, y);
@@ -1078,7 +1083,7 @@ const PdfGen = {
       y += 1.5; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 4;
       doc.setFont('helvetica', 'normal');
       spec.table.rows.forEach(r => {
-        const oms = doc.splitTextToSize(String(r[0] || ''), xCat - M - 3);
+        const oms = split(r[0], xCat - M - 3);
         ensure(oms.length * 4.6 + 1);
         doc.setTextColor(...DARK); txt(oms, M, y);
         doc.setTextColor(...GRAY); txt(r[1] || '', xCat, y);
@@ -1101,7 +1106,7 @@ const PdfGen = {
     if (spec.footer) {
       ensure(8); y += 3;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
-      const f = doc.splitTextToSize(String(spec.footer), CW);
+      const f = split(spec.footer, CW);
       txt(f, M, y);
     }
     return doc;
