@@ -18,4 +18,6 @@ struct UitvaartActivityAttributes: ActivityAttributes {
     var kerk: String        // dienstlocatie
     var eindDatum: Date     // uitvaarttijdstip — voor de live countdown
     var startDatum: Date    // moment waarop de activity startte — voor de voortgangsbalk
+    var familie: String     // bv. "Familie Habib"
+    var datumLabel: String  // bv. "Vandaag · 14:30"
 }

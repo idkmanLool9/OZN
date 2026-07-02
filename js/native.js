@@ -243,7 +243,7 @@ Native.testLiveActivity = async function () {
   if (!en || !en.enabled) throw new Error('Live activiteiten staan uit — zet ze aan bij Instellingen → Uitvaartbeheer.');
   const eind = new Date(Date.now() + 2 * 3600 * 1000);
   await LA.endAll().catch(() => {});
-  await LA.start({ naam: 'Testweergave', tijd: 'demo', kerk: 'Voorbeeldlocatie', eindMs: eind.getTime(), status: 'Test' });
+  await LA.start({ naam: 'Testweergave', tijd: '10:27', kerk: 'Maria kathedraal', eindMs: eind.getTime(), status: 'Test', familie: 'Familie Voorbeeld', datumLabel: 'Vandaag · 10:27' });
   Native._laStartedFor = -1;
   return 'Demo gestart. Vergrendel nu je scherm — de widget staat op het vergrendelscherm (2 uur aftellen).';
 };
@@ -263,6 +263,8 @@ Native.startUitvaartActivity = async function (dsr) {
   const uit = Native._parseDT(dsr.uitvaart_datum, dsr.uitvaart_tijd);
   if (!uit) return false;
   const naam = [dsr.voornaam, dsr.achternaam].filter(Boolean).join(' ') || dsr.dossier_nummer || 'Uitvaart';
+  const familie = dsr.achternaam ? ('Familie ' + dsr.achternaam)
+    : ([dsr.contact_voornaam, dsr.contact_naam].filter(Boolean).join(' ') || '');
   try {
     await LA.endAll(); // voorkom dubbele widgets
     await LA.start({
@@ -271,6 +273,8 @@ Native.startUitvaartActivity = async function (dsr) {
       kerk: dsr.kerk_locatie || dsr.begraafplaats || '',
       eindMs: uit.getTime(),
       status: 'Vandaag',
+      familie,
+      datumLabel: 'Vandaag' + (dsr.uitvaart_tijd ? ' · ' + dsr.uitvaart_tijd : ''),
     });
     Native._laStartedFor = dsr.id;
     return true;

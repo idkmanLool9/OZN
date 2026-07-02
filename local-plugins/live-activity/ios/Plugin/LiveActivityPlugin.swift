@@ -43,8 +43,10 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         var eind = Date(timeIntervalSince1970: eindMs / 1000)
         if eind <= start { eind = start.addingTimeInterval(60) }
         let status = call.getString("status") ?? "Vandaag"
+        let familie = call.getString("familie") ?? ""
+        let datumLabel = call.getString("datumLabel") ?? ""
 
-        let attributes = UitvaartActivityAttributes(naam: naam, tijd: tijd, kerk: kerk, eindDatum: eind, startDatum: start)
+        let attributes = UitvaartActivityAttributes(naam: naam, tijd: tijd, kerk: kerk, eindDatum: eind, startDatum: start, familie: familie, datumLabel: datumLabel)
         let state = UitvaartActivityAttributes.ContentState(status: status)
         do {
             let activity: Activity<UitvaartActivityAttributes>
