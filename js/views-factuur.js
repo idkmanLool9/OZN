@@ -90,9 +90,6 @@ function buildFactuurPdf(d, kosten) {
   lvM('Factuurnummer', factuurnr, true);
   lvM('Factuurdatum', fmtNL(today));
   lvM('Orderreferentie', 'Uitvaart ' + (fullName(d) || ''), true);
-  lvM('Betalingstermijn', termijn + ' dagen', true);
-  lvM('Klantnummer', d.gezinsnummer || String(d.id || ''));
-  lvM('Leverdatum', d.uitvaart_datum ? fmtDate(d.uitvaart_datum) : fmtNL(today));
 
   // ── Linkerkolom: logo + "Factuur" + ontvanger ──
   let ly = M;
