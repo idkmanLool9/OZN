@@ -65,7 +65,7 @@ private struct LockScreenView: View {
             // Kop (compact, één regel) + Live-badge
             HStack(spacing: 7) {
                 Image(systemName: "cross.fill").font(.subheadline).foregroundStyle(sokPurple)
-                Text("Uitvaartbeheer").font(.subheadline.weight(.bold)).foregroundStyle(.primary)
+                Text("Uitvaart Intake").font(.subheadline.weight(.bold)).foregroundStyle(.primary)
                 Text("· SOK Antiochië").font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength: 4)
                 HStack(spacing: 5) {

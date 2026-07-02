@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-126';
+const CACHE_VERSION = 'sok-uitvaart-build-127';
 const SHELL = [
   './',
   './index.html',
@@ -150,7 +150,7 @@ async function staleWhileRevalidate(req) {
 
 // ─── Push-notificaties ──────────────────────────────────────────────────────
 self.addEventListener('push', event => {
-  let payload = { title: 'Uitvaartbeheer', body: 'Je hebt een nieuwe melding.', url: '/' };
+  let payload = { title: 'Uitvaart Intake', body: 'Je hebt een nieuwe melding.', url: '/' };
   if (event.data) {
     try { payload = Object.assign(payload, event.data.json()); }
     catch (_) { payload.body = event.data.text(); }

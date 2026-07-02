@@ -59,7 +59,7 @@ const FamiliePortaalView = {
           <div class="fp-brand">
             <div class="fp-cross">✝</div>
             <div>
-              <strong>${esc(s.app_name || 'Uitvaartbeheer')}</strong>
+              <strong>${esc(s.app_name || 'Uitvaart Intake')}</strong>
               <span>${esc(s.app_tagline || '')}</span>
             </div>
           </div>
@@ -99,7 +99,7 @@ const FamiliePortaalView = {
           <div class="fp-brand">
             <div class="fp-cross">✝</div>
             <div>
-              <strong>${esc(s.app_name || 'Uitvaartbeheer')}</strong>
+              <strong>${esc(s.app_name || 'Uitvaart Intake')}</strong>
               <span>${esc(s.app_tagline || '')}</span>
             </div>
           </div>

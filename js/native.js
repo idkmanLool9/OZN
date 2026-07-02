@@ -240,7 +240,7 @@ Native.testLiveActivity = async function () {
   const LA = Native._la();
   if (!LA) throw new Error('Live Activity zit niet in deze app-build.');
   const en = await LA.areEnabled().catch(() => ({ enabled: false }));
-  if (!en || !en.enabled) throw new Error('Live activiteiten staan uit — zet ze aan bij Instellingen → Uitvaartbeheer.');
+  if (!en || !en.enabled) throw new Error('Live activiteiten staan uit — zet ze aan bij Instellingen → Uitvaart Intake.');
   const eind = new Date(Date.now() + 2 * 3600 * 1000);
   await LA.endAll().catch(() => {});
   await LA.start({ naam: 'Testweergave', tijd: '10:27', kerk: 'Maria kathedraal', eindMs: eind.getTime(), status: 'Test', familie: 'Familie Voorbeeld', datumLabel: 'Vandaag · 10:27' });

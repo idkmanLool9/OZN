@@ -1,6 +1,6 @@
 {
-  "name": "Uitvaartbeheer SOK Antiochië",
-  "short_name": "SOK Uitvaart",
+  "name": "Uitvaart Intake SOK Antiochië",
+  "short_name": "Uitvaart Intake",
   "description": "Intern dossierbeheer voor de uitvaartleider van de Syrisch-Orthodoxe Kerk van Antiochië",
   "start_url": "./",
   "scope": "./",

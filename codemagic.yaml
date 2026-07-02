@@ -130,6 +130,8 @@ workflows:
             || pb "Set :NSPhotoLibraryAddUsageDescription 'Voor het opslaan van gescande documenten.'"
           # Live Activities: app mag live-widgets tonen (voor latere lockscreen-widget)
           pb "Add :NSSupportsLiveActivities bool true" || pb "Set :NSSupportsLiveActivities true"
+          # App-naam onder het icoon (robuust, want ios/ wordt elke build opnieuw gegenereerd)
+          pb "Add :CFBundleDisplayName string 'Uitvaart Intake'" || pb "Set :CFBundleDisplayName 'Uitvaart Intake'"
       - name: CocoaPods
         script: |
           cd ios/App && pod install

@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 126;
-const APP_VERSION    = '5.36.0';
+const APP_BUILD      = 127;
+const APP_VERSION    = '5.36.1';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -27,10 +27,10 @@ const Settings = {
     splash_duration_ms: 2500,
     splash_animation: 'glass', // 'glass' | 'fade' | 'scale' | 'slide'
     splash_title: 'Welkom',
-    splash_subtitle: 'Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië',
+    splash_subtitle: 'Uitvaart Intake · Syrisch-Orthodoxe Kerk van Antiochië',
     splash_offline_title: 'Welkom terug',
     // Branding
-    app_name: 'Uitvaartbeheer',
+    app_name: 'Uitvaart Intake',
     app_tagline: 'Syrisch-Orthodoxe Kerk van Antiochië',
     primary_color: '#2563eb',
     accent_color: '#c9a24a',
@@ -658,7 +658,7 @@ const PushNotificaties = {
       if (p !== 'granted') return false;
     }
     const reg = await navigator.serviceWorker.ready;
-    reg.showNotification('Uitvaartbeheer · test', {
+    reg.showNotification('Uitvaart Intake · test', {
       body: 'Push-notificaties werken op dit apparaat. Je krijgt voortaan herinneringen voor aankomende uitvaarten.',
       icon: './icon.svg',
       badge: './icon.svg',

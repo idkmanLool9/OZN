@@ -932,8 +932,8 @@ function renderAccount(msg) {
       btn.textContent = 'Bezig met verzenden...';
       try {
         await EmailService.send(to,
-          'Test — ' + (Settings.get('app_name') || 'Uitvaartbeheer'),
-          'Dit is een test-e-mail vanuit je Uitvaartbeheer-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
+          'Test — ' + (Settings.get('app_name') || 'Uitvaart Intake'),
+          'Dit is een test-e-mail vanuit je Uitvaart Intake-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
         result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Controleer de inbox (en spam-map).</div>`;
       } catch (e) {
         result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.text ? e.text : (e.message || String(e)))}</div>`;
@@ -964,7 +964,7 @@ function renderAccount(msg) {
   if (laEl && typeof Native !== 'undefined' && Native.liveActivityStatus) {
     Native.liveActivityStatus().then(st => {
       if (st === 'on') laEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ aan</span> — widget kan getoond worden';
-      else if (st === 'off') laEl.innerHTML = '<span style="color:#b8860b;font-weight:600;">uit</span> — zet aan bij Instellingen → Uitvaartbeheer → Live activiteiten';
+      else if (st === 'off') laEl.innerHTML = '<span style="color:#b8860b;font-weight:600;">uit</span> — zet aan bij Instellingen → Uitvaart Intake → Live activiteiten';
       else if (st === 'unavailable') laEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet beschikbaar</span>' + (Native._laLastError ? ' <span class="muted small">(' + esc(Native._laLastError) + ')</span>' : '');
       else laEl.textContent = 'alleen in de app';
     }).catch(() => { laEl.textContent = 'kon status niet bepalen'; });
