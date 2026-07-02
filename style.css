@@ -2932,6 +2932,18 @@ select.dossiers-control {
 /* Anker-secties netjes onder een eventuele sticky bovenbalk laten landen */
 .card[id] { scroll-margin-top: 1.25rem; }
 
+/* ─── Ledenadministratie ─────────────────────────────────────────────────── */
+.leden-cards { display: flex; flex-direction: column; gap: .6rem; }
+.lid-card {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem;
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: .7rem .9rem; background: var(--bg);
+}
+.lid-card-body { min-width: 0; }
+.lid-card-top { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin-bottom: .15rem; }
+.lid-card-acties { display: flex; gap: .3rem; flex: none; }
+.gekoppelde-dossiers { margin: .5rem 0 0; padding-left: 1.1rem; line-height: 1.7; }
+
 /* ─── Edge-to-edge veilige zones (statusbalk/notch in de native app) ──────────
    De app loopt tot achter de statusbalk; deze regels vullen die strook met de
    app-kleur (geen zwart meer) en houden de inhoud eronder vandaan. Op web zijn

@@ -123,6 +123,28 @@ const DEMO_NOTITIES = [
   { id: 920002, dossier_id: 900002, tekst: 'Huisbezoek gepland op 30-06 om 20:00. Dochter Ninwe is contactpersoon.', auteur: 'Rume', created_at: '2026-06-30T09:00:00.000Z' },
 ];
 
+// Ledenadministratie — fictieve gezinnen, gekoppeld aan de demo-dossiers via
+// hetzelfde gezinsnummer.
+const DEMO_GEZINNEN = [
+  { id: 930001, gezinsnummer: 'G-0421', familienaam: 'Aydın', parochie: 'Mor Kuryakos — Enschede', adres: 'Lariksstraat 14', postcode: '7545 XT', woonplaats: 'Enschede', telefoon: '06 24 55 18 90', email: 'familie.aydin@example.com', status: 'actief', notities: '', created_at: '2026-01-10T09:00:00.000Z', updated_at: '2026-06-15T09:10:00.000Z', bijgewerkt_door: 'Robert' },
+  { id: 930002, gezinsnummer: 'G-0512', familienaam: 'Barsoum', parochie: 'Mor Severios — Hengelo', adres: 'Deldenerstraat 210', postcode: '7551 AG', woonplaats: 'Hengelo', telefoon: '06 41 20 77 63', email: 'familie.barsoum@example.com', status: 'actief', notities: '', created_at: '2026-02-02T09:00:00.000Z', updated_at: '2026-07-01T15:45:00.000Z', bijgewerkt_door: 'Rume' },
+  { id: 930003, gezinsnummer: 'G-0533', familienaam: 'Younan', parochie: 'Mor Aday — Rijssen', adres: 'Wierdensestraat 66', postcode: '7607 GJ', woonplaats: 'Almelo', telefoon: '06 38 91 44 02', email: 'familie.younan@example.com', status: 'actief', notities: '', created_at: '2026-03-18T09:00:00.000Z', updated_at: '2026-07-02T08:05:00.000Z' },
+];
+
+const DEMO_LEDEN = [
+  // Aydın
+  { id: 940001, gezin_id: 930001, voornaam: 'Georges', achternaam: 'Aydın', doopnaam: 'Gewargis', geslacht: 'man', relatie: 'hoofd', geboortedatum: '1947-03-12', geboorteplaats: 'Midyat, Turkije', doopdatum: '1947-05-04', doopplaats: 'Midyat', status: 'overleden', overlijdensdatum: '2026-06-10', notities: '' },
+  { id: 940002, gezin_id: 930001, voornaam: 'Saïda', achternaam: 'Aydın-Barsoum', geslacht: 'vrouw', relatie: 'partner', geboortedatum: '1951-08-19', geboorteplaats: 'Midyat, Turkije', status: 'actief', telefoon: '06 24 55 18 91' },
+  { id: 940003, gezin_id: 930001, voornaam: 'Elias', achternaam: 'Aydın', geslacht: 'man', relatie: 'kind', geboortedatum: '1978-02-27', geboorteplaats: 'Enschede', doopdatum: '1978-04-16', doopplaats: 'Enschede', status: 'actief', telefoon: '06 24 55 18 90', email: 'elias.aydin@example.com' },
+  // Barsoum
+  { id: 940010, gezin_id: 930002, voornaam: 'Marta', achternaam: 'Barsoum', geslacht: 'vrouw', relatie: 'hoofd', geboortedatum: '1952-09-01', geboorteplaats: 'Qamishli, Syrië', status: 'overleden', overlijdensdatum: '2026-06-28' },
+  { id: 940011, gezin_id: 930002, voornaam: 'Ninwe', achternaam: 'Barsoum', geslacht: 'vrouw', relatie: 'kind', geboortedatum: '1983-05-12', geboorteplaats: 'Hengelo', status: 'actief', telefoon: '06 41 20 77 63', email: 'ninwe.b@example.com' },
+  // Younan
+  { id: 940020, gezin_id: 930003, voornaam: 'Yusuf', achternaam: 'Younan', geslacht: 'man', relatie: 'hoofd', geboortedatum: '1963-11-24', geboorteplaats: 'Bagdad, Irak', status: 'overleden', overlijdensdatum: '2026-07-01' },
+  { id: 940021, gezin_id: 930003, voornaam: 'Hana', achternaam: 'Younan', geslacht: 'vrouw', relatie: 'partner', geboortedatum: '1968-06-30', geboorteplaats: 'Bagdad, Irak', status: 'actief' },
+  { id: 940022, gezin_id: 930003, voornaam: 'Sargon', achternaam: 'Younan', geslacht: 'man', relatie: 'kind', geboortedatum: '1992-10-08', geboorteplaats: 'Almelo', status: 'actief', telefoon: '06 38 91 44 02', email: 'sargon.younan@example.com' },
+];
+
 const Demo = {
   isActive() {
     const u = (typeof Auth !== 'undefined' && Auth.current()) || null;
@@ -138,6 +160,8 @@ const Demo = {
     Cloud.cache.dossiers = Demo._clone(DEMO_DOSSIERS);
     Cloud.cache.kosten   = Demo._clone(DEMO_KOSTEN).map(normKosten);
     Cloud.cache.notities = Demo._clone(DEMO_NOTITIES);
+    Cloud.cache.gezinnen = Demo._clone(DEMO_GEZINNEN);
+    Cloud.cache.leden    = Demo._clone(DEMO_LEDEN);
     try {
       const [kim, blm, etn] = await Promise.all([
         sb.from('kist_afbeeldingen').select('*'),
@@ -172,7 +196,10 @@ const Demo = {
       if (!row.status) row.status = 'nieuw';
       if (!row.dossier_nummer) row.dossier_nummer = '2026-' + (row.id - 899900);
     }
-    else { row.created_at = row.created_at || now; }
+    else {
+      row.created_at = row.created_at || now;
+      if (tbl === 'gezinnen' || tbl === 'leden') row.updated_at = now;
+    }
     const norm = (typeof normalize !== 'undefined') ? normalize(tbl, row) : row;
     (Cloud.cache[tbl] = Cloud.cache[tbl] || []).push(norm);
     return Promise.resolve(norm);
@@ -182,7 +209,7 @@ const Demo = {
     const i = rows.findIndex(x => x.id === id);
     if (i < 0) return Promise.resolve(null);
     const merged = Object.assign({}, rows[i], patch);
-    if (tbl === 'dossiers') merged.updated_at = new Date().toISOString();
+    if (tbl === 'dossiers' || tbl === 'gezinnen' || tbl === 'leden') merged.updated_at = new Date().toISOString();
     const norm = (typeof normalize !== 'undefined') ? normalize(tbl, merged) : merged;
     rows[i] = norm;
     return Promise.resolve(norm);

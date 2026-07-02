@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 150;
-const APP_VERSION    = '5.42.2';
+const APP_BUILD      = 151;
+const APP_VERSION    = '5.43.0';
 const APP_BUILD_DATE = '2026-07-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -969,6 +969,10 @@ Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
+Router.add('/leden', (p, full) => renderLedenList(p, full));
+Router.add('/leden/nieuw', () => renderGezinForm({}));
+Router.add('/leden/:id', p => renderGezinDetail(p));
+Router.add('/leden/:id/bewerk', p => renderGezinForm(p));
 Router.add('/begraafplaats', () => renderBegraafplaats());
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/bloemen', () => renderBloemenBeheer());
@@ -1096,7 +1100,7 @@ Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
   function cleanSessionStorage() {
     ActiveProfile.clear();
-    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] };
+    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [] };
     Cloud.loaded = false;
     // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
     // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet

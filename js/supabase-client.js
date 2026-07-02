@@ -11,6 +11,8 @@ const KEYS = {
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
   BLOEMEN: 'bloemen_catalogus',
   ETEN: 'eten_drinken_catalogus',
+  GEZINNEN: 'gezinnen',
+  LEDEN: 'leden',
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -57,7 +59,7 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [] },
   loaded: false,
   offline: false,
 
@@ -65,13 +67,17 @@ const Cloud = {
     // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, k, n, kim, blm, etn] = await Promise.all([
+      const [d, k, n, kim, blm, etn, gz, ld] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
         sb.from('kosten').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
         sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
         sb.from('eten_drinken_catalogus').select('*').order('naam', { ascending: true }),
+        // Ledenadministratie — tolerant: als de tabellen nog niet bestaan
+        // (migratie nog niet gedraaid) blijven ze gewoon leeg.
+        sb.from('gezinnen').select('*').order('familienaam', { ascending: true }),
+        sb.from('leden').select('*').order('achternaam', { ascending: true }),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
@@ -80,6 +86,8 @@ const Cloud = {
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
       Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
       Cloud.cache.eten_drinken_catalogus = ((etn && etn.data) || []).map(normEten);
+      Cloud.cache.gezinnen = ((gz && gz.data) || []).map(normRow);
+      Cloud.cache.leden = ((ld && ld.data) || []).map(normRow);
       Cloud.loaded = true;
       Cloud.offline = false;
       try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}
@@ -102,7 +110,7 @@ const Cloud = {
 };
 
 // Tabellen die een 'bijgewerkt_door' kolom hebben (zie supabase-schema.sql)
-const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten']);
+const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten', 'gezinnen', 'leden']);
 
 // Wrapper rond insert/update: als de DB nog geen bijgewerkt_door kolom heeft
 // (oude schema, gebruiker heeft migratie nog niet gedraaid), proberen we het

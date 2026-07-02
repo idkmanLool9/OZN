@@ -949,7 +949,9 @@ const Router = {
           const route = a.getAttribute('data-route');
           const active = route === '/dossiers'
             ? (path === '/' || path.startsWith('/dossiers'))
-            : path === route;
+            : (route === '/leden'
+                ? path.startsWith('/leden')
+                : path === route);
           a.classList.toggle('active', active);
         });
         // "In een dossier" = detail / intake / bewerken / factuur (alles
