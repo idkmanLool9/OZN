@@ -6,10 +6,12 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-148';
+const CACHE_VERSION = 'sok-uitvaart-build-149';
 const SHELL = [
   './',
   './index.html',
+  './privacy.html',
+  './support.html',
   './style.css',
   './print.css',
   './manifest.webmanifest',
@@ -96,6 +98,26 @@ self.addEventListener('fetch', e => {
       url.host === 'fonts.gstatic.com') {
     e.respondWith(staleWhileRevalidate(req));
     return;
+  }
+
+  // Losse statische pagina's (support/privacy): altijd de echte pagina serveren,
+  // nooit de app-shell als fallback. Werkt voor /support én /support.html.
+  if (url.origin === location.origin) {
+    const staticMatch = url.pathname.match(/^\/(support|privacy)(?:\.html)?$/);
+    if (staticMatch) {
+      const file = './' + staticMatch[1] + '.html';
+      e.respondWith(
+        fetch(new Request(req, { cache: 'no-cache' }))
+          .then(resp => {
+            if (resp && resp.ok && resp.type === 'basic') {
+              caches.open(CACHE_VERSION).then(c => c.put(file, resp.clone()));
+            }
+            return resp;
+          })
+          .catch(() => caches.match(file))
+      );
+      return;
+    }
   }
 
   // Eigen assets

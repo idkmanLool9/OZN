@@ -4,8 +4,8 @@ Alles klaar om te kopiëren/plakken in **App Store Connect**. Onderaan staan de
 losse acties die alleen jij kunt doen (screenshots, demo-account, unlisted).
 
 Live pagina's (al online op Cloudflare Pages):
-- **Privacybeleid:** https://uitvaart.pages.dev/privacy.html
-- **Support:** https://uitvaart.pages.dev/support.html
+- **Privacybeleid:** https://uitvaart.pages.dev/privacy
+- **Support:** https://uitvaart.pages.dev/support
 - **Marketing/website:** https://uitvaart.pages.dev/
 
 ---
@@ -27,20 +27,76 @@ Live pagina's (al online op Cloudflare Pages):
 | **Availability** | Nederland (evt. later BE / DE / SE) |
 
 **URLs (tab "App Information" → "General Information"):**
-- Privacy Policy URL: `https://uitvaart.pages.dev/privacy.html`
-- Support URL (tab "Version Information"): `https://uitvaart.pages.dev/support.html`
+- Privacy Policy URL: `https://uitvaart.pages.dev/privacy`
+- Support URL (tab "Version Information"): `https://uitvaart.pages.dev/support`
 - Marketing URL (optioneel): `https://uitvaart.pages.dev/`
 
 ---
 
-## 2. Teksten (Version Information — NL)
+## 2. Teksten (Version Information)
+
+> Engels is de primaire tekst (Apple-reviewers lezen Engels). Wil je óók een
+> Nederlandse localisatie? Voeg die als extra taal toe en plak de NL-versie
+> onderaan deze sectie.
 
 ### Promotional Text (max 170 tekens)
 ```
-Beheer alle uitvaartdossiers van je parochie op één plek — intake, kosten, facturen, dagplanning en familiecommunicatie in een rustige, overzichtelijke app.
+Manage all your parish's funeral case files in one place — intake, costs, cost estimates, day schedules and family communication in a calm, clear app.
 ```
 
 ### Description (max 4000 tekens)
+```
+Uitvaart Intake — administration for parishes and monasteries
+
+A complete administration app for funeral coordinators within the Syriac Orthodox Church of Antioch and other parishes. Keep every case file complete, clear and always at hand — on your iPad.
+
+WHAT IT DOES
+· Full intake in one continuous form — deceased, contact person, church, funeral service, insurance and payment
+· Automatic case number and retention tracking
+· Cost items per category (transport, coffin, church, cemetery, catering, cleaning) with quantities and guide prices
+· Insurance coverage per package — DELA templates with coverage applied automatically per category
+· Postcode entry: type postcode + house number, street and town fill in automatically
+· Scan documents with the real Apple document scanner (automatic cropping and perspective correction)
+· Digital signatures on the intake file
+· Professional cost-estimate PDF and case overview — save, print, share or email
+· Lock screen widget (Live Activity) with a countdown to the next funeral
+· Local reminders for upcoming funerals and home visits
+
+FAMILY PORTAL
+· Share a secure link with the contact person: they see the day schedule and a checklist of what to bring
+· The family can optionally upload a photo of an identity document
+· No login required and no sensitive administration visible
+
+FOR WHOM
+Uitvaart Intake is a closed tool for the funeral coordinators and secretariat of the parishes of the Syriac Orthodox Church of Antioch. Access is by invitation: accounts are created by the secretariat; there is no public sign-up.
+
+PRIVACY
+All data is stored encrypted on European servers, in accordance with the GDPR. No advertising, no tracking, no reselling of data.
+
+Questions? monastery@morephrem.com
+```
+
+### Keywords (max 100 tekens, komma-gescheiden)
+```
+funeral,records,administration,parish,monastery,invoice,mourning cards,DELA,insurance,church,burial
+```
+
+### What's New in This Version (bij updates)
+```
+New name "Uitvaart Intake", the real Apple document scanner, a family portal with day schedule and ID upload, a lock screen widget, and professional cost-estimate PDFs.
+```
+
+---
+
+<details>
+<summary>Nederlandse versie (optioneel — voor een NL-localisatie)</summary>
+
+**Promotional Text**
+```
+Beheer alle uitvaartdossiers van je parochie op één plek — intake, kosten, kostenramingen, dagplanning en familiecommunicatie in een rustige, overzichtelijke app.
+```
+
+**Description**
 ```
 Uitvaart Intake — administratie voor parochies en kloosters
 
@@ -54,7 +110,7 @@ WAT HET DOET
 · Postcode-invoer: typ postcode + huisnummer, straat en woonplaats vullen zichzelf in
 · Documenten scannen met de echte Apple-documentscanner (automatische uitsnede en perspectief-correctie)
 · Digitale handtekeningen op het intake-dossier
-· Professionele PDF-factuur en dossieroverzicht — opslaan, printen, delen of mailen
+· Professionele PDF-kostenraming en dossieroverzicht — opslaan, printen, delen of mailen
 · Lockscreen-widget (Live Activity) met aftelteller naar de eerstvolgende uitvaart
 · Lokale herinneringen voor aankomende uitvaarten en huisbezoeken
 
@@ -72,15 +128,11 @@ Alle gegevens worden versleuteld opgeslagen op Europese servers, conform de AVG.
 Vragen? monastery@morephrem.com
 ```
 
-### Keywords (max 100 tekens, komma-gescheiden)
+**Keywords**
 ```
-uitvaart,dossier,administratie,parochie,klooster,factuur,dagplanning,DELA,verzekering,kerk,begrafenis
+uitvaart,dossier,administratie,parochie,klooster,factuur,rouwkaart,DELA,verzekering,kerk,begrafenis
 ```
-
-### What's New in This Version (bij updates)
-```
-Nieuwe naam "Uitvaart Intake", echte Apple-documentscanner, familie-portaal met dagplanning en ID-upload, lockscreen-widget, en professionele PDF-facturen.
-```
+</details>
 
 ---
 
