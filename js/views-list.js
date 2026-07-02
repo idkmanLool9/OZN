@@ -108,6 +108,9 @@ function renderDossierList(params, path) {
 
 function renderAccount(msg) {
   const u = Auth.current();
+  // Instellingen op functieniveau beschikbaar. Losse secties definiëren hun
+  // eigen `s` in een IIFE; de Factuur-sectie leunt op deze buitenste `s`.
+  const s = Settings.all();
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head"><h1>Mijn account</h1></div>
