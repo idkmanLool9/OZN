@@ -746,11 +746,8 @@ function bindDetailEvents(id) {
   // Artsverklaring bekijken (signed URL)
   const avBtn = $('#btn-view-artsverklaring');
   if (avBtn && dRow && dRow.artsverklaring_pad) {
-    avBtn.addEventListener('click', async () => {
-      try {
-        const url = await ArtsVerklaring.signedUrl(dRow.artsverklaring_pad, 300);
-        if (url) window.open(url, '_blank');
-      } catch (_) {}
+    avBtn.addEventListener('click', () => {
+      openUrlAsync(ArtsVerklaring.signedUrl(dRow.artsverklaring_pad, 300));
     });
   }
 

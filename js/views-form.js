@@ -888,11 +888,8 @@ function renderDossierForm(params) {
   function bindArtsverklaringButtons() {
     const viewBtn = document.getElementById('artsverklaring-view');
     const remBtn = document.getElementById('artsverklaring-remove');
-    if (viewBtn) viewBtn.addEventListener('click', async () => {
-      try {
-        const url = await ArtsVerklaring.signedUrl(avHidden.value, 300);
-        if (url) window.open(url, '_blank');
-      } catch (_) {}
+    if (viewBtn) viewBtn.addEventListener('click', () => {
+      openUrlAsync(ArtsVerklaring.signedUrl(avHidden.value, 300));
     });
     if (remBtn) remBtn.addEventListener('click', async () => {
       const ok = await Modal.confirm({ title: 'Artsverklaring verwijderen?', message: 'Het bestand wordt verwijderd.', confirmText: 'Verwijderen' });

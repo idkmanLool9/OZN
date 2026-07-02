@@ -96,6 +96,22 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
   }
 }
 
+// Opent een URL die pas ná een async-call bekend is, betrouwbaar in een nieuw
+// tabblad — ook op iOS/WKWebView. Truc: open het tabblad SYNCHROON binnen de
+// klik-gesture (anders blokkeert de popup-blokkering het na 'await'), en laad
+// de URL erin zodra die klaar is.
+async function openUrlAsync(urlPromise) {
+  const win = window.open('', '_blank');
+  try {
+    const url = await urlPromise;
+    if (!url) { if (win) win.close(); return; }
+    if (win) win.location.href = url;
+    else window.open(url, '_blank'); // fallback (bv. als het blanco tabblad werd geweigerd)
+  } catch (e) {
+    if (win) win.close();
+  }
+}
+
 // ─── Modal-pop-up (vervangt browser-alert) ─────────────────────────────────
 const Modal = {
   _busy: false,
