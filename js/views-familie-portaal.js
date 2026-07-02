@@ -13,8 +13,14 @@ const FamiliePortaalView = {
     document.body.classList.add('familie-portaal-body');
     const root = document.getElementById('view') || document.body;
 
-    // Verberg de admin-app shell (zijbalk/topbar/footer) als die rondhangt
-    document.querySelectorAll('#login-screen, #profile-screen, .sidebar, .topbar, .footer, .splash').forEach(el => el && (el.hidden = true));
+    // Verberg de admin-app shell (zijbalk/topbar/footer). Naast het CSS-regel
+    // óók inline display:none !important, zodat het werkt zelfs met een oude
+    // gecachte stylesheet.
+    document.querySelectorAll('#login-screen, #profile-screen, .sidebar, .topbar, .footer, .splash').forEach(el => {
+      if (!el) return;
+      el.hidden = true;
+      try { el.style.setProperty('display', 'none', 'important'); } catch (_) {}
+    });
     const app = document.getElementById('app');
     if (app) app.hidden = false;
 
