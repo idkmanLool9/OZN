@@ -994,15 +994,24 @@ const PdfGen = {
   async fromHTML(htmlString, filename = 'document.pdf') {
     await PdfGen.load();
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;left:-99999px;top:0;width:794px;background:#fff;padding:24px;color:#111;font:14px/1.5 system-ui,sans-serif;';
+    // BELANGRIJK: in beeld (0,0) plaatsen, niet ver buiten beeld
+    // (left:-99999px) — anders rendert html2canvas een leeg vlak. Achter de
+    // app (z-index:-1) en aria-hidden, dus onzichtbaar voor de gebruiker.
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:#fff;padding:24px;color:#111;font:14px/1.5 system-ui,sans-serif;z-index:-1;box-sizing:border-box;';
     wrap.innerHTML = htmlString;
     document.body.appendChild(wrap);
     try {
+      // Wacht tot eventuele afbeeldingen (logo) geladen zijn, anders missen ze.
+      const imgs = Array.from(wrap.querySelectorAll('img'));
+      await Promise.all(imgs.map(img => (img.complete && img.naturalWidth)
+        ? Promise.resolve()
+        : new Promise(res => { img.onload = res; img.onerror = res; })));
       const opt = {
         margin: [10, 10, 14, 10],
         filename,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0, windowWidth: 900 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
       const blob = await window.html2pdf().set(opt).from(wrap).output('blob');
