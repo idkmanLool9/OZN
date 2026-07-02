@@ -39,7 +39,7 @@ function renderDossierDetail(params) {
           </p>
         </div>
         <div class="page-actions">
-          <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Factuur openen">📄 Factuur</a>
+          <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Kostenraming openen">📄 Kostenraming</a>
           <button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>
           <a href="#/dossiers/${d.id}/bewerken" class="btn btn-primary">Bewerken</a>
           <details class="page-actions-more">
@@ -114,16 +114,6 @@ function renderDossierDetail(params) {
           ${dlRow('Begraafplaats', [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — '))}
           ${d.graf_type === 'familiegraf' ? dlRow('Certificaatnummer', d.certificaat_nummer) : ''}
         </dl>
-        <h3>Logistiek</h3>
-        <dl class="dl">
-          ${dlRow('Kist', d.kist_type ? kistRowValue(d.kist_type) : '')}
-          ${dlRow('Rouwauto', d.rouwauto)}
-          ${dlRow("Volgauto's", d.aantal_volgauto)}
-          ${dlRow('Dragers', d.dragers)}
-          ${dlRow('Bloemstukken', d.bloemstukken ? bloemRowValue(d.bloemstukken) : '')}
-          ${dlRow('Rouwkaarten', d.rouwkaarten_aantal)}
-          ${dlRow('Condoleance', d.condoleance_locatie)}
-        </dl>
         <h3>Verzekering & betaling</h3>
         <dl class="dl">
           ${dlRow('Status', d.verzekering_status)}
@@ -176,7 +166,7 @@ function renderDossierDetail(params) {
           <span class="kosten-chevron" aria-hidden="true">▾</span>
           <h2 style="border:none;padding:0;margin:0;display:inline;">Kosten</h2>
           ${kosten.length > 0 ? `<span class="muted small kosten-summary">· ${kosten.length} ${kosten.length === 1 ? 'post' : 'posten'} · ${fmtEUR(totaal)}${moetNogBetalen > 0 ? ` · <strong style="color:#b34;">open ${fmtEUR(moetNogBetalen)}</strong>` : ' · <strong style="color:#2a7a3a;">volledig betaald</strong>'}</span>` : ''}
-          ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm kosten-factuur-link" onclick="event.stopPropagation()">📄 Factuur openen</a>` : ''}
+          ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm kosten-factuur-link" onclick="event.stopPropagation()">📄 Kostenraming openen</a>` : ''}
         </button>
         <div id="kosten-body" class="kosten-body">
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' : (() => {

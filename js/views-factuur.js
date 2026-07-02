@@ -21,7 +21,7 @@ function buildFactuurDocHTML(d, kosten) {
           <p style="margin:.15rem 0;font-size:.9rem;color:var(--muted);">${esc(s.app_tagline)}</p>
         </div>
         <div class="factuur-meta">
-          <p style="margin:0;"><strong>FACTUUR</strong></p>
+          <p style="margin:0;"><strong>VOORLOPIGE KOSTENRAMING</strong></p>
           <p style="margin:.1rem 0;">Dossier: ${esc(d.dossier_nummer)}</p>
           <p style="margin:.1rem 0;">Datum: ${new Date().toLocaleDateString('nl-NL')}</p>
         </div>
@@ -119,7 +119,7 @@ function renderFactuur(params) {
       <div class="page-head no-print">
         <div>
           <a href="#/dossiers/${d.id}" class="back-link">← Terug naar dossier</a>
-          <h1>Factuur / eindafrekening</h1>
+          <h1>Voorlopige kostenraming</h1>
           <p class="muted">Dossier <strong>${esc(d.dossier_nummer)}</strong></p>
         </div>
         <div class="page-actions">
