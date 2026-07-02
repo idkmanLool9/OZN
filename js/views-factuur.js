@@ -49,6 +49,21 @@ function kostenramingSpec(d, kosten) {
   };
 }
 
+// Oplopend factuurnummer per dossier. Eén keer toegekend (bij de eerste
+// factuur), daarna stabiel. Formaat: JAAR + 4-cijferig volgnummer (bv.
+// 20260001). Opgeslagen in de cloud-instellingen; geen DB-migratie nodig.
+function factuurNummerVoor(d) {
+  if (!d || d.id == null) return String((d && d.dossier_nummer) || '');
+  const map = Object.assign({}, Settings.get('factuur_nummers') || {});
+  if (map[d.id]) return map[d.id];
+  const next = (Number(Settings.get('factuur_volgnr')) || 0) + 1;
+  const jaar = new Date().getFullYear();
+  const nr = `${jaar}${String(next).padStart(4, '0')}`;
+  map[d.id] = nr;
+  Settings.set({ factuur_volgnr: next, factuur_nummers: map });
+  return nr;
+}
+
 // Professionele PDF-factuur (jsPDF) volgens het vaste sjabloon: bedrijfskop +
 // betaalgegevens + regeltabel (Aantal/Prijs/Totaal) + btw-overzicht.
 function buildFactuurPdf(d, kosten) {
@@ -66,7 +81,7 @@ function buildFactuurPdf(d, kosten) {
   const fmtNL = dt => dt.toLocaleDateString('nl-NL');
   const termijn = Number(s.factuur_betalingstermijn_dagen) || 30;
   const verval = new Date(today.getTime() + termijn * 86400000);
-  const factuurnr = d.dossier_nummer || '';
+  const factuurnr = factuurNummerVoor(d);
   const totaal = (kosten || []).reduce((sum, k) => sum + (Number(k.bedrag) || 0), 0);
 
   // ── Rechterkolom: bedrijf + IBAN/btw/kvk + factuurmeta ──

@@ -121,6 +121,7 @@ function renderAccount(msg) {
         <a href="#/account#login-instellingen">Loginscherm</a>
         <a href="#/account#acc-welkom">Welkomscherm</a>
         <a href="#/account#email-instellingen">E-mail</a>
+        <a href="#/account#factuur-instellingen">Factuur</a>
         <a href="#/account#push-instellingen">Push-notificaties</a>
         <a href="#/account#snelstart-instellingen">SnelStart</a>
         <a href="#/account#profielen">Profielen</a>
@@ -445,6 +446,29 @@ function renderAccount(msg) {
             </div>
           </form>`;
         })()}
+      </section>
+
+      <section class="card narrow" id="factuur-instellingen">
+        <h2>Factuurgegevens</h2>
+        <p class="muted small">Deze gegevens staan bovenaan de PDF-factuur (bedrijfskop + betaalgegevens).</p>
+        <form id="factuur-form" class="form" autocomplete="off">
+          <label><span>Bedrijfsnaam</span><input type="text" name="factuur_bedrijfsnaam" value="${esc(s.factuur_bedrijfsnaam || '')}"></label>
+          <label><span>Adres (2 regels toegestaan)</span><textarea name="factuur_adres" rows="2">${esc(s.factuur_adres || '')}</textarea></label>
+          <div class="grid-2" style="gap:.75rem;">
+            <label><span>Telefoon</span><input type="text" name="factuur_telefoon" value="${esc(s.factuur_telefoon || '')}"></label>
+            <label><span>E-mail</span><input type="text" name="factuur_email" value="${esc(s.factuur_email || '')}"></label>
+          </div>
+          <label><span>IBAN</span><input type="text" name="factuur_iban" value="${esc(s.factuur_iban || '')}"></label>
+          <div class="grid-3" style="gap:.75rem;">
+            <label><span>Btw-nr</span><input type="text" name="factuur_btw" value="${esc(s.factuur_btw || '')}"></label>
+            <label><span>KvK</span><input type="text" name="factuur_kvk" value="${esc(s.factuur_kvk || '')}"></label>
+            <label><span>Betalingstermijn (dagen)</span><input type="number" name="factuur_betalingstermijn_dagen" value="${esc(s.factuur_betalingstermijn_dagen || 30)}" min="0" step="1"></label>
+          </div>
+          <div class="form-actions" style="justify-content:space-between;align-items:center;">
+            <span class="muted small">Laatste factuurnummer: <strong>${esc(Settings.get('factuur_volgnr') || 0)}</strong></span>
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
       </section>
 
       <section class="card narrow" id="push-instellingen">
@@ -912,6 +936,26 @@ function renderAccount(msg) {
           email_footer_instagram_url: f.email_footer_instagram_url.value.trim(),
         });
         renderAccount({ success: 'E-mail-footer opgeslagen.' });
+      });
+    }
+
+    // Factuurgegevens
+    const factuurForm = $('#factuur-form');
+    if (factuurForm) {
+      factuurForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = e.target;
+        Settings.set({
+          factuur_bedrijfsnaam: f.factuur_bedrijfsnaam.value.trim(),
+          factuur_adres:        f.factuur_adres.value.replace(/\r/g, '').trim(),
+          factuur_telefoon:     f.factuur_telefoon.value.trim(),
+          factuur_email:        f.factuur_email.value.trim(),
+          factuur_iban:         f.factuur_iban.value.trim(),
+          factuur_btw:          f.factuur_btw.value.trim(),
+          factuur_kvk:          f.factuur_kvk.value.trim(),
+          factuur_betalingstermijn_dagen: parseInt(f.factuur_betalingstermijn_dagen.value, 10) || 30,
+        });
+        renderAccount({ success: 'Factuurgegevens opgeslagen.' });
       });
     }
 
