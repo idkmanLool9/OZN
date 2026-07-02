@@ -993,14 +993,20 @@ const PdfGen = {
   // Render HTML-string naar een offscreen container en converteer naar PDF Blob.
   async fromHTML(htmlString, filename = 'document.pdf') {
     await PdfGen.load();
+    // BELANGRIJK voor html2canvas: het element moet ZICHTBAAR in de flow staan
+    // (geen position:fixed, geen left:-99999px, geen display:none) anders komt
+    // de PDF leeg. We renderen het dus in beeld (linksboven, absolute) en
+    // verbergen het voor de gebruiker met een dek-overlay eroverheen.
     const wrap = document.createElement('div');
-    // BELANGRIJK: in beeld (0,0) plaatsen, niet ver buiten beeld
-    // (left:-99999px) — anders rendert html2canvas een leeg vlak. Achter de
-    // app (z-index:-1) en aria-hidden, dus onzichtbaar voor de gebruiker.
     wrap.setAttribute('aria-hidden', 'true');
-    wrap.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:#fff;padding:24px;color:#111;font:14px/1.5 system-ui,sans-serif;z-index:-1;box-sizing:border-box;';
+    wrap.style.cssText = 'position:absolute;left:0;top:0;width:794px;background:#fff;padding:24px;color:#111;font:14px/1.5 -apple-system,system-ui,sans-serif;box-sizing:border-box;';
     wrap.innerHTML = htmlString;
+    const cover = document.createElement('div');
+    cover.style.cssText = 'position:fixed;inset:0;background:var(--bg,#f7f3ee);z-index:2147483646;';
+    const prevScrollY = window.scrollY;
     document.body.appendChild(wrap);
+    document.body.appendChild(cover);
+    window.scrollTo(0, 0);
     try {
       // Wacht tot eventuele afbeeldingen (logo) geladen zijn, anders missen ze.
       const imgs = Array.from(wrap.querySelectorAll('img'));
@@ -1011,13 +1017,15 @@ const PdfGen = {
         margin: [10, 10, 14, 10],
         filename,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0, windowWidth: 900 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       };
       const blob = await window.html2pdf().set(opt).from(wrap).output('blob');
       return blob;
     } finally {
       wrap.remove();
+      cover.remove();
+      window.scrollTo(0, prevScrollY);
     }
   },
 
