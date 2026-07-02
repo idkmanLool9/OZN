@@ -1024,6 +1024,28 @@ const PdfGen = {
     if (urlErr) throw new Error('Tijdelijke download-link maken faalde: ' + urlErr.message);
     return { url: data.signedUrl, path };
   },
+
+  // Genereer een PDF en lever 'm af — werkt op web én in de app:
+  //  · Native app: upload naar Supabase en open de PDF in de in-app Safari
+  //    (bekijken, opslaan in Bestanden, printen, mailen, delen).
+  //  · Web: download het bestand direct.
+  async deliver(htmlString, filename = 'document.pdf', dossierId = null) {
+    const blob = await PdfGen.fromHTML(htmlString, filename);
+    const isApp = typeof Native !== 'undefined' && Native.isApp && Native.isApp();
+    if (isApp && dossierId != null) {
+      const naam = String(filename || 'document').replace(/\.pdf$/i, '');
+      const { url } = await PdfGen.uploadAsAttachment(dossierId, blob, naam);
+      if (typeof Native.openUrl === 'function') await Native.openUrl(url);
+      else window.open(url, '_blank');
+      return;
+    }
+    // Web: download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename || 'document.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+  },
 };
 
 // ─── SignaturePad: digitale handtekening op een canvas ─────────────────────

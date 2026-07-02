@@ -123,11 +123,24 @@ function renderFactuur(params) {
           <p class="muted">Dossier <strong>${esc(d.dossier_nummer)}</strong></p>
         </div>
         <div class="page-actions">
-          <button type="button" class="btn btn-primary" id="btn-factuur-print">📄 Printen / opslaan als PDF</button>
+          <button type="button" class="btn btn-primary" id="btn-factuur-pdf">📄 Opslaan / delen als PDF</button>
+          <button type="button" class="btn btn-ghost no-print" id="btn-factuur-print">🖨️ Printen</button>
         </div>
       </div>
       ${buildFactuurDocHTML(d, kosten)}
     </div>`;
 
+  const pdfBtn = $('#btn-factuur-pdf');
+  pdfBtn.addEventListener('click', async () => {
+    const orig = pdfBtn.textContent;
+    pdfBtn.disabled = true; pdfBtn.textContent = 'PDF maken…';
+    try {
+      await PdfGen.deliver(buildFactuurDocHTML(d, kosten), `kostenraming-${d.dossier_nummer}.pdf`, d.id);
+    } catch (e) {
+      Modal.show({ type: 'error', title: 'PDF maken mislukt', message: e.message || String(e) });
+    } finally {
+      pdfBtn.disabled = false; pdfBtn.textContent = orig;
+    }
+  });
   $('#btn-factuur-print').addEventListener('click', () => window.print());
 }
