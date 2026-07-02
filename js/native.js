@@ -197,14 +197,21 @@ Native._la = function () {
 
 // Status voor de diagnose in Account:
 //   'web' | 'unavailable' (plugin niet in build) | 'off' (uit in iOS) | 'on'
+Native._laLastError = '';
 Native.liveActivityStatus = async function () {
   if (!Native.isApp()) return 'web';
+  const LA = Native._la();
+  if (!LA) { Native._laLastError = 'registerPlugin gaf niets terug'; return 'unavailable'; }
   try {
-    if (!(Capacitor.isPluginAvailable && Capacitor.isPluginAvailable('LiveActivity'))) return 'unavailable';
-    const LA = Native._la();
+    // Rechtstreeks de plugin aanroepen = de échte test (niet isPluginAvailable,
+    // dat auto-ontdekte plugins soms niet correct meldt).
     const e = await LA.areEnabled();
+    Native._laLastError = '';
     return (e && e.enabled) ? 'on' : 'off';
-  } catch (_) { return 'unavailable'; }
+  } catch (err) {
+    Native._laLastError = ((err && (err.message || err.code)) || String(err)) + '';
+    return 'unavailable';
+  }
 };
 
 // Handmatige test: start meteen een demo-Live-Activity (2 uur aftellen), of

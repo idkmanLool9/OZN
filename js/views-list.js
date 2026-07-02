@@ -965,7 +965,7 @@ function renderAccount(msg) {
     Native.liveActivityStatus().then(st => {
       if (st === 'on') laEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ aan</span> — widget kan getoond worden';
       else if (st === 'off') laEl.innerHTML = '<span style="color:#b8860b;font-weight:600;">uit</span> — zet aan bij Instellingen → Uitvaartbeheer → Live activiteiten';
-      else if (st === 'unavailable') laEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span>';
+      else if (st === 'unavailable') laEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet beschikbaar</span>' + (Native._laLastError ? ' <span class="muted small">(' + esc(Native._laLastError) + ')</span>' : '');
       else laEl.textContent = 'alleen in de app';
     }).catch(() => { laEl.textContent = 'kon status niet bepalen'; });
   }

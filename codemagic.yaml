@@ -184,5 +184,7 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        # Geen beta_groups: interne testers (App Store Connect-gebruikers)
+        # krijgen elke build automatisch zodra die verwerkt is — zonder
+        # beta-review. Externe groepen zouden review vereisen en botsen met
+        # "another build is in review".
