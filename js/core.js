@@ -936,7 +936,7 @@ const Router = {
     }
 
     if (!Auth.current()) { showLogin(); return; }
-    if (!ActiveProfile.current()) { showProfilePicker(); return; }
+    if (Settings.get('profielkiezer_actief') && !ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();
 
     for (const r of Router.routes) {
@@ -1326,9 +1326,12 @@ const ActiveProfile = {
     try { localStorage.removeItem(ActiveProfile.STORAGE_KEY); } catch (_) {}
   },
   renderChip() {
-    const p = ActiveProfile.current();
     const chip = $('#btn-active-profile');
-    if (!chip || !p) return;
+    if (!chip) return;
+    const uit = (typeof Settings !== 'undefined') && !Settings.get('profielkiezer_actief');
+    const p = ActiveProfile.current();
+    if (uit || !p) { chip.hidden = true; return; }
+    chip.hidden = false;
     $('#active-profile-name').textContent = p.name;
     $('#active-profile-dot').style.background = p.color || '#6b1e2a';
   },

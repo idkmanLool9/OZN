@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 142;
-const APP_VERSION    = '5.41.0';
+const APP_BUILD      = 143;
+const APP_VERSION    = '5.41.1';
 const APP_BUILD_DATE = '2026-06-23';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -66,6 +66,9 @@ const Settings = {
     push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
     // Begraafplaats-plattegrond (PNG/JPG, getoond bovenaan begraafplaats-view)
     cemetery_map_url: '',
+    // Profielkiezer ("Wie werkt vandaag?") na login tonen. Uit = meteen door
+    // naar de app zonder profielkeuze.
+    profielkiezer_actief: false,
     // Profielen — Wie werkt vandaag? Beheer in Account
     profielen: [
       { id: 'rume',   name: 'Rume',   color: '#6b1e2a' },
