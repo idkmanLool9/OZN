@@ -38,10 +38,13 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         let kerk = call.getString("kerk") ?? ""
         let nowMs = Date().timeIntervalSince1970 * 1000
         let eindMs = call.getDouble("eindMs") ?? nowMs
-        let eind = Date(timeIntervalSince1970: eindMs / 1000)
+        let start = Date()
+        // Voortgangsbalk vereist start < eind; anders een minimale marge.
+        var eind = Date(timeIntervalSince1970: eindMs / 1000)
+        if eind <= start { eind = start.addingTimeInterval(60) }
         let status = call.getString("status") ?? "Vandaag"
 
-        let attributes = UitvaartActivityAttributes(naam: naam, tijd: tijd, kerk: kerk, eindDatum: eind)
+        let attributes = UitvaartActivityAttributes(naam: naam, tijd: tijd, kerk: kerk, eindDatum: eind, startDatum: start)
         let state = UitvaartActivityAttributes.ContentState(status: status)
         do {
             let activity: Activity<UitvaartActivityAttributes>

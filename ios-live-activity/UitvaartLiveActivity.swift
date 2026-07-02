@@ -41,9 +41,19 @@ struct UitvaartLiveActivity: Widget {
                         .font(.headline).lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if !context.attributes.kerk.isEmpty {
-                        Label(context.attributes.kerk, systemImage: "mappin.and.ellipse")
-                            .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                    VStack(alignment: .leading, spacing: 6) {
+                        if !context.attributes.kerk.isEmpty {
+                            Label(context.attributes.kerk, systemImage: "mappin.and.ellipse")
+                                .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        ProgressView(timerInterval: context.attributes.startDatum...context.attributes.eindDatum,
+                                     countsDown: false) {
+                            EmptyView()
+                        } currentValueLabel: {
+                            EmptyView()
+                        }
+                        .progressViewStyle(.linear)
+                        .tint(sokBlue)
                     }
                 }
             } compactLeading: {
@@ -96,6 +106,16 @@ private struct LockScreenView: View {
                     .foregroundStyle(.primary)
                 Spacer()
             }
+
+            // Live voortgangsbalk richting het uitvaarttijdstip
+            ProgressView(timerInterval: context.attributes.startDatum...context.attributes.eindDatum,
+                         countsDown: false) {
+                EmptyView()
+            } currentValueLabel: {
+                EmptyView()
+            }
+            .progressViewStyle(.linear)
+            .tint(sokBlue)
 
             // Detailregels: tijd + locatie met iconen
             HStack(spacing: 18) {
