@@ -56,7 +56,7 @@ h3 { font-size: 1rem; margin: 1.25rem 0 .5rem; color: var(--primary); }
 /* Topbar */
 .topbar { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50; }
 .topbar-inner { max-width: 1200px; margin: 0 auto; padding: .75rem 1.25rem; display: flex; align-items: center; gap: 1.5rem; }
-.brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; color: var(--text); }
+.brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; color: var(--text); flex: none; min-width: 0; }
 .brand:hover { text-decoration: none; }
 .brand-mark {
   background: var(--primary); color: #fff;
@@ -85,16 +85,17 @@ body.ui-square .stat-card,
 body.ui-square .kist-card { border-radius: 2px; }
 body.ui-square .brand-mark { border-radius: 4px; }
 body.ui-square .badge, body.ui-square .status, body.ui-square .offline-badge { border-radius: 3px; }
-.brand-text strong { display: block; font-size: 1rem; }
-.brand-text small { color: var(--muted); font-size: .78rem; }
+.brand-text { display: flex; flex-direction: column; min-width: 0; }
+.brand-text strong { display: block; font-size: 1rem; white-space: nowrap; }
+.brand-text small { color: var(--muted); font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .topnav { display: flex; gap: .25rem; flex: 1; }
 .topnav a { color: var(--text); padding: .5rem .85rem; border-radius: var(--radius); font-size: .92rem; }
 .topnav a:hover { background: var(--bg); text-decoration: none; }
 .topnav a.active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
 
-.user-area { display: flex; align-items: center; gap: .75rem; }
-.user-name { color: var(--muted); font-size: .9rem; }
+.user-area { display: flex; align-items: center; gap: .75rem; min-width: 0; flex-shrink: 1; }
+.user-name { color: var(--muted); font-size: .9rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Layout */
 .main { padding: 1.5rem 1.25rem 3rem; }
@@ -2860,6 +2861,13 @@ body { overflow-x: clip; }
 /* Onder 980px valt de zijbalk altijd weg; de bovenbalk-navigatie blijft. */
 @media (max-width: 980px) {
   .sidebar { display: none; }
+  /* Bovenbalk op tablet-breedte: merk + gebruiker samen op de eerste rij,
+     de navigatie zakt naar een eigen, horizontaal scrollbare rij eronder.
+     Zo raakt de merktekst niet meer ingeklemd (voorheen brak "Uitvaart
+     Intake" en de ondertitel lelijk af). */
+  .topbar-inner { flex-wrap: wrap; gap: .6rem 1rem; }
+  .topnav { order: 3; width: 100%; overflow-x: auto; flex-basis: 100%; }
+  .user-area { margin-left: auto; }
 }
 
 /* ─── v1: klassieke bovenbalk-layout (zoals vanouds) ─────────────────────────
