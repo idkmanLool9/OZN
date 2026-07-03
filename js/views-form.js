@@ -1,5 +1,57 @@
 // Dossier intake/edit formulier
 
+// ─── Auto-invullen: bekende naam / gezinsnummer → gegevens overnemen ─────────
+// Zoekt matches in de ledenadministratie (gezinnen/leden) én in eerdere
+// dossiers, en biedt aan om lege velden automatisch te vullen.
+const Autofill = {
+  _lc(s) { return String(s == null ? '' : s).trim().toLowerCase(); },
+
+  lidByNaam(voornaam, achternaam) {
+    const vn = Autofill._lc(voornaam), an = Autofill._lc(achternaam);
+    if (!an) return null;
+    const lid = DB.list(KEYS.LEDEN).find(l =>
+      Autofill._lc(l.achternaam) === an && (vn ? Autofill._lc(l.voornaam) === vn : true));
+    if (!lid) return null;
+    return { lid, gezin: (lid.gezin_id != null ? DB.byId(KEYS.GEZINNEN, lid.gezin_id) : null) || {} };
+  },
+  gezinByNummer(nr) {
+    const n = Autofill._lc(nr);
+    if (!n) return null;
+    return DB.list(KEYS.GEZINNEN).find(g => Autofill._lc(g.gezinsnummer) === n) || null;
+  },
+  dossierByNaam(voornaam, achternaam, veldVoornaam, veldAchternaam, excludeId) {
+    const vn = Autofill._lc(voornaam), an = Autofill._lc(achternaam);
+    if (!an) return null;
+    return DB.list(KEYS.DOSSIERS)
+      .filter(d => Autofill._lc(d[veldAchternaam]) === an &&
+        (vn ? Autofill._lc(d[veldVoornaam]) === vn : true) && d.id !== excludeId)
+      .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))[0] || null;
+  },
+
+  // pairs: [[veldnaam, waarde], ...] — vult uitsluitend lege velden, na bevestiging.
+  async vul(form, titel, bericht, pairs) {
+    const teVullen = pairs.filter(([f, v]) =>
+      v != null && v !== '' && form.elements[f] && !form.elements[f].value);
+    if (!teVullen.length) return;
+    const ok = await Modal.confirm({
+      type: 'info', title: titel, message: bericht,
+      confirmText: 'Ja, overnemen', cancelText: 'Nee, leeg laten',
+    });
+    if (!ok) return;
+    let n = 0;
+    teVullen.forEach(([f, v]) => {
+      const el = form.elements[f];
+      if (el && !el.value) {
+        el.value = v; n++;
+        // Alleen 'input' (voor autosave) — geen 'change', anders vuren de
+        // autofill-listeners opnieuw.
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+    if (n && typeof Toast !== 'undefined') Toast.show(`${n} veld${n === 1 ? '' : 'en'} automatisch ingevuld`, 'success');
+  },
+};
+
 function dossierDraftKey(isNew, id) {
   return `sok_draft_${isNew ? 'new' : id}`;
 }
@@ -1021,33 +1073,86 @@ function renderDossierForm(params) {
     woonplaatsEl: $('input[name="contact_woonplaats"]'),
   });
 
-  // ─── #3 Auto-fill contactpersoon-gegevens uit eerder dossier ──────────
+  // ─── Auto-invullen bij bekende naam / gezinsnummer ─────────────────────
+  const autofillForm = $('#dossier-form');
+  const exclId = isNew ? null : dossier.id;
+
+  // (a) Overledene: bekende naam → persoons- + gezinsgegevens overnemen.
+  //     Bron 1 = ledenadministratie, bron 2 = een eerder dossier.
+  const checkOverledene = async () => {
+    const voornaam = (autofillForm.elements['voornaam']?.value || '').trim();
+    const achternaam = (autofillForm.elements['achternaam']?.value || '').trim();
+    if (!voornaam || !achternaam) return;               // pas matchen als beide er zijn
+    const naam = `${voornaam} ${achternaam}`;
+    const m = Autofill.lidByNaam(voornaam, achternaam);
+    if (m) {
+      const l = m.lid, g = m.gezin || {};
+      await Autofill.vul(autofillForm, 'Bekend lid',
+        `${naam} staat in de ledenadministratie${g.familienaam ? ` (gezin ${g.familienaam})` : ''}. Bekende gegevens overnemen?`,
+        [['doopnaam', l.doopnaam], ['geslacht', l.geslacht],
+         ['geboortedatum', l.geboortedatum], ['geboorteplaats', l.geboorteplaats],
+         ['adres_overledene', g.adres], ['postcode_overledene', g.postcode],
+         ['woonplaats_overledene', g.woonplaats],
+         ['gezinsnummer', g.gezinsnummer], ['parochie', g.parochie]]);
+      return;
+    }
+    const d = Autofill.dossierByNaam(voornaam, achternaam, 'voornaam', 'achternaam', exclId);
+    if (d) {
+      await Autofill.vul(autofillForm, 'Bekende naam',
+        `${naam} kwam eerder voor in dossier ${d.dossier_nummer}. Bekende gegevens overnemen?`,
+        [['doopnaam', d.doopnaam], ['geslacht', d.geslacht],
+         ['geboortedatum', d.geboortedatum], ['geboorteplaats', d.geboorteplaats],
+         ['adres_overledene', d.adres_overledene], ['postcode_overledene', d.postcode_overledene],
+         ['woonplaats_overledene', d.woonplaats_overledene], ['bsn', d.bsn],
+         ['gezinsnummer', d.gezinsnummer], ['parochie', d.parochie]]);
+    }
+  };
+  ['voornaam', 'achternaam'].forEach(n => {
+    const inp = autofillForm.elements[n];
+    if (inp) inp.addEventListener('change', checkOverledene);
+  });
+
+  // (b) Contactpersoon: bekende naam → contactgegevens overnemen.
+  //     Bron 1 = ledenadministratie, bron 2 = een eerder dossier.
   const contactNaamInp = $('input[name="contact_naam"]');
   if (contactNaamInp) {
     contactNaamInp.addEventListener('change', async () => {
-      const val = contactNaamInp.value.trim();
-      if (!val) return;
-      const matches = DB.list(KEYS.DOSSIERS).filter(x =>
-        x.contact_naam && x.contact_naam.toLowerCase() === val.toLowerCase() &&
-        (isNew || x.id !== dossier.id)
-      );
-      if (matches.length === 0) return;
-      const m = matches.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))[0];
-      const ok = await Modal.confirm({
-        type: 'info',
-        title: 'Bekende contactpersoon',
-        message: `${val} kwam eerder voor in dossier ${m.dossier_nummer}. Eerder ingevulde contactgegevens overnemen (telefoon, e-mail, adres)?`,
-        confirmText: 'Ja, overnemen',
-        cancelText: 'Nee, leeg laten',
-      });
-      if (!ok) return;
-      const fields = ['contact_voornaam','contact_relatie','contact_telefoon','contact_email',
-                      'contact_adres','contact_postcode','contact_woonplaats','gezinsnummer'];
-      const form = $('#dossier-form');
-      fields.forEach(f => {
-        const inp = form.elements[f];
-        if (inp && !inp.value && m[f]) inp.value = m[f];
-      });
+      const achternaam = contactNaamInp.value.trim();
+      const voornaam = (autofillForm.elements['contact_voornaam']?.value || '').trim();
+      if (!achternaam) return;
+      const m = Autofill.lidByNaam(voornaam, achternaam);
+      if (m) {
+        const l = m.lid, g = m.gezin || {};
+        await Autofill.vul(autofillForm, 'Bekende contactpersoon',
+          `${[voornaam, achternaam].filter(Boolean).join(' ')} staat in de ledenadministratie${g.familienaam ? ` (gezin ${g.familienaam})` : ''}. Contactgegevens overnemen?`,
+          [['contact_voornaam', l.voornaam], ['contact_telefoon', l.telefoon], ['contact_email', l.email],
+           ['contact_geboortedatum', l.geboortedatum],
+           ['contact_adres', g.adres], ['contact_postcode', g.postcode], ['contact_woonplaats', g.woonplaats],
+           ['gezinsnummer', g.gezinsnummer]]);
+        return;
+      }
+      const d = Autofill.dossierByNaam(voornaam, achternaam, 'contact_voornaam', 'contact_naam', exclId);
+      if (d) {
+        await Autofill.vul(autofillForm, 'Bekende contactpersoon',
+          `${achternaam} kwam eerder voor in dossier ${d.dossier_nummer}. Contactgegevens overnemen?`,
+          [['contact_voornaam', d.contact_voornaam], ['contact_relatie', d.contact_relatie],
+           ['contact_telefoon', d.contact_telefoon], ['contact_email', d.contact_email],
+           ['contact_adres', d.contact_adres], ['contact_postcode', d.contact_postcode],
+           ['contact_woonplaats', d.contact_woonplaats], ['gezinsnummer', d.gezinsnummer]]);
+      }
+    });
+  }
+
+  // (c) Gezinsnummer: bekend nummer → parochie + adres uit het gezin.
+  const gezinnrInp = $('input[name="gezinsnummer"]');
+  if (gezinnrInp) {
+    gezinnrInp.addEventListener('change', async () => {
+      const g = Autofill.gezinByNummer(gezinnrInp.value.trim());
+      if (!g) return;
+      await Autofill.vul(autofillForm, `Gezin ${g.familienaam || g.gezinsnummer}`,
+        `Gezinsnummer ${g.gezinsnummer} is bekend${g.familienaam ? ` (${g.familienaam})` : ''}. Adres en parochie overnemen?`,
+        [['parochie', g.parochie],
+         ['adres_overledene', g.adres], ['postcode_overledene', g.postcode], ['woonplaats_overledene', g.woonplaats]]);
     });
   }
 
