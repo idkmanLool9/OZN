@@ -52,6 +52,33 @@ const Autofill = {
   },
 };
 
+// BSN-elfproef (Nederlandse 9-cijferige BSN-controle).
+function isValidBSN(bsn) {
+  const s = String(bsn == null ? '' : bsn).replace(/\D/g, '');
+  if (s.length !== 9 || /^0+$/.test(s)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(s[i], 10) * (i === 8 ? -1 : 9 - i);
+  return sum % 11 === 0;
+}
+
+// Zoek een bestaand dossier van dezelfde persoon (zelfde BSN, of zelfde
+// voornaam + achternaam + geboortedatum). exclId sluit het huidige dossier uit.
+function vindDubbelDossier(data, exclId) {
+  const bsn = String(data.bsn || '').replace(/\D/g, '');
+  const vn = String(data.voornaam || '').trim().toLowerCase();
+  const an = String(data.achternaam || '').trim().toLowerCase();
+  const gb = String(data.geboortedatum || '').trim();
+  return DB.list(KEYS.DOSSIERS).find(d => {
+    if (d.id === exclId) return false;
+    if (bsn && String(d.bsn || '').replace(/\D/g, '') === bsn) return true;
+    if (vn && an && gb &&
+        String(d.voornaam || '').trim().toLowerCase() === vn &&
+        String(d.achternaam || '').trim().toLowerCase() === an &&
+        String(d.geboortedatum || '').trim() === gb) return true;
+    return false;
+  }) || null;
+}
+
 function dossierDraftKey(isNew, id) {
   return `sok_draft_${isNew ? 'new' : id}`;
 }
@@ -1156,6 +1183,23 @@ function renderDossierForm(params) {
     });
   }
 
+  // (d) BSN-elfproef: markeer een ongeldig BSN (niet-blokkerend).
+  ['bsn', 'contact_bsn'].forEach(name => {
+    const inp = autofillForm.elements[name];
+    if (!inp) return;
+    inp.addEventListener('change', () => {
+      const v = inp.value.trim();
+      if (v && !isValidBSN(v)) {
+        inp.style.borderColor = '#b3261e';
+        inp.setAttribute('title', 'BSN lijkt ongeldig (elfproef-controle)');
+        if (typeof Toast !== 'undefined') Toast.show('BSN lijkt ongeldig — controleer het nummer', 'error');
+      } else {
+        inp.style.borderColor = '';
+        inp.removeAttribute('title');
+      }
+    });
+  });
+
   // ─── Autosave: bewaar concept tijdens typen, herstel na navigatie ───
   const draftKey = dossierDraftKey(isNew, dossier.id);
   const formEl = $('#dossier-form');
@@ -1277,6 +1321,22 @@ function renderDossierForm(params) {
         }
         return;
       }
+    }
+
+    // Dubbel-dossier / persoon-detectie (niet-blokkerend, wel waarschuwen).
+    const dubbel = vindDubbelDossier(data, isNew ? null : dossier.id);
+    if (dubbel) {
+      const bsnMatch = String(data.bsn || '').replace(/\D/g, '') &&
+        String(dubbel.bsn || '').replace(/\D/g, '') === String(data.bsn || '').replace(/\D/g, '');
+      const reden = bsnMatch ? 'hetzelfde BSN' : 'dezelfde naam en geboortedatum';
+      const tochOpslaan = await Modal.confirm({
+        type: 'warning',
+        title: 'Mogelijk dubbel dossier',
+        message: `Er bestaat al een dossier (${dubbel.dossier_nummer || '#' + dubbel.id}) met ${reden}${fullName(dubbel) ? ' — ' + fullName(dubbel) : ''}. Toch een nieuw dossier opslaan?`,
+        confirmText: 'Toch opslaan',
+        cancelText: 'Annuleren',
+      });
+      if (!tochOpslaan) return;
     }
 
     const btn = e.target.querySelector('button[type=submit]');
