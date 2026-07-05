@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 157;
-const APP_VERSION    = '5.46.1';
+const APP_BUILD      = 158;
+const APP_VERSION    = '5.46.2';
 const APP_BUILD_DATE = '2026-07-02';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -54,9 +54,9 @@ const Settings = {
     rounded_cards: true,
     font_id: 'default',
     form_density: 'normaal', // 'compact' | 'normaal' | 'ruim' | 'extraruim'
-    // Ontwerp-versie: 'v2' = nieuwe zijbalk-layout (standaard),
-    // 'v1' = klassieke bovenbalk-layout.
-    design_version: 'v2',
+    // Ontwerp-versie: 'v1' = klassieke bovenbalk-layout (standaard),
+    // 'v2' = nieuwe zijbalk-layout.
+    design_version: 'v1',
     // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
     // catalogi (kisten, bloemen, eten & drinken)
     catalog_admin_mode: false,
@@ -511,8 +511,8 @@ const Branding = {
     document.body.classList.toggle('ui-compact', !!s.compact_mode);
     document.body.classList.toggle('ui-square', !s.rounded_cards);
 
-    // Ontwerp-versie: v2 = nieuwe zijbalk (standaard), v1 = klassieke bovenbalk
-    document.body.classList.toggle('design-v1', (s.design_version || 'v2') === 'v1');
+    // Ontwerp-versie: v1 = klassieke bovenbalk (standaard), v2 = nieuwe zijbalk
+    document.body.classList.toggle('design-v1', (s.design_version || 'v1') === 'v1');
 
     // Form-dichtheid
     document.body.classList.remove('density-compact','density-normaal','density-ruim','density-extraruim');
