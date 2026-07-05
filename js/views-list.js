@@ -298,8 +298,8 @@ function renderAccount(msg) {
             <label>
               <span>Ontwerp</span>
               <select name="design_version">
-                <option value="v1" ${(s.design_version||'v1')==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
-                <option value="v2" ${s.design_version==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
+                <option value="v2" ${(s.design_version||'v2')==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
+                <option value="v1" ${s.design_version==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
               </select>
               <span class="muted small">Wissel tussen het nieuwe ontwerp met zijbalk (v2) en de vertrouwde bovenbalk-indeling (v1).</span>
             </label>
