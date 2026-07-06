@@ -16,9 +16,9 @@
 //                    build 48 → 4.8.0
 //                    build 50 → 5.0.0
 //                    build 60 → 6.0.0
-const APP_BUILD      = 54;
-const APP_VERSION    = '5.4.0';
-const APP_BUILD_DATE = '2026-05-28';
+const APP_BUILD      = 55;
+const APP_VERSION    = '5.4.1';
+const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
