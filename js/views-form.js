@@ -325,6 +325,7 @@ function renderDossierForm(params) {
               <datalist id="kisten-datalist">
                 ${(typeof KISTEN_CATALOGUS !== 'undefined' ? KISTEN_CATALOGUS : []).map(k => `<option value="${esc(k.naam)}"></option>`).join('')}
               </datalist>
+              <span id="kist-voorraad-hint" class="muted small" style="display:block;margin-top:.25rem;min-height:1.1em;"></span>
             </label>
             <label><span>Rouwauto</span>
               <select name="rouwauto">
@@ -896,6 +897,29 @@ function renderDossierForm(params) {
       const alAanwezig = lijst.some(k => (k.omschrijving || '').startsWith(KIST_PREFIX));
       if (!alAanwezig) syncAutoKostKist(huidigeKist);
     }
+  })();
+
+  // Voorraad-hint bij de kist-input (alleen beheerder — medewerker heeft
+  // sowieso geen voorraadgegevens in cache dankzij RLS).
+  (function initKistVoorraadHint() {
+    const kistInp2 = $('input[name="kist_type"]');
+    const hint = $('#kist-voorraad-hint');
+    if (!kistInp2 || !hint) return;
+    if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) return;
+    if (typeof KistVoorraad === 'undefined') return;
+    const update = () => {
+      const naam = (kistInp2.value || '').trim();
+      if (!naam) { hint.textContent = ''; hint.removeAttribute('data-tone'); return; }
+      const r = KistVoorraad.byNaam(naam);
+      if (!r) { hint.textContent = 'Geen voorraadgegevens voor deze kist.'; hint.setAttribute('data-tone', 'onbekend'); return; }
+      const aant = r.aantal || 0, min = r.min_aantal || 0;
+      if (aant === 0) { hint.textContent = `⚠ Voorraad: 0 — deze kist is niet op voorraad.`; hint.setAttribute('data-tone', 'leeg'); }
+      else if (aant < min) { hint.textContent = `⚠ Voorraad: ${aant} (onder minimum ${min}) — bijbestellen aanbevolen.`; hint.setAttribute('data-tone', 'laag'); }
+      else { hint.textContent = `✓ Voorraad: ${aant} beschikbaar.`; hint.setAttribute('data-tone', 'ok'); }
+    };
+    kistInp2.addEventListener('input', update);
+    kistInp2.addEventListener('change', update);
+    update();
   })();
   // Storage-event: alleen kist-veld syncen (bloem is additief).
   window.addEventListener('storage', (e) => {

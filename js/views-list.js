@@ -45,6 +45,20 @@ function renderDossierList(params, path) {
         <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
       </div>
 
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder() && typeof KistVoorraad !== 'undefined') ? (() => {
+        const laag = KistVoorraad.laag();
+        if (!laag.length) return '';
+        const leeg = laag.filter(r => (r.aantal || 0) === 0).length;
+        return `
+        <div class="alert alert-warn kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <div>
+            <strong>⚠ Voorraad laag${leeg ? ` · ${leeg} kist${leeg === 1 ? '' : 'en'} leeg` : ''}</strong>
+            <span class="muted small">${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum.</span>
+          </div>
+          <a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>
+        </div>`;
+      })() : ''}
+
       <form class="dossiers-filterbar" id="filter-form">
         <div class="catalog-search">
           <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam of dossiernummer…" autocomplete="off">

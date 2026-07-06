@@ -147,9 +147,11 @@ function renderKistenBeheer(msg) {
     const vMin    = vr ? (vr.min_aantal || 0) : 0;
     const vLaag   = vr && vAantal < vMin;
     const vLeeg   = vr && vAantal === 0;
+    // Chip toont alleen de huidige voorraad (compact). Kleur signaleert
+    // 'leeg' of 'onder minimum'; de exacte grens zie je in beheermodus.
     const vChip   = isBeheerder ? (
       vr
-        ? `<span class="kist-voorraad-chip ${vLeeg ? 'is-leeg' : (vLaag ? 'is-laag' : '')}" title="Voorraad · minimum ${vMin}">📦 ${vAantal}${vMin ? ` <span class="muted small">/ ${vMin}</span>` : ''}${vLaag ? ' ⚠' : ''}</span>`
+        ? `<span class="kist-voorraad-chip ${vLeeg ? 'is-leeg' : (vLaag ? 'is-laag' : '')}" title="Voorraad${vMin ? ' · minimum ' + vMin : ''}">📦 ${vAantal}${vLaag ? ' ⚠' : ''}</span>`
         : `<span class="kist-voorraad-chip is-onbekend" title="Nog geen voorraad ingesteld">📦 —</span>`
     ) : '';
     return `
@@ -175,13 +177,19 @@ function renderKistenBeheer(msg) {
             ${vChip}
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
-          ${isBeheerder ? `
+          ${adminMode ? `
             <div class="kist-voorraad-row">
               <label class="voorraad-cell"><span class="muted small">Voorraad</span>
                 <input type="number" min="0" step="1" data-vr-aantal="${esc(k.naam)}" value="${esc(vAantal != null ? vAantal : '')}" placeholder="—" inputmode="numeric" style="max-width:70px;">
               </label>
               <label class="voorraad-cell"><span class="muted small">Min.</span>
                 <input type="number" min="0" step="1" data-vr-min="${esc(k.naam)}" value="${esc(vMin || '')}" placeholder="—" inputmode="numeric" style="max-width:60px;">
+              </label>
+              <label class="voorraad-cell"><span class="muted small">Gewenst</span>
+                <input type="number" min="0" step="1" data-vr-peil="${esc(k.naam)}" value="${esc((vr && vr.gewenst_peil) || '')}" placeholder="—" inputmode="numeric" style="max-width:60px;" title="Gewenst peil na bestellen">
+              </label>
+              <label class="voorraad-cell"><span class="muted small">Levertijd (dgn)</span>
+                <input type="number" min="0" step="1" data-vr-lever="${esc(k.naam)}" value="${esc((vr && vr.levertijd_dagen) || '')}" placeholder="—" inputmode="numeric" style="max-width:70px;" title="Levertijd in dagen">
               </label>
               <button type="button" class="btn btn-sm" data-vr-save="${esc(k.naam)}">Opslaan</button>
               ${vr && vr.laatst_besteld ? `<span class="muted small" title="Laatst besteld">🗓 ${esc(fmtDate(vr.laatst_besteld))}${vr.besteld_aantal ? ' · ' + vr.besteld_aantal + '×' : ''}</span>` : ''}
@@ -380,11 +388,19 @@ function renderKistenBeheer(msg) {
       const naam = vrSaveBtn.getAttribute('data-vr-save');
       const aInp = $(`input[data-vr-aantal="${CSS.escape(naam)}"]`);
       const mInp = $(`input[data-vr-min="${CSS.escape(naam)}"]`);
-      const aRaw = aInp && aInp.value !== '' ? parseInt(aInp.value, 10) : null;
-      const mRaw = mInp && mInp.value !== '' ? parseInt(mInp.value, 10) : null;
+      const gInp = $(`input[data-vr-peil="${CSS.escape(naam)}"]`);
+      const lInp = $(`input[data-vr-lever="${CSS.escape(naam)}"]`);
+      const parseOpt = (inp) => (inp && inp.value !== '') ? parseInt(inp.value, 10) : null;
+      const aRaw = parseOpt(aInp);
+      const mRaw = parseOpt(mInp);
+      const gRaw = parseOpt(gInp);
+      const lRaw = parseOpt(lInp);
       const patch = {};
       if (aRaw != null && isFinite(aRaw) && aRaw >= 0) patch.aantal = aRaw;
       if (mRaw != null && isFinite(mRaw) && mRaw >= 0) patch.min_aantal = mRaw;
+      // Optionele extra kolommen: alleen zetten als er iets is ingevuld (null = geen wijziging)
+      if (gRaw != null && isFinite(gRaw) && gRaw >= 0) patch.gewenst_peil = gRaw;
+      if (lRaw != null && isFinite(lRaw) && lRaw >= 0) patch.levertijd_dagen = lRaw;
       if (aRaw != null && !isFinite(aRaw)) { Modal.show({ type:'warning', title:'Ongeldig aantal', message:'Vul een geheel getal ≥ 0 in.' }); return; }
       if (!Object.keys(patch).length) return;
       try {
@@ -534,10 +550,17 @@ function renderKistenBestellijst(msg) {
   const alle = KistVoorraad.all().slice()
     .sort((a, b) => ((a.aantal||0) - (a.min_aantal||0)) - ((b.aantal||0) - (b.min_aantal||0)));
   const laag = alle.filter(r => (r.aantal || 0) < (r.min_aantal || 0));
-  // Per rij: te bestellen aantal = bestel_aantal (indien ingesteld), anders (min×2 - aantal), altijd ≥ 1
+  // Per rij: te bestellen aantal is (in volgorde):
+  //   1) expliciet ingesteld bestel_aantal,
+  //   2) gewenst_peil − huidige voorraad (aanbevolen),
+  //   3) fallback: 2×min − voorraad.
+  // Altijd minimaal 1 stuk.
   const berekend = laag.map(r => {
-    const target = r.bestel_aantal && r.bestel_aantal > 0 ? r.bestel_aantal : Math.max(1, (r.min_aantal || 1) * 2 - (r.aantal || 0));
-    return { ...r, teBestellen: target };
+    let target;
+    if (r.bestel_aantal && r.bestel_aantal > 0) target = r.bestel_aantal;
+    else if (r.gewenst_peil && r.gewenst_peil > 0) target = r.gewenst_peil - (r.aantal || 0);
+    else target = (r.min_aantal || 1) * 2 - (r.aantal || 0);
+    return { ...r, teBestellen: Math.max(1, target) };
   });
   const totaal = berekend.reduce((s, r) => s + r.teBestellen, 0);
   const nu = new Date().toLocaleDateString('nl-NL');
@@ -567,12 +590,13 @@ function renderKistenBestellijst(msg) {
       ` : `
       <section class="card">
         <table class="table">
-          <thead><tr><th>Kist</th><th class="num">Voorraad</th><th class="num">Min.</th><th class="num">Te bestellen</th><th>Laatst besteld</th><th></th></tr></thead>
+          <thead><tr><th>Kist</th><th class="num">Voorraad</th><th class="num">Min.</th><th class="num">Levertijd</th><th class="num">Te bestellen</th><th>Laatst besteld</th><th></th></tr></thead>
           <tbody>
             ${berekend.map(r => `<tr class="${(r.aantal||0) === 0 ? 'row-leeg' : ''}">
               <td><strong>${esc(r.naam)}</strong></td>
               <td class="num">${r.aantal || 0}</td>
               <td class="num">${r.min_aantal || 0}</td>
+              <td class="num muted small">${r.levertijd_dagen ? r.levertijd_dagen + ' dgn' : '—'}</td>
               <td class="num"><input type="number" min="1" step="1" value="${r.teBestellen}" data-bestel-aantal="${esc(r.naam)}" style="width:70px;text-align:right;"></td>
               <td class="muted small">${r.laatst_besteld ? esc(fmtDate(r.laatst_besteld)) + (r.besteld_aantal ? ' · ' + r.besteld_aantal + '×' : '') : '—'}</td>
               <td><button type="button" class="btn btn-sm" data-mark-besteld="${esc(r.naam)}" title="Markeer als besteld (dan komt hij niet meer op deze lijst voor vandaag)">✓ Besteld</button></td>

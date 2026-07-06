@@ -30,3 +30,8 @@ $$;
 drop trigger if exists kv_touch on public.kist_voorraad;
 create trigger kv_touch before update on public.kist_voorraad
   for each row execute function public.kist_voorraad_touch();
+
+-- Uitbreiding: levertijd + gewenst peil voor slimmere besteladvies
+alter table public.kist_voorraad
+  add column if not exists levertijd_dagen integer check (levertijd_dagen is null or levertijd_dagen >= 0),
+  add column if not exists gewenst_peil    integer check (gewenst_peil    is null or gewenst_peil    >= 0);
