@@ -69,73 +69,39 @@ function renderDossierDetail(params) {
 
         <h3>Overledene</h3>
         <dl class="dl">
+          ${dlRow('Dossiernummer', d.dossier_nummer)}
+          ${dlRow('Opdrachtgever', d.opdrachtgever_naam)}
           ${dlRow('Naam', fullName(d))}
           ${dlRow('Geslacht', d.geslacht)}
           ${dlRow('Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' '))}
-          ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdenstijd && 'om ' + d.overlijdenstijd, d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' '))}
+          ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' '))}
           ${dlRow('Adres', [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', '))}
-          ${dlRow('BSN', d.bsn)}
-          ${dlRow('Nationaliteit', d.nationaliteit)}
-          ${dlRow('Lid SOK', d.syrisch_orthodox_lid)}
-          ${dlRow('Verzekering', d.verzekering_maatschappij)}
-          ${dlRow('Polisnummer', d.polisnummer)}
-          ${dlRow('Gezinsnummer', d.gezinsnummer)}
           ${d.artsverklaring_pad ? `<div><dt>Artsverklaring</dt><dd><button type="button" class="link-btn" id="btn-view-artsverklaring">📄 Bekijk scan</button></dd></div>` : ''}
-          ${dlRow('(Ex)partner', d.partner_naam)}
-          ${dlRow('Kinderen', d.kinderen_status)}
-          ${dlRow('Minderjarige kinderen', d.minderjarige_kinderen)}
-          ${(d.minderjarige_kinderen === 'ja' && d.kinderen_namen) ? `<div><dt>Namen kinderen</dt><dd class="prewrap">${esc(d.kinderen_namen)}</dd></div>` : ''}
+          ${d.overdraagformulier_pad ? `<div><dt>Overdraagformulier</dt><dd><button type="button" class="link-btn" id="btn-view-overdraag">📄 Bekijk scan</button></dd></div>` : ''}
         </dl>
-        <h3>Contactpersoon</h3>
+        <h3>Opbaren &amp; locatie</h3>
         <dl class="dl">
-          ${dlRow('BSN', d.contact_bsn)}
-          ${dlRow('Naam', [d.contact_voornaam, d.contact_naam].filter(Boolean).join(' '))}
-          ${dlRow('Adres', [d.contact_adres, d.contact_huisnummer].filter(Boolean).join(' '))}
-          ${dlRow('Postcode / woonplaats', [d.contact_postcode, d.contact_woonplaats].filter(Boolean).join(' '))}
-          ${dlRow('Geboortedatum', fmtDate(d.contact_geboortedatum))}
-          ${dlRow('Telefoon', d.contact_telefoon)}
-          ${dlRow('E-mail', d.contact_email)}
-          ${dlRow('Relatie tot overledene', d.contact_relatie)}
+          ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : ''))}
+          ${d.opbaring_type === 'thuis' ? dlRow('Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
+          ${(d.opbaring_type === 'thuis' && d.benodigde_rouwgoederen) ? `<div><dt>Benodigde rouwgoederen</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
+          ${dlRow('Opbaarlocatie', d.opbaarlocatie_type)}
         </dl>
-        ${(d.contact_telefoon || d.contact_email) ? `
-          <div class="quick-contact">
-            ${d.contact_telefoon ? `<a class="btn btn-sm" href="tel:${esc(d.contact_telefoon.replace(/\s/g,''))}">📞 Bel</a>` : ''}
-            ${d.contact_telefoon ? `<a class="btn btn-sm" href="https://wa.me/${esc(toWaNumber(d.contact_telefoon))}" target="_blank" rel="noopener">💬 WhatsApp</a>` : ''}
-            ${d.contact_email ? `<a class="btn btn-sm" href="mailto:${esc(d.contact_email)}">✉️ E-mail</a>` : ''}
-          </div>` : ''}
-        <h3>Kerkelijk &amp; uitvaartdienst</h3>
+        <h3>Uitvaartdienst</h3>
         <dl class="dl">
-          ${dlRow('Parochie', d.parochie)}
-          ${dlRow('Priester', d.priester)}
           ${dlRow('Voorganger uitvaart', d.uitvaart_voorganger)}
           ${dlRow('Type uitvaart', d.uitvaart_type)}
           ${dlRow('Datum & tijdstip', [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' '))}
-          ${dlRow('Kerk', d.kerk_locatie)}
+          ${dlRow('Kerk / locatie', d.kerk_locatie)}
           ${dlRow('Begraafplaats', [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — '))}
           ${d.graf_type === 'familiegraf' ? dlRow('Certificaatnummer', d.certificaat_nummer) : ''}
         </dl>
-        <h3>Verzekering & betaling</h3>
+        <h3>Betaling</h3>
         <dl class="dl">
-          ${dlRow('Status', d.verzekering_status)}
-          ${d.verzekering_status === 'met verzekering' ? `
-            ${dlRow('Maatschappij', d.verzekering_maatschappij)}
-            ${dlRow('Polisnummer', d.polisnummer)}
-            ${dlRow('Polishouder', d.verzekering_polishouder)}
-            ${dlRow('Dekkingsbedrag', d.verzekering_dekking ? fmtEUR(d.verzekering_dekking) : '')}
-            ${dlRow('Pakket', d.verzekering_pakket)}
-            ${dlRow('Aanmelding-status', d.verzekering_aanmelding_status)}
-            ${dlRow('Contactpersoon', d.verzekering_contact_naam)}
-            ${dlRow('Telefoon contact', d.verzekering_contact_telefoon)}
-          ` : ''}
-          ${d.verzekering_status === 'zonder verzekering' ? `
-            ${dlRow('Betaalwijze', d.betaalwijze)}
-            ${dlRow('Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : '')}
-            ${dlRow('Eindafrekening', d.eindafrekening_bedrag ? fmtEUR(d.eindafrekening_bedrag) + (d.eindafrekening_status ? ' (' + d.eindafrekening_status + ')' : '') : '')}
-            ${dlRow('Betalingstermijn', d.betalingstermijn)}
-            ${dlRow('Verantwoordelijke', d.verantwoordelijke_persoon)}
-          ` : ''}
-          ${dlRow('Opdrachtgever', d.opdrachtgever_naam)}
           ${dlRow('Telefoon opdrachtgever', d.opdrachtgever_telefoon)}
+          ${dlRow('Betaalwijze', d.betaalwijze)}
+          ${dlRow('Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : '')}
+          ${dlRow('Eindafrekening', d.eindafrekening_bedrag ? fmtEUR(d.eindafrekening_bedrag) + (d.eindafrekening_status ? ' (' + d.eindafrekening_status + ')' : '') : '')}
+          ${dlRow('Betalingstermijn', d.betalingstermijn)}
         </dl>
         ${d.bijzonderheden ? `<h3>Bijzonderheden</h3><p class="prewrap">${esc(d.bijzonderheden)}</p>` : ''}
 
@@ -791,6 +757,14 @@ function bindDetailEvents(id) {
   if (avBtn && dRow && dRow.artsverklaring_pad) {
     avBtn.addEventListener('click', () => {
       openUrlAsync(ArtsVerklaring.signedUrl(dRow.artsverklaring_pad, 300));
+    });
+  }
+
+  // Overdraagformulier bekijken (signed URL, zelfde opslag)
+  const odBtn = $('#btn-view-overdraag');
+  if (odBtn && dRow && dRow.overdraagformulier_pad) {
+    odBtn.addEventListener('click', () => {
+      openUrlAsync(ArtsVerklaring.signedUrl(dRow.overdraagformulier_pad, 300));
     });
   }
 

@@ -160,6 +160,29 @@ function renderDossierForm(params) {
         <fieldset class="card" data-step="1">
           <legend>Gegevens overledene</legend>
           <div class="grid-3">
+            <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
+              <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
+            </label>
+            <label class="span-2"><span>Opdrachtgever <span class="muted small">(uitvaartleider / klant)</span></span>
+              ${(() => {
+                const lijst = Settings.get('opdrachtgevers') || [];
+                const huidig = v('opdrachtgever_naam');
+                const inLijst = lijst.some(o => (o.naam || o) === huidig);
+                return `
+                <select name="opdrachtgever_naam" id="opdrachtgever-input">
+                  <option value="">— kies een opdrachtgever —</option>
+                  ${lijst.map(o => {
+                    const naam = o.naam || o;
+                    return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
+                  }).join('')}
+                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
+                </select>
+                ${lijst.length === 0
+                  ? '<span class="muted small">Nog geen opdrachtgevers ingesteld — voeg toe in <a href="#/account#opdrachtgevers">Account → Opdrachtgevers</a>.</span>'
+                  : '<span class="muted small">Beheren in <a href="#/account#opdrachtgevers">Account</a>.</span>'}
+                `;
+              })()}
+            </label>
             <label><span>Achternaam</span><input type="text" name="achternaam" value="${v('achternaam')}"></label>
             <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}"></label>
             <label><span>Geslacht</span>
@@ -172,13 +195,10 @@ function renderDossierForm(params) {
             <label><span>Geboortedatum</span><input type="date" name="geboortedatum" value="${v('geboortedatum')}"></label>
             <label><span>Geboorteplaats</span><input type="text" name="geboorteplaats" value="${v('geboorteplaats')}"></label>
             <label><span>Overlijdensdatum</span><input type="date" name="overlijdensdatum" value="${v('overlijdensdatum')}"></label>
-            <label><span>Tijdstip overlijden</span><input type="time" name="overlijdenstijd" value="${v('overlijdenstijd')}"></label>
             <label><span>Plaats van overlijden</span><input type="text" name="overlijdensplaats" value="${v('overlijdensplaats')}" placeholder="ziekenhuis, thuis..."></label>
             <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}"></label>
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
-            <label><span>BSN</span><input type="text" name="bsn" value="${v('bsn')}"></label>
-            <label><span>Nationaliteit</span><input type="text" name="nationaliteit" value="${v('nationaliteit')}"></label>
             <label class="span-3"><span>Artsverklaring (overlijdensverklaring)</span>
               <input type="hidden" name="artsverklaring_pad" value="${esc(v('artsverklaring_pad'))}">
               <div class="artsverklaring-row" id="artsverklaring-row">
@@ -191,98 +211,45 @@ function renderDossierForm(params) {
                 ${v('artsverklaring_pad') ? '<button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-view">Bekijk</button><button type="button" class="btn btn-sm btn-ghost" id="artsverklaring-remove">Verwijder</button>' : ''}
               </div>
             </label>
-            <label><span>Lid Syrisch-Orthodoxe Kerk</span>
-              <select name="syrisch_orthodox_lid">
-                <option value="">—</option>
-                <option value="ja" ${sel('syrisch_orthodox_lid','ja')}>Ja</option>
-                <option value="nee" ${sel('syrisch_orthodox_lid','nee')}>Nee</option>
-                <option value="onbekend" ${sel('syrisch_orthodox_lid','onbekend')}>Onbekend</option>
-              </select>
-            </label>
-            <label><span>Parochie</span>
-              ${(() => {
-                const lijst = Settings.get('parochies') || [];
-                const huidig = v('parochie');
-                const inLijst = lijst.some(p => (p.naam || p) === huidig);
-                return `
-                <select name="parochie" id="parochie-input">
-                  <option value="">— kies een parochie —</option>
-                  ${lijst.map(p => {
-                    const naam = p.naam || p;
-                    return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
-                  }).join('')}
-                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
-                </select>
-                ${lijst.length === 0
-                  ? '<span class="muted small">Nog geen parochies ingesteld — voeg toe in <a href="#/account#parochies">Account → Parochies &amp; priesters</a>.</span>'
-                  : '<span class="muted small">Beheren in <a href="#/account#parochies">Account</a>.</span>'}
-                `;
-              })()}
-            </label>
-            <label><span>Priester / Abuna</span><input type="text" name="priester" id="priester-input" value="${v('priester')}"></label>
-            <label><span>Verzekering</span>
-              ${(() => {
-                const opties = ['DELA','Suryoyo UA','Anders'];
-                const huidig = v('verzekering_maatschappij');
-                const inLijst = opties.some(o => o === huidig);
-                return `
-                <select name="verzekering_maatschappij" id="verzekering-mij-select">
-                  <option value="">— geen / n.v.t. —</option>
-                  ${opties.map(o => `<option value="${esc(o)}" ${huidig === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}
-                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)}</option>` : ''}
-                </select>`;
-              })()}
-            </label>
-            <label id="polisnummer-row" ${v('verzekering_maatschappij') ? '' : 'hidden'}><span>Polisnummer</span><input type="text" name="polisnummer" value="${v('polisnummer')}"></label>
-            <label><span>Gezinsnummer</span><input type="text" name="gezinsnummer" value="${v('gezinsnummer')}" placeholder="(klooster-administratie)"></label>
-            <label class="span-3"><span>Naam (ex)partner</span>
-              <input type="text" name="partner_naam" value="${v('partner_naam')}" placeholder="naam echtgeno(o)t(e), partner of ex-partner (optioneel)">
-            </label>
-            <label><span>Laat overledene kinderen na?</span>
-              <select name="kinderen_status" id="kinderen-status-select">
-                <option value="">—</option>
-                <option value="ja" ${sel('kinderen_status','ja')}>Ja</option>
-                <option value="nee" ${sel('kinderen_status','nee')}>Nee</option>
-              </select>
-            </label>
-            <label id="minderjarige-row" ${v('kinderen_status') === 'ja' ? '' : 'hidden'}><span>Minderjarige kinderen?</span>
-              <select name="minderjarige_kinderen" id="minderjarige-kinderen-select">
-                <option value="">—</option>
-                <option value="ja" ${sel('minderjarige_kinderen','ja')}>Ja</option>
-                <option value="nee" ${sel('minderjarige_kinderen','nee')}>Nee</option>
-              </select>
-            </label>
-            <label class="span-3" id="kinderen-namen-row" hidden><span>Namen minderjarige kinderen (één per regel)</span>
-              <textarea name="kinderen_namen" rows="3" placeholder="bv.&#10;Sami (12)&#10;Maria (8)">${v('kinderen_namen')}</textarea>
+            <label class="span-3"><span>Overdraagformulier</span>
+              <input type="hidden" name="overdraagformulier_pad" value="${esc(v('overdraagformulier_pad'))}">
+              <div class="artsverklaring-row" id="overdraag-row">
+                <label class="btn btn-sm" id="overdraag-filelabel" style="cursor:pointer;">
+                  📷 Scan / kies bestand
+                  <input type="file" id="overdraag-input" accept="image/*,application/pdf" capture="environment" hidden>
+                </label>
+                <span class="artsverklaring-status muted small" id="overdraag-status">${v('overdraagformulier_pad') ? '✓ geüpload' : 'nog geen bestand'}</span>
+                ${v('overdraagformulier_pad') ? '<button type="button" class="btn btn-sm btn-ghost" id="overdraag-view">Bekijk</button><button type="button" class="btn btn-sm btn-ghost" id="overdraag-remove">Verwijder</button>' : ''}
+              </div>
             </label>
           </div>
         </fieldset>
 
         <fieldset class="card" data-step="1">
-          <legend>Contactpersoon</legend>
+          <legend>Opbaren &amp; locatie</legend>
           <div class="grid-3">
-            <label><span>BSN</span><input type="text" name="contact_bsn" value="${v('contact_bsn')}"></label>
-            <label><span>Achternaam</span><input type="text" name="contact_naam" value="${v('contact_naam')}"></label>
-            <label><span>Voornaam</span><input type="text" name="contact_voornaam" value="${v('contact_voornaam')}"></label>
-            <label class="span-2"><span>Adres (straatnaam)</span><input type="text" name="contact_adres" value="${v('contact_adres')}"></label>
-            <label><span>Huisnummer</span><input type="text" name="contact_huisnummer" value="${v('contact_huisnummer')}" placeholder="bv. 12 of 12a"></label>
-            <label><span>Postcode</span><input type="text" name="contact_postcode" value="${v('contact_postcode')}"></label>
-            <label class="span-2"><span>Woonplaats</span><input type="text" name="contact_woonplaats" value="${v('contact_woonplaats')}"></label>
-            <label><span>Geboortedatum</span><input type="date" name="contact_geboortedatum" value="${v('contact_geboortedatum')}"></label>
-            <label><span>Telefoon</span><input type="tel" name="contact_telefoon" value="${v('contact_telefoon')}"></label>
-            <label class="span-2"><span>E-mail</span><input type="email" name="contact_email" value="${v('contact_email')}"></label>
-            <label><span>Relatie tot overledene</span>
-              ${(() => {
-                const opties = ['Partner','Zoon','Dochter','Kleinkind','Anders'];
-                const huidig = v('contact_relatie');
-                const inLijst = opties.some(o => o === huidig);
-                return `
-                <select name="contact_relatie">
-                  <option value="">—</option>
-                  ${opties.map(o => `<option value="${esc(o)}" ${huidig === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}
-                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)}</option>` : ''}
-                </select>`;
-              })()}
+            <label><span>Ophalen of thuis opbaren?</span>
+              <select name="opbaring_type" id="opbaring-type-select">
+                <option value="">—</option>
+                <option value="ophalen" ${sel('opbaring_type','ophalen')}>Ophalen</option>
+                <option value="thuis" ${sel('opbaring_type','thuis')}>Thuis opbaren</option>
+              </select>
+            </label>
+            <label id="thuis-datum-row" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Datum thuis opbaren</span>
+              <input type="date" name="thuis_opbaren_datum" value="${v('thuis_opbaren_datum')}">
+            </label>
+            <label id="thuis-tijd-row" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Begintijd thuis</span>
+              <input type="time" name="thuis_opbaren_tijd" value="${v('thuis_opbaren_tijd')}">
+            </label>
+            <label class="span-3" id="rouwgoederen-row" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Benodigde rouwgoederen</span>
+              <textarea name="benodigde_rouwgoederen" rows="3" placeholder="bv. baar, koeling, rouwkleed, kaarsen...">${v('benodigde_rouwgoederen')}</textarea>
+            </label>
+            <label><span>Opbaarlocatie</span>
+              <select name="opbaarlocatie_type">
+                <option value="">—</option>
+                <option value="uitvaartcentrum" ${sel('opbaarlocatie_type','uitvaartcentrum')}>Uitvaartcentrum</option>
+                <option value="aula" ${sel('opbaarlocatie_type','aula')}>Aula</option>
+              </select>
             </label>
           </div>
         </fieldset>
@@ -413,10 +380,9 @@ function renderDossierForm(params) {
 
   // Aanbevolen velden per stap — bepalen kleur (rood/oranje/groen)
   const STEP_FIELDS = {
-    1: ['achternaam','voornaam','geboortedatum','overlijdensdatum',
+    1: ['opdrachtgever_naam','achternaam','voornaam','geboortedatum','overlijdensdatum',
         'adres_overledene','postcode_overledene','woonplaats_overledene',
-        'parochie','priester',
-        'contact_naam','contact_voornaam','contact_telefoon','contact_relatie'],
+        'opbaring_type','opbaarlocatie_type'],
     2: ['uitvaart_type','uitvaart_datum',
         'uitvaart_tijd','kerk_locatie','begraafplaats'],
     3: [], // kosten + kist/bloemen via catalogus-pagina, geen verplichte velden
@@ -499,19 +465,20 @@ function renderDossierForm(params) {
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
 
-  // Verzekering-maatschappij gekozen → polisnummer-veld tonen
-  const verzMijSel = document.getElementById('verzekering-mij-select');
-  const polisRow = document.getElementById('polisnummer-row');
-  const updatePolisRow = () => {
-    if (!verzMijSel || !polisRow) return;
-    polisRow.hidden = !verzMijSel.value;
+  // Ophalen / thuis opbaren → thuis-velden (datum, begintijd, rouwgoederen) tonen
+  const opbaringSel = document.getElementById('opbaring-type-select');
+  const thuisRows = ['thuis-datum-row', 'thuis-tijd-row', 'rouwgoederen-row']
+    .map(id => document.getElementById(id));
+  const updateThuisRows = () => {
+    const thuis = opbaringSel && opbaringSel.value === 'thuis';
+    thuisRows.forEach(r => { if (r) r.hidden = !thuis; });
   };
-  if (verzMijSel) {
-    verzMijSel.addEventListener('change', () => {
-      updatePolisRow();
+  if (opbaringSel) {
+    opbaringSel.addEventListener('change', () => {
+      updateThuisRows();
       updateStepColors();
     });
-    updatePolisRow();
+    updateThuisRows();
   }
 
   // Graf-type → grafnummer pas tonen na keuze; certificaatnummer bij familiegraf
@@ -986,6 +953,61 @@ function renderDossierForm(params) {
   }
   bindArtsverklaringButtons();
 
+  // ─── Overdraagformulier scan/upload (zelfde opslag als artsverklaring) ──
+  const odInput = document.getElementById('overdraag-input');
+  const odHidden = document.querySelector('input[name="overdraagformulier_pad"]');
+  const odRow = document.getElementById('overdraag-row');
+  const odStatus = document.getElementById('overdraag-status');
+  async function doOverdraagUpload(file) {
+    if (!file) return;
+    if (!navigator.onLine) {
+      Modal.show({ type: 'offline', title: 'Geen internet', message: 'Uploaden kan alleen met internetverbinding.' });
+      return;
+    }
+    odStatus.textContent = 'Bezig met uploaden...';
+    try {
+      const path = await ArtsVerklaring.upload(file);
+      const old = odHidden.value;
+      if (old && old !== path) ArtsVerklaring.remove(old);
+      odHidden.value = path;
+      odHidden.dispatchEvent(new Event('input', { bubbles: true }));
+      odStatus.textContent = '✓ geüpload';
+      if (!document.getElementById('overdraag-view')) {
+        odRow.insertAdjacentHTML('beforeend',
+          '<button type="button" class="btn btn-sm btn-ghost" id="overdraag-view">Bekijk</button>' +
+          '<button type="button" class="btn btn-sm btn-ghost" id="overdraag-remove">Verwijder</button>');
+        bindOverdraagButtons();
+      }
+    } catch (_) {
+      odStatus.textContent = 'upload mislukt';
+    }
+  }
+  function bindOverdraagButtons() {
+    const viewBtn = document.getElementById('overdraag-view');
+    const remBtn = document.getElementById('overdraag-remove');
+    if (viewBtn) viewBtn.addEventListener('click', () => {
+      openUrlAsync(ArtsVerklaring.signedUrl(odHidden.value, 300));
+    });
+    if (remBtn) remBtn.addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Overdraagformulier verwijderen?', message: 'Het bestand wordt verwijderd.', confirmText: 'Verwijderen' });
+      if (!ok) return;
+      const old = odHidden.value;
+      odHidden.value = '';
+      odHidden.dispatchEvent(new Event('input', { bubbles: true }));
+      if (old) ArtsVerklaring.remove(old);
+      odStatus.textContent = 'nog geen bestand';
+      viewBtn?.remove(); remBtn.remove();
+    });
+  }
+  if (odInput) {
+    odInput.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      await doOverdraagUpload(file);
+      odInput.value = '';
+    });
+  }
+  bindOverdraagButtons();
+
   // Live kleuren bijwerken bij élke input-wijziging (debounced)
   let colorTimer = null;
   document.getElementById('dossier-form').addEventListener('input', () => {
@@ -1034,70 +1056,12 @@ function renderDossierForm(params) {
     if (status) { status.textContent = 'nog niet ondertekend'; status.classList.remove('signed'); }
   });
 
-  // ─── Kinderen-status → minderjarige-vraag tonen/verbergen ────────────
-  const kinderenSel = $('#kinderen-status-select');
-  const minderjarigRow = $('#minderjarige-row');
-  const minderjarigSel = $('#minderjarige-kinderen-select');
-  const kindRow = $('#kinderen-namen-row');
-  let minderjarigPopupShown = (dossier.minderjarige_kinderen === 'ja');
-  function updateKinderenVisibility() {
-    const kinderenJa = kinderenSel?.value === 'ja';
-    if (minderjarigRow) minderjarigRow.hidden = !kinderenJa;
-    // Bij "Nee, geen kinderen" → reset minderjarig-veld en namen
-    if (!kinderenJa && minderjarigSel) {
-      if (minderjarigSel.value) minderjarigSel.value = '';
-    }
-    const minderjarigJa = kinderenJa && minderjarigSel?.value === 'ja';
-    if (kindRow) kindRow.hidden = !minderjarigJa;
-  }
-  if (kinderenSel) {
-    kinderenSel.addEventListener('change', updateKinderenVisibility);
-  }
-  if (minderjarigSel) {
-    minderjarigSel.addEventListener('change', () => {
-      updateKinderenVisibility();
-      if (minderjarigSel.value === 'ja' && !minderjarigPopupShown) {
-        minderjarigPopupShown = true;
-        Modal.show({
-          type: 'info',
-          title: 'Minderjarige kinderen',
-          message: 'Vergeet niet de namen (en leeftijden) van de minderjarige kinderen op de achterzijde van het aangifte-formulier in te vullen.',
-        });
-      }
-    });
-  }
-  updateKinderenVisibility();
-
-  // ─── Parochie kiezen → priester (abuna) automatisch invullen ────────
-  const parochieInp = $('#parochie-input');
-  const priesterInp = $('#priester-input');
-  if (parochieInp) {
-    parochieInp.addEventListener('change', () => {
-      if (!priesterInp) return;
-      const naam = parochieInp.value;
-      if (!naam) return;
-      const lijst = Settings.get('parochies') || [];
-      const match = lijst.find(p => (p.naam || p) === naam);
-      // Bij een bewuste keuze altijd de standaard-priester overnemen.
-      // Was er nog een handmatig ingevulde priester? Vragen of die behouden moet blijven.
-      const had = priesterInp.value.trim();
-      const nieuw = (match && match.priester) ? match.priester : '';
-      if (nieuw && nieuw !== had) priesterInp.value = nieuw;
-    });
-  }
-
   // ─── Adres-autocomplete via PDOK Locatieserver ───────────────────────
   // Typ "Straatnaam 12" → kies uit dropdown → alle velden auto-ingevuld.
   Postcode.bindAddressAutocomplete({
     straatEl:     $('input[name="adres_overledene"]'),
     postcodeEl:   $('input[name="postcode_overledene"]'),
     woonplaatsEl: $('input[name="woonplaats_overledene"]'),
-  });
-  Postcode.bindAddressAutocomplete({
-    straatEl:     $('input[name="contact_adres"]'),
-    huisnummerEl: $('input[name="contact_huisnummer"]'),
-    postcodeEl:   $('input[name="contact_postcode"]'),
-    woonplaatsEl: $('input[name="contact_woonplaats"]'),
   });
 
   // ─── Auto-invullen bij bekende naam / gezinsnummer ─────────────────────
@@ -1139,66 +1103,6 @@ function renderDossierForm(params) {
     if (inp) inp.addEventListener('change', checkOverledene);
   });
 
-  // (b) Contactpersoon: bekende naam → contactgegevens overnemen.
-  //     Bron 1 = ledenadministratie, bron 2 = een eerder dossier.
-  const contactNaamInp = $('input[name="contact_naam"]');
-  if (contactNaamInp) {
-    contactNaamInp.addEventListener('change', async () => {
-      const achternaam = contactNaamInp.value.trim();
-      const voornaam = (autofillForm.elements['contact_voornaam']?.value || '').trim();
-      if (!achternaam) return;
-      const m = Autofill.lidByNaam(voornaam, achternaam);
-      if (m) {
-        const l = m.lid, g = m.gezin || {};
-        await Autofill.vul(autofillForm, 'Bekende contactpersoon',
-          `${[voornaam, achternaam].filter(Boolean).join(' ')} staat in de ledenadministratie${g.familienaam ? ` (gezin ${g.familienaam})` : ''}. Contactgegevens overnemen?`,
-          [['contact_voornaam', l.voornaam], ['contact_telefoon', l.telefoon], ['contact_email', l.email],
-           ['contact_geboortedatum', l.geboortedatum],
-           ['contact_adres', g.adres], ['contact_postcode', g.postcode], ['contact_woonplaats', g.woonplaats],
-           ['gezinsnummer', g.gezinsnummer]]);
-        return;
-      }
-      const d = Autofill.dossierByNaam(voornaam, achternaam, 'contact_voornaam', 'contact_naam', exclId);
-      if (d) {
-        await Autofill.vul(autofillForm, 'Bekende contactpersoon',
-          `${achternaam} kwam eerder voor in dossier ${d.dossier_nummer}. Contactgegevens overnemen?`,
-          [['contact_voornaam', d.contact_voornaam], ['contact_relatie', d.contact_relatie],
-           ['contact_telefoon', d.contact_telefoon], ['contact_email', d.contact_email],
-           ['contact_adres', d.contact_adres], ['contact_postcode', d.contact_postcode],
-           ['contact_woonplaats', d.contact_woonplaats], ['gezinsnummer', d.gezinsnummer]]);
-      }
-    });
-  }
-
-  // (c) Gezinsnummer: bekend nummer → parochie + adres uit het gezin.
-  const gezinnrInp = $('input[name="gezinsnummer"]');
-  if (gezinnrInp) {
-    gezinnrInp.addEventListener('change', async () => {
-      const g = Autofill.gezinByNummer(gezinnrInp.value.trim());
-      if (!g) return;
-      await Autofill.vul(autofillForm, `Gezin ${g.familienaam || g.gezinsnummer}`,
-        `Gezinsnummer ${g.gezinsnummer} is bekend${g.familienaam ? ` (${g.familienaam})` : ''}. Adres en parochie overnemen?`,
-        [['parochie', g.parochie],
-         ['adres_overledene', g.adres], ['postcode_overledene', g.postcode], ['woonplaats_overledene', g.woonplaats]]);
-    });
-  }
-
-  // (d) BSN-elfproef: markeer een ongeldig BSN (niet-blokkerend).
-  ['bsn', 'contact_bsn'].forEach(name => {
-    const inp = autofillForm.elements[name];
-    if (!inp) return;
-    inp.addEventListener('change', () => {
-      const v = inp.value.trim();
-      if (v && !isValidBSN(v)) {
-        inp.style.borderColor = '#b3261e';
-        inp.setAttribute('title', 'BSN lijkt ongeldig (elfproef-controle)');
-        if (typeof Toast !== 'undefined') Toast.show('BSN lijkt ongeldig — controleer het nummer', 'error');
-      } else {
-        inp.style.borderColor = '';
-        inp.removeAttribute('title');
-      }
-    });
-  });
 
   // ─── Autosave: bewaar concept tijdens typen, herstel na navigatie ───
   const draftKey = dossierDraftKey(isNew, dossier.id);

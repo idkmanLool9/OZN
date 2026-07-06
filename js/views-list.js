@@ -564,6 +564,28 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="opdrachtgevers">
+        <h2>Opdrachtgevers</h2>
+        <p class="muted small">De uitvaartleiders / klanten waarvoor jullie werken. Deze verschijnen in de opdrachtgever-dropdown bovenaan het dossier.</p>
+        ${(() => {
+          const lijst = Settings.get('opdrachtgevers') || [];
+          return `
+          <form id="opdrachtgever-form" class="form" autocomplete="off">
+            <div id="opdrachtgever-rows" class="parochie-rows">
+              ${lijst.map((o, i) => `
+                <div class="parochie-row" data-idx="${i}">
+                  <input type="text" class="opdrachtgever-naam" value="${esc(o.naam || o || '')}" placeholder="bv. Uitvaartzorg Jansen">
+                  <button type="button" class="btn-icon" data-action="del-opdrachtgever" title="verwijderen">×</button>
+                </div>`).join('')}
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-opdrachtgever">+ Opdrachtgever toevoegen</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="parochies">
         <h2>Parochies &amp; priesters</h2>
         <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Abuna) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
@@ -1293,6 +1315,35 @@ function renderAccount(msg) {
       const actiefId = (ActiveProfile.current() || {}).id;
       if (actiefId && !profielen.some(p => p.id === actiefId)) ActiveProfile.clear();
       renderAccount({ success: 'Profielen opgeslagen.' });
+    });
+  }
+
+  // Opdrachtgevers beheer
+  const opdrForm = $('#opdrachtgever-form');
+  if (opdrForm) {
+    $('#btn-add-opdrachtgever').addEventListener('click', () => {
+      const rows = $('#opdrachtgever-rows');
+      const div = document.createElement('div');
+      div.className = 'parochie-row';
+      div.innerHTML = `
+        <input type="text" class="opdrachtgever-naam" value="" placeholder="bv. Uitvaartzorg Jansen">
+        <button type="button" class="btn-icon" data-action="del-opdrachtgever" title="verwijderen">×</button>`;
+      rows.appendChild(div);
+      div.querySelector('.opdrachtgever-naam').focus();
+    });
+    opdrForm.addEventListener('click', e => {
+      const del = e.target.closest('button[data-action="del-opdrachtgever"]');
+      if (!del) return;
+      const row = del.closest('.parochie-row');
+      if (row) row.remove();
+    });
+    opdrForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const lijst = $$('#opdrachtgever-rows .parochie-row').map(row => ({
+        naam: (row.querySelector('.opdrachtgever-naam').value || '').trim(),
+      })).filter(o => o.naam);
+      Settings.set({ opdrachtgevers: lijst });
+      renderAccount({ success: 'Opdrachtgevers opgeslagen.' });
     });
   }
 

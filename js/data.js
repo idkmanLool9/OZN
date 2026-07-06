@@ -22,7 +22,6 @@ const KOSTEN_CATEGORIEEN = [
   { id: 'aula',          label: 'Aula',                 icon: '🏛️' },
   { id: 'kerk',          label: 'Kerk',                 icon: '✝️' },
   { id: 'begraafplaats', label: 'Begraafplaats & graf', icon: '🪦' },
-  { id: 'bloemen',       label: 'Bloemen',              icon: '💐' },
   { id: 'rouwkaarten',   label: 'Rouwkaarten',          icon: '✉️' },
   { id: 'schoonmaak',    label: 'Schoonmaak',           icon: '🧹' },
   { id: 'administratie', label: 'Administratie',        icon: '📝' },
@@ -58,14 +57,7 @@ const KOSTEN_PRESETS = [
   { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                        bedrag:  31.00 },
   { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud koper',                          bedrag:  31.00 },
   { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                             bedrag:  17.80 },
-  { nav: 'bloemen',  categorie: 'bloemen',       omschrijving: '💐 Bloemen — kies in catalogus', bedrag: null   },
-  { nav: 'eten',     categorie: 'overig',        omschrijving: '🍽 Eten & drinken — kies in catalogus', bedrag: null },
-  // Items met food: true vragen om een aantal bij toevoegen (totaal = aantal × prijs)
-  { food: true, categorie: 'overig', omschrijving: 'Simit',                                       bedrag:   0.80 },
   { categorie: 'overig',        omschrijving: 'Papier op tafels',                                 bedrag:  60.00 },
-  // vraagPrijs: bij toevoegen vraagt de app om het werkelijke bedrag
-  // (richtprijs — varieert per dossier). Geen aantal-prompt.
-  { vraagPrijs: true, categorie: 'overig', omschrijving: 'Koffie / thee / water',                 bedrag:   0    },
   { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                       bedrag: 100.00 },
   { nav: 'extra',    categorie: 'overig',        omschrijving: '＋ Extra uitgave (zelf invullen)', bedrag: null },
 ];
@@ -217,42 +209,32 @@ function kistSVG(materiaal) {
 // Velden die we als 'aangeraden in te vullen' beschouwen — bij opslaan
 // zonder deze waardes verschijnt een waarschuwingspop-up.
 const AANBEVOLEN_VELDEN = [
+  { name: 'opdrachtgever_naam',    label: 'Opdrachtgever (uitvaartleider)' },
   { name: 'voornaam',              label: 'Voornaam overledene' },
   { name: 'achternaam',            label: 'Achternaam overledene' },
   { name: 'geboortedatum',         label: 'Geboortedatum' },
   { name: 'overlijdensdatum',      label: 'Overlijdensdatum' },
   { name: 'adres_overledene',      label: 'Adres overledene' },
   { name: 'woonplaats_overledene', label: 'Woonplaats overledene' },
-  { name: 'contact_naam',          label: 'Achternaam contactpersoon' },
-  { name: 'contact_telefoon',      label: 'Telefoon contactpersoon' },
-  { name: 'parochie',              label: 'Parochie' },
   { name: 'uitvaart_type',         label: 'Type uitvaart' },
   { name: 'uitvaart_datum',        label: 'Datum uitvaart' },
-  { name: 'kerk_locatie',          label: 'Kerk / dienstlocatie' },
-  { name: 'begraafplaats',         label: 'Begraafplaats' },
 ];
 
 const DOSSIER_VELDEN = [
+  'dossier_nummer',
+  'opdrachtgever_naam','opdrachtgever_telefoon',
   'voornaam','achternaam','geslacht','geboortedatum','geboorteplaats',
-  'overlijdensdatum','overlijdenstijd','overlijdensplaats',
+  'overlijdensdatum','overlijdensplaats',
   'adres_overledene','postcode_overledene','woonplaats_overledene',
-  'bsn','nationaliteit','syrisch_orthodox_lid',
-  'gezinsnummer','grafnummer','certificaat_nummer','artsverklaring_pad',
-  'partner_naam','kinderen_status','minderjarige_kinderen','kinderen_namen',
-  'contact_naam','contact_voornaam','contact_relatie','contact_telefoon','contact_email',
-  'contact_adres','contact_huisnummer','contact_postcode','contact_woonplaats',
-  'contact_bsn','contact_geboortedatum',
-  'parochie','priester','uitvaart_voorganger','huisbezoek_datum','huisbezoek_tijd',
-  'uitvaart_type','uitvaart_datum','uitvaart_tijd','kerk_locatie',
+  'grafnummer','certificaat_nummer','artsverklaring_pad','overdraagformulier_pad',
+  'opbaring_type','thuis_opbaren_datum','thuis_opbaren_tijd','benodigde_rouwgoederen',
+  'opbaarlocatie_type',
+  'uitvaart_voorganger','uitvaart_type','uitvaart_datum','uitvaart_tijd','kerk_locatie',
   'begraafplaats','graf_type',
-  'kist_type','rouwauto','aantal_volgauto','dragers','bloemstukken',
-  'rouwkaarten_aantal','condoleance_locatie',
-  'verzekering_status','verzekering_maatschappij','polisnummer',
-  'verzekering_polishouder','verzekering_dekking','verzekering_pakket',
-  'verzekering_aanmelding_status','verzekering_contact_naam','verzekering_contact_telefoon',
+  'kist_type','rouwauto','aantal_volgauto','dragers',
+  'condoleance_locatie',
   'betaalwijze','aanbetaling_bedrag','aanbetaling_datum',
   'eindafrekening_bedrag','eindafrekening_status','betalingstermijn',
   'verantwoordelijke_persoon',
-  'opdrachtgever_naam','opdrachtgever_telefoon',
   'bijzonderheden','status'
 ];

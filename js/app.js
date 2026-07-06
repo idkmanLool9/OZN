@@ -12,9 +12,9 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 158;
-const APP_VERSION    = '5.46.2';
-const APP_BUILD_DATE = '2026-07-02';
+const APP_BUILD      = 159;
+const APP_VERSION    = '5.47.0';
+const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -975,8 +975,6 @@ Router.add('/leden/:id', p => renderGezinDetail(p));
 Router.add('/leden/:id/bewerk', p => renderGezinForm(p));
 Router.add('/begraafplaats', () => renderBegraafplaats());
 Router.add('/kisten', () => renderKistenBeheer());
-Router.add('/bloemen', () => renderBloemenBeheer());
-Router.add('/eten', () => renderEtenBeheer());
 Router.add('/portaal', (p, full) => renderPortaalBeheer(full));
 Router.add('/account', () => renderAccount());
 Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
