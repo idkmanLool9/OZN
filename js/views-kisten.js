@@ -565,32 +565,12 @@ function renderKistenBestellijst(msg) {
             </tr>`).join('')}
           </tbody>
         </table>
-        <div class="form-actions" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
-          <span class="muted small">${berekend.length} kist${berekend.length===1?'':'en'} · totaal ${totaal} stuks</span>
-          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
-            <button type="button" class="btn" id="btn-copy-bestellijst">📋 Kopieer als tekst</button>
-            <a class="btn btn-primary" id="btn-mail-bestellijst" href="mailto:?subject=${encodeURIComponent('Bestelaanvraag OZN — ' + nu)}&body=${encodeURIComponent(tekst)}">✉ E-mail voorbereiden</a>
-          </div>
+        <div class="form-actions" style="justify-content:flex-end;">
+          <span class="muted small">${berekend.length} kist${berekend.length===1?'':'en'} · totaal ${totaal} stuks te bestellen</span>
         </div>
-      </section>
-
-      <section class="card">
-        <h3 style="margin-top:0;">Tekstversie (kopieer of e-mail)</h3>
-        <textarea id="bestellijst-tekst" rows="${Math.max(6, berekend.length + 4)}" style="width:100%;font-family:ui-monospace,monospace;font-size:.9rem;">${esc(tekst)}</textarea>
       </section>
       `}
     </div>`;
-
-  // Kopieer-knop
-  const copyBtn = $('#btn-copy-bestellijst');
-  if (copyBtn) copyBtn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(tekst);
-      if (typeof Toast !== 'undefined') Toast.show('Bestellijst gekopieerd', 'success');
-    } catch (_) {
-      const ta = $('#bestellijst-tekst'); if (ta) { ta.select(); document.execCommand('copy'); }
-    }
-  });
 
   // Markeer één regel als besteld (laatst_besteld + besteld_aantal invullen)
   $('#view').onclick = async e => {

@@ -2814,6 +2814,12 @@ tr.row-leeg { background: #fdf3f3; }
 .voorraad-chip.is-on { background: var(--primary, #2563eb); color: #fff; border-color: var(--primary, #2563eb); }
 .voorraad-table-wrap { overflow-x: auto; }
 .voorraad-table td, .voorraad-table th { vertical-align: middle; padding: .5rem .6rem; }
+/* Header blijft bovenaan bij scrollen */
+.voorraad-table thead th {
+  position: sticky; top: 0; z-index: 5;
+  background: #fff;
+  box-shadow: 0 1px 0 var(--border, #e5e0d6);
+}
 .voorraad-table input[type="number"] {
   width: 70px; padding: .3rem .4rem; text-align: right;
   border: 1px solid var(--border, #e5e0d6); border-radius: 4px; font-variant-numeric: tabular-nums;
