@@ -155,20 +155,34 @@ Native._dataUrlToFile = async function (dataUrl, naam) {
 //   'unavailable' → app, maar plugin zit niet in de build (oude TestFlight-
 //                   build, of pod niet meegecompileerd)
 //   'web'         → geen native app (browser)
+// Huidig platform ('android' | 'ios' | 'web')
+Native.platform = function () {
+  try { return (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || 'web'; }
+  catch (_) { return 'web'; }
+};
+
+// Welke documentscanner-plugin gebruikt deze app-build?
+//   Android → 'DocumentScannerMlkit' (Google ML Kit Document Scanner API)
+//   iOS     → 'DocumentScanner' (eigen VisionKit-plugin)
+Native._scannerPluginName = function () {
+  return Native.platform() === 'android' ? 'DocumentScannerMlkit' : 'DocumentScanner';
+};
+
 Native.scannerStatus = async function () {
   if (!Native.isApp()) return 'web';
   // Dezelfde accessor als de echte scan, zodat de status klopt met de praktijk.
-  return Native._plugin('DocumentScanner') ? 'native' : 'unavailable';
+  return Native._plugin(Native._scannerPluginName()) ? 'native' : 'unavailable';
 };
 
-// Apple documentscanner (eigen VisionKit-plugin: randherkenning + recht
-// trekken + meerdere pagina's — dezelfde als "Scan document" in Notities/
-// Bestanden). Geeft de eerste pagina als File terug. Valt terug op de gewone
-// camera als de scanner (nog) niet in de build zit.
+// Documentscanner met randherkenning + recht trekken (Apple VisionKit op iOS,
+// Google ML Kit Document Scanner op Android). Geeft de eerste pagina als
+// File terug. Valt terug op de gewone camera als de scanner (nog) niet in
+// de build zit.
 Native.scanDocument = async function () {
   if (!Native.isApp()) return null;
+  const pluginName = Native._scannerPluginName();
   try {
-    const DS = Native._plugin('DocumentScanner');
+    const DS = Native._plugin(pluginName);
     if (!DS) return Native.scanFoto();
     const res = await DS.scan();
     if (res && res.cancelled) return null; // gebruiker annuleerde bewust
@@ -183,8 +197,8 @@ Native.scanDocument = async function () {
         Native._scannerMissingWarned = true;
         Modal.show({
           type: 'info',
-          title: 'Apple-scanner nog niet in deze versie',
-          message: 'Deze app-build bevat de documentscanner nog niet — er wordt nu de gewone camera gebruikt. Maak een nieuwe TestFlight-build om de echte scanner te activeren.',
+          title: 'Documentscanner nog niet in deze versie',
+          message: 'Deze app-build bevat de documentscanner nog niet — er wordt nu de gewone camera gebruikt. Bouw een nieuwe APK (Android) of TestFlight-build (iOS) om de echte scanner te activeren.',
         });
       }
     }

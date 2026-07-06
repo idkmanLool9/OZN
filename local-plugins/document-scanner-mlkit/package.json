@@ -1,0 +1,14 @@
+{
+  "name": "capacitor-document-scanner-mlkit",
+  "version": "1.0.0",
+  "description": "Google ML Kit Document Scanner voor Capacitor (Android)",
+  "license": "MIT",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "files": [
+    "android/"
+  ]
+}
