@@ -154,6 +154,12 @@ function renderKistenBeheer(msg) {
         ? `<span class="kist-voorraad-chip ${vLeeg ? 'is-leeg' : (vLaag ? 'is-laag' : '')}" title="Voorraad${vMin ? ' · minimum ' + vMin : ''}">📦 ${vAantal}${vLaag ? ' ⚠' : ''}</span>`
         : `<span class="kist-voorraad-chip is-onbekend" title="Nog geen voorraad ingesteld">📦 —</span>`
     ) : '';
+    // Leesbare status voor beheerder (alleen tonen als er een voorraadregel is)
+    const vStatus = (isBeheerder && vr) ? (
+      vLeeg ? `<span class="kist-voorraad-status is-leeg">⚠ Niet op voorraad</span>`
+      : vLaag ? `<span class="kist-voorraad-status is-laag">⚠ Bijna op — nog ${vAantal} (min ${vMin})</span>`
+      : `<span class="kist-voorraad-status is-ok">✓ Op voorraad — ${vAantal} stuks</span>`
+    ) : '';
     return `
       <div class="kist-card ${hidden ? 'is-hidden-catalog' : ''}" data-naam="${esc(k.naam)}">
         <div class="kist-card-imgwrap">
@@ -169,6 +175,7 @@ function renderKistenBeheer(msg) {
         <div class="kist-card-body">
           <strong class="kist-card-naam">${esc(k.naam)}</strong>
           <span class="muted small">${esc(k.materiaal)}</span>
+          ${vStatus}
           <div class="kist-card-foot">
             <div class="kist-card-foot-meta">
               <span class="kist-price">${fmtEUR(k.bedrag)}</span>
@@ -226,16 +233,29 @@ function renderKistenBeheer(msg) {
       </div>
 
       ${isBeheerder ? (() => {
-        const laag = (typeof KistVoorraad !== 'undefined') ? KistVoorraad.laag() : [];
-        if (!laag.length) return '';
-        return `
-        <div class="alert alert-warn kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
-          <div>
-            <strong>⚠ Voorraad laag</strong>
-            <span class="muted small">${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum — tijd om bij te bestellen.</span>
-          </div>
-          <a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>
-        </div>`;
+        if (typeof KistVoorraad === 'undefined') return '';
+        const alles = KistVoorraad.all();
+        const laag = KistVoorraad.laag();
+        if (laag.length) {
+          return `
+          <div class="alert alert-warn kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            <div>
+              <strong>⚠ Voorraad laag</strong>
+              <span class="muted small">${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum — tijd om bij te bestellen.</span>
+            </div>
+            <a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>
+          </div>`;
+        }
+        if (!alles.length && !adminMode) {
+          return `
+          <div class="alert alert-info kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            <div>
+              <strong>📦 Voorraadbeheer</strong>
+              <span class="muted small">Nog geen voorraad ingesteld. Schakel <strong>Beheermodus</strong> in (Account → Weergave) om per kist een voorraad + minimum in te vullen.</span>
+            </div>
+          </div>`;
+        }
+        return '';
       })() : ''}
 
       <div class="catalog-zoekbalk">

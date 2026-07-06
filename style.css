@@ -2778,6 +2778,13 @@ fieldset[data-step][hidden] { display: none !important; }
 .kist-voorraad-chip.is-laag { background: #fff6e6; color: #8a5a00; border-color: #f2d69a; }
 .kist-voorraad-chip.is-leeg { background: #fde4e4; color: #8a1e1e; border-color: #f2b4b4; }
 .kist-voorraad-chip.is-onbekend { background: #f4f2ee; color: #7a7466; border-color: #e5e0d6; }
+.kist-voorraad-status {
+  display: inline-block; font-size: .78rem; font-weight: 600;
+  margin: .2rem 0 .1rem; line-height: 1.3;
+}
+.kist-voorraad-status.is-ok   { color: #2a7a3a; }
+.kist-voorraad-status.is-laag { color: #8a5a00; }
+.kist-voorraad-status.is-leeg { color: #8a1e1e; }
 .kist-voorraad-row {
   display: flex; flex-wrap: wrap; align-items: end; gap: .5rem;
   margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed var(--border, #e5e0d6);
