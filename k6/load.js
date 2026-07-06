@@ -15,7 +15,7 @@ import { check, sleep, group } from 'k6';
 const BASE_URL = __ENV.BASE_URL || 'https://uitvaart.pages.dev';
 const SUPABASE_URL = __ENV.SUPABASE_URL || 'https://cmcbmcyxdndymxgpxmed.supabase.co';
 const SUPABASE_KEY = __ENV.SUPABASE_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wdWVqbWtobWxia2FlbHFibmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MjI2NzQsImV4cCI6MjA5MzA5ODY3NH0.pq6GJXqEdGNzarAw0lj8DWrtAguE3T7-MI439rlmemk';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtY2JtY3l4ZG5keW14Z3B4bWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMzgzMjAsImV4cCI6MjA5ODkxNDMyMH0.sVhIpC3l4_J1RGJiPEwBcw15sbOdIOMvVbD_51ULnlg';
 
 export const options = {
   stages: [

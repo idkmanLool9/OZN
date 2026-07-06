@@ -13,16 +13,17 @@
 /index.html
   Cache-Control: public, max-age=300, must-revalidate
 
-# Statische assets met versie-suffix: lang cachen, ze veranderen toch niet
-# (CSS/JS vernieuwen zichzelf via service-worker bij nieuw buildnummer)
+# JS/CSS: korte cache met must-revalidate zodat de browser bij elke
+# request een ETag-check doet bij de server. Voorkomt dat een nieuwe
+# service-worker tijdens install per ongeluk oude files cacht.
 /js/*
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=300, must-revalidate
 
 /style.css
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=300, must-revalidate
 
 /print.css
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=300, must-revalidate
 
 /icon.svg
   Cache-Control: public, max-age=86400

@@ -2,13 +2,13 @@
 <html lang="nl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#6b1e2a" />
+  <meta name="theme-color" content="#2563eb" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
-  <title>Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</title>
+  <title>Uitvaart Intake · Syrisch-Orthodoxe Kerk van Antiochië</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="print.css" media="print" />
 </head>
@@ -18,7 +18,7 @@
     <div class="splash-card">
       <div class="brand-mark big">✝</div>
       <h1 id="splash-title">Welkom</h1>
-      <p class="splash-sub">Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië</p>
+      <p class="splash-sub">Uitvaart Intake · Syrisch-Orthodoxe Kerk van Antiochië</p>
 
       <div id="splash-online" class="splash-state" hidden>
         <div class="splash-spinner" aria-hidden="true"></div>
@@ -80,7 +80,7 @@
         <div class="login-brand-head">
           <div class="brand-mark big" id="login-logo">✝</div>
           <div class="login-brand-name">
-            <strong id="login-app-name">Uitvaartbeheer</strong>
+            <strong id="login-app-name">Uitvaart Intake</strong>
             <span id="login-app-tagline">Syrisch-Orthodoxe Kerk van Antiochië</span>
           </div>
         </div>
@@ -98,7 +98,7 @@
     <main class="login-form-pane">
       <div class="login-form-wrap">
         <h2 id="login-form-title">Inloggen</h2>
-        <p class="login-form-sub" id="login-form-subtitle">Voer uw e-mailadres en wachtwoord in om door te gaan.</p>
+        <p class="login-form-sub" id="login-form-subtitle">Voer je e-mailadres en wachtwoord in om door te gaan.</p>
         <div id="login-error" class="alert alert-error" hidden></div>
         <form id="login-form" class="form" autocomplete="on">
           <label>
@@ -124,83 +124,143 @@
 
   <!-- Wie werkt vandaag? -->
   <section id="profile-screen" class="profile-screen" hidden>
+    <div class="profile-bg-orb profile-bg-orb-1" aria-hidden="true"></div>
+    <div class="profile-bg-orb profile-bg-orb-2" aria-hidden="true"></div>
+    <div class="profile-bg-orb profile-bg-orb-3" aria-hidden="true"></div>
     <div class="profile-card">
+      <div class="profile-greeting" id="profile-greeting">Goedendag</div>
       <h1 class="profile-title">Wie werkt er vandaag?</h1>
-      <p class="profile-subtitle">Kies hieronder met wie je bent ingelogd — zo blijft duidelijk wie wat heeft bijgewerkt in de dossiers.</p>
-      <div class="profile-options">
-        <button type="button" class="profile-option" data-profile="rume">
-          <span class="profile-avatar" style="background:#6b1e2a;">R</span>
-          <span class="profile-name">Rume</span>
-          <span class="profile-role">Uitvaartleider</span>
-        </button>
-        <button type="button" class="profile-option" data-profile="robert">
-          <span class="profile-avatar" style="background:#2a5d6b;">R</span>
-          <span class="profile-name">Robert</span>
-          <span class="profile-role">Uitvaartleider</span>
-        </button>
+      <p class="profile-subtitle">Tik op je naam — zo blijft duidelijk wie wat heeft bijgewerkt in de dossiers.</p>
+      <div class="profile-options" id="profile-options-mount">
+        <!-- gevuld door app.js uit Settings.get('profielen') -->
       </div>
-      <button type="button" id="profile-logout" class="btn btn-ghost btn-sm" style="margin-top:1.5rem;">Uitloggen</button>
+      <div class="profile-foot">
+        <a href="#/account#profielen" id="profile-manage-link" class="profile-manage-link">⚙ Beheren in Account</a>
+        <button type="button" id="profile-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
+      </div>
     </div>
   </section>
 
   <!-- App -->
   <div id="app" hidden>
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a href="#/" class="brand">
-          <span class="brand-mark">✝</span>
-          <span class="brand-text">
-            <strong>Uitvaartbeheer</strong>
-            <small>Syrisch-Orthodoxe Kerk van Antiochië</small>
+    <div class="app-shell">
+
+      <!-- Zijbalk -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+          <span class="sidebar-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v3M10.5 3.5h3"/><path d="M12 6 5 11v9h14v-9z"/><path d="M9.5 20v-4a2.5 2.5 0 0 1 5 0v4"/></svg>
           </span>
-        </a>
-        <nav class="topnav" id="topnav">
-          <a href="#/dossiers" data-route="/dossiers">Dossiers</a>
-          <a href="#/dossiers/nieuw" data-route="/dossiers/nieuw">Nieuw dossier</a>
-          <a href="#/kisten" data-route="/kisten">Kisten</a>
-          <a href="#/bloemen" data-route="/bloemen">Bloemen</a>
-          <a href="#/eten-drinken" data-route="/eten-drinken">Eten &amp; drinken</a>
-          <a href="#/account" data-route="/account">Account</a>
-        </nav>
-        <div class="user-area">
-          <span class="offline-badge" id="offline-badge" hidden title="Geen internet — leesmodus">offline</span>
-          <button type="button" id="btn-active-profile" class="active-profile-chip" title="Wissel actieve gebruiker">
-            <span class="active-profile-dot" id="active-profile-dot"></span>
-            <span class="active-profile-name" id="active-profile-name"></span>
-          </button>
-          <span class="user-name" id="user-name"></span>
-          <button type="button" id="btn-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
+          <strong>Uitvaart Intake</strong>
+          <span class="sidebar-sub">Syrisch-Orthodoxe Kerk van Antiochië</span>
         </div>
+        <nav class="sidenav">
+          <a href="#/dossiers" data-route="/dossiers">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            <span>Dossiers</span>
+          </a>
+          <a href="#/leden" data-route="/leden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="3.2"/><path d="M22 20v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Leden</span>
+          </a>
+          <a href="#/begraafplaats" data-route="/begraafplaats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg>
+            <span>Begraafplaats</span>
+          </a>
+          <a href="#/kisten" data-route="/kisten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+            <span>Kisten</span>
+          </a>
+          <a href="#/bloemen" data-route="/bloemen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 9.6C12.4 7 13.6 5.5 15 6.1s1.2 2.4-.2 3.6M12 14.4C11.6 17 10.4 18.5 9 17.9s-1.2-2.4.2-3.6M9.6 12C7 12.4 5.5 13.6 6.1 15s2.4 1.2 3.6-.2M14.4 12C17 11.6 18.5 10.4 17.9 9s-2.4-1.2-3.6.2"/></svg>
+            <span>Bloemen</span>
+          </a>
+          <a href="#/eten" data-route="/eten">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a2 2 0 0 0 4 0V3M8 11v10"/><path d="M16.5 3C15 3 14 5 14 7.5s1 4 2.5 4M16.5 3v18"/></svg>
+            <span>Eten</span>
+          </a>
+          <a href="#/portaal" data-route="/portaal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
+            <span>Portaal</span>
+          </a>
+          <a href="#/account" data-route="/account">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>
+            <span>Account</span>
+          </a>
+        </nav>
+        <div class="sidebar-foot">
+          <div class="sidebar-user">
+            <span class="side-avatar" id="side-avatar">–</span>
+            <span class="side-user-text">
+              <strong id="side-user-name">—</strong>
+              <small id="side-user-email"></small>
+            </span>
+          </div>
+          <button type="button" id="btn-logout-side" class="btn btn-ghost sidebar-logout">⎋ Uitloggen</button>
+        </div>
+      </aside>
+
+      <!-- Werkgebied -->
+      <div class="app-main">
+        <header class="topbar">
+          <div class="topbar-inner">
+            <a href="#/" class="brand">
+              <span class="brand-mark">✝</span>
+              <span class="brand-text">
+                <strong>Uitvaart Intake</strong>
+                <small>Syrisch-Orthodoxe Kerk van Antiochië</small>
+              </span>
+            </a>
+            <nav class="topnav" id="topnav">
+              <a href="#/dossiers" data-route="/dossiers">Dossiers</a>
+              <a href="#/kisten" data-route="/kisten">Kisten</a>
+              <a href="#/bloemen" data-route="/bloemen">Bloemen</a>
+              <a href="#/eten" data-route="/eten">Eten</a>
+              <a href="#/account" data-route="/account">Account</a>
+            </nav>
+            <div class="user-area">
+              <span class="offline-badge" id="offline-badge" hidden title="Geen internet — leesmodus">offline</span>
+              <button type="button" id="btn-active-profile" class="active-profile-chip" title="Wissel actieve gebruiker">
+                <span class="active-profile-dot" id="active-profile-dot"></span>
+                <span class="active-profile-name" id="active-profile-name"></span>
+              </button>
+              <span class="user-name" id="user-name"></span>
+              <button type="button" id="btn-logout" class="btn btn-ghost btn-sm">Uitloggen</button>
+            </div>
+          </div>
+        </header>
+        <main id="view" class="main"></main>
+        <footer class="footer">
+          <div class="footer-inner">
+            Intern systeem · Syrisch-Orthodoxe Kerk van Antiochië · Uitvaart Intake · gegevens veilig opgeslagen in de cloud
+            <span id="footer-version" class="footer-version"></span>
+          </div>
+        </footer>
       </div>
-    </header>
-    <main id="view" class="main"></main>
-    <footer class="footer">
-      <div class="footer-inner">
-        Intern systeem · Syrisch-Orthodoxe Kerk van Antiochië · Uitvaartbeheer · gegevens veilig opgeslagen in de cloud
-        <span id="footer-version" class="footer-version"></span>
-      </div>
-    </footer>
+
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <!-- jscanify (document-scan met auto-crop, deskew en perspective-correctie). Laadt
-       OpenCV.js dynamisch. Alleen geladen wanneer je daadwerkelijk een scan start. -->
-  <script defer src="https://cdn.jsdelivr.net/npm/jscanify@1.3.0/src/jscanify.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/snelstart.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/demo.js"></script>
   <script src="js/core.js"></script>
-  <script src="js/intake-scan.js"></script>
-  <script src="js/id-scan.js"></script>
   <script src="js/views-list.js"></script>
+  <script src="js/views-leden.js"></script>
   <script src="js/views-form.js"></script>
   <script src="js/views-detail.js"></script>
   <script src="js/views-kisten.js"></script>
+  <script src="js/views-graven.js"></script>
   <script src="js/views-bloemen.js"></script>
-  <script src="js/views-eten-drinken.js"></script>
+  <script src="js/views-eten.js"></script>
   <script src="js/views-factuur.js"></script>
-  <script src="js/views-rouwkaart.js"></script>
+  <script src="js/views-familie-portaal.js"></script>
+  <script src="js/views-portaal.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/native.js"></script>
 </body>
 </html>

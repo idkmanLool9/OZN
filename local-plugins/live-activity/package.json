@@ -1,0 +1,15 @@
+{
+  "name": "capacitor-live-activity-sok",
+  "version": "1.0.0",
+  "description": "ActivityKit Live Activity-besturing voor Capacitor (SOK Uitvaartbeheer)",
+  "license": "MIT",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "files": [
+    "ios/",
+    "CapacitorLiveActivitySok.podspec"
+  ]
+}

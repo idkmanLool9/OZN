@@ -48,6 +48,18 @@ workflows:
       - name: CocoaPods
         script: |
           cd ios/App && pod install
+      - name: Live Activity widget-extensie injecteren
+        script: |
+          # De widget-Swift + Info.plist naar het gegenereerde project kopiëren
+          mkdir -p ios/App/UitvaartWidget
+          cp ios-live-activity/UitvaartWidgetBundle.swift \
+             ios-live-activity/UitvaartLiveActivity.swift \
+             ios-live-activity/UitvaartActivityAttributes.swift \
+             ios-live-activity/Info.plist \
+             ios/App/UitvaartWidget/
+          # Widget-target in het Xcode-project injecteren
+          gem install xcodeproj --no-document
+          ruby scripts/add-widget-extension.rb
       - name: Unsigned .ipa bouwen
         script: |
           cd ios/App
@@ -88,7 +100,7 @@ workflows:
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
-        APP_STORE_APP_ID: 0000000000  # vervangen na aanmaken in App Store Connect
+        APP_STORE_APP_ID: 6786043538
       node: 20
       xcode: latest
       cocoapods: default
@@ -103,13 +115,64 @@ workflows:
             npx cap add ios
           fi
           npx cap sync ios
+      - name: Info.plist aanvullen (export-compliance, camera, live activity)
+        script: |
+          PLIST=ios/App/App/Info.plist
+          pb() { /usr/libexec/PlistBuddy -c "$1" "$PLIST" 2>/dev/null; }
+          # Export-compliance: voorkomt de 'gebruikt je app encryptie?'-vraag
+          pb "Add :ITSAppUsesNonExemptEncryption bool false" || pb "Set :ITSAppUsesNonExemptEncryption false"
+          # Camera + fotobibliotheek: VERPLICHT, anders crasht de app bij de scan
+          pb "Add :NSCameraUsageDescription string 'Voor het scannen van de artsverklaring en documenten met de camera.'" \
+            || pb "Set :NSCameraUsageDescription 'Voor het scannen van de artsverklaring en documenten met de camera.'"
+          pb "Add :NSPhotoLibraryUsageDescription string 'Voor het kiezen van een bestaande foto van de artsverklaring of document.'" \
+            || pb "Set :NSPhotoLibraryUsageDescription 'Voor het kiezen van een bestaande foto van de artsverklaring of document.'"
+          pb "Add :NSPhotoLibraryAddUsageDescription string 'Voor het opslaan van gescande documenten.'" \
+            || pb "Set :NSPhotoLibraryAddUsageDescription 'Voor het opslaan van gescande documenten.'"
+          # Live Activities: app mag live-widgets tonen (voor latere lockscreen-widget)
+          pb "Add :NSSupportsLiveActivities bool true" || pb "Set :NSSupportsLiveActivities true"
+          # App-naam onder het icoon (robuust, want ios/ wordt elke build opnieuw gegenereerd)
+          pb "Add :CFBundleDisplayName string 'Uitvaart Intake'" || pb "Set :CFBundleDisplayName 'Uitvaart Intake'"
       - name: CocoaPods
         script: |
           cd ios/App && pod install
-      - name: Versie + buildnummer
+      - name: Live Activity widget-extensie injecteren
         script: |
+          # De widget-Swift + Info.plist naar het gegenereerde project kopiëren
+          mkdir -p ios/App/UitvaartWidget
+          cp ios-live-activity/UitvaartWidgetBundle.swift \
+             ios-live-activity/UitvaartLiveActivity.swift \
+             ios-live-activity/UitvaartActivityAttributes.swift \
+             ios-live-activity/Info.plist \
+             ios/App/UitvaartWidget/
+          # Widget-target in het Xcode-project injecteren (vóór de versie-stap,
+          # zodat `agvtool new-version -all` de widget hetzelfde buildnummer geeft
+          # als de app — App Store eist gelijke versies).
+          gem install xcodeproj --no-document
+          ruby scripts/add-widget-extension.rb
+      - name: App-icon genereren uit assets/icon-only.png
+        script: |
+          npm run cap:assets
+      - name: Versie + buildnummer (uniek via tijdstempel)
+        script: |
+          # Buildnummer = Unix-tijdstempel: altijd uniek én hoger dan het
+          # vorige, dus nooit meer "build number already used" bij uploaden.
+          # -all pakt ook de widget-extensie mee (apple-generic versioning).
           cd ios/App
-          agvtool new-version -all $(($BUILD_NUMBER + 100))
+          agvtool new-version -all "$(date +%s)"
+      - name: Widget-extensie signing (App ID + profiel ophalen/aanmaken)
+        script: |
+          # De widget-extensie (nl.sok.uitvaartbeheer.widget) heeft een eigen
+          # App ID + provisioning-profiel nodig. --create probeert het aan te
+          # maken via de App Store Connect API; lukt dat niet (bv. de API-sleutel
+          # mag geen identifiers aanmaken), dan is het HANDMATIG aanmaken in
+          # Apple Developer nodig — daarna downloadt deze stap het profiel.
+          # Non-fataal: de build gaat door zodat we de diagnose zien.
+          app-store-connect fetch-signing-files "nl.sok.uitvaartbeheer.widget" \
+            --platform IOS --type IOS_APP_STORE --create \
+            || echo "⚠️  Widget-profiel automatisch aanmaken/ophalen lukte niet — maak het handmatig aan in Apple Developer."
+          keychain add-certificates || true
+          echo "=== Geïnstalleerde provisioning-profielen ==="
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" 2>/dev/null || true
       - name: Signed .ipa bouwen
         script: |
           xcode-project use-profiles
@@ -123,5 +186,7 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        beta_groups:
-          - Internal Testers
+        # Geen beta_groups: interne testers (App Store Connect-gebruikers)
+        # krijgen elke build automatisch zodra die verwerkt is — zonder
+        # beta-review. Externe groepen zouden review vereisen en botsen met
+        # "another build is in review".

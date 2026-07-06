@@ -10,7 +10,38 @@ function esc(v) {
 }
 function fmt(v) { return v && String(v).trim() ? v : '—'; }
 function fmtEUR(n) { return '€ ' + (Number(n) || 0).toFixed(2).replace('.', ','); }
-function parseEUR(s) { return parseFloat(String(s || '').replace(/[€\s.]/g, '').replace(',', '.')) || 0; }
+// Parseer een door de gebruiker getypt bedrag — robuust tegen verschillende
+// notaties (EU komma-decimaal, US punt-decimaal, EU duizend-scheiding):
+//   "625,40"       → 625.40
+//   "625.40"       → 625.40  (punt-decimaal, 1-2 cijfers na)
+//   "1.234,56"     → 1234.56 (EU: punt = duizend, komma = decimaal)
+//   "1,234.56"     → 1234.56 (US: komma = duizend, punt = decimaal)
+//   "62.540"       → 62540   (geen komma → punt = duizend-sep)
+//   "62540"        → 62540
+function parseEUR(s) {
+  if (s == null) return 0;
+  let str = String(s).replace(/[€\s]/g, '').trim();
+  if (!str) return 0;
+  const hasComma = str.includes(',');
+  const hasDot   = str.includes('.');
+  if (hasComma && hasDot) {
+    // Beide aanwezig: laatste van de twee is de decimaal-scheiding.
+    if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+      str = str.replace(/\./g, '').replace(',', '.');         // EU
+    } else {
+      str = str.replace(/,/g, '');                            // US
+    }
+  } else if (hasComma) {
+    str = str.replace(',', '.');                              // EU decimaal
+  } else if (hasDot) {
+    // Eén of meer punten zonder komma. Als het patroon precies één punt
+    // is gevolgd door 1-2 cijfers tot het eind → punt-decimaal. Anders
+    // (bv. "1.234" of "1.234.567") → duizend-scheiding.
+    if (!/^\d+\.\d{1,2}$/.test(str)) str = str.replace(/\./g, '');
+  }
+  const n = parseFloat(str);
+  return isFinite(n) ? n : 0;
+}
 function fmtDate(iso) {
   if (!iso) return '';
   if (typeof iso === 'string' && iso.length === 10) return iso.split('-').reverse().join('-');
@@ -62,6 +93,32 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
     return file;
   } finally {
     URL.revokeObjectURL(url);
+  }
+}
+
+// Opent een URL die pas ná een async-call bekend is, betrouwbaar in een nieuw
+// tabblad — ook op iOS/WKWebView. Truc: open het tabblad SYNCHROON binnen de
+// klik-gesture (anders blokkeert de popup-blokkering het na 'await'), en laad
+// de URL erin zodra die klaar is.
+async function openUrlAsync(urlPromise) {
+  // Native app: SFSafariViewController (zoom + tekstselectie + Live Text),
+  // geen popup-blokkering. Geen synchrone-gesture-truc nodig.
+  if (typeof Native !== 'undefined' && Native.isApp && Native.isApp()) {
+    try {
+      const url = await urlPromise;
+      if (url) await Native.openUrl(url);
+    } catch (_) {}
+    return;
+  }
+  // Web: open het tabblad synchroon binnen de klik en laad de URL erin.
+  const win = window.open('', '_blank');
+  try {
+    const url = await urlPromise;
+    if (!url) { if (win) win.close(); return; }
+    if (win) win.location.href = url;
+    else window.open(url, '_blank'); // fallback (bv. als het blanco tabblad werd geweigerd)
+  } catch (e) {
+    if (win) win.close();
   }
 }
 
@@ -125,9 +182,21 @@ const Modal = {
       Modal._currentClose = close;
       const onConfirm = () => close(true);
       const onCancel = () => close(false);
+      // Focus-trap: Tab/Shift+Tab cyclet binnen het modal i.p.v. te ontsnappen
+      const trapFocus = e => {
+        if (e.key !== 'Tab') return;
+        const focusables = Array.from(m.querySelectorAll('button:not([hidden]), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'))
+          .filter(el => !el.hidden && el.offsetParent !== null);
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last  = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      };
       const keyHandler = e => {
         if (e.key === 'Enter') { e.preventDefault(); onConfirm(); }
         else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        else trapFocus(e);
       };
       btn.addEventListener('click', onConfirm);
       btnCancel.addEventListener('click', onCancel);
@@ -168,6 +237,27 @@ const Modal = {
       return `<svg viewBox="0 0 64 64" width="42" height="42"><circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="3.5"/><polyline points="20,33 28,41 44,24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     }
     return `<svg viewBox="0 0 64 64" width="42" height="42"><circle cx="32" cy="32" r="28" fill="none" stroke="currentColor" stroke-width="3.5"/><circle cx="32" cy="22" r="2.5" fill="currentColor"/><line x1="32" y1="30" x2="32" y2="46" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>`;
+  },
+};
+
+// ─── Toast: korte, niet-blokkerende melding (auto-verdwijnt) ─────────────────
+const Toast = {
+  show(msg, type = 'info') {
+    let host = document.getElementById('toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'toast-host';
+      document.body.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.textContent = msg;
+    host.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('toast-in'));
+    setTimeout(() => {
+      el.classList.remove('toast-in');
+      setTimeout(() => el.remove(), 300);
+    }, 3800);
   },
 };
 
@@ -339,6 +429,147 @@ const Postcode = {
         if (Postcode.isValid(postcodeEl.value) && !woonplaatsEl?.value.trim()) run();
       });
     }
+  },
+
+  // Google-style autocomplete: typ straat + huisnummer, zie een lijstje
+  // matches uit PDOK Locatieserver, klik = postcode/woonplaats meteen mee
+  // ingevuld. Werkt op zowel "één gecombineerd adres-veld" als op
+  // "aparte straat + huisnummer"-velden.
+  //
+  // straatEl     — verplicht. Krijgt of straatnaam (als huisnummerEl er is)
+  //                of "Straat 12" (als huisnummerEl ontbreekt).
+  // huisnummerEl — optioneel apart veld. Als ingevuld, dan splitsen we
+  //                straat en huisnummer over twee velden.
+  // postcodeEl   — verplicht. Wordt geformatteerd als '1234 AB'.
+  // woonplaatsEl — verplicht.
+  bindAddressAutocomplete({ straatEl, huisnummerEl, postcodeEl, woonplaatsEl }) {
+    if (!straatEl || straatEl.dataset.autocompleteBound === '1') return;
+    straatEl.dataset.autocompleteBound = '1';
+
+    // Dropdown-container — eenmalig per veld
+    const wrap = document.createElement('div');
+    wrap.className = 'addr-autocomplete';
+    const ddown = document.createElement('div');
+    ddown.className = 'addr-autocomplete-list';
+    ddown.hidden = true;
+
+    // Plaats wrap rond straatEl
+    straatEl.parentNode.insertBefore(wrap, straatEl);
+    wrap.appendChild(straatEl);
+    wrap.appendChild(ddown);
+
+    let activeIdx = -1;
+    let results = [];
+    let abortCtrl = null;
+    let debounceT = null;
+    let suppressFetch = false;   // voorkomt her-openen van de lijst na een keuze
+
+    const renderList = () => {
+      if (!results.length) { ddown.hidden = true; return; }
+      ddown.innerHTML = results.map((r, i) => `
+        <button type="button" class="addr-autocomplete-item ${i === activeIdx ? 'active' : ''}" data-idx="${i}">
+          <strong>${esc((r.straatnaam || '') + ' ' + (r.huis_nlt || r.huisnummer || ''))}</strong>
+          <span class="muted small">${esc(formatPostcode(r.postcode || ''))} ${esc(r.woonplaatsnaam || '')}</span>
+        </button>
+      `).join('');
+      ddown.hidden = false;
+    };
+
+    const formatPostcode = pc => {
+      const n = String(pc || '').replace(/\s+/g, '').toUpperCase();
+      return /^\d{4}[A-Z]{2}$/.test(n) ? n.slice(0, 4) + ' ' + n.slice(4) : pc;
+    };
+
+    const pickResult = r => {
+      // Onderdruk de zoek-listener tijdens het programmatisch invullen, anders
+      // heropent het gedispatchte 'input'-event de lijst na ~300ms.
+      suppressFetch = true;
+      clearTimeout(debounceT);
+      // Adres-/straat-veld invullen
+      if (huisnummerEl) {
+        straatEl.value = r.straatnaam || '';
+        huisnummerEl.value = r.huis_nlt || r.huisnummer || '';
+        huisnummerEl.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        const huis = r.huis_nlt || r.huisnummer || '';
+        straatEl.value = ((r.straatnaam || '') + (huis ? ' ' + huis : '')).trim();
+      }
+      if (postcodeEl)   postcodeEl.value   = formatPostcode(r.postcode || '');
+      if (woonplaatsEl) woonplaatsEl.value = r.woonplaatsnaam || '';
+      // Trigger change events zodat dependent listeners (autosave, validatie) actief blijven
+      [straatEl, postcodeEl, woonplaatsEl].filter(Boolean).forEach(el => {
+        el.dispatchEvent(new Event('input',  { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      ddown.hidden = true;
+      results = [];
+      activeIdx = -1;
+      // Onderdrukking pas opheffen ná het debounce-venster, zodat de door het
+      // invullen veroorzaakte input-events geen nieuwe zoekopdracht starten.
+      setTimeout(() => { suppressFetch = false; }, 400);
+    };
+
+    const fetchSuggestions = async () => {
+      const straat = straatEl.value.trim();
+      const huis   = huisnummerEl ? huisnummerEl.value.trim() : '';
+      const q = (straat + ' ' + huis).trim();
+      if (q.length < 3) { ddown.hidden = true; results = []; return; }
+
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+      const url = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?' +
+        'fq=type:adres&fl=weergavenaam,straatnaam,huisnummer,huis_nlt,postcode,woonplaatsnaam&rows=8&q=' +
+        encodeURIComponent(q);
+      try {
+        const r = await fetch(url, { signal: abortCtrl.signal });
+        if (!r.ok) return;
+        const j = await r.json();
+        results = (j.response && j.response.docs) || [];
+        activeIdx = -1;
+        renderList();
+      } catch (e) {
+        if (e.name !== 'AbortError') console.warn('PDOK suggest faalde:', e);
+      }
+    };
+
+    const scheduleFetch = () => {
+      if (suppressFetch) return;   // net een adres gekozen → niet opnieuw zoeken
+      clearTimeout(debounceT);
+      debounceT = setTimeout(fetchSuggestions, 300);
+    };
+
+    // Input-events op beide velden (straat én huisnummer indien apart)
+    [straatEl, huisnummerEl].filter(Boolean).forEach(el => {
+      el.addEventListener('input', scheduleFetch);
+    });
+
+    // Pijltjes + Enter + Escape
+    [straatEl, huisnummerEl].filter(Boolean).forEach(el => {
+      el.addEventListener('keydown', e => {
+        if (ddown.hidden || !results.length) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault(); activeIdx = (activeIdx + 1) % results.length; renderList();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault(); activeIdx = (activeIdx - 1 + results.length) % results.length; renderList();
+        } else if (e.key === 'Enter' && activeIdx >= 0) {
+          e.preventDefault(); pickResult(results[activeIdx]);
+        } else if (e.key === 'Escape') {
+          ddown.hidden = true;
+        }
+      });
+    });
+
+    // Klik op een item
+    ddown.addEventListener('click', e => {
+      const item = e.target.closest('.addr-autocomplete-item');
+      if (!item) return;
+      pickResult(results[parseInt(item.dataset.idx, 10)]);
+    });
+
+    // Sluit dropdown bij klik buiten
+    document.addEventListener('click', e => {
+      if (!wrap.contains(e.target)) ddown.hidden = true;
+    });
   },
 };
 
@@ -709,8 +940,24 @@ const Router = {
     const fullHash = (location.hash || '#/').slice(1) || '/';
     const path = fullHash.split('?')[0].split('#')[0];
 
+    // Familie-portaal: anonieme route, geen login/profiel-keuze nodig
+    if (path.startsWith('/familie/')) {
+      for (const r of Router.routes) {
+        const m = path.match(r.regex);
+        if (m) {
+          const params = {};
+          r.keys.forEach((k, i) => params[k] = decodeURIComponent(m[i + 1]));
+          r.handler(params, fullHash);
+          window.scrollTo(0, 0);
+          return;
+        }
+      }
+      render404();
+      return;
+    }
+
     if (!Auth.current()) { showLogin(); return; }
-    if (!ActiveProfile.current()) { showProfilePicker(); return; }
+    if (Settings.get('profielkiezer_actief') && !ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();
 
     for (const r of Router.routes) {
@@ -719,15 +966,27 @@ const Router = {
         const params = {};
         r.keys.forEach((k, i) => params[k] = decodeURIComponent(m[i + 1]));
         r.handler(params, fullHash);
-        $$('#topnav a').forEach(a => {
+        $$('[data-route]').forEach(a => {
           const route = a.getAttribute('data-route');
-          let active = false;
-          if (route === '/dossiers/nieuw') active = path === '/dossiers/nieuw';
-          else if (route === '/dossiers') active = path === '/' || (path.startsWith('/dossiers') && path !== '/dossiers/nieuw');
-          else active = path === route;
+          const active = route === '/dossiers'
+            ? (path === '/' || path.startsWith('/dossiers'))
+            : (route === '/leden'
+                ? path.startsWith('/leden')
+                : path === route);
           a.classList.toggle('active', active);
         });
-        window.scrollTo(0, 0);
+        // "In een dossier" = detail / intake / bewerken / factuur (alles
+        // ónder /dossiers/…). Dan verbergen we de zijbalk en tonen alleen
+        // de bovenbalk; op de overige pagina's juist andersom.
+        const inDossier = /^\/dossiers\/.+/.test(path);
+        document.body.classList.toggle('in-dossier', inDossier);
+        // Familie-portaal-beheer: kale pagina zonder bovenbalk.
+        document.body.classList.toggle('portaal-page', path === '/portaal');
+        // Naar een sectie-anker scrollen (bv. #/account#parochies); anders boven.
+        const anchor = (fullHash.split('#')[1] || '').split('?')[0];
+        const anchorEl = anchor ? document.getElementById(anchor) : null;
+        if (anchorEl) anchorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else window.scrollTo(0, 0);
         return;
       }
     }
@@ -735,96 +994,190 @@ const Router = {
   },
 };
 
-// ─── DocumentScanner: auto-crop, perspective-correctie en deskew via jscanify ──
-// Gebruikt jscanify (CDN) dat OpenCV.js dynamisch laadt. Bij eerste scan wordt
-// OpenCV ingeladen (~7MB), daarna gecached door de service-worker.
-const DocumentScanner = {
-  _ready: false,
-  _opencvLoaded: false,
-  _initPromise: null,
+// ─── PdfGen: PDF-opbouw met jsPDF (tekent tekst/tabellen zelf) ─────────────
+// Geen html2canvas: dat rendert leeg op nieuwe iOS-Safari. jsPDF tekent de
+// PDF direct uit een 'spec' (kop, secties, tabel, totalen) → betrouwbaar op
+// web én app, en de tekst is selecteerbaar.
+const PdfGen = {
+  _loadPromise: null,
+  CDN: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
 
-  async _loadOpenCV() {
-    if (window.cv && window.cv.Mat) { this._opencvLoaded = true; return; }
-    return new Promise((resolve, reject) => {
-      if (document.getElementById('opencv-script')) {
-        const t = setInterval(() => {
-          if (window.cv && window.cv.Mat) { clearInterval(t); this._opencvLoaded = true; resolve(); }
-        }, 100);
-        return;
-      }
+  load() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+    if (PdfGen._loadPromise) return PdfGen._loadPromise;
+    PdfGen._loadPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.id = 'opencv-script';
+      s.src = PdfGen.CDN;
       s.async = true;
-      s.src = 'https://docs.opencv.org/4.10.0/opencv.js';
-      s.onload = () => {
-        if (window.cv && window.cv.then) {
-          window.cv.then(() => { this._opencvLoaded = true; resolve(); });
-        } else {
-          // Wacht tot cv.Mat beschikbaar is
-          const t = setInterval(() => {
-            if (window.cv && window.cv.Mat) { clearInterval(t); this._opencvLoaded = true; resolve(); }
-          }, 100);
-        }
-      };
-      s.onerror = () => reject(new Error('OpenCV.js kon niet worden geladen'));
+      s.onload  = () => resolve();
+      s.onerror = () => reject(new Error('PDF-bibliotheek kon niet worden geladen — controleer internet.'));
       document.head.appendChild(s);
     });
+    return PdfGen._loadPromise;
   },
 
-  async init() {
-    if (this._ready) return;
-    if (this._initPromise) return this._initPromise;
-    this._initPromise = (async () => {
-      if (typeof jscanify === 'undefined') {
-        throw new Error('jscanify-bibliotheek niet geladen');
-      }
-      await this._loadOpenCV();
-      this._ready = true;
-    })();
-    return this._initPromise;
+  _jsPDF() {
+    const J = window.jspdf && window.jspdf.jsPDF;
+    if (!J) throw new Error('PDF-bibliotheek niet geladen.');
+    return J;
   },
 
-  // Verwerk een afbeelding-bestand: return Blob met gecropte/rechtgezette versie
-  async scan(file) {
-    await this.init();
-    const img = await this._fileToImage(file);
-    const scanner = new jscanify();
-    const tmp = document.createElement('canvas');
-    tmp.width = img.naturalWidth || img.width;
-    tmp.height = img.naturalHeight || img.height;
-    tmp.getContext('2d').drawImage(img, 0, 0);
+  // Bouw een jsPDF-document en geef de PDF-Blob terug. Accepteert een spec
+  // (via makeDoc) OF een builder-functie die zelf een jsPDF-doc teruggeeft.
+  async blobFromSpec(specOrBuilder) {
+    await PdfGen.load();
+    const doc = (typeof specOrBuilder === 'function') ? specOrBuilder() : PdfGen.makeDoc(specOrBuilder);
+    return doc.output('blob');
+  },
 
-    let result;
-    try {
-      // Bepaal output-grootte op basis van langste kant — max ~1800 px
-      const maxDim = 1800;
-      const ratio = Math.min(maxDim / tmp.width, maxDim / tmp.height, 1);
-      const outW = Math.round(tmp.width * ratio);
-      const outH = Math.round(tmp.height * ratio);
-      result = scanner.extractPaper(tmp, outW, outH);
-    } catch (e) {
-      throw new Error('Geen document gedetecteerd. Probeer met meer contrast en zorg dat de hele rand zichtbaar is.');
+  // Teken een A4-document uit een spec:
+  //   { title, meta:[..], intro:[{label,lines:[..]}], sections:[{heading,rows:[[k,v]]}],
+  //     table:{heading,rows:[[oms,cat,bedrag]]}, totals:[[label,val,bold]], footer }
+  makeDoc(spec) {
+    const J = PdfGen._jsPDF();
+    const doc = new J({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+    const M = 15, W = 210, H = 297, CW = W - 2 * M;
+    const BLUE = [37, 99, 235], GRAY = [110, 110, 110], DARK = [35, 35, 35];
+    let y = M;
+    const ensure = (h) => { if (y + h > H - M) { doc.addPage(); y = M; } };
+    // Emoji/pictogrammen strippen — het standaard jsPDF-lettertype kan ze niet
+    // weergeven en verpest anders de regel (garbled tekens + rare spatiëring).
+    const EMOJI_RX = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{2022}]/gu;
+    const clean = (t) => String(t == null ? '' : t).replace(EMOJI_RX, '').replace(/[ \t]{2,}/g, ' ').replace(/^[ \t]+/, '');
+    const txt = (t, x, yy, o) => doc.text(Array.isArray(t) ? t : clean(t), x, yy, o);
+    const split = (t, w) => doc.splitTextToSize(clean(t), w);
+
+    // Kop
+    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+    txt(s.app_name || 'Uitvaart Intake', M, y + 2);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    txt(s.app_tagline || '', M, y + 7);
+    doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    txt(spec.title || '', W - M, y + 2, { align: 'right' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    (spec.meta || []).forEach((m, i) => txt(m, W - M, y + 7 + i * 4.5, { align: 'right' }));
+    y += 15;
+    doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 7;
+
+    // Intro (twee kolommen: bv. Voor / Betreft)
+    if (spec.intro && spec.intro.length) {
+      const colW = CW / 2, startY = y; let maxY = y;
+      spec.intro.forEach((blk, i) => {
+        const x = M + i * colW; let yy = startY;
+        doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+        txt(blk.label + ':', x, yy); yy += 5;
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(70, 70, 70);
+        (blk.lines || []).filter(l => l && String(l).trim()).forEach(ln => {
+          const w = split(ln, colW - 5);
+          txt(w, x, yy); yy += w.length * 4.5;
+        });
+        maxY = Math.max(maxY, yy);
+      });
+      y = maxY + 5;
     }
 
-    return new Promise((resolve, reject) => {
-      result.toBlob(b => {
-        if (!b) return reject(new Error('Conversie naar afbeelding mislukt'));
-        resolve(new File([b], (file.name || 'scan').replace(/\.\w+$/, '') + '-scan.jpg', { type: 'image/jpeg' }));
-      }, 'image/jpeg', 0.9);
+    // Secties (kop + label/waarde-rijen)
+    (spec.sections || []).forEach(sec => {
+      const rows = (sec.rows || []).filter(r => r[1] != null && String(r[1]).trim() !== '');
+      if (!rows.length) return;
+      ensure(10);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+      txt(sec.heading, M, y); y += 5.5;
+      doc.setFontSize(9.5);
+      rows.forEach(([label, val]) => {
+        const vLines = split(val, CW - 45);
+        ensure(vLines.length * 4.6 + 1);
+        doc.setTextColor(...GRAY); doc.setFont('helvetica', 'bold'); txt(label, M, y);
+        doc.setTextColor(...DARK); doc.setFont('helvetica', 'normal'); txt(vLines, M + 43, y);
+        y += Math.max(5, vLines.length * 4.6);
+      });
+      y += 4;
     });
+
+    // Tabel (Omschrijving / Categorie / Bedrag)
+    if (spec.table && spec.table.rows && spec.table.rows.length) {
+      ensure(12);
+      if (spec.table.heading) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLUE);
+        txt(spec.table.heading, M, y); y += 6;
+      }
+      const xBedrag = W - M, xCat = W - M - 42;
+      doc.setFontSize(9); doc.setTextColor(...DARK); doc.setFont('helvetica', 'bold');
+      txt('Omschrijving', M, y); txt('Categorie', xCat, y); txt('Bedrag', xBedrag, y, { align: 'right' });
+      y += 1.5; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 4;
+      doc.setFont('helvetica', 'normal');
+      spec.table.rows.forEach(r => {
+        const oms = split(r[0], xCat - M - 3);
+        ensure(oms.length * 4.6 + 1);
+        doc.setTextColor(...DARK); txt(oms, M, y);
+        doc.setTextColor(...GRAY); txt(r[1] || '', xCat, y);
+        doc.setTextColor(...DARK); txt(r[2] || '', xBedrag, y, { align: 'right' });
+        y += Math.max(5, oms.length * 4.6);
+      });
+      y += 1; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 5;
+    }
+
+    // Totalen (rechts uitgelijnd)
+    (spec.totals || []).forEach(([label, val, bold]) => {
+      ensure(6);
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(bold ? 11 : 9.5);
+      doc.setTextColor(...(bold ? BLUE : DARK));
+      txt(label, W - M - 45, y, { align: 'right' });
+      txt(val, W - M, y, { align: 'right' });
+      y += bold ? 6.5 : 5.5;
+    });
+
+    if (spec.footer) {
+      ensure(8); y += 3;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
+      const f = split(spec.footer, CW);
+      txt(f, M, y);
+    }
+    return doc;
   },
 
-  async _fileToImage(file) {
-    const url = URL.createObjectURL(file);
+  // Upload PDF Blob naar Supabase Storage en geef een tijdelijke download-link
+  // (7 dagen) terug. Pad: documenten/<dossierId>/email-bijlagen/<timestamp>-<type>.pdf
+  async uploadAsAttachment(dossierId, blob, type = 'bijlage') {
+    const path = `${dossierId}/email-bijlagen/${Date.now()}-${type}.pdf`;
+    const file = new File([blob], `${type}.pdf`, { type: 'application/pdf' });
+    const { error } = await sb.storage.from('documenten').upload(path, file, { upsert: false });
+    if (error) throw new Error('Upload van PDF-bijlage faalde: ' + error.message);
+    const { data, error: urlErr } = await sb.storage.from('documenten')
+      .createSignedUrl(path, 7 * 24 * 3600); // 7 dagen
+    if (urlErr) throw new Error('Tijdelijke download-link maken faalde: ' + urlErr.message);
+    return { url: data.signedUrl, path };
+  },
+
+  // Genereer een PDF en lever 'm af — betrouwbaar op web én in de app.
+  // We uploaden naar Supabase en openen de https-link:
+  //  · App: in de in-app Safari (bekijken, opslaan in Bestanden, printen, delen).
+  //  · Web: in een nieuw tabblad (waar je 'm kunt bewaren/printen/delen).
+  // Https i.p.v. een blob-URL, want iOS Safari kan blob-downloads niet openen
+  // ("WebKitBlobResource fout 1").
+  async deliver(spec, filename = 'document.pdf', dossierId = null) {
+    const isApp = typeof Native !== 'undefined' && Native.isApp && Native.isApp();
+    // Web: open het tabblad NU (nog binnen de klik-gesture), anders blokkeert
+    // de popup-blokkering het na het async genereren.
+    const win = isApp ? null : window.open('', '_blank');
     try {
-      return await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = url;
-      });
-    } finally {
-      // URL.revokeObjectURL kan, maar de browser ruimt het op
+      const blob = await PdfGen.blobFromSpec(spec);
+      if (!blob || blob.size < 500) throw new Error('De PDF is leeg gebleven — probeer het opnieuw.');
+      const naam = String(filename || 'document').replace(/\.pdf$/i, '');
+      let url;
+      if (dossierId != null) {
+        ({ url } = await PdfGen.uploadAsAttachment(dossierId, blob, naam));
+      } else {
+        url = URL.createObjectURL(blob);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+      if (isApp && typeof Native.openUrl === 'function') await Native.openUrl(url);
+      else if (win) win.location.href = url;
+      else window.open(url, '_blank');
+    } catch (e) {
+      if (win) win.close();
+      throw e;
     }
   },
 };
@@ -914,40 +1267,95 @@ function showProfilePicker() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = false;
   $('#app').hidden = true;
+  // Vul de greeting in op basis van tijd van de dag
+  const greetEl = $('#profile-greeting');
+  if (greetEl) {
+    const h = new Date().getHours();
+    greetEl.textContent =
+      h < 6  ? 'Goedenacht' :
+      h < 12 ? 'Goedemorgen' :
+      h < 18 ? 'Goedemiddag' :
+               'Goedenavond';
+  }
+  // Render alle profielen dynamisch uit Settings
+  const mount = $('#profile-options-mount');
+  if (mount) {
+    const profielen = ActiveProfile.list();
+    if (profielen.length === 0) {
+      mount.innerHTML = `
+        <div class="profile-empty">
+          <p class="muted">Nog geen profielen ingesteld.</p>
+          <a href="#/account#profielen" class="btn btn-primary btn-sm">+ Profiel toevoegen</a>
+        </div>`;
+    } else {
+      mount.innerHTML = profielen.map(p => {
+        const letter = (p.name || '?').trim().charAt(0).toUpperCase();
+        const c = p.color || '#6b1e2a';
+        return `
+          <button type="button" class="profile-option" data-profile="${esc(p.id)}">
+            <span class="profile-avatar-wrap">
+              <span class="profile-avatar-ring" style="--ring-color:${esc(c)};"></span>
+              <span class="profile-avatar" style="background:${esc(c)};">${esc(letter)}</span>
+            </span>
+            <span class="profile-name">${esc(p.name)}</span>
+          </button>`;
+      }).join('');
+    }
+  }
+}
+function initialen(naam) {
+  const delen = String(naam || '').trim().split(/\s+/).filter(Boolean);
+  if (delen.length === 0) return '–';
+  if (delen.length === 1) return delen[0].slice(0, 2).toUpperCase();
+  return (delen[0][0] + delen[delen.length - 1][0]).toUpperCase();
 }
 function showApp() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = true;
   $('#app').hidden = false;
-  const s = Auth.current(); if (s) $('#user-name').textContent = s.fullName || s.email;
+  const s = Auth.current();
+  if (s) {
+    const naam = s.fullName || s.email;
+    $('#user-name').textContent = naam;
+    const sn = $('#side-user-name'); if (sn) sn.textContent = naam;
+    const se = $('#side-user-email'); if (se) se.textContent = s.email || '';
+    const av = $('#side-avatar'); if (av) av.textContent = initialen(naam);
+  }
   ActiveProfile.renderChip();
 }
 
-// ─── Actief profiel (Rume / Robert) — onthouden in localStorage ───
+// ─── Actief profiel — beheerd in Settings.profielen, onthouden in localStorage ───
 const ActiveProfile = {
-  PROFILES: {
-    rume:   { id: 'rume',   name: 'Rume',   role: 'Uitvaartleider', color: '#6b1e2a' },
-    robert: { id: 'robert', name: 'Robert', role: 'Uitvaartleider', color: '#2a5d6b' },
-  },
   STORAGE_KEY: 'sok_active_profile',
+  list() {
+    const arr = (typeof Settings !== 'undefined' && Array.isArray(Settings.get('profielen')))
+      ? Settings.get('profielen') : [];
+    return arr.filter(p => p && p.id && p.name);
+  },
+  byId(id) {
+    return ActiveProfile.list().find(p => p.id === id) || null;
+  },
   current() {
     try {
       const id = localStorage.getItem(ActiveProfile.STORAGE_KEY);
-      return id && ActiveProfile.PROFILES[id] ? ActiveProfile.PROFILES[id] : null;
+      return id ? ActiveProfile.byId(id) : null;
     } catch (_) { return null; }
   },
   set(id) {
-    if (!ActiveProfile.PROFILES[id]) return;
+    if (!ActiveProfile.byId(id)) return;
     try { localStorage.setItem(ActiveProfile.STORAGE_KEY, id); } catch (_) {}
   },
   clear() {
     try { localStorage.removeItem(ActiveProfile.STORAGE_KEY); } catch (_) {}
   },
   renderChip() {
-    const p = ActiveProfile.current();
     const chip = $('#btn-active-profile');
-    if (!chip || !p) return;
+    if (!chip) return;
+    const uit = (typeof Settings !== 'undefined') && !Settings.get('profielkiezer_actief');
+    const p = ActiveProfile.current();
+    if (uit || !p) { chip.hidden = true; return; }
+    chip.hidden = false;
     $('#active-profile-name').textContent = p.name;
-    $('#active-profile-dot').style.background = p.color;
+    $('#active-profile-dot').style.background = p.color || '#6b1e2a';
   },
 };

@@ -14,6 +14,7 @@ const DEST = path.join(SRC, 'www');
 const FILES = [
   'index.html',
   'privacy.html',
+  'support.html',
   'style.css',
   'print.css',
   'icon.svg',

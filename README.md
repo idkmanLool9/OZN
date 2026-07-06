@@ -39,22 +39,21 @@ Het bestand `.nojekyll` zorgt dat Pages alles direct serveert.
 ## Functies
 
 - **Login** met e-mail + wachtwoord (Supabase Auth, EU-regio)
-- **Cloudsync** — open op telefoon, laptop, kantoorpc → zelfde dossiers
-- **Dashboard** — totalen, aankomende uitvaarten, open taken
+- **Cloudsync** — open op telefoon, iPad, laptop, kantoorpc → zelfde dossiers
+- **Profielkeuze** — Rume of Robert kiest wie er vandaag werkt; elke
+  wijziging wordt automatisch op naam getrackt
 - **Volledige intake** — alle velden uit het St. Ephrem-formulier:
   contactpersoon (incl. voor- en achternaam), overledene
   (Dossiernr., Grafnummer, BSN, Polisnummer, **Gezinsnummer**),
   kerkelijk, uitvaartdienst, logistiek, verzekering, bijzonderheden
-- **Standaard-checklist** automatisch per dossier (17 taken)
-- **Kosten** met preset-catalogus uit het intake-formulier:
-  aannametarief €622, mortuarium €146, vervoer 0–40km €231,
-  rouwauto €242, basismodel kist €615,40, aula 3 dagen €446,
-  verzorging extern €111/€63, Kerk + Dolabani Zaal €500,
-  openen graf €250, naamsteen €295, onderhoud €600
+- **Kosten** met preset-catalogus + categorie-groepering + DELA-dekking-
+  berekening: zien wie wat dekt en hoeveel familie nog te betalen heeft
 - **Kistmodel-keuze** uit volledige Unigra-tarievenlijst (45 modellen)
-- **Documenten** uploaden (overlijdensakte, ID, polis, ...) — opgeslagen
-  in Supabase Storage, downloadbaar via tijdelijke beveiligde links
-- **Notities** chronologisch per dossier
+- **Bloemen & eten-drinken catalogus** met foto's + aantal per uitvaart
+- **Notities** chronologisch per dossier — getrackt op auteur
+- **Factuur** — bewerkbare layout, direct uitprinten of als PDF mailen
+- **Mail-verstuurder** met multi-recipient + CC + adresboek + automatische
+  PDF-bijlage (factuur of dossier), via EmailJS of mailto-fallback
 - **Print** — clean A4-overzicht via browser-print
 - **JSON-export** als extra back-up
 - **Zoeken & filteren** op naam/dossiernr/gezinsnummer/status
@@ -73,7 +72,7 @@ js/
   core.js                   ← helpers + hash-router
   views-list.js             ← dashboard, dossierlijst, account
   views-form.js             ← intake/bewerk-formulier
-  views-detail.js           ← detail + taken/kosten/documenten/notities
+  views-detail.js           ← detail + kosten + notities + mail-verstuurder
   app.js                    ← init en routes
 ```
 
