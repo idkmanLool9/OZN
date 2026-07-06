@@ -126,7 +126,7 @@ function applyDossierDraft(formEl, data) {
     if (lijst) {
       lijst.innerHTML = data.__brengen_naar.map(loc => `
         <div class="brengen-naar-row" style="display:flex; gap:.5rem; align-items:center;">
-          <input type="text" class="brengen-naar-input" list="opbaarlocaties-datalist" value="${esc(loc)}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
+          <input type="text" class="brengen-naar-input" value="${esc(loc)}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
           <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
         </div>`).join('');
       changed++;
@@ -199,50 +199,50 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="1">
           <legend>Opdrachtgever <span class="muted small">(uitvaartleider / klant)</span></legend>
-          <div class="grid-3">
-            <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
-              <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
-            </label>
-            <label class="span-2"><span>Opdrachtgever</span>
-              ${(() => {
-                const lijst = Settings.get('opdrachtgevers') || [];
-                const huidig = v('opdrachtgever_naam');
-                const inLijst = lijst.some(o => (o.naam || o) === huidig);
-                return `
-                <select name="opdrachtgever_naam" id="opdrachtgever-input">
-                  <option value="">— kies een opdrachtgever —</option>
-                  ${lijst.map(o => {
-                    const naam = o.naam || o;
-                    return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
-                  }).join('')}
-                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
-                </select>`;
-              })()}
-            </label>
-          </div>
+          <label>
+            ${(() => {
+              const lijst = Settings.get('opdrachtgevers') || [];
+              const huidig = v('opdrachtgever_naam');
+              const inLijst = lijst.some(o => (o.naam || o) === huidig);
+              return `
+              <select name="opdrachtgever_naam" id="opdrachtgever-input">
+                <option value="">— kies een opdrachtgever —</option>
+                ${lijst.map(o => {
+                  const naam = o.naam || o;
+                  return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
+                }).join('')}
+                ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
+              </select>`;
+            })()}
+          </label>
         </fieldset>
 
         <fieldset class="card" data-step="1">
           <legend>Personeel</legend>
-          <label><span>Extra personeel <span class="muted small">(aanvinken uit accounts)</span></span>
-            ${(() => {
-              // Jezelf niet tonen: filter het eigen profiel (op auth-id) weg.
-              const meId = (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().id : null;
-              const personeel = (DB.list(KEYS.PERSONEEL) || []);
-              const bron = personeel.length ? personeel : (DB.list(KEYS.PROFIELEN) || []);
-              const accounts = [...new Set(bron
-                .filter(p => !meId || p.id !== meId)
-                .map(p => (p.naam || '').trim()).filter(Boolean))].sort();
-              const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
-              if (!accounts.length) return '<span class="muted small">Nog geen accounts — voeg toe in <a href="#/account#rollen">Account</a>.</span>';
-              return `<div style="display:flex; flex-wrap:wrap; gap:.5rem;">
-                ${accounts.map(naam => `
-                  <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
-                    <input type="checkbox" class="extra-personeel-cb" value="${esc(naam)}" ${gekozen.includes(naam) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(naam)}</span>
-                  </label>`).join('')}
-              </div>`;
-            })()}
-          </label>
+          <div class="grid-3">
+            <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
+              <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
+            </label>
+            <label class="span-2"><span>Extra personeel <span class="muted small">(aanvinken uit accounts)</span></span>
+              ${(() => {
+                // Jezelf niet tonen: filter het eigen profiel (op auth-id) weg.
+                const meId = (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().id : null;
+                const personeel = (DB.list(KEYS.PERSONEEL) || []);
+                const bron = personeel.length ? personeel : (DB.list(KEYS.PROFIELEN) || []);
+                const accounts = [...new Set(bron
+                  .filter(p => !meId || p.id !== meId)
+                  .map(p => (p.naam || '').trim()).filter(Boolean))].sort();
+                const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
+                if (!accounts.length) return '<span class="muted small">Nog geen accounts — voeg toe in <a href="#/account#rollen">Account</a>.</span>';
+                return `<div style="display:flex; flex-wrap:wrap; gap:.5rem;">
+                  ${accounts.map(naam => `
+                    <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
+                      <input type="checkbox" class="extra-personeel-cb" value="${esc(naam)}" ${gekozen.includes(naam) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(naam)}</span>
+                    </label>`).join('')}
+                </div>`;
+              })()}
+            </label>
+          </div>
         </fieldset>
 
         <fieldset class="card" data-step="1">
@@ -352,7 +352,7 @@ function renderDossierForm(params) {
                     ? dossier.brengen_naar : [''];
                   return arr.map((loc, i) => `
                     <div class="brengen-naar-row" style="display:flex; gap:.5rem; align-items:center;">
-                      <input type="text" class="brengen-naar-input" list="opbaarlocaties-datalist" value="${esc(loc || '')}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
+                      <input type="text" class="brengen-naar-input" value="${esc(loc || '')}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
                       <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
                     </div>`).join('');
                 })()}
@@ -391,23 +391,10 @@ function renderDossierForm(params) {
             </div>
           </div>
 
-          <!-- ── OPBAARLOCATIE (adres met suggesties uit eerdere dossiers) ─ -->
-          <label style="display:block; margin-top:.75rem;"><span>Opbaarlocatie <span class="muted small">(naam, straat + huisnummer)</span></span>
-            <input type="text" name="opbaarlocatie_type" list="opbaarlocaties-datalist" value="${esc(v('opbaarlocatie_type'))}" placeholder="bv. Aula Vale — Oldenzaal, of Blokfluitlaan 12">
+          <!-- ── OPBAARLOCATIE (vrije invoer, geen suggesties) ────────────── -->
+          <label style="display:block; margin-top:.75rem;"><span>Opbaarlocatie</span>
+            <input type="text" name="opbaarlocatie_type" value="${esc(v('opbaarlocatie_type'))}">
           </label>
-          <datalist id="opbaarlocaties-datalist">
-            ${(() => {
-              // Suggesties uit eerder gebruikte opbaarlocaties + brengen-naar entries
-              const gebruikt = new Set();
-              DB.list(KEYS.DOSSIERS).forEach(d => {
-                if (d.opbaarlocatie_type) gebruikt.add(d.opbaarlocatie_type);
-                if (Array.isArray(d.brengen_naar)) d.brengen_naar.forEach(x => x && gebruikt.add(x));
-              });
-              // Standaard-opties altijd meenemen
-              ['Aula Vale', 'Uitvaartcentrum'].forEach(x => gebruikt.add(x));
-              return [...gebruikt].sort().map(x => `<option value="${esc(x)}"></option>`).join('');
-            })()}
-          </datalist>
         </fieldset>
 
         <fieldset class="card" data-step="2">
@@ -600,7 +587,7 @@ function renderDossierForm(params) {
       div.className = 'brengen-naar-row';
       div.style.cssText = 'display:flex; gap:.5rem; align-items:center;';
       div.innerHTML = `
-        <input type="text" class="brengen-naar-input" list="opbaarlocaties-datalist" value="${esc(val)}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
+        <input type="text" class="brengen-naar-input" value="${esc(val)}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
         <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>`;
       return div;
     };
