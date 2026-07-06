@@ -9,21 +9,23 @@
 /manifest.webmanifest
   Cache-Control: no-cache, no-store, must-revalidate
 
-# index.html: korte cache, zodat een nieuwe deploy snel zichtbaar wordt
+# index.html: nooit uit cache zonder revalidatie — een nieuwe deploy is
+# meteen zichtbaar (browser doet altijd een ETag-check bij de server).
 /index.html
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache, must-revalidate
 
-# JS/CSS: korte cache met must-revalidate zodat de browser bij elke
-# request een ETag-check doet bij de server. Voorkomt dat een nieuwe
-# service-worker tijdens install per ongeluk oude files cacht.
+# JS/CSS: 'no-cache' = de browser mag cachen maar MOET elke request
+# revalideren bij de server (ETag/If-Modified-Since). Zo krijg je een
+# nieuwe build meteen binnen i.p.v. tot 5 min later. Voorkomt ook dat een
+# nieuwe service-worker tijdens install per ongeluk oude files cacht.
 /js/*
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache, must-revalidate
 
 /style.css
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache, must-revalidate
 
 /print.css
-  Cache-Control: public, max-age=300, must-revalidate
+  Cache-Control: no-cache, must-revalidate
 
 /icon.svg
   Cache-Control: public, max-age=86400
