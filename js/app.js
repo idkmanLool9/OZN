@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 170;
-const APP_VERSION    = '5.53.0';
+const APP_BUILD      = 171;
+const APP_VERSION    = '5.54.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -464,6 +464,9 @@ const Branding = {
         return `<li>${safe}</li>`;
       }).join('');
     }
+
+    // Footer (dynamisch op basis van de branding)
+    setText('footer-brand', `Intern systeem · ${s.app_name}${s.app_tagline ? ' · ' + s.app_tagline : ''} · gegevens veilig opgeslagen in de cloud`);
 
     // Document-titel
     document.title = `${s.app_name} · ${s.app_tagline}`;

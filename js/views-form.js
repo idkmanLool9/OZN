@@ -236,13 +236,13 @@ function renderDossierForm(params) {
             ].map(([naam, label]) => {
               const aan = dossier[naam] === 'ja';
               return `
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.6rem .9rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
-                <label style="display:flex; align-items:center; gap:.6rem; margin:0; cursor:pointer; font-weight:500;">
-                  <input type="checkbox" name="${naam}" data-aantal-row="${naam}-aantal-row" ${aan ? 'checked' : ''} style="width:1.15rem; height:1.15rem; accent-color:var(--primary,#2563eb);"> ${label}
+              <div style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
+                <label style="display:flex; flex-direction:row; align-items:center; gap:.6rem; margin:0; cursor:pointer; font-weight:500; flex:1;">
+                  <input type="checkbox" name="${naam}" data-aantal-row="${naam}-aantal-row" ${aan ? 'checked' : ''} style="width:1.15rem; height:1.15rem; flex:0 0 auto; accent-color:var(--primary,#2563eb);"> <span>${label}</span>
                 </label>
-                <span id="${naam}-aantal-row" style="display:flex; align-items:center; gap:.5rem;" ${aan ? '' : 'hidden'}>
+                <span id="${naam}-aantal-row" style="display:flex; flex-direction:row; align-items:center; gap:.5rem; flex:0 0 auto;" ${aan ? '' : 'hidden'}>
                   <span class="muted small">aantal</span>
-                  <input type="number" name="${naam}_aantal" min="0" inputmode="numeric" style="width:5rem;" value="${v(naam + '_aantal')}">
+                  <input type="number" name="${naam}_aantal" min="0" inputmode="numeric" style="width:4.5rem;" value="${v(naam + '_aantal')}">
                 </span>
               </div>`;
             }).join('')}

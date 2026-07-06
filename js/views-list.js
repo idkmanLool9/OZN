@@ -42,8 +42,7 @@ function renderDossierList(params, path) {
 
       <form class="dossiers-filterbar" id="filter-form">
         <div class="catalog-search">
-          <span class="catalog-search-icon">🔍</span>
-          <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon…" autocomplete="off">
+          <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam of dossiernummer…" autocomplete="off">
         </div>
         <select name="status" class="dossiers-control" id="dossiers-status">
           <option value="">Alle statussen</option>
@@ -64,16 +63,14 @@ function renderDossierList(params, path) {
         : `<div class="dossiers-kaart">
             <table class="table dossiers-table">
               <thead><tr>
-                <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th><th aria-hidden="true"></th>
+                <th>Dossier</th><th>Overledene</th><th>Opdrachtgever</th><th>Overlijden</th><th>Status</th><th>Laatst gewijzigd</th><th aria-hidden="true"></th>
               </tr></thead>
               <tbody>
                 ${dossiers.map(d => `<tr data-id="${d.id}">
                   <td><a href="#/dossiers/${d.id}" class="dossier-link">${esc(d.dossier_nummer)}</a></td>
                   <td><strong>${esc(fullName(d) || '—')}</strong></td>
-                  <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
-                  <td>${esc(d.gezinsnummer || '—')}</td>
+                  <td>${esc(d.opdrachtgever_naam || '—')}</td>
                   <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
-                  <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
                   <td>${dossierStatusBadge(d.status)}</td>
                   <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? '<br>- ' + esc(d.bijgewerkt_door) : ''}</span></td>
                   <td class="dossiers-chevron" aria-hidden="true">›</td>
