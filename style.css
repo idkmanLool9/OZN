@@ -2761,6 +2761,23 @@ fieldset[data-step][hidden] { display: none !important; }
 }
 .kist-card-foot .kist-price { font-size: .95rem; }
 .kist-kies-btn { white-space: nowrap; }
+/* Voorraad-indicatie op de kistkaart (beheerder) */
+.kist-voorraad-chip {
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .15rem .5rem; border-radius: 999px; font-size: .8rem; font-weight: 600;
+  background: #eef4ff; color: #244a8a; border: 1px solid #d5e2fb; white-space: nowrap;
+}
+.kist-voorraad-chip.is-laag { background: #fff6e6; color: #8a5a00; border-color: #f2d69a; }
+.kist-voorraad-chip.is-leeg { background: #fde4e4; color: #8a1e1e; border-color: #f2b4b4; }
+.kist-voorraad-chip.is-onbekend { background: #f4f2ee; color: #7a7466; border-color: #e5e0d6; }
+.kist-voorraad-row {
+  display: flex; flex-wrap: wrap; align-items: end; gap: .5rem;
+  margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed var(--border, #e5e0d6);
+}
+.kist-voorraad-row .voorraad-cell { display: flex; flex-direction: column; gap: .1rem; }
+.kist-voorraad-banner { border-left: 4px solid #d68910; }
+tr.row-leeg { background: #fdf3f3; }
+.alert.alert-warn { background: #fff6e6; color: #6b4900; border: 1px solid #f2d69a; padding: .75rem 1rem; border-radius: 8px; }
 
 /* Lijstweergave */
 .kist-grid.is-list { grid-template-columns: 1fr; gap: .6rem; }

@@ -135,11 +135,23 @@ function renderKistenBeheer(msg) {
   const start = (_kistPagina - 1) * KISTEN_PER_PAGINA;
   const pagina = gefilterd.slice(start, start + KISTEN_PER_PAGINA);
 
+  const isBeheerder = (typeof Auth !== 'undefined') && Auth.isBeheerder();
   const kaart = (k) => {
     const url = KistFotos.urlVoor(k.naam);
     const hidden = !!k._hidden;
     const isFav = favs.includes(k.naam);
     const isTop = meestGekozen && k.naam === meestGekozen;
+    const vr = isBeheerder && (typeof KistVoorraad !== 'undefined')
+      ? KistVoorraad.byNaam(k.naam) : null;
+    const vAantal = vr ? (vr.aantal || 0) : null;
+    const vMin    = vr ? (vr.min_aantal || 0) : 0;
+    const vLaag   = vr && vAantal < vMin;
+    const vLeeg   = vr && vAantal === 0;
+    const vChip   = isBeheerder ? (
+      vr
+        ? `<span class="kist-voorraad-chip ${vLeeg ? 'is-leeg' : (vLaag ? 'is-laag' : '')}" title="Voorraad · minimum ${vMin}">📦 ${vAantal}${vMin ? ` <span class="muted small">/ ${vMin}</span>` : ''}${vLaag ? ' ⚠' : ''}</span>`
+        : `<span class="kist-voorraad-chip is-onbekend" title="Nog geen voorraad ingesteld">📦 —</span>`
+    ) : '';
     return `
       <div class="kist-card ${hidden ? 'is-hidden-catalog' : ''}" data-naam="${esc(k.naam)}">
         <div class="kist-card-imgwrap">
@@ -160,8 +172,20 @@ function renderKistenBeheer(msg) {
           <span class="muted small">${esc(k.materiaal)}</span>
           <div class="kist-card-foot">
             <span class="kist-price">${fmtEUR(k.bedrag)}</span>
+            ${vChip}
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
+          ${isBeheerder ? `
+            <div class="kist-voorraad-row">
+              <label class="voorraad-cell"><span class="muted small">Voorraad</span>
+                <input type="number" min="0" step="1" data-vr-aantal="${esc(k.naam)}" value="${esc(vAantal != null ? vAantal : '')}" placeholder="—" inputmode="numeric" style="max-width:70px;">
+              </label>
+              <label class="voorraad-cell"><span class="muted small">Min.</span>
+                <input type="number" min="0" step="1" data-vr-min="${esc(k.naam)}" value="${esc(vMin || '')}" placeholder="—" inputmode="numeric" style="max-width:60px;">
+              </label>
+              <button type="button" class="btn btn-sm" data-vr-save="${esc(k.naam)}">Opslaan</button>
+              ${vr && vr.laatst_besteld ? `<span class="muted small" title="Laatst besteld">🗓 ${esc(fmtDate(vr.laatst_besteld))}${vr.besteld_aantal ? ' · ' + vr.besteld_aantal + '×' : ''}</span>` : ''}
+            </div>` : ''}
           ${adminMode ? `
             <div class="kist-card-actions">
               <label class="btn btn-sm">${url ? 'Vervang foto' : 'Foto uploaden'}
@@ -193,6 +217,19 @@ function renderKistenBeheer(msg) {
         </div>
         ${adminMode ? '<span class="badge badge-amber">Beheermodus aan</span>' : ''}
       </div>
+
+      ${isBeheerder ? (() => {
+        const laag = (typeof KistVoorraad !== 'undefined') ? KistVoorraad.laag() : [];
+        if (!laag.length) return '';
+        return `
+        <div class="alert alert-warn kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <div>
+            <strong>⚠ Voorraad laag</strong>
+            <span class="muted small">${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum — tijd om bij te bestellen.</span>
+          </div>
+          <a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>
+        </div>`;
+      })() : ''}
 
       <div class="catalog-zoekbalk">
         <div class="catalog-search">
@@ -337,6 +374,28 @@ function renderKistenBeheer(msg) {
     const favBtn = e.target.closest('[data-fav]');
     if (favBtn) { _toggleKistFav(favBtn.getAttribute('data-fav')); renderKistenBeheer(); return; }
 
+    // ── Voorraad opslaan (per kist, beheerder) ──
+    const vrSaveBtn = e.target.closest('button[data-vr-save]');
+    if (vrSaveBtn) {
+      const naam = vrSaveBtn.getAttribute('data-vr-save');
+      const aInp = $(`input[data-vr-aantal="${CSS.escape(naam)}"]`);
+      const mInp = $(`input[data-vr-min="${CSS.escape(naam)}"]`);
+      const aRaw = aInp && aInp.value !== '' ? parseInt(aInp.value, 10) : null;
+      const mRaw = mInp && mInp.value !== '' ? parseInt(mInp.value, 10) : null;
+      const patch = {};
+      if (aRaw != null && isFinite(aRaw) && aRaw >= 0) patch.aantal = aRaw;
+      if (mRaw != null && isFinite(mRaw) && mRaw >= 0) patch.min_aantal = mRaw;
+      if (aRaw != null && !isFinite(aRaw)) { Modal.show({ type:'warning', title:'Ongeldig aantal', message:'Vul een geheel getal ≥ 0 in.' }); return; }
+      if (!Object.keys(patch).length) return;
+      try {
+        await KistVoorraad.upsert(naam, patch);
+        renderKistenBeheer({ success: `Voorraad "${naam}" opgeslagen (${patch.aantal ?? '—'} stuks).` });
+      } catch (err) {
+        renderKistenBeheer({ error: 'Voorraad opslaan mislukt: ' + (err.message || err) });
+      }
+      return;
+    }
+
     // ── Beheermodus: prijs / verwijder / herstel / reset ──
     const savePriceBtn = e.target.closest('button[data-save-price]');
     if (savePriceBtn) {
@@ -455,5 +514,120 @@ function renderKistenBeheer(msg) {
       await KistFotos.remove(naam);
       renderKistenBeheer({ success: 'Foto verwijderd.' });
     } catch (_) {}
+  };
+}
+
+// ─── Bestellijst (beheerder) ────────────────────────────────────────────────
+// Overzicht van alle kisten waar voorraad < minimum. Toont per kist wat er
+// besteld moet worden om weer op peil te komen (bestel_aantal of anders 2×min).
+// Geeft een tekst-blok dat je kunt kopiëren of mailen naar Unigra.
+function renderKistenBestellijst(msg) {
+  const isBeheerder = (typeof Auth !== 'undefined') && Auth.isBeheerder();
+  if (!isBeheerder) {
+    $('#view').innerHTML = `
+      <div class="page">
+        <div class="page-head"><div><a href="#/kisten" class="back-link">← Terug naar kisten</a><h1>Geen toegang</h1></div></div>
+        <div class="card"><p class="muted">De bestellijst is alleen zichtbaar voor beheerders.</p></div>
+      </div>`;
+    return;
+  }
+  const alle = KistVoorraad.all().slice()
+    .sort((a, b) => ((a.aantal||0) - (a.min_aantal||0)) - ((b.aantal||0) - (b.min_aantal||0)));
+  const laag = alle.filter(r => (r.aantal || 0) < (r.min_aantal || 0));
+  // Per rij: te bestellen aantal = bestel_aantal (indien ingesteld), anders (min×2 - aantal), altijd ≥ 1
+  const berekend = laag.map(r => {
+    const target = r.bestel_aantal && r.bestel_aantal > 0 ? r.bestel_aantal : Math.max(1, (r.min_aantal || 1) * 2 - (r.aantal || 0));
+    return { ...r, teBestellen: target };
+  });
+  const totaal = berekend.reduce((s, r) => s + r.teBestellen, 0);
+  const nu = new Date().toLocaleDateString('nl-NL');
+  const tekst = berekend.length
+    ? [
+        `Bestelaanvraag voor Unigra — ${nu}`,
+        `Van: OZN — Overledenenzorg Nederland`,
+        ``,
+        ...berekend.map(r => `- ${r.teBestellen}× ${r.naam}   (huidige voorraad: ${r.aantal||0}, min: ${r.min_aantal||0})`),
+        ``,
+        `Totaal: ${totaal} kist${totaal === 1 ? '' : 'en'}`,
+      ].join('\n')
+    : '';
+
+  $('#view').innerHTML = `
+    <div class="page">
+      <div class="page-head">
+        <div><a href="#/kisten" class="back-link">← Terug naar kisten</a><h1>Bestellijst — Unigra</h1>
+          <p class="muted">Alle kisten waarvan de voorraad onder het minimum staat.</p></div>
+      </div>
+
+      ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
+      ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
+
+      ${berekend.length === 0 ? `
+        <div class="card"><p class="muted">🎉 Alle voorraden zijn op peil — niets te bestellen.</p></div>
+      ` : `
+      <section class="card">
+        <table class="table">
+          <thead><tr><th>Kist</th><th class="num">Voorraad</th><th class="num">Min.</th><th class="num">Te bestellen</th><th>Laatst besteld</th><th></th></tr></thead>
+          <tbody>
+            ${berekend.map(r => `<tr class="${(r.aantal||0) === 0 ? 'row-leeg' : ''}">
+              <td><strong>${esc(r.naam)}</strong></td>
+              <td class="num">${r.aantal || 0}</td>
+              <td class="num">${r.min_aantal || 0}</td>
+              <td class="num"><input type="number" min="1" step="1" value="${r.teBestellen}" data-bestel-aantal="${esc(r.naam)}" style="width:70px;text-align:right;"></td>
+              <td class="muted small">${r.laatst_besteld ? esc(fmtDate(r.laatst_besteld)) + (r.besteld_aantal ? ' · ' + r.besteld_aantal + '×' : '') : '—'}</td>
+              <td><button type="button" class="btn btn-sm" data-mark-besteld="${esc(r.naam)}" title="Markeer als besteld (dan komt hij niet meer op deze lijst voor vandaag)">✓ Besteld</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="form-actions" style="justify-content:space-between;flex-wrap:wrap;gap:.5rem;">
+          <span class="muted small">${berekend.length} kist${berekend.length===1?'':'en'} · totaal ${totaal} stuks</span>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button type="button" class="btn" id="btn-copy-bestellijst">📋 Kopieer als tekst</button>
+            <a class="btn btn-primary" id="btn-mail-bestellijst" href="mailto:?subject=${encodeURIComponent('Bestelaanvraag OZN — ' + nu)}&body=${encodeURIComponent(tekst)}">✉ E-mail voorbereiden</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 style="margin-top:0;">Tekstversie (kopieer of e-mail)</h3>
+        <textarea id="bestellijst-tekst" rows="${Math.max(6, berekend.length + 4)}" style="width:100%;font-family:ui-monospace,monospace;font-size:.9rem;">${esc(tekst)}</textarea>
+      </section>
+      `}
+    </div>`;
+
+  // Kopieer-knop
+  const copyBtn = $('#btn-copy-bestellijst');
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(tekst);
+      if (typeof Toast !== 'undefined') Toast.show('Bestellijst gekopieerd', 'success');
+    } catch (_) {
+      const ta = $('#bestellijst-tekst'); if (ta) { ta.select(); document.execCommand('copy'); }
+    }
+  });
+
+  // Markeer één regel als besteld (laatst_besteld + besteld_aantal invullen)
+  $('#view').onclick = async e => {
+    const backLink = e.target.closest('.back-link');
+    if (backLink) { e.preventDefault(); Router.go('/kisten'); return; }
+    const mBtn = e.target.closest('button[data-mark-besteld]');
+    if (mBtn) {
+      const naam = mBtn.getAttribute('data-mark-besteld');
+      const aInp = $(`input[data-bestel-aantal="${CSS.escape(naam)}"]`);
+      const aantal = aInp ? parseInt(aInp.value, 10) : null;
+      if (!aantal || aantal < 1) return;
+      try {
+        await KistVoorraad.upsert(naam, {
+          laatst_besteld: new Date().toISOString().slice(0, 10),
+          besteld_aantal: aantal,
+          // Direct de voorraad ophogen zodat de kist van de lijst verdwijnt;
+          // de beheerder kan bij levering nog verfijnen.
+          aantal: ((KistVoorraad.byNaam(naam) || {}).aantal || 0) + aantal,
+        });
+        renderKistenBestellijst({ success: `${naam}: ${aantal} besteld — voorraad bijgewerkt.` });
+      } catch (err) {
+        renderKistenBestellijst({ error: 'Opslaan mislukt: ' + (err.message || err) });
+      }
+    }
   };
 }

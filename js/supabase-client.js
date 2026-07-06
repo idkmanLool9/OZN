@@ -16,6 +16,7 @@ const KEYS = {
   PROFIELEN: 'profiles',
   PERSONEEL: 'personeel_namen',   // alleen id+naam (voor personeelskiezer; geen rol-lek)
   PLANNING: 'planning_items',
+  KIST_VOORRAAD: 'kist_voorraad', // voorraad per kist-naam (beheerder-only)
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -88,7 +89,7 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [], profiles: [], personeel_namen: [], planning_items: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [], profiles: [], personeel_namen: [], planning_items: [], kist_voorraad: [] },
   loaded: false,
   offline: false,
 
@@ -96,7 +97,7 @@ const Cloud = {
     // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, k, n, kim, blm, etn, gz, ld, pf, pn, pl] = await Promise.all([
+      const [d, k, n, kim, blm, etn, gz, ld, pf, pn, pl, kv] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
         sb.from('kosten_zicht').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
@@ -113,6 +114,8 @@ const Cloud = {
         sb.from('personeel_namen').select('*').order('naam', { ascending: true }),
         // Planning-agenda (tolerant als de tabel nog niet bestaat)
         sb.from('planning_items').select('*').order('start_ts', { ascending: true }),
+        // Kist-voorraad (RLS: beheerder-only; medewerker krijgt lege lijst)
+        sb.from('kist_voorraad').select('*'),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
@@ -126,6 +129,7 @@ const Cloud = {
       Cloud.cache.profiles = ((pf && pf.data) || []).map(normRow);
       Cloud.cache.personeel_namen = ((pn && pn.data) || []).map(normRow);
       Cloud.cache.planning_items = ((pl && pl.data) || []).map(normRow);
+      Cloud.cache.kist_voorraad = ((kv && kv.data) || []).map(normRow);
       Cloud.loaded = true;
       Cloud.offline = false;
       try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}
@@ -361,6 +365,44 @@ const ArtsVerklaring = {
   async remove(path) {
     if (!path) return;
     await sb.storage.from('documenten').remove([path]).catch(() => {});
+  },
+};
+
+// ─── Kist-voorraad (beheerder-only) ─────────────────────────────────────────
+const KistVoorraad = {
+  // Alles synchroon uit de cache: welke rij hoort bij deze kist-naam?
+  byNaam(naam) { return (Cloud.cache.kist_voorraad || []).find(r => r.naam === naam); },
+  all() { return Cloud.cache.kist_voorraad || []; },
+  // Alle kisten die onder hun minimum zitten (of geen voorraad hebben).
+  laag() {
+    return KistVoorraad.all().filter(r => (r.aantal || 0) < (r.min_aantal || 0));
+  },
+  // Upsert per kist. Werkt met SEL/UPSERT op de 'naam'-PK.
+  async upsert(naam, patch) {
+    if (!navigator.onLine) throw new Error('offline');
+    const bestaand = KistVoorraad.byNaam(naam);
+    const row = Object.assign({ naam }, bestaand || {}, patch);
+    // Wie wijzigde: actief profiel of e-mail
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+      ? ActiveProfile.current().name : null;
+    const u = Auth.current();
+    row.bijgewerkt_door = profielNaam || (u ? (u.fullName || u.email) : null);
+    const { data, error } = await sb.from('kist_voorraad')
+      .upsert(row, { onConflict: 'naam' }).select().single();
+    if (error) throw error;
+    // Cache bijwerken
+    const arr = Cloud.cache.kist_voorraad;
+    const i = arr.findIndex(x => x.naam === naam);
+    if (i >= 0) arr[i] = data; else arr.push(data);
+    return data;
+  },
+  // Reserveer 1 stuk (bij dossier-koppeling). Fout is niet-fataal.
+  async reserveer1(naam) {
+    if (!naam) return;
+    const cur = KistVoorraad.byNaam(naam);
+    if (!cur) return; // nog geen voorraadregel = niet bijhouden
+    const nieuw = Math.max(0, (cur.aantal || 0) - 1);
+    try { await KistVoorraad.upsert(naam, { aantal: nieuw }); } catch (_) {}
   },
 };
 

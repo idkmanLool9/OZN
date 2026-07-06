@@ -1271,6 +1271,13 @@ function renderDossierForm(params) {
       if (isNew) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
         savedDossier = created;
+        // Voorraad-reservering: als er een kist_type is gekozen én er een
+        // voorraadregel bestaat, 1 afboeken. Alleen beheerder (RLS blokkeert
+        // medewerker sowieso — dan gewoon overslaan).
+        if (data.kist_type && typeof KistVoorraad !== 'undefined'
+            && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+          try { await KistVoorraad.reserveer1(data.kist_type); } catch (_) {}
+        }
         // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
         // Alleen beheerders beheren kosten (server-side geblokkeerd voor medewerkers).
         try {
