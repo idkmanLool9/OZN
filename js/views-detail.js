@@ -79,6 +79,16 @@ function renderDossierDetail(params) {
           ${d.artsverklaring_pad ? `<div><dt>Artsverklaring</dt><dd><button type="button" class="link-btn" id="btn-view-artsverklaring">📄 Bekijk scan</button></dd></div>` : ''}
           ${d.overdraagformulier_pad ? `<div><dt>Overdraagformulier</dt><dd><button type="button" class="link-btn" id="btn-view-overdraag">📄 Bekijk scan</button></dd></div>` : ''}
         </dl>
+        ${(() => {
+          const items = [
+            ['Oorbel(en)',  d.bezit_oorbellen, d.bezit_oorbellen_aantal],
+            ['Ring(en)',    d.bezit_ringen,    d.bezit_ringen_aantal],
+            ['Armband(en)', d.bezit_armbanden, d.bezit_armbanden_aantal],
+          ].filter(([, heeft]) => heeft === 'ja');
+          if (!items.length) return '';
+          return `<h3>Bezittingen</h3><dl class="dl">${items.map(([label, , aantal]) =>
+            dlRow(label, aantal ? `${aantal} stuk(s)` : 'ja')).join('')}</dl>`;
+        })()}
         <h3>Opbaren &amp; locatie</h3>
         <dl class="dl">
           ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : ''))}

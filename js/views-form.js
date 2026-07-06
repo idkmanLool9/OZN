@@ -225,6 +225,30 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
+        <fieldset class="card" data-step="1">
+          <legend>Bezittingen</legend>
+          <p class="muted small">Streep aan welke sieraden/bezittingen de overledene bij zich heeft en vul het aantal in.</p>
+          <div style="display:flex; flex-direction:column; gap:.75rem;">
+            ${[
+              ['bezit_oorbellen', 'Oorbel(en)'],
+              ['bezit_ringen',    'Ring(en)'],
+              ['bezit_armbanden', 'Armband(en)'],
+            ].map(([naam, label]) => {
+              const aan = dossier[naam] === 'ja';
+              return `
+              <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+                <label style="display:flex; align-items:center; gap:.5rem; margin:0; cursor:pointer; min-width:9rem;">
+                  <input type="checkbox" name="${naam}" data-aantal-row="${naam}-aantal-row" ${aan ? 'checked' : ''}> ${label}
+                </label>
+                <label id="${naam}-aantal-row" style="margin:0; display:flex; align-items:center; gap:.5rem;" ${aan ? '' : 'hidden'}>
+                  <span class="muted small">aantal (per stuk)</span>
+                  <input type="number" name="${naam}_aantal" min="0" inputmode="numeric" style="width:6rem;" value="${v(naam + '_aantal')}">
+                </label>
+              </div>`;
+            }).join('')}
+          </div>
+        </fieldset>
+
         <fieldset class="card" data-step="2">
           <legend>Opbaren &amp; locatie</legend>
           <div class="grid-3">
@@ -479,6 +503,15 @@ function renderDossierForm(params) {
     });
     updateThuisRows();
   }
+
+  // Bezittingen: aantal-veld tonen zodra het sieraad is aangevinkt
+  document.querySelectorAll('input[type="checkbox"][data-aantal-row]').forEach(cb => {
+    const row = document.getElementById(cb.getAttribute('data-aantal-row'));
+    if (!row) return;
+    const upd = () => { row.hidden = !cb.checked; };
+    cb.addEventListener('change', () => { upd(); updateStepColors(); });
+    upd();
+  });
 
   // Graf-type → grafnummer pas tonen na keuze; certificaatnummer bij familiegraf
   const grafTypeSel = document.getElementById('graf-type-select');
