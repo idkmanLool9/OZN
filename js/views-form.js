@@ -90,6 +90,10 @@ function snapshotDossierForm(formEl) {
     if (inp.type === 'checkbox') data[f] = inp.checked ? 'ja' : 'nee';
     else data[f] = inp.value;
   });
+  // Extra personeel (checkboxes zonder name, buiten DOSSIER_VELDEN) meenemen
+  // zodat de keuze een autosave-restore overleeft bij een nieuw dossier.
+  data.__extra_personeel = [...formEl.querySelectorAll('.extra-personeel-cb')]
+    .filter(cb => cb.checked).map(cb => cb.value);
   return data;
 }
 function applyDossierDraft(formEl, data) {
@@ -104,6 +108,14 @@ function applyDossierDraft(formEl, data) {
       inp.value = data[f];
       changed++;
     }
+  }
+  // Extra personeel terugzetten
+  if (Array.isArray(data.__extra_personeel)) {
+    const want = new Set(data.__extra_personeel);
+    formEl.querySelectorAll('.extra-personeel-cb').forEach(cb => {
+      const v = want.has(cb.value);
+      if (cb.checked !== v) { cb.checked = v; changed++; }
+    });
   }
   // Datum-displays bijwerken na restore (hidden value is gezet, visible niet)
   if (typeof WheelDate !== 'undefined') WheelDate.syncDisplays(formEl);
@@ -181,7 +193,11 @@ function renderDossierForm(params) {
               ${(() => {
                 // Jezelf niet tonen: filter het eigen profiel (op auth-id) weg.
                 const meId = (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().id : null;
-                const accounts = [...new Set((DB.list(KEYS.PROFIELEN) || [])
+                // Uit personeel_namen (id+naam view) — werkt ook voor medewerkers,
+                // die geen volledige profiles-lijst meer mogen zien.
+                const personeel = (DB.list(KEYS.PERSONEEL) || []);
+                const bron = personeel.length ? personeel : (DB.list(KEYS.PROFIELEN) || []);
+                const accounts = [...new Set(bron
                   .filter(p => !meId || p.id !== meId)
                   .map(p => (p.naam || '').trim()).filter(Boolean))].sort();
                 const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
@@ -540,6 +556,30 @@ function renderDossierForm(params) {
         if (a._rank[0] !== b._rank[0]) return a._rank[0] - b._rank[0];
         return a._rank[1] - b._rank[1];
       });
+    // Medewerkers mogen geen prijzen zien en geen kosten beheren (server-side
+    // afgedwongen). Toon een alleen-lezen lijst zonder bedragen en zonder
+    // schrijf-acties; aftikken kan in het dossier zelf.
+    const kanKosten = (typeof Auth === 'undefined') || Auth.isBeheerder();
+    if (!kanKosten) {
+      mount.innerHTML = `
+        ${kosten.length === 0
+          ? '<p class="muted small">Nog geen kostenposten.</p>'
+          : `<table class="table wizard-kosten-table">
+              <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Aantal</th><th></th></tr></thead>
+              <tbody>${kosten.map(k => {
+                const aantal = Number(k.aantal) || 1;
+                return `<tr>
+                  <td>${esc(k.omschrijving)}</td>
+                  <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
+                  <td class="num">${aantal}</td>
+                  <td>${k.betaald ? '<span class="badge badge-green" title="Afgevinkt">✓</span>' : ''}</td>
+                </tr>`;
+              }).join('')}</tbody>
+            </table>`}
+        <p class="muted small" style="margin-top:.5rem;">Bedragen en het beheren van kostenposten zijn voorbehouden aan de beheerder. Aftikken kan in het dossier zelf.</p>`;
+      return;
+    }
+
     const totaal = kosten.reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const betaald = kosten.filter(k => k.betaald).reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const open = Math.max(0, totaal - betaald);
@@ -798,6 +838,9 @@ function renderDossierForm(params) {
   const KIST_PREFIX = 'Kist: ';
 
   async function syncAutoKost(prefix, categorie, naam, bedrag) {
+    // Medewerkers beheren geen kosten (server-side geblokkeerd) — auto-kosten
+    // overslaan zodat er geen mislukte schrijfacties/foutmeldingen ontstaan.
+    if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) { renderWizardKosten(); return; }
     if (isNew) {
       // Verwijder eerdere auto-post uit buffer
       kostenBuffer = kostenBuffer.filter(k => !(k.omschrijving || '').startsWith(prefix));
@@ -1229,7 +1272,9 @@ function renderDossierForm(params) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
         savedDossier = created;
         // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
+        // Alleen beheerders beheren kosten (server-side geblokkeerd voor medewerkers).
         try {
+          if (typeof Auth === 'undefined' || Auth.isBeheerder())
           await Promise.all((kostenBuffer || []).map(p => DB.insert(KEYS.KOSTEN, {
             dossier_id: created.id,
             omschrijving: p.omschrijving,
