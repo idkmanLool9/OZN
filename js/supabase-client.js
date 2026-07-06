@@ -17,23 +17,41 @@ const KEYS = {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 let _session = null;
+let _rol = null;   // 'beheerder' | 'medewerker' — uit public.profiles
 
 const Auth = {
   async init() {
     const { data } = await sb.auth.getSession();
     _session = data.session || null;
-    sb.auth.onAuthStateChange((_evt, sess) => { _session = sess || null; });
+    sb.auth.onAuthStateChange((_evt, sess) => {
+      _session = sess || null;
+      _rol = null;
+      if (_session) Auth.loadRol();
+    });
+    if (_session) await Auth.loadRol();
     return _session;
   },
+  // Haal de rol van de ingelogde gebruiker op uit profiles (RLS: eigen rij).
+  async loadRol() {
+    try {
+      const uid = _session && _session.user && _session.user.id;
+      if (!uid) { _rol = null; return; }
+      const { data } = await sb.from('profiles').select('rol').eq('id', uid).maybeSingle();
+      _rol = (data && data.rol) || 'medewerker';
+    } catch (_) { _rol = 'medewerker'; }
+  },
+  rol() { return _rol || 'medewerker'; },
+  isBeheerder() { return _rol === 'beheerder'; },
   current() {
     if (!_session) return null;
     const u = _session.user;
-    return { id: u.id, email: u.email, fullName: u.user_metadata?.full_name || u.email, role: 'beheerder' };
+    return { id: u.id, email: u.email, fullName: u.user_metadata?.full_name || u.email, role: _rol || 'medewerker' };
   },
   async login(email, password) {
     const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return error.message;
     _session = data.session;
+    await Auth.loadRol();
     return null;
   },
   async logout() { await sb.auth.signOut(); _session = null; },
