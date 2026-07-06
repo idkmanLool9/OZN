@@ -216,8 +216,6 @@ const AANBEVOLEN_VELDEN = [
   { name: 'overlijdensdatum',      label: 'Overlijdensdatum' },
   { name: 'adres_overledene',      label: 'Adres overledene' },
   { name: 'woonplaats_overledene', label: 'Woonplaats overledene' },
-  { name: 'uitvaart_type',         label: 'Type uitvaart' },
-  { name: 'uitvaart_datum',        label: 'Datum uitvaart' },
 ];
 
 const DOSSIER_VELDEN = [

@@ -154,11 +154,9 @@ function renderDossierForm(params) {
           <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Opbaren &amp; locatie</span></button>
           <button type="button" class="wizard-step" data-go="3"><span class="num">3</span><span class="lbl">Kosten</span></button>
           <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Bijzonderheden</span></button>
-          <button type="button" class="wizard-step" data-go="5"><span class="num">5</span><span class="lbl">Handtekeningen</span></button>
         </nav>
 
-        <fieldset class="card" data-step="1">
-          <legend>Gegevens overledene</legend>
+        <fieldset data-step="1" style="border:none; padding:0; margin:0 0 1rem;">
           <div class="grid-3">
             <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
               <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
@@ -176,13 +174,15 @@ function renderDossierForm(params) {
                     return `<option value="${esc(naam)}" ${huidig === naam ? 'selected' : ''}>${esc(naam)}</option>`;
                   }).join('')}
                   ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)} (niet in lijst)</option>` : ''}
-                </select>
-                ${lijst.length === 0
-                  ? '<span class="muted small">Nog geen opdrachtgevers ingesteld — voeg toe in <a href="#/account#opdrachtgevers">Account → Opdrachtgevers</a>.</span>'
-                  : '<span class="muted small">Beheren in <a href="#/account#opdrachtgevers">Account</a>.</span>'}
-                `;
+                </select>`;
               })()}
             </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="card" data-step="1">
+          <legend>Gegevens overledene</legend>
+          <div class="grid-3">
             <label><span>Achternaam</span><input type="text" name="achternaam" value="${v('achternaam')}"></label>
             <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}"></label>
             <label><span>Geslacht</span>
@@ -259,68 +259,28 @@ function renderDossierForm(params) {
                 <option value="thuis" ${sel('opbaring_type','thuis')}>Thuis opbaren</option>
               </select>
             </label>
-            <label id="thuis-datum-row" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Datum thuis opbaren</span>
-              <input type="date" name="thuis_opbaren_datum" value="${v('thuis_opbaren_datum')}">
-            </label>
-            <label id="thuis-tijd-row" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Begintijd thuis</span>
-              <input type="time" name="thuis_opbaren_tijd" value="${v('thuis_opbaren_tijd')}">
-            </label>
-            <label class="span-3" id="rouwgoederen-row" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Benodigde rouwgoederen</span>
-              <textarea name="benodigde_rouwgoederen" rows="3" placeholder="bv. baar, koeling, rouwkleed, kaarsen...">${v('benodigde_rouwgoederen')}</textarea>
-            </label>
-            <label><span>Opbaarlocatie</span>
+          </div>
+        </fieldset>
+
+        <fieldset class="card" data-step="2" id="opbaring-detail-fieldset" ${dossier.opbaring_type ? '' : 'hidden'}>
+          <legend id="opbaring-detail-legend">${dossier.opbaring_type === 'thuis' ? 'Thuis opbaren' : (dossier.opbaring_type === 'ophalen' ? 'Ophalen' : '')}</legend>
+          <div class="grid-3">
+            <label class="opbaring-ophalen" ${dossier.opbaring_type === 'ophalen' ? '' : 'hidden'}><span>Opbaarlocatie</span>
               <select name="opbaarlocatie_type">
                 <option value="">—</option>
                 <option value="uitvaartcentrum" ${sel('opbaarlocatie_type','uitvaartcentrum')}>Uitvaartcentrum</option>
                 <option value="aula" ${sel('opbaarlocatie_type','aula')}>Aula</option>
               </select>
             </label>
-          </div>
-        </fieldset>
-
-        <fieldset class="card" data-step="2">
-          <legend>Uitvaart</legend>
-          <div class="grid-3">
-            <label><span>Type uitvaart</span>
-              <select name="uitvaart_type">
-                <option value="">—</option>
-                <option value="begrafenis" ${sel('uitvaart_type','begrafenis')}>Begrafenis</option>
-                <option value="repatriëring" ${sel('uitvaart_type','repatriëring')}>Repatriëring</option>
-              </select>
+            <label class="opbaring-thuis" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Datum thuis opbaren</span>
+              <input type="date" name="thuis_opbaren_datum" value="${v('thuis_opbaren_datum')}">
             </label>
-            <label><span>Datum uitvaart</span><input type="date" name="uitvaart_datum" value="${v('uitvaart_datum')}"></label>
-            <label><span>Tijdstip uitvaart</span><input type="time" name="uitvaart_tijd" value="${v('uitvaart_tijd')}"></label>
-            <label><span>Wie leidt de uitvaart?</span>
-              ${(() => {
-                // Alle ingevulde priesters uit Account → Parochies
-                const priesters = [...new Set((Settings.get('parochies') || [])
-                  .map(p => (p.priester || '').trim()).filter(Boolean))].sort();
-                const huidig = v('uitvaart_voorganger');
-                const inLijst = priesters.some(p => p === huidig);
-                return `
-                <select name="uitvaart_voorganger">
-                  <option value="">— kies een priester —</option>
-                  ${priesters.map(p => `<option value="${esc(p)}" ${huidig === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
-                  ${huidig && !inLijst ? `<option value="${esc(huidig)}" selected>${esc(huidig)}</option>` : ''}
-                </select>
-                ${priesters.length === 0 ? '<span class="muted small">Nog geen priesters ingesteld — voeg toe in <a href="#/account#parochies">Account</a>.</span>' : ''}`;
-              })()}
+            <label class="opbaring-thuis" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Begintijd thuis</span>
+              <input type="time" name="thuis_opbaren_tijd" value="${v('thuis_opbaren_tijd')}">
             </label>
-            <label class="span-3"><span>Kerk / dienstlocatie</span>
-              <input type="text" name="kerk_locatie" value="${esc(v('kerk_locatie') || (isNew ? (Settings.get('default_kerk_locatie') || 'Maria kathedraal') : ''))}" placeholder="bv. Maria kathedraal">
+            <label class="span-3 opbaring-thuis" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}><span>Benodigde rouwgoederen</span>
+              <textarea name="benodigde_rouwgoederen" rows="3" placeholder="bv. baar, koeling, rouwkleed, kaarsen...">${v('benodigde_rouwgoederen')}</textarea>
             </label>
-            <label class="span-2"><span>Begraafplaats</span>
-              <input type="text" name="begraafplaats" value="${esc(v('begraafplaats') || (isNew ? (Settings.get('default_begraafplaats') || 'St. Ephrem') : ''))}">
-            </label>
-            <label><span>Type graf</span>
-              <select name="graf_type" id="graf-type-select">
-                <option value="">—</option>
-                ${['oude begraafplaats','algemeen graf','familiegraf','priester graf'].map(x =>
-                  `<option value="${esc(x)}" ${sel('graf_type', x)}>${esc(x)}</option>`).join('')}
-              </select>
-            </label>
-            <label id="grafnummer-row" ${v('graf_type') ? '' : 'hidden'}><span>Grafnummer</span><input type="text" name="grafnummer" value="${v('grafnummer')}"></label>
-            <label id="certificaat-row" ${v('graf_type') === 'familiegraf' ? '' : 'hidden'}><span>Certificaatnummer <span class="muted small">(familiegraf)</span></span><input type="text" name="certificaat_nummer" value="${v('certificaat_nummer')}"></label>
           </div>
         </fieldset>
 
@@ -343,24 +303,6 @@ function renderDossierForm(params) {
           </label>
         </fieldset>
 
-        <fieldset class="card" data-step="5">
-          <legend>Handtekeningen <a href="#/account#handtekeningen" class="muted small" style="margin-left:.5rem;text-transform:none;letter-spacing:0;">velden beheren →</a></legend>
-          <div class="signatures-grid">
-            ${(Settings.get('signature_fields') || []).map(f => `
-              <div class="signature-block" data-sigid="${esc(f.id)}">
-                <div class="signature-header">
-                  <strong>${esc(f.label)}</strong>
-                  ${f.required ? '<span class="badge badge-amber">verplicht</span>' : '<span class="muted small">optioneel</span>'}
-                </div>
-                <canvas class="signature-pad" data-sigid="${esc(f.id)}" width="600" height="180"></canvas>
-                <div class="signature-actions">
-                  <span class="signature-status muted small" data-status="${esc(f.id)}">nog niet ondertekend</span>
-                  <button type="button" class="btn btn-sm btn-ghost" data-action="clear-sig" data-sigid="${esc(f.id)}">Wissen</button>
-                </div>
-              </div>`).join('') || '<p class="muted">Geen handtekening-velden ingesteld. <a href="#/account">Beheer in Account</a>.</p>'}
-          </div>
-        </fieldset>
-
         <div class="form-actions wizard-actions">
           <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-back-form" title="Terug — je concept blijft bewaard">← Terug naar dossiers</a>
           <div class="wizard-actions-right">
@@ -373,7 +315,7 @@ function renderDossierForm(params) {
     </div>`;
 
   // ─── Wizard: stappen tonen één voor één ──────────────────────────────
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 4;
   const stepKey = `sok_wizard_step_${isNew ? 'nieuw' : dossier.id}`;
   const maxKey  = `sok_wizard_max_${isNew ? 'nieuw' : dossier.id}`;
   // Als er géén concept (draft) bewaard is, wissen we eerder onthouden
@@ -406,11 +348,9 @@ function renderDossierForm(params) {
   const STEP_FIELDS = {
     1: ['opdrachtgever_naam','achternaam','voornaam','geboortedatum','overlijdensdatum',
         'adres_overledene','postcode_overledene','woonplaats_overledene'],
-    2: ['opbaring_type','opbaarlocatie_type','uitvaart_type','uitvaart_datum',
-        'uitvaart_tijd','kerk_locatie','begraafplaats'],
-    3: [], // kosten + kist/bloemen via catalogus-pagina, geen verplichte velden
+    2: ['opbaring_type'],
+    3: [], // kosten + kist via catalogus-pagina, geen verplichte velden
     4: [],  // bijzonderheden is volledig optioneel
-    // 5 = handtekeningen, speciale logica
   };
 
   const fillStateForStep = (step) => {
@@ -421,17 +361,6 @@ function renderDossierForm(params) {
       const v = fd.get(name);
       return v != null && String(v).trim() !== '';
     };
-
-    // Stap 5 — handtekeningen, check via Settings + bestaande dossier-data
-    if (step === 5) {
-      const verplicht = (Settings.get('signature_fields') || []).filter(f => f.required);
-      if (verplicht.length === 0) return 'complete';
-      const sigs = dossier.handtekeningen || {};
-      const gevuld = verplicht.filter(f => sigs[f.id]).length;
-      if (gevuld === 0) return 'empty';
-      if (gevuld < verplicht.length) return 'partial';
-      return 'complete';
-    }
 
     const fields = STEP_FIELDS[step] || [];
     if (fields.length === 0) return 'complete';
@@ -475,11 +404,8 @@ function renderDossierForm(params) {
       localStorage.setItem(maxKey,  String(maxStepReached));
     } catch (_) {}
     updateStepColors();
-    // SignaturePads pas initialiseren wanneer stap 5 zichtbaar is —
-    // anders is de canvas 0×0 en kan er niet getekend worden.
-    if (currentStep === 5 && typeof initSigPadsIfNeeded === 'function') {
-      requestAnimationFrame(initSigPadsIfNeeded);
-    }
+    // Opbaren-detailsectie (blauw kopje met gekozen optie) synchroniseren
+    if (currentStep === 2 && typeof updateOpbaring === 'function') updateOpbaring();
   };
 
   document.querySelectorAll('.wizard-step').forEach(el => {
@@ -488,21 +414,25 @@ function renderDossierForm(params) {
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
 
-  // Ophalen / thuis opbaren → thuis-velden (datum, begintijd, rouwgoederen) tonen
-  const opbaringSel = document.getElementById('opbaring-type-select');
-  const thuisRows = ['thuis-datum-row', 'thuis-tijd-row', 'rouwgoederen-row']
-    .map(id => document.getElementById(id));
-  const updateThuisRows = () => {
-    const thuis = opbaringSel && opbaringSel.value === 'thuis';
-    thuisRows.forEach(r => { if (r) r.hidden = !thuis; });
-  };
-  if (opbaringSel) {
-    opbaringSel.addEventListener('change', () => {
-      updateThuisRows();
-      updateStepColors();
-    });
-    updateThuisRows();
+  // Ophalen / thuis opbaren → dynamisch blauw kopje met de gekozen optie,
+  // met de bijbehorende vervolgvragen (waar voorheen 'Uitvaart' stond).
+  function updateOpbaring() {
+    const sel = document.getElementById('opbaring-type-select');
+    const fs = document.getElementById('opbaring-detail-fieldset');
+    const lg = document.getElementById('opbaring-detail-legend');
+    if (!sel || !fs) return;
+    const val = sel.value;
+    if (!val) { fs.hidden = true; return; }
+    fs.hidden = false;
+    if (lg) lg.textContent = val === 'thuis' ? 'Thuis opbaren' : 'Ophalen';
+    fs.querySelectorAll('.opbaring-ophalen').forEach(e => { e.hidden = (val !== 'ophalen'); });
+    fs.querySelectorAll('.opbaring-thuis').forEach(e => { e.hidden = (val !== 'thuis'); });
   }
+  const opbaringSel = document.getElementById('opbaring-type-select');
+  if (opbaringSel) {
+    opbaringSel.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
+  }
+  updateOpbaring();
 
   // Bezittingen: aantal-veld tonen zodra het sieraad is aangevinkt
   document.querySelectorAll('input[type="checkbox"][data-aantal-row]').forEach(cb => {
@@ -1212,28 +1142,8 @@ function renderDossierForm(params) {
     });
     if (!data.status) data.status = 'nieuw';
 
-    // Handtekeningen verzamelen — behoud bestaande als de pad niet opnieuw is getekend
-    const handtekeningen = Object.assign({}, existingSigs);
-    let missingRequired = [];
-    (Settings.get('signature_fields') || []).forEach(f => {
-      const pad = sigPads[f.id];
-      if (!pad) return;
-      if (!pad.isEmpty()) {
-        handtekeningen[f.id] = { data: pad.toDataURL(), signed_at: new Date().toISOString() };
-      }
-      if (f.required && !(handtekeningen[f.id] && handtekeningen[f.id].data)) {
-        missingRequired.push(f.label);
-      }
-    });
-    if (missingRequired.length > 0) {
-      Modal.show({
-        type: 'warning',
-        title: 'Handtekening vereist',
-        message: 'Vul nog de volgende handtekening(en) in: ' + missingRequired.join(', '),
-      });
-      return;
-    }
-    data.handtekeningen = handtekeningen;
+    // Handtekeningen niet meer in het formulier — bestaande behouden.
+    data.handtekeningen = existingSigs;
 
     // Aanbevolen-velden check
     const ontbrekend = AANBEVOLEN_VELDEN.filter(f => !data[f.name] || !String(data[f.name]).trim());

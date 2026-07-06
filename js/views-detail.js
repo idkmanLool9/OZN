@@ -96,15 +96,6 @@ function renderDossierDetail(params) {
           ${(d.opbaring_type === 'thuis' && d.benodigde_rouwgoederen) ? `<div><dt>Benodigde rouwgoederen</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
           ${dlRow('Opbaarlocatie', d.opbaarlocatie_type)}
         </dl>
-        <h3>Uitvaartdienst</h3>
-        <dl class="dl">
-          ${dlRow('Voorganger uitvaart', d.uitvaart_voorganger)}
-          ${dlRow('Type uitvaart', d.uitvaart_type)}
-          ${dlRow('Datum & tijdstip', [fmtDate(d.uitvaart_datum), d.uitvaart_tijd && 'om ' + d.uitvaart_tijd].filter(Boolean).join(' '))}
-          ${dlRow('Kerk / locatie', d.kerk_locatie)}
-          ${dlRow('Begraafplaats', [d.begraafplaats, d.grafnummer && 'graf ' + d.grafnummer, d.graf_type && '(' + d.graf_type + ')'].filter(Boolean).join(' — '))}
-          ${d.graf_type === 'familiegraf' ? dlRow('Certificaatnummer', d.certificaat_nummer) : ''}
-        </dl>
         <h3>Betaling</h3>
         <dl class="dl">
           ${dlRow('Telefoon opdrachtgever', d.opdrachtgever_telefoon)}
