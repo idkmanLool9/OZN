@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 190;
-const APP_VERSION    = '5.64.0';
+const APP_BUILD      = 191;
+const APP_VERSION    = '5.65.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -119,6 +119,14 @@ const Settings = {
     login_form_title: 'Inloggen',
     login_form_subtitle: 'Voer je e-mailadres en wachtwoord in om door te gaan.',
     login_secretariaat_text: 'Geen account? Vraag het secretariaat.',
+    // OZN-specifieke keuzelijstjes (beheerder-onderhouden).
+    // rouwgoederen_opties: standaard-vinkjes bij thuis-opbaren.
+    // rouwauto_lijst: opties in de rouwauto-dropdown.
+    rouwgoederen_opties: [
+      'Airco', 'Opbaarplank', 'Koelplaat', 'Schermen',
+      'Kaarsen/Kruis', 'Schragen', 'Baarwagen', 'Rok',
+    ],
+    rouwauto_lijst: [],
     // Factuur-bedrijfsgegevens (kop + betaalgegevens op de PDF-factuur)
     factuur_bedrijfsnaam: 'OZN Vastgoed B.V.',
     factuur_adres: '',

@@ -82,15 +82,25 @@ function renderDossierDetail(params) {
             ['Ring(en)',    d.bezit_ringen,    d.bezit_ringen_aantal],
             ['Armband(en)', d.bezit_armbanden, d.bezit_armbanden_aantal],
           ].filter(([, heeft]) => heeft === 'ja');
-          if (!items.length) return '';
-          return `<h3>Bezittingen</h3><dl class="dl">${items.map(([label, , aantal]) =>
-            dlRow(label, aantal ? `${aantal} stuk(s)` : 'ja')).join('')}</dl>`;
+          const extras = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.filter(x => x && x.label) : [];
+          if (!items.length && !extras.length) return '';
+          return `<h3>Bezittingen</h3><dl class="dl">${
+            items.map(([label, , aantal]) => dlRow(label, aantal ? `${aantal} stuk(s)` : 'ja')).join('')
+          }${
+            extras.map(x => dlRow(x.label, x.aantal ? `${x.aantal} stuk(s)` : '')).join('')
+          }</dl>`;
         })()}
         <h3>Opbaren &amp; locatie</h3>
         <dl class="dl">
           ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : ''))}
-          ${d.opbaring_type === 'thuis' ? dlRow('Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
-          ${(d.opbaring_type === 'thuis' && d.benodigde_rouwgoederen) ? `<div><dt>Benodigde rouwgoederen</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
+          ${(d.opbaring_type === 'ophalen' && Array.isArray(d.brengen_naar) && d.brengen_naar.length)
+            ? dlRow('Brengen naar', d.brengen_naar.map(esc).join(' → ')) : ''}
+          ${d.opbaring_type === 'thuis' ? dlRow('Start thuis-opbaring', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
+          ${d.opbaring_type === 'thuis' ? dlRow('Einde thuis-opbaring', [fmtDate(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd && 'om ' + d.thuis_opbaren_eindtijd].filter(Boolean).join(' ')) : ''}
+          ${(d.opbaring_type === 'thuis' && Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length)
+            ? dlRow('Benodigde rouwgoederen', d.rouwgoederen_lijst.map(esc).join(', ')) : ''}
+          ${(d.opbaring_type === 'thuis' && d.benodigde_rouwgoederen)
+            ? `<div><dt>Extra (vrije tekst)</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
           ${dlRow('Opbaarlocatie', d.opbaarlocatie_type)}
         </dl>
         ${(() => {

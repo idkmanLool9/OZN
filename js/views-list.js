@@ -688,6 +688,29 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="rouwauto-lijst-sectie">
+        <h2>Rouwauto's</h2>
+        <p class="muted small">De rouwauto's van OZN — deze verschijnen in de dropdown "Rouwauto" in het dossier. Eén per regel.</p>
+        <form id="rouwauto-form" class="form" autocomplete="off">
+          <label>
+            <textarea name="rouwauto_lijst" rows="4" placeholder="bv.&#10;Mercedes E-klasse (grijs)&#10;Volvo XC90 (zwart)">${esc((Settings.get('rouwauto_lijst') || []).join('\n'))}</textarea>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+      </section>
+
+      <section class="card narrow" id="rouwgoederen-sectie">
+        <h2>Rouwgoederen (thuis opbaren)</h2>
+        <p class="muted small">De vinkjes die in het dossier verschijnen bij "Benodigde rouwgoederen". Eén per regel.</p>
+        <form id="rouwgoederen-form" class="form" autocomplete="off">
+          <label>
+            <textarea name="rouwgoederen_opties" rows="6" placeholder="Airco&#10;Opbaarplank&#10;Koelplaat&#10;Schermen&#10;Kaarsen/Kruis&#10;Schragen&#10;Baarwagen&#10;Rok">${esc((Settings.get('rouwgoederen_opties') || []).join('\n'))}</textarea>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+      </section>` : ''}
+
       <section class="card narrow" id="acc-welkom">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
@@ -1408,6 +1431,26 @@ function renderAccount(msg) {
       renderAccount({ success: 'Opdrachtgevers opgeslagen.' });
     });
   }
+
+  // Rouwauto-lijst
+  const rauForm = $('#rouwauto-form');
+  if (rauForm) rauForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const lijst = (e.target.rouwauto_lijst.value || '')
+      .split('\n').map(s => s.trim()).filter(Boolean);
+    Settings.set({ rouwauto_lijst: lijst });
+    renderAccount({ success: `Rouwauto's opgeslagen (${lijst.length}).` });
+  });
+
+  // Rouwgoederen-opties
+  const rgForm = $('#rouwgoederen-form');
+  if (rgForm) rgForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const lijst = (e.target.rouwgoederen_opties.value || '')
+      .split('\n').map(s => s.trim()).filter(Boolean);
+    Settings.set({ rouwgoederen_opties: lijst });
+    renderAccount({ success: `Rouwgoederen-opties opgeslagen (${lijst.length}).` });
+  });
 
   // Parochies + priesters beheer
   const parochieForm = $('#parochie-form');
