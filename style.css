@@ -2757,15 +2757,23 @@ fieldset[data-step][hidden] { display: none !important; }
 .kist-card-naam { font-size: .95rem; }
 .kist-card-foot {
   display: flex; align-items: center; justify-content: space-between;
-  gap: .5rem; margin-top: .5rem;
+  gap: .5rem; margin-top: .5rem; flex-wrap: wrap;
 }
+.kist-card-foot-meta { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; min-width: 0; }
 .kist-card-foot .kist-price { font-size: .95rem; }
 .kist-kies-btn { white-space: nowrap; }
+/* Op smalle kaarten (kleiner scherm of dichte grid): knop op eigen regel */
+@media (max-width: 720px) {
+  .kist-card-foot { flex-direction: column; align-items: stretch; }
+  .kist-card-foot-meta { justify-content: space-between; }
+  .kist-kies-btn { width: 100%; }
+}
 /* Voorraad-indicatie op de kistkaart (beheerder) */
 .kist-voorraad-chip {
-  display: inline-flex; align-items: center; gap: .25rem;
-  padding: .15rem .5rem; border-radius: 999px; font-size: .8rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: .2rem;
+  padding: .1rem .45rem; border-radius: 999px; font-size: .75rem; font-weight: 600;
   background: #eef4ff; color: #244a8a; border: 1px solid #d5e2fb; white-space: nowrap;
+  line-height: 1.4;
 }
 .kist-voorraad-chip.is-laag { background: #fff6e6; color: #8a5a00; border-color: #f2d69a; }
 .kist-voorraad-chip.is-leeg { background: #fde4e4; color: #8a1e1e; border-color: #f2b4b4; }

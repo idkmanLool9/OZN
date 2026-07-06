@@ -163,9 +163,6 @@ function renderKistenBeheer(msg) {
               : `<div class="kist-card-svg">${kistSVG(k.materiaal)}</div>
                  <div class="kist-card-no-img">geen foto</div>`}
           </button>
-          <button type="button" class="kist-fav ${isFav ? 'is-fav' : ''}" data-fav="${esc(k.naam)}" aria-label="${isFav ? 'Verwijder uit favorieten' : 'Voeg toe aan favorieten'}" title="Favoriet">
-            ${isFav ? '♥' : '♡'}
-          </button>
           ${isTop ? '<span class="kist-badge-top">★ Meest gekozen</span>' : ''}
           ${hidden ? '<span class="kist-hidden-badge">verwijderd</span>' : ''}
         </div>
@@ -173,8 +170,10 @@ function renderKistenBeheer(msg) {
           <strong class="kist-card-naam">${esc(k.naam)}</strong>
           <span class="muted small">${esc(k.materiaal)}</span>
           <div class="kist-card-foot">
-            <span class="kist-price">${fmtEUR(k.bedrag)}</span>
-            ${vChip}
+            <div class="kist-card-foot-meta">
+              <span class="kist-price">${fmtEUR(k.bedrag)}</span>
+              ${vChip}
+            </div>
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
           ${adminMode ? `
@@ -379,9 +378,6 @@ function renderKistenBeheer(msg) {
       if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    const favBtn = e.target.closest('[data-fav]');
-    if (favBtn) { _toggleKistFav(favBtn.getAttribute('data-fav')); renderKistenBeheer(); return; }
-
     // ── Voorraad opslaan (per kist, beheerder) ──
     const vrSaveBtn = e.target.closest('button[data-vr-save]');
     if (vrSaveBtn) {
