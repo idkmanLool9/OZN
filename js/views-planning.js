@@ -1,17 +1,23 @@
 // Planning & overzicht — 'wanneer moet wat' én 'wanneer is wat vrij'.
 // Eén flexibele agenda: taken, opbaring, ritten, verzorging en blokkades
 // op resources (Aula-kamers, rouwauto's, medewerkers).
+// Twee weergaven: Agenda (lijst per dag) en Week (kalender-kolommen).
 
 const PLANNING_TYPES = [
-  { id: 'taak',       label: 'Taak',        icon: '✓' },
-  { id: 'opbaring',   label: 'Opbaring',    icon: '🕯' },
+  { id: 'taak',       label: 'Taak',          icon: '✓' },
+  { id: 'opbaring',   label: 'Opbaring',      icon: '🕯' },
   { id: 'rit',        label: 'Rit / vervoer', icon: '🚐' },
-  { id: 'verzorging', label: 'Verzorging',  icon: '🧴' },
+  { id: 'verzorging', label: 'Verzorging',    icon: '🧴' },
   { id: 'blokkade',   label: 'Bezet / vrij blokkeren', icon: '⛔' },
 ];
 function planningTypeMeta(id) {
   return PLANNING_TYPES.find(t => t.id === id) || { label: id || 'Taak', icon: '•' };
 }
+
+// Weergave-status (blijft bewaard tussen re-renders binnen de sessie)
+let _planningMode = 'agenda';   // 'agenda' | 'week'
+let _planningWeek = 0;          // offset in weken t.o.v. deze week
+let _planningResource = '';     // filter op resource ('' = alle)
 
 // 'YYYY-MM-DDTHH:mm' (lokaal) → ISO-string; leeg → null
 function planningToISO(datum, tijd) {
@@ -22,22 +28,30 @@ function planningToISO(datum, tijd) {
 }
 function planningDagKey(iso) {
   if (!iso) return 'geen-datum';
-  return new Date(iso).toISOString().slice(0, 10);
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+function planningVandaagKey() { return planningDagKey(new Date().toISOString()); }
 function planningDagLabel(key) {
   if (key === 'geen-datum') return 'Zonder datum';
   const d = new Date(key + 'T12:00:00');
-  const vandaag = new Date(); vandaag.setHours(12, 0, 0, 0);
-  const morgen = new Date(vandaag); morgen.setDate(morgen.getDate() + 1);
-  const dk = d.toISOString().slice(0, 10);
+  const vandaag = planningVandaagKey();
+  const morgenD = new Date(); morgenD.setDate(morgenD.getDate() + 1);
   let prefix = '';
-  if (dk === vandaag.toISOString().slice(0, 10)) prefix = 'Vandaag · ';
-  else if (dk === morgen.toISOString().slice(0, 10)) prefix = 'Morgen · ';
+  if (key === vandaag) prefix = 'Vandaag · ';
+  else if (key === planningDagKey(morgenD.toISOString())) prefix = 'Morgen · ';
   return prefix + d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 function planningTijd(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+}
+// Maandag van de week (met week-offset), als Date op 00:00 lokaal
+function planningWeekMaandag(offset) {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  const dow = (d.getDay() + 6) % 7;             // 0 = maandag
+  d.setDate(d.getDate() - dow + offset * 7);
+  return d;
 }
 
 function planningWaarschuwingen() {
@@ -46,40 +60,95 @@ function planningWaarschuwingen() {
   const out = [];
   actief.forEach(d => {
     const missend = [];
+    if (!d.opbaring_type) missend.push('ophalen/thuis nog niet gekozen');
+    if (d.opbaring_type === 'thuis' && !d.thuis_opbaren_datum) missend.push('geen datum thuis opbaren');
     if (!d.kist_type) missend.push('kist nog niet gekozen');
     if (d.rouwauto !== 'ja') missend.push('rouwauto nog niet geregeld');
-    if (d.opbaring_type === 'thuis' && !d.thuis_opbaren_datum) missend.push('geen datum thuis opbaren');
-    if (!d.opbaring_type) missend.push('ophalen/thuis nog niet gekozen');
     if (missend.length) out.push({ dossier: d, missend });
   });
   return out;
 }
 
+function planningItemRow(i) {
+  const m = planningTypeMeta(i.type);
+  const d = i.dossier_id != null ? DB.byId(KEYS.DOSSIERS, i.dossier_id) : null;
+  const tijd = [planningTijd(i.start_ts), planningTijd(i.eind_ts)].filter(Boolean).join('–');
+  return `
+    <div class="parochie-row" data-plid="${i.id}" style="align-items:center; ${i.gedaan ? 'opacity:.55;' : ''}">
+      <input type="checkbox" class="pl-done" data-plid="${i.id}" ${i.gedaan ? 'checked' : ''} title="afgehandeld" style="width:1.1rem;height:1.1rem;">
+      <span style="min-width:4.2rem; font-variant-numeric:tabular-nums;" class="muted small">${esc(tijd || '—')}</span>
+      <span style="flex:1;">
+        <strong style="${i.gedaan ? 'text-decoration:line-through;' : ''}">${m.icon} ${esc(i.titel)}</strong>
+        ${i.resource ? ` <span class="badge">${esc(i.resource)}</span>` : ''}
+        ${d ? ` <a href="#/dossiers/${d.id}" class="muted small">→ ${esc(fullName(d) || d.dossier_nummer)}</a>` : ''}
+        ${i.notitie ? `<br><span class="muted small">${esc(i.notitie)}</span>` : ''}
+      </span>
+      <button type="button" class="btn-icon pl-del" data-plid="${i.id}" title="verwijderen">×</button>
+    </div>`;
+}
+
+// Compacte tegel voor de week-kolommen
+function planningItemChip(i) {
+  const m = planningTypeMeta(i.type);
+  const t = planningTijd(i.start_ts);
+  return `
+    <div class="parochie-row" data-plid="${i.id}" style="flex-direction:column; align-items:stretch; gap:.15rem; padding:.35rem .5rem; ${i.gedaan ? 'opacity:.5;' : ''}">
+      <div style="display:flex; justify-content:space-between; gap:.4rem;">
+        <span class="muted small" style="font-variant-numeric:tabular-nums;">${esc(t || '—')}</span>
+        <button type="button" class="btn-icon pl-del" data-plid="${i.id}" title="verwijderen" style="line-height:1;">×</button>
+      </div>
+      <strong class="small" style="${i.gedaan ? 'text-decoration:line-through;' : ''}">${m.icon} ${esc(i.titel)}</strong>
+      ${i.resource ? `<span class="badge" style="align-self:flex-start;">${esc(i.resource)}</span>` : ''}
+    </div>`;
+}
+
 function renderPlanning() {
-  const items = (DB.list(KEYS.PLANNING) || []).slice()
-    .sort((a, b) => (a.start_ts || '9999').localeCompare(b.start_ts || '9999'));
+  let items = (DB.list(KEYS.PLANNING) || []).slice();
+  if (_planningResource) items = items.filter(i => (i.resource || '') === _planningResource);
+  const alle = (DB.list(KEYS.PLANNING) || []);
   const dossiers = (DB.list(KEYS.DOSSIERS) || []);
   const actieveDossiers = dossiers.filter(d => !['voltooid', 'geannuleerd'].includes(d.status || 'nieuw'));
-  const resources = [...new Set(items.map(i => (i.resource || '').trim()).filter(Boolean))].sort();
+  const resources = [...new Set(alle.map(i => (i.resource || '').trim()).filter(Boolean))].sort();
   const waarschuwingen = planningWaarschuwingen();
 
-  // Groepeer op dag (verleden verbergen we niet, maar tonen 'gedaan' subtieler)
+  // ── Agenda-groepen (op dag) ────────────────────────────────────────────
   const groepen = {};
-  items.forEach(i => {
-    const k = planningDagKey(i.start_ts);
-    (groepen[k] = groepen[k] || []).push(i);
+  items.forEach(i => { const k = planningDagKey(i.start_ts); (groepen[k] = groepen[k] || []).push(i); });
+  const dagKeys = Object.keys(groepen).sort((a, b) =>
+    a === 'geen-datum' ? 1 : b === 'geen-datum' ? -1 : a.localeCompare(b));
+
+  // ── Week-kolommen ──────────────────────────────────────────────────────
+  const maandag = planningWeekMaandag(_planningWeek);
+  const weekDagen = Array.from({ length: 7 }, (_, n) => {
+    const d = new Date(maandag); d.setDate(maandag.getDate() + n);
+    const key = planningDagKey(d.toISOString());
+    return { d, key, items: items.filter(i => planningDagKey(i.start_ts) === key)
+      .sort((a, b) => (a.start_ts || '').localeCompare(b.start_ts || '')) };
   });
-  const dagKeys = Object.keys(groepen).sort((a, b) => {
-    if (a === 'geen-datum') return 1;
-    if (b === 'geen-datum') return -1;
-    return a.localeCompare(b);
-  });
+  const weekLabel = `${maandag.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })} – ` +
+    `${weekDagen[6].d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  const vandaagKey = planningVandaagKey();
+
+  const resourceFilter = resources.length ? `
+    <label style="margin:0;"><span class="muted small">Resource</span>
+      <select id="pl-resource-filter">
+        <option value="">Alle</option>
+        ${resources.map(r => `<option value="${esc(r)}" ${_planningResource === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}
+      </select>
+    </label>` : '';
 
   $('#view').innerHTML = `
     <div class="page">
-      <div class="page-head">
+      <div class="page-head" style="align-items:flex-start;">
         <div><h1>Planning &amp; overzicht</h1>
           <p class="muted">Wanneer moet wat — en wanneer is wat vrij.</p></div>
+        <div style="display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap;">
+          ${resourceFilter}
+          <div class="btn-group" role="tablist">
+            <button type="button" class="btn btn-sm ${_planningMode === 'agenda' ? 'btn-primary' : 'btn-ghost'}" id="pl-mode-agenda">Agenda</button>
+            <button type="button" class="btn btn-sm ${_planningMode === 'week' ? 'btn-primary' : 'btn-ghost'}" id="pl-mode-week">Week</button>
+          </div>
+        </div>
       </div>
 
       ${waarschuwingen.length ? `
@@ -94,9 +163,9 @@ function renderPlanning() {
         </ul>
       </section>` : ''}
 
-      <section class="card">
-        <h2 style="margin-top:0;">Nieuw planning-item</h2>
-        <form id="planning-form" class="form" autocomplete="off">
+      <details class="card" ${alle.length ? '' : 'open'}>
+        <summary style="cursor:pointer; font-weight:600;">+ Nieuw planning-item</summary>
+        <form id="planning-form" class="form" autocomplete="off" style="margin-top:.75rem;">
           <div class="grid-3">
             <label class="span-2"><span>Wat</span>
               <input type="text" name="titel" placeholder="bv. Ophalen overledene / Aula kamer 1 gereserveerd" required>
@@ -125,34 +194,46 @@ function renderPlanning() {
             <button type="submit" class="btn btn-primary">Toevoegen aan planning</button>
           </div>
         </form>
-      </section>
+      </details>
 
-      ${dagKeys.length ? dagKeys.map(k => `
+      ${_planningMode === 'week' ? `
+        <section class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.6rem;">
+            <button type="button" class="btn btn-sm btn-ghost" id="pl-week-prev">◀ Vorige</button>
+            <strong>${esc(weekLabel)}${_planningWeek === 0 ? ' · deze week' : ''}</strong>
+            <button type="button" class="btn btn-sm btn-ghost" id="pl-week-next">Volgende ▶</button>
+          </div>
+          <div class="planning-week" style="display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:.5rem; overflow-x:auto;">
+            ${weekDagen.map(wd => `
+              <div style="min-width:0;">
+                <div class="${wd.key === vandaagKey ? '' : 'muted'}" style="text-align:center; font-weight:600; padding:.25rem 0; border-bottom:2px solid ${wd.key === vandaagKey ? 'var(--primary,#2563eb)' : 'var(--border,#e5e0d6)'};">
+                  ${wd.d.toLocaleDateString('nl-NL', { weekday: 'short' })}<br>
+                  <span class="small">${wd.d.getDate()}/${wd.d.getMonth() + 1}</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:.35rem; margin-top:.4rem;">
+                  ${wd.items.map(planningItemChip).join('') || '<span class="muted small" style="text-align:center; padding:.5rem 0;">—</span>'}
+                </div>
+              </div>`).join('')}
+          </div>
+          <p class="muted small" style="margin:.6rem 0 0;">Items zonder datum staan in de Agenda-weergave.</p>
+        </section>
+      ` : (dagKeys.length ? dagKeys.map(k => `
         <section class="card">
           <h3 style="margin:0 0 .6rem; text-transform:capitalize;">${esc(planningDagLabel(k))}</h3>
           <div style="display:flex; flex-direction:column; gap:.4rem;">
-            ${groepen[k].sort((a, b) => (a.start_ts || '').localeCompare(b.start_ts || '')).map(i => {
-              const m = planningTypeMeta(i.type);
-              const d = i.dossier_id != null ? DB.byId(KEYS.DOSSIERS, i.dossier_id) : null;
-              const tijd = [planningTijd(i.start_ts), planningTijd(i.eind_ts)].filter(Boolean).join('–');
-              return `
-              <div class="parochie-row" data-plid="${i.id}" style="align-items:center; ${i.gedaan ? 'opacity:.55;' : ''}">
-                <input type="checkbox" class="pl-done" data-plid="${i.id}" ${i.gedaan ? 'checked' : ''} title="afgehandeld" style="width:1.1rem;height:1.1rem;">
-                <span style="min-width:4.2rem; font-variant-numeric:tabular-nums;" class="muted small">${esc(tijd || '—')}</span>
-                <span style="flex:1;">
-                  <strong style="${i.gedaan ? 'text-decoration:line-through;' : ''}">${m.icon} ${esc(i.titel)}</strong>
-                  ${i.resource ? ` <span class="badge">${esc(i.resource)}</span>` : ''}
-                  ${d ? ` <a href="#/dossiers/${d.id}" class="muted small">→ ${esc(fullName(d) || d.dossier_nummer)}</a>` : ''}
-                  ${i.notitie ? `<br><span class="muted small">${esc(i.notitie)}</span>` : ''}
-                </span>
-                <button type="button" class="btn-icon pl-del" data-plid="${i.id}" title="verwijderen">×</button>
-              </div>`;
-            }).join('')}
+            ${groepen[k].sort((a, b) => (a.start_ts || '').localeCompare(b.start_ts || '')).map(planningItemRow).join('')}
           </div>
-        </section>`).join('') : '<section class="card"><p class="muted">Nog geen planning-items. Voeg er hierboven een toe.</p></section>'}
+        </section>`).join('') : '<section class="card"><p class="muted">Nog geen planning-items. Voeg er hierboven een toe.</p></section>')}
     </div>`;
 
   // ── Events ─────────────────────────────────────────────────────────────
+  const setMode = m => { _planningMode = m; renderPlanning(); };
+  const agBtn = $('#pl-mode-agenda'); if (agBtn) agBtn.addEventListener('click', () => setMode('agenda'));
+  const wkBtn = $('#pl-mode-week');   if (wkBtn) wkBtn.addEventListener('click', () => setMode('week'));
+  const prev = $('#pl-week-prev'); if (prev) prev.addEventListener('click', () => { _planningWeek--; renderPlanning(); });
+  const next = $('#pl-week-next'); if (next) next.addEventListener('click', () => { _planningWeek++; renderPlanning(); });
+  const rf = $('#pl-resource-filter'); if (rf) rf.addEventListener('change', () => { _planningResource = rf.value; renderPlanning(); });
+
   const form = $('#planning-form');
   if (form) {
     form.addEventListener('submit', async e => {
