@@ -127,7 +127,7 @@ function applyDossierDraft(formEl, data) {
     if (lijst) {
       lijst.innerHTML = data.__brengen_naar.map(loc => `
         <div class="brengen-naar-row" style="display:flex; gap:.5rem; align-items:center;">
-          <input type="text" class="brengen-naar-input" value="${esc(loc)}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
+          <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc)}" placeholder="" style="flex:1;">
           <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
         </div>`).join('');
       changed++;
@@ -369,7 +369,7 @@ function renderDossierForm(params) {
                     ? dossier.brengen_naar : [''];
                   return arr.map((loc, i) => `
                     <div class="brengen-naar-row" style="display:flex; gap:.5rem; align-items:center;">
-                      <input type="text" class="brengen-naar-input" value="${esc(loc || '')}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
+                      <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc || '')}" placeholder="" style="flex:1;">
                       <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
                     </div>`).join('');
                 })()}
@@ -408,10 +408,22 @@ function renderDossierForm(params) {
             </div>
           </div>
 
-          <!-- ── OPBAARLOCATIE (vrije invoer, geen suggesties) ────────────── -->
+          <!-- ── OPBAARLOCATIE (vrije invoer + adressenboekje-suggesties) ── -->
           <label style="display:block; margin-top:.75rem;"><span>Opbaarlocatie</span>
-            <input type="text" name="opbaarlocatie_type" value="${esc(v('opbaarlocatie_type'))}">
+            <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${esc(v('opbaarlocatie_type'))}" autocomplete="off">
           </label>
+          <datalist id="locatie-suggesties">
+            ${(() => {
+              // Suggesties uit alle eerder gebruikte opbaarlocaties + brengen-naar
+              // entries. Puur uit echte data — geen hardcoded voorbeelden.
+              const s = new Set();
+              DB.list(KEYS.DOSSIERS).forEach(d => {
+                if (d.opbaarlocatie_type) s.add(d.opbaarlocatie_type);
+                if (Array.isArray(d.brengen_naar)) d.brengen_naar.forEach(x => x && s.add(x));
+              });
+              return [...s].sort().map(x => `<option value="${esc(x)}"></option>`).join('');
+            })()}
+          </datalist>
         </fieldset>
 
         <fieldset class="card" data-step="2">
@@ -604,7 +616,7 @@ function renderDossierForm(params) {
       div.className = 'brengen-naar-row';
       div.style.cssText = 'display:flex; gap:.5rem; align-items:center;';
       div.innerHTML = `
-        <input type="text" class="brengen-naar-input" value="${esc(val)}" placeholder="bv. Aula Vale, ziekenhuis, uitvaartcentrum…" style="flex:1;">
+        <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(val)}" placeholder="" style="flex:1;">
         <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>`;
       return div;
     };
