@@ -2798,6 +2798,38 @@ tr.row-leeg { background: #fdf3f3; }
 #kist-voorraad-hint[data-tone="leeg"]     { color: #8a1e1e; font-weight: 700; }
 #kist-voorraad-hint[data-tone="onbekend"] { color: #7a7466; font-style: italic; }
 
+/* Voorraadbeheer-pagina */
+.voorraad-filterbar {
+  display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;
+}
+.voorraad-filterbar input[type="search"] {
+  flex: 1 1 240px; min-width: 200px; padding: .5rem .75rem;
+  border: 1px solid var(--border, #e5e0d6); border-radius: 6px; font-size: .95rem;
+}
+.voorraad-chips { display: flex; gap: .35rem; flex-wrap: wrap; }
+.voorraad-chip {
+  padding: .35rem .7rem; border: 1px solid var(--border, #e5e0d6);
+  background: #fff; border-radius: 999px; cursor: pointer; font-size: .85rem;
+}
+.voorraad-chip.is-on { background: var(--primary, #2563eb); color: #fff; border-color: var(--primary, #2563eb); }
+.voorraad-table-wrap { overflow-x: auto; }
+.voorraad-table td, .voorraad-table th { vertical-align: middle; padding: .5rem .6rem; }
+.voorraad-table input[type="number"] {
+  width: 70px; padding: .3rem .4rem; text-align: right;
+  border: 1px solid var(--border, #e5e0d6); border-radius: 4px; font-variant-numeric: tabular-nums;
+}
+.voorraad-table input[type="number"]:focus {
+  outline: 2px solid var(--primary, #2563eb); outline-offset: 1px; border-color: transparent;
+}
+.voorraad-table input.vr-input-error { border-color: #c0392b; background: #fdf3f3; }
+.vr-status-cell { display: flex; align-items: center; gap: .4rem; }
+.vr-save-hint {
+  display: inline-block; font-size: .95rem; line-height: 1;
+}
+.vr-save-hint.is-busy { color: #8a5a00; }
+.vr-save-hint.is-ok   { color: #2a7a3a; }
+.vr-save-hint.is-err  { color: #c0392b; }
+
 /* Lijstweergave */
 .kist-grid.is-list { grid-template-columns: 1fr; gap: .6rem; }
 .kist-grid.is-list .kist-card { flex-direction: row; align-items: stretch; }

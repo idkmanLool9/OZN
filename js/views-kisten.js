@@ -184,23 +184,6 @@ function renderKistenBeheer(msg) {
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
           ${adminMode ? `
-            <div class="kist-voorraad-row">
-              <label class="voorraad-cell"><span class="muted small">Voorraad</span>
-                <input type="number" min="0" step="1" data-vr-aantal="${esc(k.naam)}" value="${esc(vAantal != null ? vAantal : '')}" placeholder="—" inputmode="numeric" style="max-width:70px;">
-              </label>
-              <label class="voorraad-cell"><span class="muted small">Min.</span>
-                <input type="number" min="0" step="1" data-vr-min="${esc(k.naam)}" value="${esc(vMin || '')}" placeholder="—" inputmode="numeric" style="max-width:60px;">
-              </label>
-              <label class="voorraad-cell"><span class="muted small">Gewenst</span>
-                <input type="number" min="0" step="1" data-vr-peil="${esc(k.naam)}" value="${esc((vr && vr.gewenst_peil) || '')}" placeholder="—" inputmode="numeric" style="max-width:60px;" title="Gewenst peil na bestellen">
-              </label>
-              <label class="voorraad-cell"><span class="muted small">Levertijd (dgn)</span>
-                <input type="number" min="0" step="1" data-vr-lever="${esc(k.naam)}" value="${esc((vr && vr.levertijd_dagen) || '')}" placeholder="—" inputmode="numeric" style="max-width:70px;" title="Levertijd in dagen">
-              </label>
-              <button type="button" class="btn btn-sm" data-vr-save="${esc(k.naam)}">Opslaan</button>
-              ${vr && vr.laatst_besteld ? `<span class="muted small" title="Laatst besteld">🗓 ${esc(fmtDate(vr.laatst_besteld))}${vr.besteld_aantal ? ' · ' + vr.besteld_aantal + '×' : ''}</span>` : ''}
-            </div>` : ''}
-          ${adminMode ? `
             <div class="kist-card-actions">
               <label class="btn btn-sm">${url ? 'Vervang foto' : 'Foto uploaden'}
                 <input type="file" accept="image/*" data-upload="${esc(k.naam)}" hidden>
@@ -234,28 +217,21 @@ function renderKistenBeheer(msg) {
 
       ${isBeheerder ? (() => {
         if (typeof KistVoorraad === 'undefined') return '';
-        const alles = KistVoorraad.all();
         const laag = KistVoorraad.laag();
-        if (laag.length) {
-          return `
-          <div class="alert alert-warn kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
-            <div>
-              <strong>⚠ Voorraad laag</strong>
-              <span class="muted small">${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum — tijd om bij te bestellen.</span>
-            </div>
-            <a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>
-          </div>`;
-        }
-        if (!alles.length && !adminMode) {
-          return `
-          <div class="alert alert-info kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
-            <div>
-              <strong>📦 Voorraadbeheer</strong>
-              <span class="muted small">Nog geen voorraad ingesteld. Schakel <strong>Beheermodus</strong> in (Account → Weergave) om per kist een voorraad + minimum in te vullen.</span>
-            </div>
-          </div>`;
-        }
-        return '';
+        const heeftLaag = laag.length > 0;
+        return `
+        <div class="alert ${heeftLaag ? 'alert-warn' : 'alert-info'} kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <div>
+            <strong>${heeftLaag ? '⚠ Voorraad laag' : '📦 Voorraadbeheer'}</strong>
+            <span class="muted small">${heeftLaag
+              ? `${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum — tijd om bij te bestellen.`
+              : 'Beheer voorraad, minimum en levertijd van alle kisten op één plek.'}</span>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <a href="#/kisten/voorraad" class="btn btn-sm">📦 Voorraadbeheer</a>
+            ${heeftLaag ? '<a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>' : ''}
+          </div>
+        </div>`;
       })() : ''}
 
       <div class="catalog-zoekbalk">
@@ -398,36 +374,6 @@ function renderKistenBeheer(msg) {
       if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    // ── Voorraad opslaan (per kist, beheerder) ──
-    const vrSaveBtn = e.target.closest('button[data-vr-save]');
-    if (vrSaveBtn) {
-      const naam = vrSaveBtn.getAttribute('data-vr-save');
-      const aInp = $(`input[data-vr-aantal="${CSS.escape(naam)}"]`);
-      const mInp = $(`input[data-vr-min="${CSS.escape(naam)}"]`);
-      const gInp = $(`input[data-vr-peil="${CSS.escape(naam)}"]`);
-      const lInp = $(`input[data-vr-lever="${CSS.escape(naam)}"]`);
-      const parseOpt = (inp) => (inp && inp.value !== '') ? parseInt(inp.value, 10) : null;
-      const aRaw = parseOpt(aInp);
-      const mRaw = parseOpt(mInp);
-      const gRaw = parseOpt(gInp);
-      const lRaw = parseOpt(lInp);
-      const patch = {};
-      if (aRaw != null && isFinite(aRaw) && aRaw >= 0) patch.aantal = aRaw;
-      if (mRaw != null && isFinite(mRaw) && mRaw >= 0) patch.min_aantal = mRaw;
-      // Optionele extra kolommen: alleen zetten als er iets is ingevuld (null = geen wijziging)
-      if (gRaw != null && isFinite(gRaw) && gRaw >= 0) patch.gewenst_peil = gRaw;
-      if (lRaw != null && isFinite(lRaw) && lRaw >= 0) patch.levertijd_dagen = lRaw;
-      if (aRaw != null && !isFinite(aRaw)) { Modal.show({ type:'warning', title:'Ongeldig aantal', message:'Vul een geheel getal ≥ 0 in.' }); return; }
-      if (!Object.keys(patch).length) return;
-      try {
-        await KistVoorraad.upsert(naam, patch);
-        renderKistenBeheer({ success: `Voorraad "${naam}" opgeslagen (${patch.aantal ?? '—'} stuks).` });
-      } catch (err) {
-        renderKistenBeheer({ error: 'Voorraad opslaan mislukt: ' + (err.message || err) });
-      }
-      return;
-    }
-
     // ── Beheermodus: prijs / verwijder / herstel / reset ──
     const savePriceBtn = e.target.closest('button[data-save-price]');
     if (savePriceBtn) {
@@ -670,4 +616,178 @@ function renderKistenBestellijst(msg) {
       }
     }
   };
+}
+
+// ─── Voorraadbeheer (aparte pagina, één tabel, auto-save per veld) ─────────
+function renderKistenVoorraad(msg) {
+  const isBeheerder = (typeof Auth !== 'undefined') && Auth.isBeheerder();
+  if (!isBeheerder) {
+    $('#view').innerHTML = `
+      <div class="page">
+        <div class="page-head"><div><a href="#/kisten" class="back-link">← Terug naar kisten</a><h1>Geen toegang</h1></div></div>
+        <div class="card"><p class="muted">Voorraadbeheer is alleen zichtbaar voor beheerders.</p></div>
+      </div>`;
+    return;
+  }
+
+  // Filter-state per bezoek (niet persistent — bewust)
+  if (typeof renderKistenVoorraad._filter === 'undefined') renderKistenVoorraad._filter = 'alle';
+  if (typeof renderKistenVoorraad._q === 'undefined') renderKistenVoorraad._q = '';
+  const filter = renderKistenVoorraad._filter;
+  const q = (renderKistenVoorraad._q || '').trim().toLowerCase();
+
+  const catalogus = (typeof KISTEN_CATALOGUS !== 'undefined') ? KISTEN_CATALOGUS : [];
+  // Verrijk elke kist met zijn voorraadregel (kan null zijn)
+  const rijen = catalogus.map(k => ({ k, vr: KistVoorraad.byNaam(k.naam) }));
+  const gefilterd = rijen.filter(({ k, vr }) => {
+    if (q && !k.naam.toLowerCase().includes(q) && !(k.materiaal || '').toLowerCase().includes(q)) return false;
+    const a = vr ? (vr.aantal || 0) : null;
+    const m = vr ? (vr.min_aantal || 0) : 0;
+    if (filter === 'leeg')  return vr && a === 0;
+    if (filter === 'laag')  return vr && a < m;
+    if (filter === 'ok')    return vr && a >= m && a > 0;
+    if (filter === 'geen')  return !vr;
+    return true;
+  });
+
+  const aantalLaag = rijen.filter(r => r.vr && (r.vr.aantal||0) < (r.vr.min_aantal||0)).length;
+  const aantalLeeg = rijen.filter(r => r.vr && (r.vr.aantal||0) === 0).length;
+  const aantalGeen = rijen.filter(r => !r.vr).length;
+
+  $('#view').innerHTML = `
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <a href="#/kisten" class="back-link">← Terug naar kisten</a>
+          <h1>Voorraadbeheer</h1>
+          <p class="muted">Wijzigingen worden <strong>automatisch opgeslagen</strong> zodra je uit een veld klikt. Geen opslaan-knop nodig.</p>
+        </div>
+        <a href="#/kisten/bestellijst" class="btn">📄 Bestellijst</a>
+      </div>
+
+      ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
+
+      <div class="card">
+        <div class="voorraad-filterbar">
+          <input type="search" id="vr-q" value="${esc(renderKistenVoorraad._q || '')}" placeholder="Zoek op naam of materiaal…">
+          <div class="voorraad-chips">
+            ${[
+              ['alle',  `Alle (${rijen.length})`],
+              ['laag',  `⚠ Laag (${aantalLaag})`],
+              ['leeg',  `⚠ Leeg (${aantalLeeg})`],
+              ['ok',    'Op peil'],
+              ['geen',  `Nog niet ingesteld (${aantalGeen})`],
+            ].map(([k, l]) => `<button type="button" class="voorraad-chip ${filter === k ? 'is-on' : ''}" data-vr-filter="${k}">${l}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="voorraad-table-wrap">
+          <table class="table voorraad-table">
+            <thead>
+              <tr>
+                <th>Kist</th>
+                <th class="num" title="Wat je nu op de plank hebt">Voorraad</th>
+                <th class="num" title="Onder deze grens komt de kist op de bestellijst">Min.</th>
+                <th class="num" title="Op dit peil wil je na bestellen zitten (leeg = automatisch 2×min)">Gewenst</th>
+                <th class="num" title="Doorlooptijd bij Unigra (dagen)">Levertijd</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="vr-body">
+              ${gefilterd.map(({ k, vr }) => {
+                const a  = vr ? (vr.aantal || 0) : null;
+                const m  = vr ? (vr.min_aantal || 0) : 0;
+                const g  = vr ? (vr.gewenst_peil || '') : '';
+                const l  = vr ? (vr.levertijd_dagen || '') : '';
+                const leeg = vr && a === 0;
+                const laag = vr && a < m;
+                const statusHtml = vr
+                  ? (leeg ? '<span class="kist-voorraad-status is-leeg">⚠ Leeg</span>'
+                    : laag ? '<span class="kist-voorraad-status is-laag">⚠ Laag</span>'
+                    : '<span class="kist-voorraad-status is-ok">✓ Op peil</span>')
+                  : '<span class="muted small">niet ingesteld</span>';
+                return `<tr data-naam="${esc(k.naam)}">
+                  <td><strong>${esc(k.naam)}</strong><br><span class="muted small">${esc(k.materiaal)}</span></td>
+                  <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="aantal"        value="${esc(a != null ? a : '')}" placeholder="—"></td>
+                  <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="min_aantal"    value="${esc(m || '')}"           placeholder="—"></td>
+                  <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="gewenst_peil"  value="${esc(g)}"                 placeholder="—"></td>
+                  <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="levertijd_dagen" value="${esc(l)}"               placeholder="—"></td>
+                  <td class="vr-status-cell">${statusHtml}<span class="vr-save-hint" hidden>💾</span></td>
+                </tr>`;
+              }).join('')}
+              ${gefilterd.length === 0 ? '<tr><td colspan="6" class="muted center">Geen kisten passen bij dit filter.</td></tr>' : ''}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+
+  // ─── Zoekbalk (debounce) ────────────────────────────────────────────────
+  const qInp = $('#vr-q');
+  if (qInp) {
+    let t = null;
+    qInp.addEventListener('input', () => {
+      clearTimeout(t);
+      t = setTimeout(() => {
+        renderKistenVoorraad._q = qInp.value;
+        renderKistenVoorraad();
+      }, 250);
+    });
+  }
+
+  // ─── Filter-chips ───────────────────────────────────────────────────────
+  document.querySelectorAll('[data-vr-filter]').forEach(b => {
+    b.addEventListener('click', () => {
+      renderKistenVoorraad._filter = b.getAttribute('data-vr-filter');
+      renderKistenVoorraad();
+    });
+  });
+
+  // ─── Auto-save per veld (on 'change' = na blur / enter) ────────────────
+  // Geen rerender: alleen de status-cel en de kleine "💾"-hint updaten,
+  // zodat de gebruiker rustig door kan naar het volgende veld.
+  document.querySelectorAll('#vr-body input[data-vr-field]').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const tr = inp.closest('tr'); if (!tr) return;
+      const naam = tr.getAttribute('data-naam');
+      const veld = inp.getAttribute('data-vr-field');
+      const raw = inp.value.trim();
+      let val = raw === '' ? null : parseInt(raw, 10);
+      if (val != null && (!isFinite(val) || val < 0)) {
+        inp.classList.add('vr-input-error');
+        setTimeout(() => inp.classList.remove('vr-input-error'), 1500);
+        return;
+      }
+      const bestaand = KistVoorraad.byNaam(naam) || {};
+      const patch = { [veld]: val };
+      // 'aantal' en 'min_aantal' zijn NOT NULL in DB → default naar 0/1 als leeg
+      if (veld === 'aantal'      && val == null) patch.aantal      = 0;
+      if (veld === 'min_aantal'  && val == null) patch.min_aantal  = 0;
+      // Kleine "opslaan"-indicator
+      const hint = tr.querySelector('.vr-save-hint');
+      if (hint) { hint.hidden = false; hint.textContent = '💾'; hint.className = 'vr-save-hint is-busy'; }
+      try {
+        const nieuw = await KistVoorraad.upsert(naam, patch);
+        // Status-cel bijwerken zonder de rest van de tabel te herrender
+        const a = nieuw.aantal || 0, m = nieuw.min_aantal || 0;
+        const leeg = a === 0, laag = a < m;
+        const statusEl = tr.querySelector('.kist-voorraad-status') || (() => {
+          const s = document.createElement('span');
+          tr.querySelector('.vr-status-cell').prepend(s);
+          return s;
+        })();
+        statusEl.className = 'kist-voorraad-status ' + (leeg ? 'is-leeg' : (laag ? 'is-laag' : 'is-ok'));
+        statusEl.textContent = leeg ? '⚠ Leeg' : (laag ? '⚠ Laag' : '✓ Op peil');
+        if (hint) { hint.textContent = '✓'; hint.className = 'vr-save-hint is-ok';
+          setTimeout(() => { hint.hidden = true; }, 1200); }
+      } catch (err) {
+        if (hint) { hint.textContent = '⚠'; hint.className = 'vr-save-hint is-err'; }
+        Modal.show({ type:'error', title:'Opslaan mislukt', message: err.message || String(err) });
+      }
+    });
+  });
+
+  // Terug-link
+  const back = document.querySelector('.back-link');
+  if (back) back.addEventListener('click', (e) => { e.preventDefault(); Router.go('/kisten'); });
 }
