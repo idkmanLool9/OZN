@@ -1,11 +1,11 @@
 {
   "appId": "nl.sok.uitvaartbeheer",
-  "appName": "Uitvaartbeheer",
+  "appName": "Uitvaart Intake",
   "webDir": "www",
   "ios": {
     "scheme": "Uitvaartbeheer",
-    "contentInset": "automatic",
-    "preferredContentMode": "mobile"
+    "contentInset": "never",
+    "preferredContentMode": "recommended"
   },
   "server": {
     "iosScheme": "uitvaartbeheer",

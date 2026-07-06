@@ -6,13 +6,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const KEYS = {
   DOSSIERS: 'dossiers',
-  TAKEN: 'taken',
   KOSTEN: 'kosten',
   NOTITIES: 'notities',
-  DOCUMENTEN: 'documenten',
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
   BLOEMEN: 'bloemen_catalogus',
-  ETEN_DRINKEN: 'eten_drinken_catalogus',
+  ETEN: 'eten_drinken_catalogus',
+  GEZINNEN: 'gezinnen',
+  LEDEN: 'leden',
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -37,6 +37,10 @@ const Auth = {
     return null;
   },
   async logout() { await sb.auth.signOut(); _session = null; },
+  // Auth-metadata van de huidige gebruiker (per-account; alleen zichtbaar voor
+  // deze ingelogde gebruiker). Wordt gebruikt voor gevoelige, per-account
+  // instellingen zoals API-sleutels.
+  metadata() { return (_session && _session.user && _session.user.user_metadata) || {}; },
   async changePassword(newPw) {
     const { error } = await sb.auth.updateUser({ password: newPw });
     return error ? error.message : null;
@@ -55,31 +59,35 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], taken: [], kosten: [], notities: [], documenten: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [] },
   loaded: false,
   offline: false,
 
   async loadAll() {
+    // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, t, k, n, doc, kim, blm, ed] = await Promise.all([
+      const [d, k, n, kim, blm, etn, gz, ld] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
-        sb.from('taken').select('*').order('volgorde', { ascending: true }),
         sb.from('kosten').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
-        sb.from('documenten').select('*').order('geupload_op', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
         sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
         sb.from('eten_drinken_catalogus').select('*').order('naam', { ascending: true }),
+        // Ledenadministratie — tolerant: als de tabellen nog niet bestaan
+        // (migratie nog niet gedraaid) blijven ze gewoon leeg.
+        sb.from('gezinnen').select('*').order('familienaam', { ascending: true }),
+        sb.from('leden').select('*').order('achternaam', { ascending: true }),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
-      Cloud.cache.taken = (t.data || []).map(normRow);
       Cloud.cache.kosten = (k.data || []).map(normKosten);
       Cloud.cache.notities = (n.data || []).map(normRow);
-      Cloud.cache.documenten = (doc.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
       Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
-      Cloud.cache.eten_drinken_catalogus = (ed.data || []).map(normBloem);
+      Cloud.cache.eten_drinken_catalogus = ((etn && etn.data) || []).map(normEten);
+      Cloud.cache.gezinnen = ((gz && gz.data) || []).map(normRow);
+      Cloud.cache.leden = ((ld && ld.data) || []).map(normRow);
       Cloud.loaded = true;
       Cloud.offline = false;
       try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}
@@ -102,7 +110,7 @@ const Cloud = {
 };
 
 // Tabellen die een 'bijgewerkt_door' kolom hebben (zie supabase-schema.sql)
-const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten']);
+const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten', 'gezinnen', 'leden']);
 
 // Wrapper rond insert/update: als de DB nog geen bijgewerkt_door kolom heeft
 // (oude schema, gebruiker heeft migratie nog niet gedraaid), proberen we het
@@ -161,9 +169,11 @@ function logTrackColumnHint() {
 function normRow(r) { return r; }
 function normKosten(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
 function normBloem(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
+function normEten(r)  { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
 function normalize(tbl, row) {
   if (tbl === 'kosten') return normKosten(row);
-  if (tbl === 'bloemen_catalogus' || tbl === 'eten_drinken_catalogus') return normBloem(row);
+  if (tbl === 'bloemen_catalogus') return normBloem(row);
+  if (tbl === 'eten_drinken_catalogus') return normEten(row);
   return row;
 }
 
@@ -174,6 +184,7 @@ const DB = {
   where(tbl, fn) { return (Cloud.cache[tbl] || []).filter(fn); },
 
   async insert(tbl, payload) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.insert(tbl, payload);
     if (!navigator.onLine) {
       Modal.show({
         type: 'offline',
@@ -204,6 +215,7 @@ const DB = {
   },
 
   async update(tbl, id, patch) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.update(tbl, id, patch);
     if (!navigator.onLine) {
       Modal.show({
         type: 'offline',
@@ -227,6 +239,7 @@ const DB = {
   },
 
   async remove(tbl, id) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.remove(tbl, id);
     if (!navigator.onLine) {
       Modal.show({
         type: 'offline',
@@ -244,6 +257,7 @@ const DB = {
   },
 
   async removeWhere(tbl, fn) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.removeWhere(tbl, fn);
     const ids = Cloud.cache[tbl].filter(fn).map(x => x.id);
     if (ids.length === 0) return;
     const { error } = await sb.from(tbl).delete().in('id', ids);
@@ -288,30 +302,27 @@ async function handleStaleCache() {
   });
 }
 
-// ─── Storage (documenten-uploads, privé) ────────────────────────────────────
-const Storage = {
-  async upload(dossierId, file) {
-    const compressed = await compressImage(file, 2200, 0.9); // images compressed; PDFs etc. blijven onveranderd
-    const safe = compressed.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${dossierId}/${Date.now()}-${safe}`;
+// ─── Artsverklaring (privé, bucket 'documenten') ────────────────────────────
+// Scan/foto van de artsverklaring (overlijdensverklaring). Privé opgeslagen;
+// bekijken via tijdelijke signed URL.
+const ArtsVerklaring = {
+  async upload(file) {
+    const compressed = await compressImage(file, 2200, 0.9);
+    const safe = (compressed.name || 'artsverklaring').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `artsverklaring/${Date.now()}-${safe}`;
     const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-    if (error) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
-      throw error;
-    }
+    if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
     return path;
   },
-  async signedUrl(path, seconds = 60) {
+  async signedUrl(path, seconds = 300) {
+    if (!path) return null;
     const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
-    if (error) {
-      Modal.show({ type: 'error', title: 'Download-link mislukt', message: error.message });
-      throw error;
-    }
+    if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
     return data.signedUrl;
   },
   async remove(path) {
-    const { error } = await sb.storage.from('documenten').remove([path]);
-    if (error) console.warn('Bestand verwijderen faalde:', error.message);
+    if (!path) return;
+    await sb.storage.from('documenten').remove([path]).catch(() => {});
   },
 };
 
@@ -437,59 +448,8 @@ const BloemenFotos = {
   },
 };
 
-// ─── Foto van overledene (publieke bucket 'documenten' — privé via signed URLs zou ook kunnen, maar voor weergave op rouwkaart maken we een aparte bucket) ───
-const FotoOverledene = {
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  urlVoor(path) {
-    if (!path) return null;
-    const base = FotoOverledene.publicUrl(path);
-    if (!base) return null;
-    return base + '?v=' + Date.now();
-  },
-  async upload(dossierId, file) {
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-    const path = `${dossierId}/foto.${ext}`;
-    const { error } = await sb.storage.from('overledenen').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (error) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
-      throw error;
-    }
-    return path;
-  },
-  async remove(path) {
-    if (!path) return;
-    await sb.storage.from('overledenen').remove([path]).catch(() => {});
-  },
-};
-
-// ─── Paspoort-kaart visualisatie (door Android NFC-scanner app gemaakt) ──
-// Zelfde 'overledenen' bucket; pad staat in dossiers.paspoort_kaart_pad
-const PaspoortKaart = {
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  urlVoor(path) {
-    if (!path) return null;
-    const base = PaspoortKaart.publicUrl(path);
-    if (!base) return null;
-    return base + '?v=' + Date.now();
-  },
-  async remove(path) {
-    if (!path) return;
-    await sb.storage.from('overledenen').remove([path]).catch(() => {});
-  },
-};
-
-// ─── Eten & drinken-catalogus + foto's (publieke bucket) ────────────────────
-const EtenDrinkenFotos = {
+// ─── Eten & drinken-catalogus + foto's (publieke bucket) ───────────────────
+const EtenFotos = {
   slug(naam) {
     return naam.toLowerCase()
       .replace(/[\s/]+/g, '-')
@@ -506,9 +466,9 @@ const EtenDrinkenFotos = {
     return (Cloud.cache.eten_drinken_catalogus || []).find(b => b.naam === naam);
   },
   urlVoor(naam) {
-    const r = EtenDrinkenFotos.byNaam(naam);
+    const r = EtenFotos.byNaam(naam);
     if (!r || !r.storage_pad) return null;
-    const base = EtenDrinkenFotos.publicUrl(r.storage_pad);
+    const base = EtenFotos.publicUrl(r.storage_pad);
     if (!base) return null;
     const ts = r.updated_at ? new Date(r.updated_at).getTime() : Date.now();
     return base + '?v=' + ts;
@@ -516,20 +476,15 @@ const EtenDrinkenFotos = {
   async uploadFoto(naam, file) {
     file = await compressImage(file, 1600, 0.85);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const path = `${EtenDrinkenFotos.slug(naam)}.${ext}`;
+    const path = `${EtenFotos.slug(naam)}.${ext}`;
     const oude = (Cloud.cache.eten_drinken_catalogus || []).filter(b => b.naam === naam);
     for (const o of oude) {
       if (o.storage_pad && o.storage_pad !== path) {
         await sb.storage.from('eten_drinken').remove([o.storage_pad]).catch(() => {});
       }
     }
-    const { error: upErr } = await sb.storage.from('eten_drinken').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (upErr) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: upErr.message });
-      throw upErr;
-    }
+    const { error } = await sb.storage.from('eten_drinken').upload(path, file, { upsert: true, cacheControl: '3600' });
+    if (error) throw error;
     return path;
   },
   async removeFoto(b) {

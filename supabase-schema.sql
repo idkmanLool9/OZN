@@ -106,8 +106,213 @@ ALTER TABLE public.kosten
 ALTER TABLE public.documenten
   ADD COLUMN IF NOT EXISTS bijgewerkt_door TEXT;
 
+-- E-mail-adresboek per dossier: lijst van eerder gebruikte mailadressen
+-- (familie, verzekeraar, mede-uitvaartleider, ...) zodat ze in de mail-
+-- modal direct als suggestie verschijnen.
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS email_adresboek JSONB DEFAULT '[]'::jsonb;
+
+-- v5.11: certificaatnummer (familiegraf), voorganger-priester, artsverklaring-scan
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS certificaat_nummer TEXT,
+  ADD COLUMN IF NOT EXISTS uitvaart_voorganger TEXT,
+  ADD COLUMN IF NOT EXISTS artsverklaring_pad TEXT;
+
+-- ────────────────────────────────────────────────────────────────────
+-- 1.B  Cleanup voor ongebruikte kolommen / tabellen (v5.5.0)
+--
+-- Onderstaande commando's zijn DESTRUCTIEF — alleen draaien als je zeker
+-- weet dat de data niet meer nodig is. Verwijderen van een hele tabel
+-- (taken, documenten) is bijvoorbeeld nooit terug te krijgen.
+-- Haal de "--"-tekens weg voor de regels die je écht wilt uitvoeren.
+-- ────────────────────────────────────────────────────────────────────
+
+-- Kolommen op dossiers die niet meer door de UI worden gebruikt:
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS doopnaam;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS burgerlijke_staat;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS beroep;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS avondwake_datum;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS avondwake_tijd;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS avondwake_locatie;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS muziek_zang;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS paspoort_kaart_pad;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS foto_overledene_pad;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_zelfde_als_contact;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_naam;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_geboortedatum;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangever_geboorteplaats;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS akte_overlijden;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS publicatie_krant;
+-- ALTER TABLE public.dossiers DROP COLUMN IF EXISTS aangifte_datum;
+
+-- Hele tabellen die door de UI niet meer worden bevraagd:
+-- DROP TABLE IF EXISTS public.taken CASCADE;
+-- DROP TABLE IF EXISTS public.documenten CASCADE;
+
 -- PostgREST-cache vernieuwen zodat de nieuwe kolommen meteen bruikbaar zijn
 NOTIFY pgrst, 'reload schema';
+
+-- ────────────────────────────────────────────────────────────────────
+-- Push-notificaties: per apparaat één subscription opslaan zodat de
+-- Edge Function 'send-push' er notificaties naartoe kan sturen.
+-- ────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  profiel TEXT,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_sent_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx
+  ON public.push_subscriptions(user_id);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_own_push" ON public.push_subscriptions;
+CREATE POLICY "auth_own_push" ON public.push_subscriptions
+  FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- ────────────────────────────────────────────────────────────────────
+-- Familie-portaal: tijdelijke publieke deel-link per dossier
+-- (v5.6.0) Genereer een tijdelijke link die de familie kan gebruiken
+-- om hun eigen dossier-info in te zien — geen login nodig.
+-- ────────────────────────────────────────────────────────────────────
+
+ALTER TABLE public.dossiers
+  ADD COLUMN IF NOT EXISTS familie_checklist JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS familie_dagplanning JSONB DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS familie_welkomtekst TEXT;
+
+CREATE TABLE IF NOT EXISTS public.familie_portaal_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  dossier_id BIGINT NOT NULL REFERENCES public.dossiers(id) ON DELETE CASCADE,
+  token TEXT NOT NULL UNIQUE,
+  naam TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  created_by UUID REFERENCES auth.users(id)
+);
+CREATE INDEX IF NOT EXISTS familie_portaal_tokens_token_idx
+  ON public.familie_portaal_tokens(token);
+CREATE INDEX IF NOT EXISTS familie_portaal_tokens_dossier_idx
+  ON public.familie_portaal_tokens(dossier_id);
+
+ALTER TABLE public.familie_portaal_tokens ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_familie" ON public.familie_portaal_tokens;
+CREATE POLICY "auth_all_familie" ON public.familie_portaal_tokens
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- RPC: anonieme lezing van EEN SUBSET van dossier-gegevens met een token.
+-- Returnt NULL als token onbekend of verlopen — bewust geen 'access denied'
+-- om geen info te lekken.
+CREATE OR REPLACE FUNCTION public.get_familie_portaal(p_token TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_dossier_id BIGINT;
+  v_result JSONB;
+BEGIN
+  SELECT dossier_id INTO v_dossier_id
+    FROM public.familie_portaal_tokens
+   WHERE token = p_token AND expires_at > now();
+
+  IF v_dossier_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  -- Bouw veilige publieke subset (GEEN BSN, GEEN kosten, GEEN notities)
+  SELECT jsonb_build_object(
+    'dossier_nummer',     dossier_nummer,
+    'voornaam',           voornaam,
+    'achternaam',         achternaam,
+    'geboortedatum',      geboortedatum,
+    'overlijdensdatum',   overlijdensdatum,
+    'uitvaart_datum',     uitvaart_datum,
+    'uitvaart_tijd',      uitvaart_tijd,
+    'uitvaart_type',      uitvaart_type,
+    'kerk_locatie',       kerk_locatie,
+    'begraafplaats',      begraafplaats,
+    'parochie',           parochie,
+    'priester',           priester,
+    'huisbezoek_datum',   huisbezoek_datum,
+    'huisbezoek_tijd',    huisbezoek_tijd,
+    'avondwake_datum',    avondwake_datum,
+    'avondwake_tijd',     avondwake_tijd,
+    'avondwake_locatie',  avondwake_locatie,
+    'condoleance_locatie',condoleance_locatie,
+    'familie_checklist',  COALESCE(familie_checklist, '[]'::jsonb),
+    'familie_dagplanning',COALESCE(familie_dagplanning, '[]'::jsonb),
+    'familie_welkomtekst',familie_welkomtekst,
+    'familie_id_status', (
+      SELECT COALESCE(jsonb_object_agg(slot, uploaded_at), '{}'::jsonb)
+        FROM public.familie_id_uploads WHERE dossier_id = v_dossier_id
+    )
+  ) INTO v_result
+    FROM public.dossiers
+   WHERE id = v_dossier_id;
+
+  RETURN v_result;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_familie_portaal(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_familie_portaal(TEXT) TO authenticated;
+
+-- Optionele ID-kaart-upload door de familie via de portal (voor/achter,
+-- overledene + contactpersoon). Base64, token-beveiligd via RPC.
+CREATE TABLE IF NOT EXISTS public.familie_id_uploads (
+  id BIGSERIAL PRIMARY KEY,
+  dossier_id BIGINT NOT NULL REFERENCES public.dossiers(id) ON DELETE CASCADE,
+  slot TEXT NOT NULL,          -- overledene_voor | overledene_achter | contact_voor | contact_achter
+  data_url TEXT NOT NULL,      -- data:image/jpeg;base64,...
+  uploaded_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (dossier_id, slot)
+);
+CREATE INDEX IF NOT EXISTS familie_id_uploads_dossier_idx
+  ON public.familie_id_uploads(dossier_id);
+ALTER TABLE public.familie_id_uploads ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_all_id_uploads" ON public.familie_id_uploads;
+CREATE POLICY "auth_all_id_uploads" ON public.familie_id_uploads
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION public.familie_portaal_upload_id(
+  p_token TEXT, p_slot TEXT, p_data_url TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_dossier_id BIGINT;
+BEGIN
+  IF p_slot NOT IN ('overledene_voor','overledene_achter','contact_voor','contact_achter') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ongeldige_slot');
+  END IF;
+  IF p_data_url IS NULL OR p_data_url NOT LIKE 'data:image/%'
+     OR length(p_data_url) > 4000000 THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ongeldige_afbeelding');
+  END IF;
+  SELECT dossier_id INTO v_dossier_id
+    FROM public.familie_portaal_tokens
+   WHERE token = p_token AND expires_at > now();
+  IF v_dossier_id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'ongeldige_link');
+  END IF;
+  INSERT INTO public.familie_id_uploads (dossier_id, slot, data_url, uploaded_at)
+    VALUES (v_dossier_id, p_slot, p_data_url, now())
+  ON CONFLICT (dossier_id, slot) DO UPDATE
+    SET data_url = EXCLUDED.data_url, uploaded_at = now();
+  RETURN jsonb_build_object('ok', true);
+END; $$;
+GRANT EXECUTE ON FUNCTION public.familie_portaal_upload_id(TEXT, TEXT, TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.familie_portaal_upload_id(TEXT, TEXT, TEXT) TO authenticated;
 
 -- Aangifte-formulier (papieren formulier "Aangifte van overlijden")
 ALTER TABLE public.dossiers
@@ -204,11 +409,15 @@ DECLARE
   volgnr INT;
 BEGIN
   IF NEW.dossier_nummer IS NULL OR NEW.dossier_nummer = '' THEN
+    -- Hoogste volgnummer over BEIDE oude en nieuwe notatie
+    -- (oud: 'SOK-YYYY-XXXX', nieuw: 'YYYY-XXXX'), zodat we
+    -- nooit een dubbel nummer uitgeven binnen hetzelfde jaar.
     SELECT COALESCE(MAX(CAST(SUBSTRING(dossier_nummer FROM '[0-9]+$') AS INT)), 0) + 1
       INTO volgnr
       FROM public.dossiers
-     WHERE dossier_nummer LIKE 'SOK-' || jaar || '-%';
-    NEW.dossier_nummer := 'SOK-' || jaar || '-' || LPAD(volgnr::TEXT, 4, '0');
+     WHERE dossier_nummer LIKE jaar || '-%'
+        OR dossier_nummer LIKE 'SOK-' || jaar || '-%';
+    NEW.dossier_nummer := jaar || '-' || LPAD(volgnr::TEXT, 4, '0');
   END IF;
   RETURN NEW;
 END;

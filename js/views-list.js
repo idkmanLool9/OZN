@@ -1,5 +1,13 @@
 // Dossierlijst, account, 404
 
+// Statusbadge met passend icoon (✓ Voltooid, etc.)
+function dossierStatusBadge(st) {
+  const s = st || 'nieuw';
+  const ico = { nieuw: '✦', in_behandeling: '◷', voltooid: '✓', geannuleerd: '✕' };
+  const lbl = { nieuw: 'Nieuw', in_behandeling: 'In behandeling', voltooid: 'Voltooid', geannuleerd: 'Geannuleerd' };
+  return `<span class="status status-${esc(s)}"><span class="status-ico">${ico[s] || ''}</span>${esc(lbl[s] || s.replace('_', ' '))}</span>`;
+}
+
 function renderDossierList(params, path) {
   const url = new URL(location.href);
   const q = (url.hash.split('?')[1] ? new URLSearchParams(url.hash.split('?')[1]).get('q') : '') || '';
@@ -25,69 +33,133 @@ function renderDossierList(params, path) {
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head">
-        <h1>Dossiers</h1>
-        <div class="page-actions">
-          <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
+        <div>
+          <h1>Dossiers</h1>
+          <p class="muted">Beheer en overzicht van alle dossiers.</p>
         </div>
+        <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
       </div>
-      <form class="filter-bar" id="filter-form">
-        <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon..." />
-        <select name="status">
+
+      <form class="dossiers-filterbar" id="filter-form">
+        <div class="catalog-search">
+          <span class="catalog-search-icon">🔍</span>
+          <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon…" autocomplete="off">
+        </div>
+        <select name="status" class="dossiers-control" id="dossiers-status">
           <option value="">Alle statussen</option>
           <option value="nieuw" ${status==='nieuw'?'selected':''}>Nieuw</option>
           <option value="in_behandeling" ${status==='in_behandeling'?'selected':''}>In behandeling</option>
           <option value="voltooid" ${status==='voltooid'?'selected':''}>Voltooid</option>
           <option value="geannuleerd" ${status==='geannuleerd'?'selected':''}>Geannuleerd</option>
         </select>
-        <button type="submit" class="btn">Filteren</button>
-        ${q || status ? '<a href="#/dossiers" class="btn btn-ghost">Wissen</a>' : ''}
+        <button type="submit" class="dossiers-control dossiers-filter-btn">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+          Filteren
+        </button>
+        ${q || status ? '<a href="#/dossiers" class="dossiers-wis">↺ Wis</a>' : ''}
       </form>
-      ${dossiers.length === 0 ? '<div class="card"><p class="muted">Geen dossiers gevonden.</p></div>' :
-      `<table class="table"><thead><tr>
-        <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th>
-      </tr></thead><tbody>
-        ${dossiers.map(d => `<tr>
-          <td><a href="#/dossiers/${d.id}">${esc(d.dossier_nummer)}</a></td>
-          <td><strong>${esc(fullName(d) || '—')}</strong></td>
-          <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
-          <td>${esc(d.gezinsnummer || '—')}</td>
-          <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
-          <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
-          <td><span class="status status-${esc(d.status||'nieuw')}">${esc((d.status||'nieuw').replace('_',' '))}</span></td>
-          <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? ' · ' + esc(d.bijgewerkt_door) : ''}</span></td>
-        </tr>`).join('')}
-      </tbody></table>`}
+
+      ${dossiers.length === 0
+        ? '<div class="dossiers-kaart"><p class="muted center" style="padding:2.5rem;">Geen dossiers gevonden.</p></div>'
+        : `<div class="dossiers-kaart">
+            <table class="table dossiers-table">
+              <thead><tr>
+                <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th><th aria-hidden="true"></th>
+              </tr></thead>
+              <tbody>
+                ${dossiers.map(d => `<tr data-id="${d.id}">
+                  <td><a href="#/dossiers/${d.id}" class="dossier-link">${esc(d.dossier_nummer)}</a></td>
+                  <td><strong>${esc(fullName(d) || '—')}</strong></td>
+                  <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
+                  <td>${esc(d.gezinsnummer || '—')}</td>
+                  <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
+                  <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
+                  <td>${dossierStatusBadge(d.status)}</td>
+                  <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? '<br>- ' + esc(d.bijgewerkt_door) : ''}</span></td>
+                  <td class="dossiers-chevron" aria-hidden="true">›</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`}
     </div>`;
 
-  $('#filter-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const f = e.target;
+  const navigeerFilter = (f) => {
     const params = new URLSearchParams();
     if (f.q.value) params.set('q', f.q.value);
     if (f.status.value) params.set('status', f.status.value);
     location.hash = '#/dossiers' + (params.toString() ? '?' + params.toString() : '');
+  };
+  $('#filter-form').addEventListener('submit', e => {
+    e.preventDefault();
+    navigeerFilter(e.target);
+  });
+  // Statuskeuze meteen toepassen
+  const statusSel = $('#dossiers-status');
+  if (statusSel) statusSel.addEventListener('change', () => navigeerFilter(statusSel.form));
+
+  // Hele rij klikbaar → naar dossier-detail (behalve op links/knoppen)
+  $$('#view tr[data-id]').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if (e.target.closest('a, button')) return;
+      Router.go('/dossiers/' + tr.getAttribute('data-id'));
+    });
   });
 }
 
 function renderAccount(msg) {
   const u = Auth.current();
+  // Instellingen op functieniveau beschikbaar. Losse secties definiëren hun
+  // eigen `s` in een IIFE; de Factuur-sectie leunt op deze buitenste `s`.
+  const s = Settings.all();
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head"><h1>Mijn account</h1></div>
-      <section class="card narrow">
+
+      <nav class="account-nav" aria-label="Snelnavigatie instellingen">
+        <a href="#/account#acc-versie">App &amp; updates</a>
+        <a href="#/account#acc-gegevens">Mijn gegevens</a>
+        <a href="#/account#acc-wachtwoord">Wachtwoord</a>
+        <a href="#/account#acc-weergave">Weergave</a>
+        <a href="#/account#acc-branding">Branding</a>
+        <a href="#/account#login-instellingen">Loginscherm</a>
+        <a href="#/account#acc-welkom">Welkomscherm</a>
+        <a href="#/account#email-instellingen">E-mail</a>
+        <a href="#/account#factuur-instellingen">Factuur</a>
+        <a href="#/account#push-instellingen">Push-notificaties</a>
+        <a href="#/account#snelstart-instellingen">SnelStart</a>
+        <a href="#/account#profielen">Profielen</a>
+        <a href="#/account#parochies">Parochies</a>
+        <a href="#/account#verzekeringen">Verzekeringen</a>
+        <a href="#/account#handtekeningen">Handtekeningen</a>
+        <a href="#/account#acc-data">Data &amp; sync</a>
+      </nav>
+
+      <section class="card narrow" id="acc-versie">
         <h2>App-versie &amp; updates</h2>
         <dl class="dl">
           <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Apple-documentscanner</dt><dd id="scanner-status" class="muted small">controleren…</dd></div>' : ''}
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Live Activity</dt><dd id="la-status" class="muted small">controleren…</dd></div>' : ''}
         </dl>
+        ${(typeof Native !== 'undefined' && Native.isApp()) ? `
+          <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .75rem;">
+            <button type="button" class="btn btn-sm" id="btn-la-test">▶︎ Test Live Activity</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-la-stop">Stop</button>
+          </div>
+          <div id="la-test-result" class="muted small" style="margin-bottom:.5rem;"></div>` : ''}
         <div id="update-result"></div>
-        <div class="form-actions" style="justify-content:flex-start;">
+        <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;">
           <button type="button" class="btn btn-primary" id="btn-check-update">Check op updates</button>
+          <button type="button" class="btn btn-ghost" id="btn-hard-reset" title="Wis alle lokale cache en service-worker, en herlaad alles vanaf de server">🧹 Reset volledig</button>
         </div>
-        <p class="muted small" style="margin-top:.5rem;">Forceert een controle op een nieuwere versie en herlaadt de service-worker. Daarna automatisch verversen.</p>
+        <p class="muted small" style="margin-top:.5rem;">
+          <strong>Check op updates</strong> haalt de laatste versie binnen.<br>
+          <strong>Reset volledig</strong> gebruik je alleen als de app vast blijft hangen op een oude versie — dossiers blijven veilig staan, alleen de offline-kopie wordt gewist.
+        </p>
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-gegevens">
         <h2>Mijn gegevens</h2>
         <form id="profile-form" class="form" autocomplete="off">
           <label>
@@ -108,7 +180,7 @@ function renderAccount(msg) {
           </div>
         </form>
       </section>
-      <section class="card narrow">
+      <section class="card narrow" id="acc-wachtwoord">
         <h2>Wachtwoord wijzigen</h2>
         ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
         ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
@@ -118,7 +190,7 @@ function renderAccount(msg) {
           <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
         </form>
       </section>
-      <section class="card narrow">
+      <section class="card narrow" id="acc-branding">
         <h2>Branding</h2>
         <p class="muted small">Logo, naam en kleuren van de app aanpassen.</p>
         ${(() => {
@@ -217,12 +289,21 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-weergave">
         <h2>Weergave</h2>
         ${(() => {
           const s = Settings.all();
           return `
           <form id="ui-form" class="form" autocomplete="off">
+            <label>
+              <span>Ontwerp</span>
+              <select name="design_version">
+                <option value="v1" ${(s.design_version||'v1')==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
+                <option value="v2" ${s.design_version==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
+              </select>
+              <span class="muted small">Wissel tussen het nieuwe ontwerp met zijbalk (v2) en de vertrouwde bovenbalk-indeling (v1).</span>
+            </label>
+
             <label>
               <span>Lettertype</span>
               <select name="font_id" id="font-select">
@@ -298,6 +379,16 @@ function renderAccount(msg) {
             <label><span>EmailJS Public Key</span><input type="text" name="emailjs_public_key" value="${esc(s.emailjs_public_key)}" placeholder="bv. xK_abc123..."></label>
             <label><span>EmailJS Service ID</span><input type="text" name="emailjs_service_id" value="${esc(s.emailjs_service_id)}" placeholder="bv. service_abc123"></label>
             <label><span>EmailJS Template ID</span><input type="text" name="emailjs_template_id" value="${esc(s.emailjs_template_id)}" placeholder="bv. template_abc123"></label>
+            <label>
+              <span>📧 Auto-mail dossier naar klooster bij opslaan</span>
+              <input type="email" name="auto_send_dossier_email" value="${esc(s.auto_send_dossier_email)}" placeholder="leeg = uit">
+              <span class="muted small">Elke keer dat een dossier wordt aangemaakt of bewerkt, wordt er automatisch een kopie verstuurd naar dit adres. Laat leeg om uit te schakelen.</span>
+            </label>
+            <label>
+              <span>🔗 Publieke web-URL (voor familie-portaal-links)</span>
+              <input type="url" name="portaal_base_url" value="${esc(s.portaal_base_url || '')}" placeholder="bv. https://uitvaartbeheer.pages.dev">
+              <span class="muted small">De adres waar de web-app draait. Nodig zodat gedeelde familie-links buiten de app werken. Wordt automatisch ingevuld zodra je de app in een browser opent; pas alleen aan als je een eigen domein gebruikt.</span>
+            </label>
             <label><span>Test-e-mailadres (voor verificatie)</span><input type="email" name="email_test_to" placeholder="bv. je eigen e-mail"></label>
             <div id="email-test-result"></div>
             <div class="form-actions" style="justify-content:space-between;">
@@ -308,9 +399,174 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      <section class="card narrow" id="email-footer-instellingen">
+        <h2>E-mail handtekening / footer</h2>
+        <p class="muted small">Donker balkje onderaan élke verzonden mail (dossier &amp; factuur). Laat een veld leeg om dat onderdeel weg te laten.</p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="email-footer-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="email_footer_enabled" ${s.email_footer_enabled ? 'checked' : ''}>
+              Footer toevoegen aan uitgaande e-mails
+            </label>
+            <label>
+              <span>Adres (één regel)</span>
+              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="St. Ephrem de Syriër Klooster · Glanerbrugstr. 33, 7585 Glane/Losser" maxlength="200">
+            </label>
+            <div class="grid-2" style="gap:.85rem;">
+              <label>
+                <span>Telefoon</span>
+                <input type="tel" name="email_footer_phone" value="${esc(s.email_footer_phone)}" placeholder="bv. 053 538 4054">
+              </label>
+              <label>
+                <span>E-mail</span>
+                <input type="email" name="email_footer_email" value="${esc(s.email_footer_email)}" placeholder="info@sok-antiochie.nl">
+              </label>
+              <label class="span-2">
+                <span>Website</span>
+                <input type="text" name="email_footer_website" value="${esc(s.email_footer_website)}" placeholder="www.sok-antiochie.nl">
+              </label>
+              <label>
+                <span>Algemene Voorwaarden (URL)</span>
+                <input type="url" name="email_footer_terms_url" value="${esc(s.email_footer_terms_url)}" placeholder="https://...">
+              </label>
+              <label>
+                <span>Privacy Voorwaarden (URL)</span>
+                <input type="url" name="email_footer_privacy_url" value="${esc(s.email_footer_privacy_url)}" placeholder="https://...">
+              </label>
+              <label>
+                <span>Facebook (URL)</span>
+                <input type="url" name="email_footer_facebook_url" value="${esc(s.email_footer_facebook_url)}" placeholder="https://facebook.com/...">
+              </label>
+              <label>
+                <span>Instagram (URL)</span>
+                <input type="url" name="email_footer_instagram_url" value="${esc(s.email_footer_instagram_url)}" placeholder="https://instagram.com/...">
+              </label>
+            </div>
+            <div class="form-actions" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow" id="factuur-instellingen">
+        <h2>Factuurgegevens</h2>
+        <p class="muted small">Deze gegevens staan bovenaan de PDF-factuur (bedrijfskop + betaalgegevens).</p>
+        <form id="factuur-form" class="form" autocomplete="off">
+          <label><span>Bedrijfsnaam</span><input type="text" name="factuur_bedrijfsnaam" value="${esc(s.factuur_bedrijfsnaam || '')}"></label>
+          <label><span>Adres (2 regels toegestaan)</span><textarea name="factuur_adres" rows="2">${esc(s.factuur_adres || '')}</textarea></label>
+          <div class="grid-2" style="gap:.75rem;">
+            <label><span>Telefoon</span><input type="text" name="factuur_telefoon" value="${esc(s.factuur_telefoon || '')}"></label>
+            <label><span>E-mail</span><input type="text" name="factuur_email" value="${esc(s.factuur_email || '')}"></label>
+          </div>
+          <label><span>IBAN</span><input type="text" name="factuur_iban" value="${esc(s.factuur_iban || '')}"></label>
+          <div class="grid-3" style="gap:.75rem;">
+            <label><span>Btw-nr</span><input type="text" name="factuur_btw" value="${esc(s.factuur_btw || '')}"></label>
+            <label><span>KvK</span><input type="text" name="factuur_kvk" value="${esc(s.factuur_kvk || '')}"></label>
+            <label><span>Betalingstermijn (dagen)</span><input type="number" name="factuur_betalingstermijn_dagen" value="${esc(s.factuur_betalingstermijn_dagen || 30)}" min="0" step="1"></label>
+          </div>
+          <div class="form-actions" style="justify-content:space-between;align-items:center;">
+            <span class="muted small">Laatste factuurnummer: <strong>${esc(Settings.get('factuur_volgnr') || 0)}</strong></span>
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card narrow" id="push-instellingen">
+        <h2>Push-notificaties</h2>
+        <p class="muted small">
+          Krijg een melding op je telefoon/iPad wanneer er een uitvaart aankomt (standaard 1 dag van tevoren).
+          Werkt op Chrome, Safari (iOS 16.4+, app moet 'op beginscherm' staan) en Android.
+        </p>
+        <div id="push-status" class="alert" style="margin-bottom:.75rem;">Laden…</div>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="push-form" class="form" autocomplete="off">
+            <label>
+              <span>VAPID public key</span>
+              <input type="text" name="push_vapid_public_key" value="${esc(s.push_vapid_public_key)}" placeholder="bv. BNb1...long base64-url string">
+              <span class="muted small">Eenmalig in te stellen. Zie <code>docs/push-setup.md</code> voor hoe je deze sleutels maakt.</span>
+            </label>
+            <label>
+              <span>Aantal dagen vooraf herinneren</span>
+              <input type="number" name="push_remind_days_ahead" value="${esc(s.push_remind_days_ahead)}" min="0" max="14" step="1">
+            </label>
+            <div class="form-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost" id="btn-push-enable">🔔 Inschakelen op dit apparaat</button>
+                <button type="button" class="btn btn-ghost" id="btn-push-disable" hidden>🔕 Uitschakelen</button>
+                <button type="button" class="btn btn-ghost" id="btn-push-test">Test-melding</button>
+              </div>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow" id="snelstart-instellingen">
+        <h2>SnelStart-koppeling (boekhouding)</h2>
+        <p class="muted small">
+          Koppel je SnelStart-administratie om straks facturen/boekingen te kunnen versturen.
+          Vraag in je SnelStart-account de <strong>B2B API-sleutels</strong> aan: een
+          <strong>Subscription key</strong> (API-gateway) en een <strong>Client key</strong>
+          (per administratie). Vul ze hieronder in en klik op <strong>Test verbinding</strong>.
+        </p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="snelstart-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="snelstart_actief" ${s.snelstart_actief ? 'checked' : ''}>
+              Koppeling actief
+            </label>
+            <label>
+              <span>Subscription key</span>
+              <input type="password" name="snelstart_subscription_key" value="${esc(s.snelstart_subscription_key)}" placeholder="Ocp-Apim-Subscription-Key" autocomplete="off">
+            </label>
+            <label>
+              <span>Client key</span>
+              <input type="password" name="snelstart_client_key" value="${esc(s.snelstart_client_key)}" placeholder="clientkey van je administratie" autocomplete="off">
+              <span class="muted small">De sleutels worden veilig in de cloud-instellingen bewaard en alleen via een beveiligde server-functie naar SnelStart gestuurd (nooit rechtstreeks vanuit de browser).</span>
+            </label>
+            <div id="snelstart-result"></div>
+            <div class="form-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-ghost" id="btn-snelstart-test">⇄ Test verbinding</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow" id="profielen">
+        <h2>Profielen — "Wie werkt vandaag?"</h2>
+        <p class="muted small">De namen die verschijnen op het profielkeuze-scherm. Wijzigingen in de naam blijven bij bestaande dossiers behouden (tracking-velden veranderen niet met terugwerkende kracht).</p>
+        ${(() => {
+          const lijst = (Settings.get('profielen') || []);
+          return `
+          <form id="profielen-form" class="form" autocomplete="off">
+            <div id="profielen-rows" class="profielen-rows">
+              ${lijst.map((p, i) => `
+                <div class="profielen-row" data-idx="${i}">
+                  <span class="profielen-avatar" style="background:${esc(p.color || '#6b1e2a')};">${esc((p.name || '?').charAt(0).toUpperCase())}</span>
+                  <input type="text" class="profielen-naam" value="${esc(p.name || '')}" placeholder="bv. Rume" maxlength="40">
+                  <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
+                  <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
+                </div>`).join('')}
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-profiel">+ Profiel toevoegen</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
       <section class="card narrow" id="parochies">
         <h2>Parochies &amp; priesters</h2>
-        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Aboona) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
+        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Abuna) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
         ${(() => {
           const lijst = Settings.get('parochies') || [];
           return `
@@ -396,7 +652,7 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-welkom">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
         ${(() => {
@@ -453,7 +709,7 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-data">
         <h2>Data &amp; synchronisatie</h2>
         ${(() => {
           const m = (() => { try { return JSON.parse(localStorage.getItem('sok_mirror') || '{}'); } catch (_) { return {}; } })();
@@ -461,19 +717,16 @@ function renderAccount(msg) {
           const offline = !!Cloud.offline || !navigator.onLine;
           const cnt = {
             dossiers: DB.list(KEYS.DOSSIERS).length,
-            taken: DB.list(KEYS.TAKEN).length,
             kosten: DB.list(KEYS.KOSTEN).length,
             notities: DB.list(KEYS.NOTITIES).length,
-            documenten: DB.list(KEYS.DOCUMENTEN).length,
             kisten_fotos: DB.list(KEYS.KIST_AFBEELDINGEN).length,
             bloemen: DB.list(KEYS.BLOEMEN).length,
-            eten_drinken: DB.list(KEYS.ETEN_DRINKEN).length,
           };
           return `
           <div class="alert ${offline ? 'alert-error' : 'alert-success'}" style="margin-bottom:.75rem;">
             <strong>${offline ? '⚠ Offline — leesmodus' : '✓ Veilig in de cloud'}</strong>
             <p class="muted small" style="margin:.35rem 0 0;color:inherit;opacity:.9;">
-              Alle dossiers, taken, kosten, notities, documenten, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
+              Alle dossiers, kosten, notities, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
               ${offline
                 ? 'Op dit moment offline — wijzigingen kunnen pas worden opgeslagen zodra je weer internet hebt. Bestaande gegevens blijven veilig staan.'
                 : 'Op elk apparaat zichtbaar zodra je inlogt. localStorage wordt enkel als offline-kopie gebruikt — niets gaat verloren bij cache wissen of nieuwe browser.'}
@@ -481,12 +734,9 @@ function renderAccount(msg) {
           </div>
           <dl class="dl" style="grid-template-columns: 1fr 1fr;">
             <div><dt>Dossiers</dt><dd><strong>${cnt.dossiers}</strong></dd></div>
-            <div><dt>Taken</dt><dd>${cnt.taken}</dd></div>
             <div><dt>Kostenposten</dt><dd>${cnt.kosten}</dd></div>
             <div><dt>Notities</dt><dd>${cnt.notities}</dd></div>
-            <div><dt>Documenten</dt><dd>${cnt.documenten}</dd></div>
             <div><dt>Bloemstukken</dt><dd>${cnt.bloemen}</dd></div>
-            <div><dt>Eten &amp; drinken</dt><dd>${cnt.eten_drinken}</dd></div>
             <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
             <div style="grid-column:span 2;"><dt>Laatst gesynchroniseerd</dt><dd>${lastSync ? lastSync.toLocaleString('nl-NL') : '—'}</dd></div>
           </dl>
@@ -527,9 +777,25 @@ function renderAccount(msg) {
     $('#logo-input').addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
-      if (!file.type.startsWith('image/')) return alert('Alleen afbeeldingen toegestaan.');
-      if (file.size > 1024 * 1024) return alert('Logo te groot (max. 1 MB).');
-      if (!navigator.onLine) return alert('Logo uploaden kan alleen met internet (gaat naar de cloud).');
+      if (!file.type.startsWith('image/')) return Modal.show({ type: 'warning', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen toegestaan.' });
+      if (file.size > 1024 * 1024) return Modal.show({ type: 'warning', title: 'Logo te groot', message: 'Maximaal 1 MB.' });
+      // Demo-/review-account: geen cloud-upload (dat zou het gedeelde app-logo
+      // overschrijven). Lokaal als verkleinde data-URL inlezen — alleen op dit
+      // toestel, en het overleeft een herstart via de demo-instellingen.
+      if (typeof Demo !== 'undefined' && Demo.isActive()) {
+        try {
+          const small = await compressImage(file, 256, 0.85);
+          pendingLogo = await new Promise((res, rej) => {
+            const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(small);
+          });
+          const prev = $('#logo-preview');
+          if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
+        } catch (err) {
+          Modal.show({ type: 'error', title: 'Kon logo niet laden', message: err.message || String(err) });
+        }
+        return;
+      }
+      if (!navigator.onLine) return Modal.show({ type: 'offline', title: 'Geen internet', message: 'Logo uploaden kan alleen met een actieve internetverbinding.' });
       const lbl = e.target.closest('label');
       if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
       try {
@@ -537,7 +803,7 @@ function renderAccount(msg) {
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
       } catch (err) {
-        alert('Upload mislukt: ' + (err.message || err));
+        Modal.show({ type: 'error', title: 'Upload mislukt', message: err.message || String(err) });
       } finally {
         if (lbl) { lbl.style.opacity = 1; }
       }
@@ -549,8 +815,10 @@ function renderAccount(msg) {
         pendingLogo = '';
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = '<span>✝</span>';
-        // Bestand uit storage verwijderen (best-effort)
-        if (navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
+        // Bestand uit storage verwijderen (best-effort). Demo-account raakt de
+        // gedeelde storage niet aan.
+        const demo = (typeof Demo !== 'undefined' && Demo.isActive());
+        if (!demo && navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
       });
     }
 
@@ -573,8 +841,9 @@ function renderAccount(msg) {
       renderAccount({ success: 'Branding opgeslagen.' });
     });
 
-    $('#btn-reset-brand').addEventListener('click', () => {
-      if (!confirm('Branding terugzetten naar standaard? (logo wordt verwijderd)')) return;
+    $('#btn-reset-brand').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Branding herstellen?', message: 'Alle branding-instellingen worden teruggezet en het logo verdwijnt.', confirmText: 'Herstellen' });
+      if (!ok) return;
       Settings.set({
         app_name: Settings.defaults.app_name,
         app_tagline: Settings.defaults.app_tagline,
@@ -606,8 +875,9 @@ function renderAccount(msg) {
       Branding.apply();
       renderAccount({ success: 'Loginscherm-teksten opgeslagen.' });
     });
-    $('#btn-reset-login').addEventListener('click', () => {
-      if (!confirm('Loginscherm-teksten terugzetten naar standaard?')) return;
+    $('#btn-reset-login').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Loginscherm herstellen?', message: 'Alle teksten op het loginscherm worden teruggezet naar de standaard.', confirmText: 'Herstellen' });
+      if (!ok) return;
       Settings.set({
         login_brand_title:    Settings.defaults.login_brand_title,
         login_brand_subtitle: Settings.defaults.login_brand_subtitle,
@@ -641,6 +911,7 @@ function renderAccount(msg) {
       e.preventDefault();
       const f = e.target;
       Settings.set({
+        design_version: f.design_version.value,
         compact_mode: f.compact_mode.checked,
         rounded_cards: f.rounded_cards.checked,
         font_id: f.font_id.value,
@@ -662,9 +933,52 @@ function renderAccount(msg) {
         emailjs_public_key: f.emailjs_public_key.value.trim(),
         emailjs_service_id: f.emailjs_service_id.value.trim(),
         emailjs_template_id: f.emailjs_template_id.value.trim(),
+        auto_send_dossier_email: f.auto_send_dossier_email.value.trim(),
+        portaal_base_url: (f.portaal_base_url.value || '').trim().replace(/\/+$/, ''),
       });
       renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
     });
+
+    // Footer / handtekening
+    const emailFooterForm = $('#email-footer-form');
+    if (emailFooterForm) {
+      emailFooterForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = e.target;
+        Settings.set({
+          email_footer_enabled:       f.email_footer_enabled.checked,
+          email_footer_address:       f.email_footer_address.value.trim(),
+          email_footer_phone:         f.email_footer_phone.value.trim(),
+          email_footer_email:         f.email_footer_email.value.trim(),
+          email_footer_website:       f.email_footer_website.value.trim(),
+          email_footer_terms_url:     f.email_footer_terms_url.value.trim(),
+          email_footer_privacy_url:   f.email_footer_privacy_url.value.trim(),
+          email_footer_facebook_url:  f.email_footer_facebook_url.value.trim(),
+          email_footer_instagram_url: f.email_footer_instagram_url.value.trim(),
+        });
+        renderAccount({ success: 'E-mail-footer opgeslagen.' });
+      });
+    }
+
+    // Factuurgegevens
+    const factuurForm = $('#factuur-form');
+    if (factuurForm) {
+      factuurForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = e.target;
+        Settings.set({
+          factuur_bedrijfsnaam: f.factuur_bedrijfsnaam.value.trim(),
+          factuur_adres:        f.factuur_adres.value.replace(/\r/g, '').trim(),
+          factuur_telefoon:     f.factuur_telefoon.value.trim(),
+          factuur_email:        f.factuur_email.value.trim(),
+          factuur_iban:         f.factuur_iban.value.trim(),
+          factuur_btw:          f.factuur_btw.value.trim(),
+          factuur_kvk:          f.factuur_kvk.value.trim(),
+          factuur_betalingstermijn_dagen: parseInt(f.factuur_betalingstermijn_dagen.value, 10) || 30,
+        });
+        renderAccount({ success: 'Factuurgegevens opgeslagen.' });
+      });
+    }
 
     $('#btn-email-test').addEventListener('click', async () => {
       const f = emailForm;
@@ -683,9 +997,9 @@ function renderAccount(msg) {
       btn.textContent = 'Bezig met verzenden...';
       try {
         await EmailService.send(to,
-          'Test — ' + (Settings.get('app_name') || 'Uitvaartbeheer'),
-          'Dit is een test-e-mail vanuit je Uitvaartbeheer-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
-        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Check de inbox (en spam-map).</div>`;
+          'Test — ' + (Settings.get('app_name') || 'Uitvaart Intake'),
+          'Dit is een test-e-mail vanuit je Uitvaart Intake-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
+        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Controleer de inbox (en spam-map).</div>`;
       } catch (e) {
         result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.text ? e.text : (e.message || String(e)))}</div>`;
       } finally {
@@ -693,6 +1007,50 @@ function renderAccount(msg) {
       }
     });
   }
+
+  // Diagnose: is de native Apple-documentscanner geladen in deze app-build?
+  const scanEl = $('#scanner-status');
+  if (scanEl && typeof Native !== 'undefined' && Native.scannerStatus) {
+    Native.scannerStatus().then(st => {
+      if (st === 'native') {
+        scanEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ actief</span> — echte Apple-scanner beschikbaar';
+      } else if (st === 'native-unsupported') {
+        scanEl.textContent = 'plugin geladen, maar dit toestel ondersteunt de scanner niet';
+      } else if (st === 'unavailable') {
+        scanEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span> — maak een nieuwe TestFlight-build';
+      } else {
+        scanEl.textContent = 'alleen in de app (niet in de browser)';
+      }
+    }).catch(() => { scanEl.textContent = 'kon status niet bepalen'; });
+  }
+
+  // Diagnose + test: Live Activity
+  const laEl = $('#la-status');
+  if (laEl && typeof Native !== 'undefined' && Native.liveActivityStatus) {
+    Native.liveActivityStatus().then(st => {
+      if (st === 'on') laEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ aan</span> — widget kan getoond worden';
+      else if (st === 'off') laEl.innerHTML = '<span style="color:#b8860b;font-weight:600;">uit</span> — zet aan bij Instellingen → Uitvaart Intake → Live activiteiten';
+      else if (st === 'unavailable') laEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet beschikbaar</span>' + (Native._laLastError ? ' <span class="muted small">(' + esc(Native._laLastError) + ')</span>' : '');
+      else laEl.textContent = 'alleen in de app';
+    }).catch(() => { laEl.textContent = 'kon status niet bepalen'; });
+  }
+  const laTestBtn = $('#btn-la-test');
+  if (laTestBtn) laTestBtn.addEventListener('click', async () => {
+    const res = $('#la-test-result');
+    laTestBtn.disabled = true; const orig = laTestBtn.textContent; laTestBtn.textContent = 'Bezig…';
+    try {
+      const msg = await Native.testLiveActivity();
+      if (res) res.innerHTML = '<span style="color:#1f7a3a;">' + esc(msg) + '</span>';
+    } catch (e) {
+      if (res) res.innerHTML = '<span style="color:#b34;">' + esc(e.message || String(e)) + '</span>';
+    } finally {
+      laTestBtn.disabled = false; laTestBtn.textContent = orig;
+    }
+  });
+  const laStopBtn = $('#btn-la-stop');
+  if (laStopBtn) laStopBtn.addEventListener('click', async () => {
+    try { await Native.endUitvaartActivities(); const r = $('#la-test-result'); if (r) r.textContent = 'Gestopt.'; } catch (_) {}
+  });
 
   // Update-check
   const updBtn = $('#btn-check-update');
@@ -706,10 +1064,10 @@ function renderAccount(msg) {
         const r = await Updater.check();
         if (r.hasUpdate) {
           result.innerHTML = `<div class="alert alert-info">Nieuwe versie beschikbaar: <strong>${esc(r.remoteVersion)}</strong> (jij draait ${esc(r.currentVersion)}). De pagina wordt over enkele seconden ververst.</div>`;
-          setTimeout(() => Updater.reloadHard(), 1800);
+          setTimeout(() => Updater.reloadHard(), 700);
         } else if (r.swUpdated) {
           result.innerHTML = `<div class="alert alert-success">Service-worker bijgewerkt naar de laatste versie. Pagina wordt ververst...</div>`;
-          setTimeout(() => Updater.reloadHard(), 1200);
+          setTimeout(() => Updater.reloadHard(), 500);
         } else {
           result.innerHTML = `<div class="alert alert-success">Je draait al de laatste versie (<strong>${esc(r.currentVersion)}</strong>).</div>`;
           updBtn.disabled = false; updBtn.textContent = orig;
@@ -718,6 +1076,223 @@ function renderAccount(msg) {
         result.innerHTML = `<div class="alert alert-error">Update-check mislukt: ${esc(e.message || e)}</div>`;
         updBtn.disabled = false; updBtn.textContent = orig;
       }
+    });
+  }
+
+  const resetBtn = $('#btn-hard-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      const ok = await Modal.confirm({
+        title: 'Volledig resetten?',
+        message: 'De service-worker en alle lokale cache worden gewist. Dossiers blijven veilig in de cloud staan. Daarna wordt de app opnieuw vanaf de server geladen.',
+        confirmText: 'Resetten',
+        cancelText: 'Annuleren',
+      });
+      if (!ok) return;
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Bezig...';
+      await Updater.hardReset();
+    });
+  }
+
+  // ─── Push-notificaties beheer ─────────────────────────────────
+  const pushForm = $('#push-form');
+  if (pushForm) {
+    const refreshPushStatus = async () => {
+      const statusEl = $('#push-status');
+      const enableBtn = $('#btn-push-enable');
+      const disableBtn = $('#btn-push-disable');
+      if (!await PushNotificaties.supported()) {
+        statusEl.className = 'alert alert-error';
+        statusEl.textContent = 'Deze browser ondersteunt geen push-notificaties.';
+        enableBtn.disabled = true;
+        return;
+      }
+      const perm = await PushNotificaties.permission();
+      const sub = await PushNotificaties.currentSubscription();
+      if (sub && perm === 'granted') {
+        statusEl.className = 'alert alert-success';
+        statusEl.innerHTML = '✓ <strong>Ingeschakeld</strong> op dit apparaat.';
+        enableBtn.hidden = true;
+        disableBtn.hidden = false;
+      } else if (perm === 'denied') {
+        statusEl.className = 'alert alert-error';
+        statusEl.innerHTML = '⚠ Notificaties geblokkeerd door de browser. Sta ze handmatig toe via de adresbalk (slot-icoontje).';
+        enableBtn.hidden = false;
+        disableBtn.hidden = true;
+      } else {
+        statusEl.className = 'alert';
+        statusEl.textContent = 'Nog niet ingeschakeld op dit apparaat.';
+        enableBtn.hidden = false;
+        disableBtn.hidden = true;
+      }
+    };
+    refreshPushStatus();
+
+    pushForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        push_vapid_public_key: f.push_vapid_public_key.value.trim(),
+        push_remind_days_ahead: parseInt(f.push_remind_days_ahead.value, 10) || 1,
+      });
+      renderAccount({ success: 'Push-instellingen opgeslagen.' });
+    });
+
+    $('#btn-push-enable').addEventListener('click', async () => {
+      const btn = $('#btn-push-enable');
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Bezig...';
+      try {
+        await PushNotificaties.subscribe();
+        Modal.show({ type: 'success', title: 'Notificaties aan', message: 'Je krijgt nu meldingen op dit apparaat.' });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Inschakelen mislukt', message: e.message || String(e) });
+      } finally {
+        btn.disabled = false; btn.textContent = orig;
+        refreshPushStatus();
+      }
+    });
+
+    $('#btn-push-disable').addEventListener('click', async () => {
+      try { await PushNotificaties.unsubscribe(); } catch (_) {}
+      refreshPushStatus();
+    });
+
+    $('#btn-push-test').addEventListener('click', async () => {
+      try {
+        const ok = await PushNotificaties.testLocal();
+        if (!ok) Modal.show({ type: 'warning', title: 'Toestemming nodig', message: 'Sta notificaties toe in de browser.' });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Test mislukt', message: e.message || String(e) });
+      }
+    });
+  }
+
+  // ─── SnelStart-koppeling (boekhouding) ───────────────────────
+  const snelstartForm = $('#snelstart-form');
+  if (snelstartForm) {
+    snelstartForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        snelstart_actief: f.snelstart_actief.checked,
+        snelstart_subscription_key: f.snelstart_subscription_key.value.trim(),
+        snelstart_client_key: f.snelstart_client_key.value.trim(),
+      });
+      renderAccount({ success: 'SnelStart-instellingen opgeslagen.' });
+      location.hash = '#/account#snelstart-instellingen';
+    });
+
+    const testBtn = $('#btn-snelstart-test');
+    if (testBtn) testBtn.addEventListener('click', async () => {
+      const f = snelstartForm;
+      const sub = f.snelstart_subscription_key.value.trim();
+      const cli = f.snelstart_client_key.value.trim();
+      const out = $('#snelstart-result');
+      if (!sub || !cli) {
+        if (out) out.innerHTML = '<div class="alert alert-error">Vul eerst beide sleutels in.</div>';
+        return;
+      }
+      // Sleutels tijdelijk opslaan zodat de test ze meeneemt
+      Settings.set({ snelstart_subscription_key: sub, snelstart_client_key: cli });
+      if (out) out.innerHTML = '<div class="alert">Bezig met testen…</div>';
+      testBtn.disabled = true;
+      try {
+        const res = await SnelStart.test();
+        if (res && res.ok) {
+          if (out) out.innerHTML = `<div class="alert alert-success">✓ ${esc(res.msg || 'Verbinding geslaagd.')}</div>`;
+        } else {
+          const detail = res && (res.msg || res.error) ? (res.msg || res.error) : 'Onbekende fout.';
+          if (out) out.innerHTML = `<div class="alert alert-error">Verbinding mislukt: ${esc(detail)}</div>`;
+        }
+      } catch (err) {
+        if (out) out.innerHTML = `<div class="alert alert-error">Kon de testfunctie niet bereiken: ${esc(err.message || String(err))}</div>`;
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+  }
+
+  // ─── Profielen-beheer (Wie werkt vandaag?) ───────────────────
+  const profielenForm = $('#profielen-form');
+  if (profielenForm) {
+    const slugify = s => String(s || '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'profiel';
+
+    function makeProfielRow(naam = '', kleur = '#6b1e2a') {
+      const rows = $('#profielen-rows');
+      const idx = rows.querySelectorAll('.profielen-row').length;
+      const letter = (naam || '?').charAt(0).toUpperCase() || '?';
+      const div = document.createElement('div');
+      div.className = 'profielen-row';
+      div.dataset.idx = idx;
+      div.innerHTML = `
+        <span class="profielen-avatar" style="background:${esc(kleur)};">${esc(letter)}</span>
+        <input type="text" class="profielen-naam" value="${esc(naam)}" placeholder="bv. Rume" maxlength="40">
+        <input type="color" class="profielen-kleur" value="${esc(kleur)}" title="Kleur van de avatar">
+        <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${idx}" title="Verwijderen">×</button>`;
+      rows.appendChild(div);
+      bindRowEvents(div);
+    }
+    function bindRowEvents(row) {
+      const naamInp = row.querySelector('.profielen-naam');
+      const kleurInp = row.querySelector('.profielen-kleur');
+      const avatar = row.querySelector('.profielen-avatar');
+      naamInp.addEventListener('input', () => {
+        const c = (naamInp.value || '?').trim().charAt(0).toUpperCase() || '?';
+        avatar.textContent = c;
+      });
+      kleurInp.addEventListener('input', () => {
+        avatar.style.background = kleurInp.value;
+      });
+    }
+    profielenForm.querySelectorAll('.profielen-row').forEach(bindRowEvents);
+
+    $('#btn-add-profiel').addEventListener('click', () => makeProfielRow('', '#6b1e2a'));
+
+    profielenForm.addEventListener('click', e => {
+      const del = e.target.closest('[data-action="del-profiel"]');
+      if (!del) return;
+      const row = del.closest('.profielen-row');
+      if (!row) return;
+      const blijft = profielenForm.querySelectorAll('.profielen-row').length - 1;
+      if (blijft < 1) {
+        Modal.show({ type: 'warning', title: 'Minstens één profiel nodig', message: 'Voeg eerst een nieuw profiel toe voordat je dit verwijdert.' });
+        return;
+      }
+      row.remove();
+    });
+
+    profielenForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const rows = profielenForm.querySelectorAll('.profielen-row');
+      const huidigLijst = Settings.get('profielen') || [];
+      const profielen = [];
+      const gebruikteIds = new Set();
+      rows.forEach((r, idx) => {
+        const naam = r.querySelector('.profielen-naam').value.trim();
+        if (!naam) return;
+        const kleur = r.querySelector('.profielen-kleur').value || '#6b1e2a';
+        // Behoud het oude id als de naam overeenkomt; anders genereer een nieuwe
+        let id = huidigLijst[idx]?.id;
+        if (!id || gebruikteIds.has(id)) {
+          let base = slugify(naam);
+          id = base;
+          let n = 2;
+          while (gebruikteIds.has(id)) id = base + '_' + (n++);
+        }
+        gebruikteIds.add(id);
+        profielen.push({ id, name: naam, color: kleur });
+      });
+      if (profielen.length === 0) {
+        Modal.show({ type: 'warning', title: 'Geen profielen', message: 'Voeg minstens één profiel toe.' });
+        return;
+      }
+      Settings.set({ profielen });
+      // Als het actieve profiel niet meer bestaat: wissen
+      const actiefId = (ActiveProfile.current() || {}).id;
+      if (actiefId && !profielen.some(p => p.id === actiefId)) ActiveProfile.clear();
+      renderAccount({ success: 'Profielen opgeslagen.' });
     });
   }
 
@@ -866,8 +1441,9 @@ function renderAccount(msg) {
       renderAccount({ success: 'Welkomscherm-instellingen opgeslagen.' });
     });
 
-    $('#btn-reset-splash').addEventListener('click', () => {
-      if (!confirm('Welkomscherm-instellingen terugzetten naar standaard?')) return;
+    $('#btn-reset-splash').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Welkomscherm herstellen?', message: 'Alle welkomscherm-instellingen worden teruggezet naar de standaard.', confirmText: 'Herstellen' });
+      if (!ok) return;
       // Reset alleen splash-instellingen
       Settings.set({
         splash_enabled: Settings.defaults.splash_enabled,
@@ -1000,10 +1576,8 @@ function renderAccount(msg) {
   $('#btn-export').addEventListener('click', () => {
     const data = {
       dossiers: DB.list(KEYS.DOSSIERS),
-      taken: DB.list(KEYS.TAKEN),
       kosten: DB.list(KEYS.KOSTEN),
       notities: DB.list(KEYS.NOTITIES),
-      documenten: DB.list(KEYS.DOCUMENTEN),
       exported_at: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

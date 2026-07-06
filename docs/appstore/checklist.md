@@ -115,6 +115,48 @@ In App Store Connect → My Apps → Uitvaartbeheer → **App Store** tab:
 - [ ] Bij goedkeuring: status wordt **Pending Developer Release** → klik **Release this Version**
 - [ ] Bij afwijzing: lees feedback, pas aan, opnieuw indienen
 
+## Fase 8-UNLISTED — Verborgen in de App Store (aanbevolen voor jullie) ⭐
+
+**Unlisted** = de app staat écht in de App Store, maar is **niet vindbaar** in
+zoeken/categorieën. Je deelt hem via een **directe link**. Voordeel t.o.v.
+TestFlight: **geen 90-dagen-verloop**, blijft permanent staan, en installeert
+als een gewone App Store-app.
+
+> Een unlisted app moet nog steeds één keer door **App Review**. Daarna blijft
+> hij verborgen staan.
+
+### Stappen
+
+1. **Build uploaden** — doe eerst Fase 4 + 5 (Codemagic → TestFlight-build).
+2. **App-informatie invullen** — in App Store Connect → Uitvaartbeheer →
+   **App Store**-tab, vul alles uit `metadata.md`:
+   - Name, Subtitle, Description, Keywords, Support URL, Privacy Policy URL
+   - Category: Business / Productivity · Age Rating: 4+
+   - **App Icon**: upload `docs/appstore/assets/appicon-1024.png` (staat klaar)
+   - **Screenshots**: min. 2 per apparaat (zie `screenshots.md`)
+   - **Build**: kies je geüploade build
+   - **App Privacy** + **App Review Information** (demo-account + notes) — zie de
+     App-Store-fase hieronder
+3. **Unlisted aanvragen** — ga naar
+   [developer.apple.com/contact/request/unlisted-app-distribution](https://developer.apple.com/contact/request/unlisted-app-distribution)
+   - Vul de **Apple ID** van de app in (het 10-cijferige nummer uit Fase 3)
+   - Bevestig dat je unlisted distributie wilt → verstuur
+   - Apple verwerkt dit meestal binnen enkele dagen
+4. **Indienen voor review** — in de App Store-tab: **Add for Review → Submit**.
+   Kies bij Version Release **"Manually release"**.
+5. **Na goedkeuring** krijg je een **directe App Store-link** (te vinden onder de
+   app in App Store Connect). Die deel je met de parochies — alleen mensen met
+   de link kunnen de app vinden en installeren.
+
+### Kort: waarom unlisted i.p.v. de andere opties
+
+| | TestFlight publieke link | **Unlisted App Store** ⭐ | Publieke App Store |
+|---|---|---|---|
+| Vindbaar in zoeken | nee | **nee** | ja |
+| Verloopt | ja, na 90 dagen | **nee** | nee |
+| App Review nodig | lichte review | **ja** | ja |
+| Installeert als echte app | via TestFlight-app | **ja, gewone app** | ja |
+
 ## Belangrijk om te weten
 
 - **Eerste keer is het meest werk** — daarna gaat het sneller (alleen build + screenshots updaten)
