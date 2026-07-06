@@ -58,11 +58,20 @@ jobs:
       - name: Installeer dependencies
         run: npm install --no-package-lock
 
+      - name: Installeer sharp voor icoon-conversie
+        run: npm install --no-save sharp @capacitor/assets
+
+      - name: Genereer OZN-icoon (SVG → PNG 1024×1024)
+        run: node scripts/generate-android-icon.mjs
+
       - name: Build web-app (www)
         run: npm run build
 
       - name: Capacitor Android-project genereren
         run: npx cap add android || npx cap sync android
+
+      - name: Bak Android-icoontjes uit assets/icon.png
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#2563eb'
 
       - name: APK bouwen (debug)
         working-directory: android

@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 187;
-const APP_VERSION    = '5.62.2';
+const APP_BUILD      = 188;
+const APP_VERSION    = '5.62.3';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -784,7 +784,7 @@ const PushNotificaties = {
       if (p !== 'granted') return false;
     }
     const reg = await navigator.serviceWorker.ready;
-    reg.showNotification('Uitvaart Intake · test', {
+    reg.showNotification('OZN · test', {
       body: 'Push-notificaties werken op dit apparaat. Je krijgt voortaan herinneringen voor aankomende uitvaarten.',
       icon: './icon.svg',
       badge: './icon.svg',
