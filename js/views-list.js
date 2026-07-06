@@ -807,6 +807,10 @@ function renderAccount(msg) {
             <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
             <div style="grid-column:span 2;"><dt>Laatst gesynchroniseerd</dt><dd>${lastSync ? lastSync.toLocaleString('nl-NL') : '—'}</dd></div>
           </dl>
+          ${(typeof Auth === 'undefined' || Auth.isBeheerder()) ? `
+          <div id="opslag-live" style="margin:.25rem 0 1rem;">
+            <div class="muted small">Opslaggebruik (Supabase Free-plan) laden…</div>
+          </div>` : ''}
           <div class="form-actions" style="justify-content:flex-start; gap:.5rem; flex-wrap:wrap;">
             <button type="button" class="btn btn-primary" id="btn-sync-now" ${offline ? 'disabled' : ''}>Sync nu opnieuw</button>
             <button type="button" class="btn" id="btn-export">Exporteer alle data (JSON)</button>
@@ -1686,6 +1690,46 @@ function renderAccount(msg) {
         message: 'Je nieuwe wachtwoord is meteen actief op alle apparaten waar je bent ingelogd.' });
     }
   });
+
+  // Live opslaggebruik (Supabase) ophalen en tonen met balkjes.
+  const opslagBox = $('#opslag-live');
+  if (opslagBox && typeof sb !== 'undefined' && navigator.onLine
+      && !(typeof Demo !== 'undefined' && Demo.isActive())) {
+    (async () => {
+      try {
+        const { data, error } = await sb.rpc('opslag_gebruik');
+        if (error || !data) throw error || new Error('geen data');
+        const MB = 1024 * 1024, GB = 1024 * MB;
+        const fmtBytes = (b) => b >= GB ? (b / GB).toFixed(2) + ' GB'
+                              : b >= MB ? (b / MB).toFixed(1) + ' MB'
+                              : Math.max(1, Math.round(b / 1024)) + ' KB';
+        const DB_LIMIT = 500 * MB, ST_LIMIT = 1 * GB;
+        const dbPct = Math.min(100, (data.db_bytes / DB_LIMIT) * 100);
+        const stPct = Math.min(100, (data.storage_bytes / ST_LIMIT) * 100);
+        const perDossier = data.dossiers > 0 ? data.storage_bytes / data.dossiers : 0;
+        const bar = (pct, kleur) => `
+          <div style="height:9px;border-radius:6px;background:var(--border,#e5e0d6);overflow:hidden;margin:.2rem 0 .1rem;">
+            <div style="height:100%;width:${pct.toFixed(1)}%;background:${pct >= 90 ? '#c0392b' : pct >= 70 ? '#d68910' : kleur};"></div>
+          </div>`;
+        opslagBox.innerHTML = `
+          <h3 style="margin:.25rem 0 .5rem;font-size:.95rem;">Opslaggebruik · Supabase Free-plan</h3>
+          <div class="muted small" style="display:flex;justify-content:space-between;">
+            <span>Database (tekstgegevens)</span><span>${fmtBytes(data.db_bytes)} / 500 MB</span>
+          </div>
+          ${bar(dbPct, 'var(--primary,#2563eb)')}
+          <div class="muted small" style="display:flex;justify-content:space-between;margin-top:.5rem;">
+            <span>Bestandsopslag (scans &amp; foto's · ${data.files} bestand${data.files === 1 ? '' : 'en'})</span><span>${fmtBytes(data.storage_bytes)} / 1 GB</span>
+          </div>
+          ${bar(stPct, 'var(--accent,#c9a24a)')}
+          <p class="muted small" style="margin:.5rem 0 0;">
+            ${data.dossiers} dossier${data.dossiers === 1 ? '' : 's'} in gebruik${perDossier > 0 ? ` · gemiddeld ± ${fmtBytes(perDossier)} aan scans/foto's per dossier` : ' · nog geen scans geüpload'}.
+            De tekstgegevens van een dossier zijn maar enkele KB's; vooral scans en foto's tellen mee voor de opslag.
+          </p>`;
+      } catch (e) {
+        opslagBox.innerHTML = `<p class="muted small">Opslaggebruik kon niet worden geladen${e && e.message ? ' (' + esc(e.message) + ')' : ''}.</p>`;
+      }
+    })();
+  }
 
   const syncBtn = $('#btn-sync-now');
   if (syncBtn) {

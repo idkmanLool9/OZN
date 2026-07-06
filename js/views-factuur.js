@@ -106,13 +106,13 @@ function buildFactuurPdf(d, kosten) {
   lvM('Referentie', 'Uitvaart ' + (fullName(d) || ''), true);
 
   // ── Linkerkolom: logo + "Kostenraming" + ontvanger ──
-  // Standaard het klooster-wapen; een eigen kostenraming-logo (indien ingesteld)
-  // gaat voor. Nooit het blauwe app-icoon hier.
+  // Eerst een eigen kostenraming-logo; anders het logo uit Instellingen
+  // (branding); als terugval het ingebakken standaard-wapen.
   let ly = M;
-  const logoUrl = s.factuur_logo_data_url || KOSTENRAMING_LOGO;
+  const logoUrl = s.factuur_logo_data_url || s.logo_data_url || KOSTENRAMING_LOGO;
   if (logoUrl) {
     try {
-      const fmt = /jpe?g/i.test(logoUrl) ? 'JPEG' : 'PNG';
+      const fmt = /jpe?g|jpeg/i.test(logoUrl) ? 'JPEG' : (/webp/i.test(logoUrl) ? 'WEBP' : 'PNG');
       // Verhouding behouden: schaal binnen een kader van 26x24 mm.
       let lw = 24, lh = 24;
       try {

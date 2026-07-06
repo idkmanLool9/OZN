@@ -179,7 +179,11 @@ function renderDossierForm(params) {
             </label>
             <label class="span-3"><span>Extra personeel <span class="muted small">(aanvinken uit accounts)</span></span>
               ${(() => {
-                const accounts = [...new Set((DB.list(KEYS.PROFIELEN) || []).map(p => (p.naam || '').trim()).filter(Boolean))].sort();
+                // Jezelf niet tonen: filter het eigen profiel (op auth-id) weg.
+                const meId = (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().id : null;
+                const accounts = [...new Set((DB.list(KEYS.PROFIELEN) || [])
+                  .filter(p => !meId || p.id !== meId)
+                  .map(p => (p.naam || '').trim()).filter(Boolean))].sort();
                 const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
                 if (!accounts.length) return '<span class="muted small">Nog geen accounts — voeg toe in <a href="#/account#rollen">Account</a>.</span>';
                 return `<div style="display:flex; flex-wrap:wrap; gap:.5rem;">
