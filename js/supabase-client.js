@@ -13,6 +13,7 @@ const KEYS = {
   ETEN: 'eten_drinken_catalogus',
   GEZINNEN: 'gezinnen',
   LEDEN: 'leden',
+  PROFIELEN: 'profiles',
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [], profiles: [] },
   loaded: false,
   offline: false,
 
@@ -85,7 +86,7 @@ const Cloud = {
     // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, k, n, kim, blm, etn, gz, ld] = await Promise.all([
+      const [d, k, n, kim, blm, etn, gz, ld, pf] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
         sb.from('kosten').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
@@ -96,6 +97,8 @@ const Cloud = {
         // (migratie nog niet gedraaid) blijven ze gewoon leeg.
         sb.from('gezinnen').select('*').order('familienaam', { ascending: true }),
         sb.from('leden').select('*').order('achternaam', { ascending: true }),
+        // Accounts + rollen (RLS: medewerker ziet enkel eigen rij, beheerder alle)
+        sb.from('profiles').select('*').order('naam', { ascending: true }),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
@@ -106,6 +109,7 @@ const Cloud = {
       Cloud.cache.eten_drinken_catalogus = ((etn && etn.data) || []).map(normEten);
       Cloud.cache.gezinnen = ((gz && gz.data) || []).map(normRow);
       Cloud.cache.leden = ((ld && ld.data) || []).map(normRow);
+      Cloud.cache.profiles = ((pf && pf.data) || []).map(normRow);
       Cloud.loaded = true;
       Cloud.offline = false;
       try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}

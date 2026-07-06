@@ -564,6 +564,32 @@ function renderAccount(msg) {
         })()}
       </section>
 
+      ${Auth.isBeheerder() ? `
+      <section class="card narrow" id="rollen">
+        <h2>Medewerkers &amp; rollen</h2>
+        <p class="muted small">Beheerders zien alles. Medewerkers zien geen afgesloten dossiers en geen prijzen. Nieuwe accounts maak je aan in het Supabase-dashboard (Authentication → Users) — die worden automatisch <em>medewerker</em>.</p>
+        ${(() => {
+          const lijst = DB.list(KEYS.PROFIELEN) || [];
+          const mij = (Auth.current() || {}).id;
+          if (!lijst.length) return '<p class="muted">Nog geen accounts geladen.</p>';
+          return `<form id="rollen-form" class="form" autocomplete="off">
+            <div style="display:flex; flex-direction:column; gap:.5rem;">
+              ${lijst.map(p => `
+                <div class="parochie-row" style="align-items:center;">
+                  <span style="flex:1;">${esc(p.naam || p.id)}${p.id === mij ? ' <span class="muted small">(jij)</span>' : ''}</span>
+                  <select class="rol-select" data-id="${esc(p.id)}" ${p.id === mij ? 'disabled title="Je kunt je eigen rol niet wijzigen"' : ''}>
+                    <option value="medewerker" ${p.rol === 'medewerker' ? 'selected' : ''}>Medewerker</option>
+                    <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
+                  </select>
+                </div>`).join('')}
+            </div>
+            <div class="form-actions" style="justify-content:flex-end; margin-top:.75rem;">
+              <button type="submit" class="btn btn-primary">Rollen opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>` : ''}
+
       <section class="card narrow" id="opdrachtgevers">
         <h2>Opdrachtgevers</h2>
         <p class="muted small">De uitvaartleiders / klanten waarvoor jullie werken. Deze verschijnen in de opdrachtgever-dropdown bovenaan het dossier.</p>
@@ -1315,6 +1341,21 @@ function renderAccount(msg) {
       const actiefId = (ActiveProfile.current() || {}).id;
       if (actiefId && !profielen.some(p => p.id === actiefId)) ActiveProfile.clear();
       renderAccount({ success: 'Profielen opgeslagen.' });
+    });
+  }
+
+  // Medewerkers & rollen (alleen beheerder)
+  const rollenForm = $('#rollen-form');
+  if (rollenForm) {
+    rollenForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const selects = $$('#rollen-form .rol-select').filter(s => !s.disabled);
+      try {
+        await Promise.all(selects.map(s => DB.update(KEYS.PROFIELEN, s.dataset.id, { rol: s.value })));
+        renderAccount({ success: 'Rollen opgeslagen.' });
+      } catch (err) {
+        Modal.show({ type: 'error', title: 'Opslaan mislukt', message: err.message || String(err) });
+      }
     });
   }
 
