@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 169;
-const APP_VERSION    = '5.52.2';
+const APP_BUILD      = 170;
+const APP_VERSION    = '5.53.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -177,31 +177,6 @@ const Settings = {
     // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
     default_kerk_locatie: 'Maria kathedraal',
     default_begraafplaats: 'St. Ephrem',
-    // Publieke web-URL van de app — nodig om familie-portaal-links te maken
-    // die buiten de app werken. In de native app is location.origin een
-    // intern scheme (uitvaartbeheer://localhost), dus daar kan het niet uit
-    // afgeleid worden. Wordt automatisch ingevuld zodra de app in een browser
-    // op de echte URL wordt geopend; handmatig aan te passen in Account.
-    portaal_base_url: '',
-    // Standaard familie-portaal-sjabloon: dagplanning + checklist die
-    // automatisch verschijnen bij elk dossier (zolang er nog niets eigen is
-    // opgeslagen). Blijft altijd bewerkbaar per dossier.
-    portaal_default_dagplanning: [
-      { tijd: '11:00', moment: 'Opbaring',                       locatie: 'Kerk' },
-      { tijd: '12:45', moment: 'Balseming & Sluiten van de kist', locatie: 'Kerk' },
-      { tijd: '13:00', moment: 'Start kerkdienst',               locatie: 'Kerk' },
-      { tijd: '13:45', moment: 'Einde kerkdienst',               locatie: 'Kerk' },
-      { tijd: '13:45', moment: 'Ter aarde brengen — begin',      locatie: 'Begraafplaats' },
-      { tijd: '14:15', moment: 'Ter aarde brengen — einde',      locatie: 'Begraafplaats' },
-      { tijd: '14:15', moment: 'Koffie / thee (catering)',       locatie: 'Zaal' },
-    ],
-    portaal_default_checklist: [
-      { titel: 'ID-kaart', beschrijving: 'ID-kaart brengen / appen van overledene én contactpersoon — voor- en achterkant.' },
-      { titel: 'Kleding overledene meenemen', beschrijving: 'Onderkleding, bovenkleding, eventueel schoenen, parfum, accessoires, kafan.' },
-      { titel: 'Nadenken over tekst linten', beschrijving: 'Nadenken over de teksten op de linten van de bloemstukken.' },
-      { titel: 'Foto meenemen', beschrijving: 'Foto meenemen van de overledene in een fotolijst.' },
-      { titel: 'Nadenken over kistdragers', beschrijving: 'Nadenken over wie de kist gaat dragen (welke personen).' },
-    ],
     // Factuur-bedrijfsgegevens (kop + betaalgegevens op de PDF-factuur)
     factuur_bedrijfsnaam: 'Syrisch-Orthodoxe Kerk van Antiochië',
     factuur_adres: 'Glanerbrugstraat 33\n7585 PK Glane',
@@ -347,7 +322,6 @@ const Settings = {
       try { Settings._cache = JSON.parse(localStorage.getItem(Settings.DEMO_KEY) || '{}') || {}; }
       catch (_) { Settings._cache = {}; }
       Settings._secretCache = {};
-      try { if (typeof FamiliePortaal !== 'undefined') FamiliePortaal.captureWebBase(); } catch (_) {}
       return;
     }
 
@@ -395,8 +369,6 @@ const Settings = {
       try { Settings._cache = Settings._stripSensitive(JSON.parse(localStorage.getItem(Settings.KEY) || '{}')); }
       catch (_) { Settings._cache = {}; }
     }
-    // Leg de echte web-URL vast (voor correcte familie-portaal-links in de app)
-    try { if (typeof FamiliePortaal !== 'undefined') FamiliePortaal.captureWebBase(); } catch (_) {}
   },
 
   reset() {
@@ -976,9 +948,7 @@ Router.add('/leden/:id/bewerk', p => renderGezinForm(p));
 Router.add('/begraafplaats', () => renderBegraafplaats());
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/planning', () => renderPlanning());
-Router.add('/portaal', (p, full) => renderPortaalBeheer(full));
 Router.add('/account', () => renderAccount());
-Router.add('/familie/:token', p => FamiliePortaalView.render(p.token));
 
 (async function init() {
   // Branding meteen toepassen — vóór de splash zichtbaar wordt

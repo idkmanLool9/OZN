@@ -384,11 +384,6 @@ function renderAccount(msg) {
               <input type="email" name="auto_send_dossier_email" value="${esc(s.auto_send_dossier_email)}" placeholder="leeg = uit">
               <span class="muted small">Elke keer dat een dossier wordt aangemaakt of bewerkt, wordt er automatisch een kopie verstuurd naar dit adres. Laat leeg om uit te schakelen.</span>
             </label>
-            <label>
-              <span>🔗 Publieke web-URL (voor familie-portaal-links)</span>
-              <input type="url" name="portaal_base_url" value="${esc(s.portaal_base_url || '')}" placeholder="bv. https://uitvaartbeheer.pages.dev">
-              <span class="muted small">De adres waar de web-app draait. Nodig zodat gedeelde familie-links buiten de app werken. Wordt automatisch ingevuld zodra je de app in een browser opent; pas alleen aan als je een eigen domein gebruikt.</span>
-            </label>
             <label><span>Test-e-mailadres (voor verificatie)</span><input type="email" name="email_test_to" placeholder="bv. je eigen e-mail"></label>
             <div id="email-test-result"></div>
             <div class="form-actions" style="justify-content:space-between;">
@@ -982,7 +977,6 @@ function renderAccount(msg) {
         emailjs_service_id: f.emailjs_service_id.value.trim(),
         emailjs_template_id: f.emailjs_template_id.value.trim(),
         auto_send_dossier_email: f.auto_send_dossier_email.value.trim(),
-        portaal_base_url: (f.portaal_base_url.value || '').trim().replace(/\/+$/, ''),
       });
       renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
     });

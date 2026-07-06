@@ -311,7 +311,6 @@ function renderDossierDetail(params) {
         </div><!-- /.kosten-body -->
       </section>
 
-      ${renderFamiliePortaalSection(d)}
 
       <section id="notities" class="card">
         <h2>Notities</h2>
@@ -333,7 +332,6 @@ function renderDossierDetail(params) {
     </div>`;
 
   bindDetailEvents(id);
-  bindFamiliePortaalSection(id);
 }
 
 function toWaNumber(tel) {
@@ -1043,154 +1041,6 @@ function bindDetailEvents(id) {
   };
 }
 
-// ─── Familie-portaal: tijdelijke deel-link + welkomtekst + checklist ──────
-const FamiliePortaal = {
-  TOKEN_LEN: 32,
-  DEFAULT_DAYS: 60,
-
-  // Cryptografisch veilige random token — base32-achtig zonder lookalikes
-  generateToken() {
-    const alf = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // geen I/O/1/0
-    const bytes = new Uint8Array(FamiliePortaal.TOKEN_LEN);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, b => alf[b % alf.length]).join('');
-  },
-
-  // Publieke basis-URL waar de web-app draait. In de native app is
-  // location.origin een intern scheme (uitvaartbeheer://localhost), dus dan
-  // gebruiken we de ingestelde/bekende publieke URL. Op het web klopt de
-  // huidige oorsprong altijd.
-  publicBase() {
-    let base = '';
-    try { base = (typeof Settings !== 'undefined' && (Settings.get('portaal_base_url') || '')) || ''; } catch (_) {}
-    base = String(base).trim();
-    if (!base && /^https?:$/.test(location.protocol)) {
-      base = location.origin + location.pathname.replace(/[^/]*$/, ''); // map, zonder bestandsnaam
-    }
-    if (!base) base = 'https://uitvaartbeheer.pages.dev/';
-    if (!/\/$/.test(base)) base += '/';
-    return base;
-  },
-
-  buildUrl(token) {
-    return `${FamiliePortaal.publicBase()}#/familie/${token}`;
-  },
-
-  // Sla de echte web-oorsprong op zodra de app in een browser wordt geopend,
-  // zodat de native app (via de gedeelde cloud-instellingen) ook correcte
-  // links maakt. Overschrijft alleen als er nog niets is ingesteld.
-  captureWebBase() {
-    try {
-      if (!/^https?:$/.test(location.protocol)) return;      // niet in native app
-      if (/^(localhost|127\.|0\.0\.0\.0)/.test(location.hostname)) return; // geen dev-URL
-      if (typeof Settings === 'undefined') return;
-      const stored = String(Settings.get('portaal_base_url') || '').trim();
-      if (stored) return;                                     // al ingesteld → respecteren
-      const base = location.origin + location.pathname.replace(/[^/]*$/, '');
-      Settings.set({ portaal_base_url: base });
-    } catch (_) {}
-  },
-
-  // Haal token voor dit dossier op uit de cloud (cache lokaal even)
-  async getForDossier(dossierId) {
-    const { data, error } = await sb.from('familie_portaal_tokens')
-      .select('*')
-      .eq('dossier_id', dossierId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (error) { console.warn(error); return null; }
-    return (data && data[0]) || null;
-  },
-
-  async createOrReplace(dossierId, days = FamiliePortaal.DEFAULT_DAYS) {
-    // Oude tokens van dit dossier verwijderen
-    await sb.from('familie_portaal_tokens').delete().eq('dossier_id', dossierId);
-    const u = Auth.current();
-    const token = FamiliePortaal.generateToken();
-    const expires = new Date(Date.now() + days * 86400000).toISOString();
-    const { data, error } = await sb.from('familie_portaal_tokens')
-      .insert({ dossier_id: dossierId, token, expires_at: expires, created_by: u ? u.id : null })
-      .select().single();
-    if (error) throw error;
-    return data;
-  },
-
-  async revoke(dossierId) {
-    const { error } = await sb.from('familie_portaal_tokens').delete().eq('dossier_id', dossierId);
-    if (error) throw error;
-  },
-};
-
-// State per render: ingeladen token-info zodat de Familie-portaal-sectie
-// async kan laden zonder de hele detail-view onhandig te maken.
-const _portaalCache = new Map();
-
-function renderFamiliePortaalSection(d) {
-  const checklist = Array.isArray(d.familie_checklist) ? d.familie_checklist : [];
-  const dagplan = Array.isArray(d.familie_dagplanning) ? d.familie_dagplanning : [];
-  const ingesteld = checklist.length + dagplan.length;
-  return `
-    <section id="familie-portaal" class="card portaal-shortcut">
-      <div class="portaal-shortcut-head">
-        <div>
-          <h2 style="border:none;padding:0;margin:0 0 .15rem;">Familie-portaal</h2>
-          <p class="muted small" style="margin:0;">Deel de dagplanning en checklist met de contactpersoon via een online link — zonder inloggen, zonder gevoelige gegevens.</p>
-        </div>
-        <span class="muted small" id="portaal-status">…</span>
-      </div>
-
-      <div id="portaal-link-row" class="portaal-link-row" hidden style="margin-top:.75rem;">
-        <input type="text" id="portaal-link" readonly>
-        <button type="button" class="btn btn-sm" id="btn-portaal-copy">📋 Kopiëren</button>
-        <button type="button" class="btn btn-sm btn-ghost" id="btn-portaal-open" title="Open in nieuw tabblad">↗ Open</button>
-      </div>
-
-      <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;">
-        <a class="btn btn-primary" href="#/portaal?dossier=${d.id}">⚙️ Portaal beheren${ingesteld ? '' : ' &amp; instellen'}</a>
-      </div>
-    </section>`;
-}
-
-async function bindFamiliePortaalSection(id) {
-  const refreshStatus = async () => {
-    const status = $('#portaal-status');
-    const linkRow = $('#portaal-link-row');
-    const linkInp = $('#portaal-link');
-    try {
-      const t = await FamiliePortaal.getForDossier(id);
-      _portaalCache.set(id, t);
-      if (t && new Date(t.expires_at) > new Date()) {
-        if (linkInp) linkInp.value = FamiliePortaal.buildUrl(t.token);
-        if (linkRow) linkRow.hidden = false;
-        const daysLeft = Math.ceil((new Date(t.expires_at) - Date.now()) / 86400000);
-        if (status) status.innerHTML = `<strong style="color:#2a7a3a;">actief</strong> · nog ${daysLeft} dagen`;
-      } else {
-        if (linkRow) linkRow.hidden = true;
-        if (status) status.textContent = 'nog geen link';
-      }
-    } catch (_) {
-      if (status) status.textContent = '(laden mislukt)';
-    }
-  };
-  refreshStatus();
-
-  const copyBtn = $('#btn-portaal-copy');
-  if (copyBtn) copyBtn.addEventListener('click', async () => {
-    const link = $('#portaal-link').value;
-    try {
-      await navigator.clipboard.writeText(link);
-      const orig = copyBtn.textContent; copyBtn.textContent = '✓ Gekopieerd';
-      setTimeout(() => copyBtn.textContent = orig, 1500);
-    } catch (_) {}
-  });
-  const openBtn = $('#btn-portaal-open');
-  if (openBtn) openBtn.addEventListener('click', () => {
-    const link = $('#portaal-link').value;
-    if (link) window.open(link, '_blank');
-  });
-}
-
-// ─── MailComposer: modal voor multi-recipient + CC + adresboek + PDF ──────
 const MailComposer = {
   EMAIL_RX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
 
