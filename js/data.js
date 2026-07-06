@@ -1,15 +1,7 @@
 // Constanten + catalogi gebaseerd op intake-template St. Ephrem de Syriër Klooster
 // en Unigra-tarievenlijst.
 
-const PAROCHIES = [
-  'St. Ephrem de Syriër Klooster — Glane/Losser',
-  'Mor Ephrem — Glanerbrug',
-  'Mor Severios — Hengelo',
-  'Mor Kuryakos — Enschede',
-  'Mor Aday — Rijssen',
-  'Sint Maria — Amsterdam',
-  'Mor Gabriël — Holland',
-];
+const PAROCHIES = [];
 
 // Vaste tarieven uit het intake-formulier
 // Categorieën voor kostenposten — volgorde + nette labels worden gebruikt
@@ -20,7 +12,7 @@ const KOSTEN_CATEGORIEEN = [
   { id: 'verzorging',    label: 'Verzorging',           icon: '🧴' },
   { id: 'kist',          label: 'Kist',                 icon: '⚰️' },
   { id: 'aula',          label: 'Aula',                 icon: '🏛️' },
-  { id: 'kerk',          label: 'Kerk',                 icon: '✝️' },
+  { id: 'kerk',          label: 'Kerk',                 icon: '🏛' },
   { id: 'begraafplaats', label: 'Begraafplaats & graf', icon: '🪦' },
   { id: 'rouwkaarten',   label: 'Rouwkaarten',          icon: '✉️' },
   { id: 'schoonmaak',    label: 'Schoonmaak',           icon: '🧹' },
@@ -47,18 +39,13 @@ const KOSTEN_PRESETS = [
   { nav: 'kist',     categorie: 'kist',          omschrijving: '🪦 Kist — kies in catalogus',     bedrag: null   },
   { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                            bedrag: 446.00 },
   { categorie: 'verzorging',    omschrijving: 'Verzorging & Inkisten',                           bedrag: 174.00 },
-  { categorie: 'kerk',          omschrijving: 'Gebruik Kerk en Dolabani Zaal',                   bedrag: 500.00 },
   { categorie: 'begraafplaats', omschrijving: 'Openen graf',                                     bedrag: 250.00 },
   { categorie: 'begraafplaats', omschrijving: 'Naamsteen',                                       bedrag: 295.00 },
   { categorie: 'begraafplaats', omschrijving: 'Onderhoudskosten',                                bedrag: 600.00 },
   { categorie: 'begraafplaats', omschrijving: 'Algemeen graf',                                   bedrag: 1250.00 },
   { categorie: 'begraafplaats', omschrijving: 'Grafmonument verwijderen en terugplaatsen incl. tekst + foto', bedrag: 1368.00 },
   { categorie: 'begraafplaats', omschrijving: 'Graf delven',                                     bedrag: 410.00 },
-  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                        bedrag:  31.00 },
-  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud koper',                          bedrag:  31.00 },
   { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                             bedrag:  17.80 },
-  { categorie: 'overig',        omschrijving: 'Papier op tafels',                                 bedrag:  60.00 },
-  { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                       bedrag: 100.00 },
   { nav: 'extra',    categorie: 'overig',        omschrijving: '＋ Extra uitgave (zelf invullen)', bedrag: null },
 ];
 

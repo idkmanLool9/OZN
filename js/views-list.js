@@ -131,9 +131,7 @@ function renderAccount(msg) {
         <a href="#/account#push-instellingen">Push-notificaties</a>
         <a href="#/account#snelstart-instellingen">SnelStart</a>
         <a href="#/account#profielen">Profielen</a>
-        <a href="#/account#parochies">Parochies</a>
-        <a href="#/account#verzekeringen">Verzekeringen</a>
-        <a href="#/account#handtekeningen">Handtekeningen</a>
+        <a href="#/account#opdrachtgevers">Opdrachtgevers</a>
         <a href="#/account#acc-data">Data &amp; sync</a>
       </nav>
 
@@ -229,7 +227,7 @@ function renderAccount(msg) {
                 <div class="logo-preview" id="logo-preview">
                   ${s.logo_data_url
                     ? `<img src="${esc(s.logo_data_url)}" alt="Logo">`
-                    : '<span>✝</span>'}
+                    : '<span>OZN</span>'}
                 </div>
                 <div class="logo-actions">
                   <label class="btn btn-sm">Bestand kiezen<input type="file" name="logo_file" accept="image/*" hidden id="logo-input"></label>
@@ -326,8 +324,8 @@ function renderAccount(msg) {
               <span class="muted small">Past de grootte van invulvelden en spacing in formulieren aan.</span>
             </label>
             <div class="font-preview" id="font-preview">
-              <h3 style="margin:0 0 .25rem;">In den naam van de Vader</h3>
-              <p style="margin:0;">De familie nodigt u uit voor de uitvaart van een geliefde. <em>Mor Severios</em> · 14:00 uur · Hengelo. Aansluitend condoleance met koffie en simit.</p>
+              <h3 style="margin:0 0 .25rem;">Overledenenzorg Nederland</h3>
+              <p style="margin:0;">Voorbeeldtekst — zo ziet dit lettertype eruit in de app. <em>Dossier 2026-001</em> · opbaren, verzorging en vervoer op één plek.</p>
             </div>
             <label class="checkbox-inline" style="font-size:.95rem;">
               <input type="checkbox" name="compact_mode" ${s.compact_mode ? 'checked' : ''}>
@@ -339,7 +337,7 @@ function renderAccount(msg) {
             </label>
             <label class="checkbox-inline" style="font-size:.95rem;">
               <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''}>
-              Beheermodus voor catalogi (toont knoppen om foto's te vervangen, bloemen/eten-producten toe te voegen of te verwijderen)
+              Beheermodus voor de kistencatalogus (toont knoppen om foto's te vervangen en prijzen aan te passen)
             </label>
             <div class="form-actions" style="justify-content:flex-end;">
               <button type="submit" class="btn btn-primary">Opslaan</button>
@@ -383,7 +381,7 @@ function renderAccount(msg) {
             <label><span>EmailJS Service ID</span><input type="text" name="emailjs_service_id" value="${esc(s.emailjs_service_id)}" placeholder="bv. service_abc123"></label>
             <label><span>EmailJS Template ID</span><input type="text" name="emailjs_template_id" value="${esc(s.emailjs_template_id)}" placeholder="bv. template_abc123"></label>
             <label>
-              <span>📧 Auto-mail dossier naar klooster bij opslaan</span>
+              <span>📧 Auto-mail dossier bij opslaan naar</span>
               <input type="email" name="auto_send_dossier_email" value="${esc(s.auto_send_dossier_email)}" placeholder="leeg = uit">
               <span class="muted small">Elke keer dat een dossier wordt aangemaakt of bewerkt, wordt er automatisch een kopie verstuurd naar dit adres. Laat leeg om uit te schakelen.</span>
             </label>
@@ -410,7 +408,7 @@ function renderAccount(msg) {
             </label>
             <label>
               <span>Adres (één regel)</span>
-              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="St. Ephrem de Syriër Klooster · Glanerbrugstr. 33, 7585 Glane/Losser" maxlength="200">
+              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="OZN Vastgoed B.V. · Oldenzaal" maxlength="200">
             </label>
             <div class="grid-2" style="gap:.85rem;">
               <label>
@@ -419,11 +417,11 @@ function renderAccount(msg) {
               </label>
               <label>
                 <span>E-mail</span>
-                <input type="email" name="email_footer_email" value="${esc(s.email_footer_email)}" placeholder="info@sok-antiochie.nl">
+                <input type="email" name="email_footer_email" value="${esc(s.email_footer_email)}" placeholder="info@ozn.nl">
               </label>
               <label class="span-2">
                 <span>Website</span>
-                <input type="text" name="email_footer_website" value="${esc(s.email_footer_website)}" placeholder="www.sok-antiochie.nl">
+                <input type="text" name="email_footer_website" value="${esc(s.email_footer_website)}" placeholder="www.ozn.nl">
               </label>
               <label>
                 <span>Algemene Voorwaarden (URL)</span>
@@ -631,94 +629,6 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow" id="parochies">
-        <h2>Parochies &amp; priesters</h2>
-        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Abuna) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
-        ${(() => {
-          const lijst = Settings.get('parochies') || [];
-          return `
-          <form id="parochie-form" class="form" autocomplete="off">
-            <div id="parochie-rows" class="parochie-rows">
-              ${lijst.map((p, i) => `
-                <div class="parochie-row" data-idx="${i}">
-                  <input type="text" class="parochie-naam" value="${esc(p.naam || '')}" placeholder="bv. Mor Severios — Hengelo">
-                  <input type="text" class="parochie-priester" value="${esc(p.priester || '')}" placeholder="standaard-priester (optioneel)">
-                  <button type="button" class="btn-icon" data-action="del-parochie" title="verwijderen">×</button>
-                </div>`).join('')}
-            </div>
-            <div class="grid-3" style="margin-top:.85rem;gap:.75rem;">
-              <label class="span-2"><span>Standaard kerk / dienstlocatie</span>
-                <input type="text" name="default_kerk_locatie" value="${esc(Settings.get('default_kerk_locatie') || '')}" placeholder="bv. Maria kathedraal">
-                <span class="muted small">Wordt vooraf ingevuld bij elk nieuw dossier.</span>
-              </label>
-              <label><span>Standaard begraafplaats</span>
-                <input type="text" name="default_begraafplaats" value="${esc(Settings.get('default_begraafplaats') || '')}" placeholder="bv. St. Ephrem">
-              </label>
-            </div>
-            <div class="form-actions" style="justify-content:space-between;">
-              <button type="button" class="btn btn-ghost" id="btn-add-parochie">+ Parochie toevoegen</button>
-              <button type="submit" class="btn btn-primary">Opslaan</button>
-            </div>
-          </form>`;
-        })()}
-      </section>
-
-      <section class="card narrow" id="verzekeringen">
-        <h2>Verzekeringsmaatschappijen &amp; pakketten</h2>
-        <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is. Vul per pakket een standaard-dekkingsbedrag in — dat wordt automatisch overgenomen in het dossier zodra het pakket is gekozen.</p>
-        ${(() => {
-          const ms = Settings.get('verzekering_maatschappijen') || [];
-          const pk = (Settings.get('verzekering_pakketten') || []).map(p =>
-            typeof p === 'string' ? { naam: p, dekking: '' } : p);
-          return `
-          <form id="verz-form" class="form" autocomplete="off">
-            <label><span>Maatschappijen (één per regel)</span>
-              <textarea name="maatschappijen" rows="6" placeholder="DELA&#10;Monuta&#10;...">${esc(ms.join('\n'))}</textarea>
-            </label>
-            <div>
-              <span class="muted small" style="display:block;margin-bottom:.35rem;">Pakketten + standaard-dekking</span>
-              <div id="pakket-rows" class="parochie-rows">
-                ${pk.map(p => `
-                  <div class="parochie-row">
-                    <input type="text" class="pakket-naam" value="${esc(p.naam || '')}" placeholder="bv. Uitgebreid pakket">
-                    <input type="text" class="pakket-dekking" value="${esc(p.dekking || '')}" inputmode="decimal" placeholder="standaard-dekking €">
-                    <button type="button" class="btn-icon" data-action="del-pakket" title="verwijderen">×</button>
-                  </div>`).join('')}
-              </div>
-            </div>
-            <div class="form-actions" style="justify-content:space-between;">
-              <button type="button" class="btn btn-ghost" id="btn-add-pakket">+ Pakket toevoegen</button>
-              <button type="submit" class="btn btn-primary">Opslaan</button>
-            </div>
-          </form>`;
-        })()}
-      </section>
-
-      <section class="card narrow" id="handtekeningen">
-        <h2>Handtekening-velden</h2>
-        <p class="muted small">Bepaal welke handtekeningen worden gevraagd bij het aanmaken/bewerken van een dossier. Verplichte velden moeten ingevuld zijn voor opslaan.</p>
-        ${(() => {
-          const fields = Settings.get('signature_fields') || [];
-          return `
-          <form id="sig-form" class="form" autocomplete="off">
-            <div id="sig-rows">
-              ${fields.map((f, i) => `
-                <div class="sig-row" data-idx="${i}">
-                  <input type="text" class="sig-label" value="${esc(f.label)}" placeholder="bv. Handtekening opdrachtgever">
-                  <label class="checkbox-inline" style="font-size:.85rem;white-space:nowrap;">
-                    <input type="checkbox" class="sig-required" ${f.required ? 'checked' : ''}> verplicht
-                  </label>
-                  <button type="button" class="btn-icon" data-action="del-sig" data-idx="${i}" title="verwijderen">×</button>
-                </div>`).join('')}
-            </div>
-            <div class="form-actions" style="justify-content:space-between;">
-              <button type="button" class="btn btn-ghost" id="btn-add-sig">+ Veld toevoegen</button>
-              <button type="submit" class="btn btn-primary">Opslaan</button>
-            </div>
-          </form>`;
-        })()}
-      </section>
-
       <section class="card narrow" id="acc-welkom">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
@@ -787,7 +697,6 @@ function renderAccount(msg) {
             kosten: DB.list(KEYS.KOSTEN).length,
             notities: DB.list(KEYS.NOTITIES).length,
             kisten_fotos: DB.list(KEYS.KIST_AFBEELDINGEN).length,
-            bloemen: DB.list(KEYS.BLOEMEN).length,
           };
           return `
           <div class="alert ${offline ? 'alert-error' : 'alert-success'}" style="margin-bottom:.75rem;">
@@ -803,7 +712,6 @@ function renderAccount(msg) {
             <div><dt>Dossiers</dt><dd><strong>${cnt.dossiers}</strong></dd></div>
             <div><dt>Kostenposten</dt><dd>${cnt.kosten}</dd></div>
             <div><dt>Notities</dt><dd>${cnt.notities}</dd></div>
-            <div><dt>Bloemstukken</dt><dd>${cnt.bloemen}</dd></div>
             <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
             <div style="grid-column:span 2;"><dt>Laatst gesynchroniseerd</dt><dd>${lastSync ? lastSync.toLocaleString('nl-NL') : '—'}</dd></div>
           </dl>
@@ -885,7 +793,7 @@ function renderAccount(msg) {
       removeBtn.addEventListener('click', async () => {
         pendingLogo = '';
         const prev = $('#logo-preview');
-        if (prev) prev.innerHTML = '<span>✝</span>';
+        if (prev) prev.innerHTML = '<span>OZN</span>';
         // Bestand uit storage verwijderen (best-effort). Demo-account raakt de
         // gedeelde storage niet aan.
         const demo = (typeof Demo !== 'undefined' && Demo.isActive());

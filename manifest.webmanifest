@@ -1,7 +1,7 @@
 {
-  "name": "Uitvaart Intake SOK Antiochië",
-  "short_name": "Uitvaart Intake",
-  "description": "Intern dossierbeheer voor de uitvaartleider van de Syrisch-Orthodoxe Kerk van Antiochië",
+  "name": "OZN — Overledenenzorg Nederland",
+  "short_name": "OZN",
+  "description": "Intern dossierbeheer voor OZN — Overledenenzorg Nederland",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

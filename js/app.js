@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 178;
-const APP_VERSION    = '5.59.0';
+const APP_BUILD      = 179;
+const APP_VERSION    = '5.60.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -41,11 +41,11 @@ const Settings = {
     splash_duration_ms: 2500,
     splash_animation: 'glass', // 'glass' | 'fade' | 'scale' | 'slide'
     splash_title: 'Welkom',
-    splash_subtitle: 'Uitvaart Intake · Syrisch-Orthodoxe Kerk van Antiochië',
+    splash_subtitle: 'OZN · Overledenenzorg Nederland',
     splash_offline_title: 'Welkom terug',
     // Branding
-    app_name: 'Uitvaart Intake',
-    app_tagline: 'Syrisch-Orthodoxe Kerk van Antiochië',
+    app_name: 'OZN',
+    app_tagline: 'Overledenenzorg Nederland',
     primary_color: '#2563eb',
     accent_color: '#c9a24a',
     logo_data_url: '',
@@ -97,33 +97,33 @@ const Settings = {
       { id: 'robert', name: 'Robert', color: '#2a5d6b' },
     ],
     // Automatisch dossier mailen naar klooster bij opslaan (leeg = uit)
-    auto_send_dossier_email: 'monastery@morephrem.com',
+    auto_send_dossier_email: '',
     // E-mail-footer (handtekening onderaan elke verzonden mail)
     email_footer_enabled: true,
     email_footer_terms_url:     '',
     email_footer_privacy_url:   '',
-    email_footer_facebook_url:  'https://www.facebook.com/SintEphrem/',
-    email_footer_instagram_url: 'https://www.instagram.com/sint_ephrem_klooster/',
-    email_footer_address: 'St. Ephrem de Syriër Klooster · Glanerbrugstr. 33, 7585 Glane/Losser',
-    email_footer_phone:   '053 461 4764',
+    email_footer_facebook_url:  '',
+    email_footer_instagram_url: '',
+    email_footer_address: '',
+    email_footer_phone:   '',
     email_footer_email:   '',
-    email_footer_website: 'morephrem.com',
+    email_footer_website: '',
     // Login-scherm teksten (split-screen)
     login_brand_title: 'Welkom terug',
     login_brand_subtitle: 'Beheer dossiers, kosten, documenten en facturen — alles op één plek.',
     login_brand_features: [
       'Dossiers met kosten en notities — altijd up-to-date',
       'Facturen direct opmaken en als PDF mailen',
-      'Digitale handtekeningen onder elk dossier',
+      'Kistassortiment en rouwauto per dossier',
       'Versleutelde sessie · automatische uitlog',
     ],
-    login_brand_foot: '© Syrisch-Orthodoxe parochies',
+    login_brand_foot: '© OZN Vastgoed B.V.',
     login_form_title: 'Inloggen',
     login_form_subtitle: 'Voer je e-mailadres en wachtwoord in om door te gaan.',
     login_secretariaat_text: 'Geen account? Vraag het secretariaat.',
     // Verzekeringsmaatschappijen (datalist in intake)
     verzekering_maatschappijen: [
-      'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema', 'Klooster eigen polis',
+      'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema',
     ],
     // Pakket-uitvoeringen — per pakket optioneel een standaard-dekkingsbedrag
     // dat in het dossier-formulier automatisch wordt voorgesteld bij de
@@ -163,7 +163,7 @@ const Settings = {
         naam: 'DELA UitvaartPlan in Diensten — DELA verzorgt zelf',
         verzekeraar: 'DELA',
         dekking: '8800',
-        opmerking: 'Alleen relevant als DELA de uitvaart zelf verzorgt — zelden van toepassing in onze parochie.',
+        opmerking: 'Alleen relevant als DELA de uitvaart zelf verzorgt — zelden van toepassing bij OZN.',
       },
       { naam: 'Standaard pakket',  dekking: '' },
       { naam: 'Uitgebreid pakket', dekking: '' },
@@ -173,26 +173,18 @@ const Settings = {
     // Parochies + bijbehorende standaard-priester (Abuna).
     // Wordt automatisch ingevuld in het intake-formulier wanneer een
     // parochie wordt gekozen.
-    parochies: [
-      { naam: 'St. Ephrem de Syriër Klooster — Glane/Losser', priester: '' },
-      { naam: 'Mor Ephrem — Glanerbrug',                       priester: '' },
-      { naam: 'Mor Severios — Hengelo',                        priester: '' },
-      { naam: 'Mor Kuryakos — Enschede',                       priester: '' },
-      { naam: 'Mor Aday — Rijssen',                            priester: '' },
-      { naam: 'Sint Maria — Amsterdam',                        priester: '' },
-      { naam: 'Mor Gabriël — Holland',                         priester: '' },
-    ],
+    parochies: [],
     // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
-    default_kerk_locatie: 'Maria kathedraal',
-    default_begraafplaats: 'St. Ephrem',
+    default_kerk_locatie: '',
+    default_begraafplaats: '',
     // Factuur-bedrijfsgegevens (kop + betaalgegevens op de PDF-factuur)
-    factuur_bedrijfsnaam: 'Syrisch-Orthodoxe Kerk van Antiochië',
-    factuur_adres: 'Glanerbrugstraat 33\n7585 PK Glane',
-    factuur_telefoon: '+31 53 461 4764',
-    factuur_email: 'monastery@morephrem.com',
-    factuur_iban: 'NL65 RABO 0129 6111 58',
-    factuur_btw: 'NL006544137B01',
-    factuur_kvk: '58679561',
+    factuur_bedrijfsnaam: 'OZN Vastgoed B.V.',
+    factuur_adres: '',
+    factuur_telefoon: '',
+    factuur_email: '',
+    factuur_iban: '',
+    factuur_btw: '',
+    factuur_kvk: '',
     factuur_betalingstermijn_dagen: 30,
     // Oplopend factuurnummer: laatste volgnummer + toegekende nummers per
     // dossier (zodat een dossier altijd hetzelfde factuurnummer houdt).
@@ -479,13 +471,14 @@ const Branding = {
     // Document-titel
     document.title = `${s.app_name} · ${s.app_tagline}`;
 
-    // Logo: vervang ✝ door <img> als er een eigen logo is
+    // Logo: vervang het merkteken door <img> als er een eigen logo is;
+    // anders een neutraal 'OZN'-monogram (geen kruis).
     document.querySelectorAll('.brand-mark').forEach(el => {
       if (s.logo_data_url) {
         el.innerHTML = `<img src="${s.logo_data_url}" alt="Logo">`;
         el.classList.add('has-custom-logo');
       } else {
-        el.innerHTML = '✝';
+        el.textContent = 'OZN';
         el.classList.remove('has-custom-logo');
       }
     });
