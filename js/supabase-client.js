@@ -363,6 +363,9 @@ const KistFotos = {
   },
   publicUrl(path) {
     if (!path) return null;
+    // Volledige URL (bv. hergebruikte kistfoto's uit het andere project) →
+    // rechtstreeks gebruiken. Anders bouwen we de URL uit de eigen bucket.
+    if (/^https?:\/\//i.test(path)) return path;
     const { data } = sb.storage.from('kisten').getPublicUrl(path);
     return data?.publicUrl || null;
   },
