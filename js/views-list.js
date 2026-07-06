@@ -654,6 +654,15 @@ function renderAccount(msg) {
           <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_archief" ${Settings.get('medewerker_ziet_archief') ? 'checked' : ''}> Medewerkers mogen het archief zien</label>
           <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
         </form>
+        <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
+        <p class="muted small">Foto's en scans van archief-dossiers worden bij archivering automatisch flink kleiner opgeslagen. Als je oude dossiers hebt die dat nog niet zijn (van vóór deze update), kun je alles hieronder ineens comprimeren.</p>
+        <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+          <span id="archief-compressie-status" class="muted small">${(() => {
+            const n = DB.where(KEYS.DOSSIERS, x => x.gearchiveerd).length;
+            return `${n} dossier${n === 1 ? '' : 's'} in archief`;
+          })()}</span>
+          <button type="button" class="btn" id="btn-comprimeer-archief">🗜 Comprimeer archief-foto's</button>
+        </div>
       </section>` : ''}
 
       ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
@@ -1390,6 +1399,44 @@ function renderAccount(msg) {
         medewerker_ziet_archief: e.target.medewerker_ziet_archief.checked,
       });
       renderAccount({ success: 'Archief-instellingen opgeslagen.' });
+    });
+  }
+
+  // Bulk-compressie van alle bestaande archief-foto's
+  const compBtn = $('#btn-comprimeer-archief');
+  const compStatus = $('#archief-compressie-status');
+  if (compBtn && typeof ArchiefCompressie !== 'undefined') {
+    compBtn.addEventListener('click', async () => {
+      const gearchiveerd = DB.where(KEYS.DOSSIERS, x => x.gearchiveerd);
+      if (!gearchiveerd.length) {
+        Modal.show({ type:'info', title:'Niks te doen', message:'Geen dossiers in het archief.' });
+        return;
+      }
+      const ok = await Modal.confirm({
+        type:'info',
+        title:`${gearchiveerd.length} dossiers comprimeren?`,
+        message:`Alle foto's en scans van de gearchiveerde dossiers worden agressief verkleind (${ArchiefCompressie.MAX_DIM} px, JPEG ${Math.round(ArchiefCompressie.QUALITY*100)}%). De originelen worden overschreven; dit kun je niet ongedaan maken. Doorgaan?`,
+        confirmText:'Ja, comprimeer',
+      });
+      if (!ok) return;
+      compBtn.disabled = true;
+      let totaalFotos = 0, totaalBespaard = 0, verwerkt = 0;
+      for (const d of gearchiveerd) {
+        if (compStatus) compStatus.textContent = `Bezig: ${++verwerkt}/${gearchiveerd.length} · ${totaalFotos} foto's · ${Math.round(totaalBespaard/1024)} KB bespaard`;
+        try {
+          const r = await ArchiefCompressie.comprimeerDossier(d);
+          totaalFotos   += r.aantal;
+          totaalBespaard += r.bespaard;
+        } catch (_) {}
+      }
+      compBtn.disabled = false;
+      const mb = (totaalBespaard / (1024*1024)).toFixed(2);
+      Modal.show({
+        type:'success',
+        title:'Klaar',
+        message:`${totaalFotos} foto's uit ${gearchiveerd.length} dossiers gecomprimeerd. Bespaard: ${mb} MB.`,
+      });
+      renderAccount();
     });
   }
 

@@ -354,6 +354,67 @@ const ArtsVerklaring = {
   },
 };
 
+// ─── Archief-compressie: foto's van een gearchiveerd dossier verkleinen ─────
+// Doel: storage sparen zonder de foto's kwijt te raken. We downloaden elke
+// foto via een tijdelijke signed URL, comprimeren agressief (400 px, 60%
+// JPEG — typisch 8-10× kleiner), en overschrijven het bestand op dezelfde
+// storage-pad. Het pad in de dossier-rij blijft dus geldig.
+const ArchiefCompressie = {
+  MAX_DIM: 400,
+  QUALITY: 0.60,
+
+  // Verzamel alle storage-paden die bij een dossier horen.
+  padenVan(dossier) {
+    const paden = [];
+    if (dossier.artsverklaring_pad)     paden.push(dossier.artsverklaring_pad);
+    if (dossier.overdraagformulier_pad) paden.push(dossier.overdraagformulier_pad);
+    if (dossier.bezit_oorbellen_foto)   paden.push(dossier.bezit_oorbellen_foto);
+    if (dossier.bezit_ringen_foto)      paden.push(dossier.bezit_ringen_foto);
+    if (dossier.bezit_armbanden_foto)   paden.push(dossier.bezit_armbanden_foto);
+    if (Array.isArray(dossier.extra_bezittingen)) {
+      dossier.extra_bezittingen.forEach(b => { if (b && b.foto_pad) paden.push(b.foto_pad); });
+    }
+    return paden;
+  },
+
+  // Één foto comprimeren: download, hercomprimeer, upload (upsert=true) op
+  // hetzelfde pad. Retourneer besparing in bytes (of 0).
+  async comprimeer1(pad) {
+    if (!pad) return 0;
+    try {
+      const { data: sign, error: sErr } = await sb.storage.from('documenten').createSignedUrl(pad, 300);
+      if (sErr || !sign) return 0;
+      const resp = await fetch(sign.signedUrl);
+      if (!resp.ok) return 0;
+      const blob = await resp.blob();
+      const oud = blob.size;
+      if (!blob.type || !blob.type.startsWith('image/')) return 0; // PDF/svg overslaan
+      // File nodig voor compressImage
+      const file = new File([blob], (pad.split('/').pop() || 'foto.jpg'), { type: blob.type });
+      const kleiner = await compressImage(file, ArchiefCompressie.MAX_DIM, ArchiefCompressie.QUALITY);
+      if (!kleiner || kleiner.size >= oud) return 0;
+      const { error: upErr } = await sb.storage.from('documenten').upload(pad, kleiner, {
+        upsert: true, contentType: 'image/jpeg', cacheControl: '3600',
+      });
+      if (upErr) return 0;
+      return Math.max(0, oud - kleiner.size);
+    } catch (_) { return 0; }
+  },
+
+  // Alle foto's van een dossier comprimeren. Retourneer {aantal, bespaardMB}.
+  async comprimeerDossier(dossier) {
+    const paden = ArchiefCompressie.padenVan(dossier);
+    if (!paden.length) return { aantal: 0, bespaard: 0 };
+    let totaal = 0;
+    let aantal = 0;
+    for (const p of paden) {
+      const b = await ArchiefCompressie.comprimeer1(p);
+      if (b > 0) { totaal += b; aantal++; }
+    }
+    return { aantal, bespaard: totaal };
+  },
+};
+
 // ─── Bezittingen-foto's (privé, bucket 'documenten', prefix 'bezittingen/') ─
 // Foto's van sieraden e.d. Zelfde patroon als ArtsVerklaring — signed URLs
 // om te bekijken; RLS op documenten (documenten_zicht) beperkt tot zichtbare

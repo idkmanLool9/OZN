@@ -753,15 +753,35 @@ function bindDetailEvents(id) {
     archBtn.addEventListener('click', async () => {
       const nu = !dRow.gearchiveerd;
       archBtn.disabled = true;
+      const origText = archBtn.textContent;
       try {
+        // Bij archiveren: foto's/scans agressief comprimeren om storage te
+        // sparen. Originele bestanden worden overschreven; het pad blijft
+        // hetzelfde. Bij uit-archief-halen niks doen (foto's zijn al klein).
+        let bespaardMsg = '';
+        if (nu && typeof ArchiefCompressie !== 'undefined' && navigator.onLine) {
+          archBtn.textContent = '⏳ Foto’s comprimeren…';
+          try {
+            const res = await ArchiefCompressie.comprimeerDossier(dRow);
+            if (res.aantal > 0) {
+              const kb = Math.round(res.bespaard / 1024);
+              bespaardMsg = ` · ${res.aantal} foto’s gecomprimeerd (± ${kb >= 1024 ? (kb/1024).toFixed(1) + ' MB' : kb + ' KB'} bespaard)`;
+            }
+          } catch (_) {}
+        }
+        archBtn.textContent = origText;
         await DB.update(KEYS.DOSSIERS, id, {
           gearchiveerd: nu,
           gearchiveerd_op: nu ? new Date().toISOString() : null
         });
-        if (typeof Toast !== 'undefined') Toast.show(nu ? 'Naar archief verplaatst' : 'Uit archief gehaald', 'success');
+        if (typeof Toast !== 'undefined') Toast.show(
+          (nu ? 'Naar archief verplaatst' : 'Uit archief gehaald') + bespaardMsg,
+          'success'
+        );
         renderDossierDetail({ id });
       } catch (err) {
         archBtn.disabled = false;
+        archBtn.textContent = origText;
         Modal.show({ type: 'error', title: 'Mislukt', message: err.message || String(err) });
       }
     });
