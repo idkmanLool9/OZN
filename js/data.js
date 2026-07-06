@@ -208,15 +208,9 @@ function kistSVG(materiaal) {
 
 // Velden die we als 'aangeraden in te vullen' beschouwen — bij opslaan
 // zonder deze waardes verschijnt een waarschuwingspop-up.
-const AANBEVOLEN_VELDEN = [
-  { name: 'opdrachtgever_naam',    label: 'Opdrachtgever (uitvaartleider)' },
-  { name: 'voornaam',              label: 'Voornaam overledene' },
-  { name: 'achternaam',            label: 'Achternaam overledene' },
-  { name: 'geboortedatum',         label: 'Geboortedatum' },
-  { name: 'overlijdensdatum',      label: 'Overlijdensdatum' },
-  { name: 'adres_overledene',      label: 'Adres overledene' },
-  { name: 'woonplaats_overledene', label: 'Woonplaats overledene' },
-];
+// Niets is verplicht in het dossier — leeg laten betekent geen
+// "ontbrekende gegevens"-waarschuwing bij opslaan.
+const AANBEVOLEN_VELDEN = [];
 
 const DOSSIER_VELDEN = [
   'dossier_nummer',

@@ -156,7 +156,7 @@ function renderDossierForm(params) {
           <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Bijzonderheden</span></button>
         </nav>
 
-        <fieldset data-step="1" style="border:none; padding:0; margin:0 0 1rem;">
+        <fieldset class="card" data-step="1">
           <div class="grid-3">
             <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
               <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
@@ -227,8 +227,8 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="1">
           <legend>Bezittingen</legend>
-          <p class="muted small">Streep aan welke sieraden/bezittingen de overledene bij zich heeft en vul het aantal in.</p>
-          <div style="display:flex; flex-direction:column; gap:.75rem;">
+          <p class="muted small">Streep aan welke sieraden de overledene bij zich heeft en vul het aantal in.</p>
+          <div style="display:flex; flex-direction:column; gap:.5rem;">
             ${[
               ['bezit_oorbellen', 'Oorbel(en)'],
               ['bezit_ringen',    'Ring(en)'],
@@ -236,14 +236,14 @@ function renderDossierForm(params) {
             ].map(([naam, label]) => {
               const aan = dossier[naam] === 'ja';
               return `
-              <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-                <label style="display:flex; align-items:center; gap:.5rem; margin:0; cursor:pointer; min-width:9rem;">
-                  <input type="checkbox" name="${naam}" data-aantal-row="${naam}-aantal-row" ${aan ? 'checked' : ''}> ${label}
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.6rem .9rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
+                <label style="display:flex; align-items:center; gap:.6rem; margin:0; cursor:pointer; font-weight:500;">
+                  <input type="checkbox" name="${naam}" data-aantal-row="${naam}-aantal-row" ${aan ? 'checked' : ''} style="width:1.15rem; height:1.15rem; accent-color:var(--primary,#2563eb);"> ${label}
                 </label>
-                <label id="${naam}-aantal-row" style="margin:0; display:flex; align-items:center; gap:.5rem;" ${aan ? '' : 'hidden'}>
-                  <span class="muted small">aantal (per stuk)</span>
-                  <input type="number" name="${naam}_aantal" min="0" inputmode="numeric" style="width:6rem;" value="${v(naam + '_aantal')}">
-                </label>
+                <span id="${naam}-aantal-row" style="display:flex; align-items:center; gap:.5rem;" ${aan ? '' : 'hidden'}>
+                  <span class="muted small">aantal</span>
+                  <input type="number" name="${naam}_aantal" min="0" inputmode="numeric" style="width:5rem;" value="${v(naam + '_aantal')}">
+                </span>
               </div>`;
             }).join('')}
           </div>
@@ -284,14 +284,27 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
+        <fieldset class="card" data-step="2">
+          <legend>Kist &amp; vervoer</legend>
+          <div class="grid-3">
+            <label class="span-2"><span>Type kist <span class="muted small">(kies uit lijst of typ zelf)</span></span>
+              <input type="text" name="kist_type" list="kisten-datalist" value="${v('kist_type')}" placeholder="bv. Natuurkist — of typ een eigen model">
+              <datalist id="kisten-datalist">
+                ${(typeof KISTEN_CATALOGUS !== 'undefined' ? KISTEN_CATALOGUS : []).map(k => `<option value="${esc(k.naam)}"></option>`).join('')}
+              </datalist>
+            </label>
+            <label><span>Rouwauto</span>
+              <select name="rouwauto">
+                <option value="">—</option>
+                <option value="ja" ${sel('rouwauto','ja')}>Ja</option>
+                <option value="nee" ${sel('rouwauto','nee')}>Nee</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
         <fieldset class="card" data-step="3">
           <legend>Kosten</legend>
-          <!-- Kist & bloemen worden gekozen via de catalogus-pagina's
-               (snel-toevoegen tegel hieronder). Hidden inputs houden de
-               keuze in het dossier-record. -->
-          <input type="hidden" name="kist_type"    value="${esc(v('kist_type'))}">
-          <input type="hidden" name="bloemstukken" value="${esc(v('bloemstukken'))}">
-
           <h3 style="margin:0 0 .5rem;">Kostenoverzicht</h3>
           <div id="wizard-kosten-mount"></div>
         </fieldset>
