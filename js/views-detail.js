@@ -48,6 +48,7 @@ function renderDossierDetail(params) {
               <button type="button" class="btn btn-ghost btn-block" id="btn-email-dossier">📧 E-mail dossier</button>
               <button type="button" class="btn btn-ghost btn-block" id="btn-print">📄 Opslaan / delen als PDF</button>
               <button type="button" class="btn btn-ghost btn-block" id="btn-copy-nr">⧉ Kopieer dossiernummer</button>
+              ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `<button type="button" class="btn btn-ghost btn-block" id="btn-archief">${d.gearchiveerd ? '📤 Uit archief halen' : '📦 Archiveren'}</button>` : ''}
               <button type="button" class="btn btn-danger btn-block" id="btn-delete">🗑 Verwijderen</button>
             </div>
           </details>
@@ -765,6 +766,26 @@ function bindDetailEvents(id) {
   if (odBtn && dRow && dRow.overdraagformulier_pad) {
     odBtn.addEventListener('click', () => {
       openUrlAsync(ArtsVerklaring.signedUrl(dRow.overdraagformulier_pad, 300));
+    });
+  }
+
+  // Archiveren / uit archief halen (alleen beheerder)
+  const archBtn = $('#btn-archief');
+  if (archBtn && dRow) {
+    archBtn.addEventListener('click', async () => {
+      const nu = !dRow.gearchiveerd;
+      archBtn.disabled = true;
+      try {
+        await DB.update(KEYS.DOSSIERS, id, {
+          gearchiveerd: nu,
+          gearchiveerd_op: nu ? new Date().toISOString() : null
+        });
+        if (typeof Toast !== 'undefined') Toast.show(nu ? 'Naar archief verplaatst' : 'Uit archief gehaald', 'success');
+        renderDossierDetail({ id });
+      } catch (err) {
+        archBtn.disabled = false;
+        Modal.show({ type: 'error', title: 'Mislukt', message: err.message || String(err) });
+      }
     });
   }
 

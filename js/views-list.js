@@ -27,7 +27,12 @@ function renderDossierList(params, path) {
       return false;
     });
   }
-  if (status) dossiers = dossiers.filter(d => d.status === status);
+  if (status === 'gearchiveerd') {
+    dossiers = dossiers.filter(d => d.gearchiveerd);
+  } else {
+    dossiers = dossiers.filter(d => !d.gearchiveerd);   // archief standaard verborgen
+    if (status) dossiers = dossiers.filter(d => d.status === status);
+  }
   dossiers.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
 
   $('#view').innerHTML = `
@@ -50,6 +55,7 @@ function renderDossierList(params, path) {
           <option value="in_behandeling" ${status==='in_behandeling'?'selected':''}>In behandeling</option>
           <option value="voltooid" ${status==='voltooid'?'selected':''}>Voltooid</option>
           <option value="geannuleerd" ${status==='geannuleerd'?'selected':''}>Geannuleerd</option>
+          ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `<option value="gearchiveerd" ${status==='gearchiveerd'?'selected':''}>📦 Archief</option>` : ''}
         </select>
         <button type="submit" class="dossiers-control dossiers-filter-btn">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
@@ -580,6 +586,17 @@ function renderAccount(msg) {
             </div>
           </form>`;
         })()}
+      </section>` : ''}
+
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="archief">
+        <h2>Archief</h2>
+        <p class="muted small">Afgehandelde dossiers (rouwauto geweest + alle datums voorbij) automatisch naar het archief. Medewerkers zien het archief niet — tenzij je dat hieronder toestaat (server-side afgedwongen).</p>
+        <form id="archief-form" class="form" autocomplete="off">
+          <label class="checkbox-inline"><input type="checkbox" name="auto_archief_actief" ${Settings.get('auto_archief_actief') ? 'checked' : ''}> Afgehandelde dossiers automatisch archiveren</label>
+          <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_archief" ${Settings.get('medewerker_ziet_archief') ? 'checked' : ''}> Medewerkers mogen het archief zien</label>
+          <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
       </section>` : ''}
 
       <section class="card narrow" id="opdrachtgevers">
@@ -1347,6 +1364,19 @@ function renderAccount(msg) {
       } catch (err) {
         Modal.show({ type: 'error', title: 'Opslaan mislukt', message: err.message || String(err) });
       }
+    });
+  }
+
+  // Archief-instellingen (alleen beheerder)
+  const archiefForm = $('#archief-form');
+  if (archiefForm) {
+    archiefForm.addEventListener('submit', e => {
+      e.preventDefault();
+      Settings.set({
+        auto_archief_actief: e.target.auto_archief_actief.checked,
+        medewerker_ziet_archief: e.target.medewerker_ziet_archief.checked,
+      });
+      renderAccount({ success: 'Archief-instellingen opgeslagen.' });
     });
   }
 

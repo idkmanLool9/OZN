@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 174;
-const APP_VERSION    = '5.56.0';
+const APP_BUILD      = 175;
+const APP_VERSION    = '5.57.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -60,6 +60,11 @@ const Settings = {
     // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
     // catalogi (kisten, bloemen, eten & drinken)
     catalog_admin_mode: false,
+    // Archief: afgehandelde dossiers automatisch archiveren (rouwauto geweest
+    // + alle datums voorbij). En: mogen medewerkers het archief zien?
+    // (medewerker_ziet_archief wordt server-side afgedwongen via RLS.)
+    auto_archief_actief: false,
+    medewerker_ziet_archief: false,
     // Per-naam overrides voor de Unigra-kistencatalogus (alleen wijzigbaar
     // in beheermodus): { 'Naam kist': { bedrag?: number, hidden?: bool } }
     kisten_overrides: {},
@@ -938,6 +943,30 @@ window.addEventListener('online', () => {
 });
 window.addEventListener('offline', updateOfflineUI);
 
+// Auto-archief: afgehandelde dossiers (rouwauto geweest + alle datums voorbij)
+// automatisch naar het archief. Alleen beheerder, alleen als ingeschakeld in
+// de instellingen. Medewerkers zien het archief niet (server-side RLS).
+async function autoArchiveer() {
+  try {
+    if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return;
+    if (!Settings.get('auto_archief_actief')) return;
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
+    const planning = DB.list(KEYS.PLANNING) || [];
+    const kandidaten = (DB.list(KEYS.DOSSIERS) || []).filter(d => {
+      if (d.gearchiveerd) return false;
+      if (d.rouwauto !== 'ja') return false;
+      const dates = [];
+      if (d.thuis_opbaren_datum) dates.push(new Date(d.thuis_opbaren_datum + 'T00:00:00'));
+      planning.forEach(p => { if (p.dossier_id === d.id && p.start_ts) dates.push(new Date(p.start_ts)); });
+      if (!dates.length) return false;             // geen datum → niet 'afgehandeld'
+      return dates.every(dt => !isNaN(dt.getTime()) && dt < vandaag);
+    });
+    for (const d of kandidaten) {
+      try { await DB.update(KEYS.DOSSIERS, d.id, { gearchiveerd: true, gearchiveerd_op: new Date().toISOString() }); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 Router.add('/', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers/nieuw', () => renderDossierForm({}));
@@ -984,6 +1013,7 @@ Router.add('/account', () => renderAccount());
     } catch (e) { console.warn('Settings laden faalde:', e.message || e); }
   }
   updateOfflineUI();
+  autoArchiveer();   // afgehandelde dossiers naar archief (indien ingeschakeld)
 
   // Auto-keepalive: voorkomt dat het gratis Supabase-project pauzeert
   // bij inactiviteit. Doet elke 5+ dagen een mini-query.
