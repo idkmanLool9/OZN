@@ -112,7 +112,6 @@ function renderDossierDetail(params) {
           // Betaling: alleen tonen wat daadwerkelijk is ingevuld (geen lege
           // streepjes-sectie meer).
           const rows = [
-            ['Telefoon opdrachtgever', d.opdrachtgever_telefoon],
             ['Betaalwijze', d.betaalwijze],
             ...(magPrijzen ? [
               ['Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : ''],
