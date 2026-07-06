@@ -27,9 +27,9 @@ android {
         // publiek veilig — RLS regelt de toegang. Override met
         // -PsupabaseUrl=... -PsupabaseAnonKey=... als nodig.
         val sbUrl     = (project.findProperty("supabaseUrl")     as String?)
-            ?: "https://mpuejmkhmlbkaelqbnae.supabase.co"
+            ?: "https://cmcbmcyxdndymxgpxmed.supabase.co"
         val sbAnonKey = (project.findProperty("supabaseAnonKey") as String?)
-            ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wdWVqbWtobWxia2FlbHFibmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MjI2NzQsImV4cCI6MjA5MzA5ODY3NH0.pq6GJXqEdGNzarAw0lj8DWrtAguE3T7-MI439rlmemk"
+            ?: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtY2JtY3l4ZG5keW14Z3B4bWVkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMzMzgzMjAsImV4cCI6MjA5ODkxNDMyMH0.sVhIpC3l4_J1RGJiPEwBcw15sbOdIOMvVbD_51ULnlg"
         buildConfigField("String", "SUPABASE_URL",      "\"$sbUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$sbAnonKey\"")
     }
