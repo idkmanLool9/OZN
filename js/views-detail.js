@@ -6,6 +6,9 @@ function renderDossierDetail(params) {
   if (!d) return render404();
 
   const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
+  // Mag deze gebruiker prijzen zien en kosten bewerken? (server dwingt óók af)
+  const magPrijzen  = (typeof Auth !== 'undefined' && typeof Auth.magPrijzenZien === 'function') ? Auth.magPrijzenZien() : true;
+  const kanBewerken = (typeof Auth === 'undefined') || Auth.isBeheerder(); // toevoegen/verwijderen kosten
   const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
@@ -39,8 +42,8 @@ function renderDossierDetail(params) {
           </p>
         </div>
         <div class="page-actions">
-          <a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Kostenraming openen">📄 Kostenraming</a>
-          <button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>
+          ${magPrijzen ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-ghost" title="Kostenraming openen">📄 Kostenraming</a>` : ''}
+          ${magPrijzen ? `<button type="button" class="btn btn-ghost" id="btn-email-factuur" title="Stuur factuur per e-mail">📧 E-mail factuur</button>` : ''}
           <a href="#/dossiers/${d.id}/bewerken" class="btn btn-primary">Bewerken</a>
           <details class="page-actions-more">
             <summary class="btn btn-ghost" title="Meer acties">⋯</summary>
@@ -102,8 +105,8 @@ function renderDossierDetail(params) {
         <dl class="dl">
           ${dlRow('Telefoon opdrachtgever', d.opdrachtgever_telefoon)}
           ${dlRow('Betaalwijze', d.betaalwijze)}
-          ${dlRow('Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : '')}
-          ${dlRow('Eindafrekening', d.eindafrekening_bedrag ? fmtEUR(d.eindafrekening_bedrag) + (d.eindafrekening_status ? ' (' + d.eindafrekening_status + ')' : '') : '')}
+          ${magPrijzen ? dlRow('Aanbetaling', d.aanbetaling_bedrag ? fmtEUR(d.aanbetaling_bedrag) + (d.aanbetaling_datum ? ' op ' + fmtDate(d.aanbetaling_datum) : '') : '') : ''}
+          ${magPrijzen ? dlRow('Eindafrekening', d.eindafrekening_bedrag ? fmtEUR(d.eindafrekening_bedrag) + (d.eindafrekening_status ? ' (' + d.eindafrekening_status + ')' : '') : '') : ''}
           ${dlRow('Betalingstermijn', d.betalingstermijn)}
         </dl>
         ${d.bijzonderheden ? `<h3>Bijzonderheden</h3><p class="prewrap">${esc(d.bijzonderheden)}</p>` : ''}
@@ -134,8 +137,8 @@ function renderDossierDetail(params) {
         <button type="button" class="kosten-header" id="btn-kosten-toggle" aria-expanded="${localStorage.getItem('sok_kosten_collapsed') !== '0' ? 'false' : 'true'}" aria-controls="kosten-body" title="Klik om in- of uit te klappen">
           <span class="kosten-chevron" aria-hidden="true">▾</span>
           <h2 style="border:none;padding:0;margin:0;display:inline;">Kosten</h2>
-          ${kosten.length > 0 ? `<span class="muted small kosten-summary">· ${kosten.length} ${kosten.length === 1 ? 'post' : 'posten'} · ${fmtEUR(totaal)}${moetNogBetalen > 0 ? ` · <strong style="color:#b34;">open ${fmtEUR(moetNogBetalen)}</strong>` : ' · <strong style="color:#2a7a3a;">volledig betaald</strong>'}</span>` : ''}
-          ${kosten.length > 0 ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm kosten-factuur-link" onclick="event.stopPropagation()">📄 Kostenraming openen</a>` : ''}
+          ${kosten.length > 0 ? `<span class="muted small kosten-summary">· ${kosten.length} ${kosten.length === 1 ? 'post' : 'posten'}${magPrijzen ? ` · ${fmtEUR(totaal)}${moetNogBetalen > 0 ? ` · <strong style="color:#b34;">open ${fmtEUR(moetNogBetalen)}</strong>` : ' · <strong style="color:#2a7a3a;">volledig betaald</strong>'}` : (kosten.every(k => k.betaald) ? ' · <strong style="color:#2a7a3a;">afgevinkt</strong>' : '')}</span>` : ''}
+          ${(kosten.length > 0 && magPrijzen) ? `<a href="#/dossiers/${d.id}/factuur" class="btn btn-sm kosten-factuur-link" onclick="event.stopPropagation()">📄 Kostenraming openen</a>` : ''}
         </button>
         <div id="kosten-body" class="kosten-body">
         ${kosten.length === 0 ? '<p class="muted">Nog geen kostenposten.</p>' : (() => {
@@ -182,15 +185,15 @@ function renderDossierDetail(params) {
               <div class="kosten-group">
                 <div class="kosten-group-head">
                   <span class="kosten-group-title">${categorieIcon(cat)} ${esc(categorieLabel(cat))}</span>
-                  <span class="kosten-group-sub muted small">${items.length} ${items.length === 1 ? 'post' : 'posten'} · ${fmtEUR(sub)}</span>
+                  <span class="kosten-group-sub muted small">${items.length} ${items.length === 1 ? 'post' : 'posten'}${magPrijzen ? ` · ${fmtEUR(sub)}` : ''}</span>
                 </div>
                 <table class="table kosten-table">
                   <colgroup>
                     <col class="kc-col-omschrijving">
                     <col class="kc-col-aantal">
-                    <col class="kc-col-bedrag">
-                    ${dekkingInfo.mode === 'categorie' ? '<col class="kc-col-dekking">' : ''}
-                    <col class="kc-col-del">
+                    ${magPrijzen ? '<col class="kc-col-bedrag">' : ''}
+                    ${(magPrijzen && dekkingInfo.mode === 'categorie') ? '<col class="kc-col-dekking">' : ''}
+                    ${kanBewerken ? '<col class="kc-col-del">' : ''}
                   </colgroup>
                   <tbody>
                     ${items.map(k => {
@@ -199,11 +202,13 @@ function renderDossierDetail(params) {
                       const dekt   = (dekkingInfo.perKost && dekkingInfo.perKost[k.id]) || 0;
                       const familieDeel = Math.max(0, (Number(k.bedrag) || 0) - dekt);
                       return `<tr>
-                      <td class="kc-omschrijving">${esc(k.omschrijving)}${aantal !== 1 ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}</td>
-                      <td class="kc-aantal"><input type="number" class="kc-aantal-input" data-id="${k.id}" data-stuk="${stuk}" value="${esc(aantal)}" min="0" step="1" inputmode="numeric"></td>
-                      <td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>
-                      ${dekkingInfo.mode === 'categorie' ? `<td class="kc-dekking num small">${dekt > 0 ? `<span class="dekking-deel">🛡 ${fmtEUR(dekt)}</span>${familieDeel > 0 ? `<br><span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>` : ''}` : `<span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>`}</td>` : ''}
-                      <td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>
+                      <td class="kc-omschrijving">${esc(k.omschrijving)}${(magPrijzen && aantal !== 1) ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}${k.betaald ? ' <span class="badge badge-green" title="Afgevinkt / betaald">✓</span>' : ''}</td>
+                      <td class="kc-aantal">${kanBewerken
+                        ? `<input type="number" class="kc-aantal-input" data-id="${k.id}" data-stuk="${stuk}" value="${esc(aantal)}" min="0" step="1" inputmode="numeric">`
+                        : `<span class="muted">${esc(aantal)}×</span>`}</td>
+                      ${magPrijzen ? `<td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>` : ''}
+                      ${(magPrijzen && dekkingInfo.mode === 'categorie') ? `<td class="kc-dekking num small">${dekt > 0 ? `<span class="dekking-deel">🛡 ${fmtEUR(dekt)}</span>${familieDeel > 0 ? `<br><span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>` : ''}` : `<span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>`}</td>` : ''}
+                      ${kanBewerken ? `<td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>` : ''}
                     </tr>`;
                     }).join('')}
                   </tbody>
@@ -212,18 +217,26 @@ function renderDossierDetail(params) {
             }).join('')}
           </div>
           <div class="kosten-totals">
+            ${magPrijzen ? `
             <div class="kosten-total-row">
               <span>Totaal factuur</span>
               <strong class="num">${fmtEUR(totaal)}</strong>
-            </div>
-            ${kosten.length > 0 ? `
+            </div>` : ''}
+            ${kosten.length > 0 ? (() => {
+              const allesAf = kosten.every(k => k.betaald);
+              const label = magPrijzen
+                ? (moetNogBetalen === 0 ? '✓ Volledig betaald' : '○ Nog open')
+                : (allesAf ? '✓ Afgevinkt' : '○ Nog te doen');
+              const on = magPrijzen ? (moetNogBetalen === 0) : allesAf;
+              return `
               <div class="kosten-total-row">
                 <span>Status</span>
-                <button type="button" class="kost-toggle kost-toggle-big ${moetNogBetalen === 0 ? 'on-betaald' : 'off-betaald'}" data-action="toggle-factuur-betaald" title="Klik om te wisselen">
-                  ${moetNogBetalen === 0 ? '✓ Volledig betaald' : '○ Nog open'}
+                <button type="button" class="kost-toggle kost-toggle-big ${on ? 'on-betaald' : 'off-betaald'}" data-action="toggle-factuur-betaald" title="Klik om te wisselen">
+                  ${label}
                 </button>
-              </div>` : ''}
-            ${verzekerd ? `
+              </div>`;
+            })() : ''}
+            ${(magPrijzen && verzekerd) ? `
               <div class="kosten-totals-divider"></div>
               ${dekking === 0 && verzDekking === 0 ? `
                 <div class="alert alert-info" style="margin:.25rem 0 .5rem;font-size:.85rem;">
@@ -264,6 +277,7 @@ function renderDossierDetail(params) {
             ` : ''}
           </div>`;
         })()}
+        ${!kanBewerken ? '' : `
         <h3 style="margin-top:1rem;">Snel toevoegen uit catalogus</h3>
         <p class="muted small">Klik om een vast tarief direct toe te voegen.${(() => {
           const adminMode = !!Settings.get('catalog_admin_mode');
@@ -309,7 +323,7 @@ function renderDossierDetail(params) {
           <input type="text" name="bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">
           <label class="checkbox-inline"><input type="checkbox" name="betaald"> betaald</label>
           <button type="submit" class="btn">+ Toevoegen</button>
-        </form>
+        </form>`}
         </div><!-- /.kosten-body -->
       </section>
 
@@ -882,7 +896,8 @@ function bindDetailEvents(id) {
     } catch (e) {}
   });
 
-  $('#add-kosten').addEventListener('submit', async e => {
+  const _addKostenForm = $('#add-kosten');
+  if (_addKostenForm) _addKostenForm.addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
     const omsch = f.omschrijving.value.trim(); if (!omsch) return;
@@ -938,10 +953,19 @@ function bindDetailEvents(id) {
         const kostenList = DB.where(KEYS.KOSTEN, k => k.dossier_id === id);
         const allesBetaald = kostenList.length > 0 && kostenList.every(k => k.betaald);
         const nieuw = !allesBetaald;
-        await Promise.all(kostenList.map(k =>
-          DB.update(KEYS.KOSTEN, k.id, { betaald: nieuw })
-        ));
-        await DB.touchDossier(id); renderDossierDetail({ id });
+        const _demoAan = (typeof Demo !== 'undefined' && Demo.isActive());
+        if (typeof Auth !== 'undefined' && !Auth.isBeheerder() && !_demoAan) {
+          // Medewerker heeft geen schrijfrecht op de kosten-tabel: aftikken via RPC.
+          const { error } = await sb.rpc('kosten_zet_betaald_dossier', { p_dossier_id: id, p_betaald: nieuw });
+          if (error) throw error;
+          kostenList.forEach(k => { const c = DB.byId(KEYS.KOSTEN, k.id); if (c) c.betaald = nieuw; });
+          renderDossierDetail({ id });
+        } else {
+          await Promise.all(kostenList.map(k =>
+            DB.update(KEYS.KOSTEN, k.id, { betaald: nieuw })
+          ));
+          await DB.touchDossier(id); renderDossierDetail({ id });
+        }
       } else if (action === 'toggle-gedekt') {
         const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
         await DB.update(KEYS.KOSTEN, tid, { gedekt: !k.gedekt });

@@ -299,6 +299,17 @@ function renderFactuur(params) {
   const d = DB.byId(KEYS.DOSSIERS, id);
   if (!d) return render404();
 
+  // Prijzen zijn afgeschermd voor medewerkers — geen toegang tot de kostenraming.
+  if (typeof Auth !== 'undefined' && typeof Auth.magPrijzenZien === 'function' && !Auth.magPrijzenZien()) {
+    $('#view').innerHTML = `
+      <div class="page">
+        <div class="page-head"><div><a href="#/dossiers/${d.id}" class="back-link">← Terug naar dossier</a>
+          <h1>Geen toegang</h1></div></div>
+        <div class="card"><p class="muted">De kostenraming met bedragen is alleen zichtbaar voor beheerders.</p></div>
+      </div>`;
+    return;
+  }
+
   const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
 
   $('#view').innerHTML = `

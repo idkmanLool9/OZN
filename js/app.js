@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 175;
-const APP_VERSION    = '5.57.0';
+const APP_BUILD      = 176;
+const APP_VERSION    = '5.58.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -65,6 +65,9 @@ const Settings = {
     // (medewerker_ziet_archief wordt server-side afgedwongen via RLS.)
     auto_archief_actief: false,
     medewerker_ziet_archief: false,
+    // Mogen gewone medewerkers prijzen/bedragen zien? Standaard niet.
+    // (Server dwingt dit af via de kosten_zicht-view + mag_prijzen_zien().)
+    medewerker_ziet_prijzen: false,
     // Per-naam overrides voor de Unigra-kistencatalogus (alleen wijzigbaar
     // in beheermodus): { 'Naam kist': { bedrag?: number, hidden?: bool } }
     kisten_overrides: {},

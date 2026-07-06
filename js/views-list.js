@@ -599,6 +599,16 @@ function renderAccount(msg) {
         </form>
       </section>` : ''}
 
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="prijzen">
+        <h2>Prijzen</h2>
+        <p class="muted small">Gewone medewerkers zien standaard geen bedragen: ze zien de kostenposten wél (en kunnen ze aftikken), maar zonder euro's en zonder totalen. Dit wordt server-side afgedwongen.</p>
+        <form id="prijzen-form" class="form" autocomplete="off">
+          <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_prijzen" ${Settings.get('medewerker_ziet_prijzen') ? 'checked' : ''}> Medewerkers mogen prijzen zien</label>
+          <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+      </section>` : ''}
+
       <section class="card narrow" id="opdrachtgevers">
         <h2>Opdrachtgevers</h2>
         <p class="muted small">De uitvaartleiders / klanten waarvoor jullie werken. Deze verschijnen in de opdrachtgever-dropdown bovenaan het dossier.</p>
@@ -1377,6 +1387,16 @@ function renderAccount(msg) {
         medewerker_ziet_archief: e.target.medewerker_ziet_archief.checked,
       });
       renderAccount({ success: 'Archief-instellingen opgeslagen.' });
+    });
+  }
+
+  // Prijzen-instellingen (alleen beheerder)
+  const prijzenForm = $('#prijzen-form');
+  if (prijzenForm) {
+    prijzenForm.addEventListener('submit', e => {
+      e.preventDefault();
+      Settings.set({ medewerker_ziet_prijzen: e.target.medewerker_ziet_prijzen.checked });
+      renderAccount({ success: 'Prijs-instellingen opgeslagen.' });
     });
   }
 

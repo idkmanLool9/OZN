@@ -44,6 +44,14 @@ const Auth = {
   },
   rol() { return _rol || 'medewerker'; },
   isBeheerder() { return _rol === 'beheerder'; },
+  // Mag deze gebruiker prijzen/bedragen zien? Beheerder altijd; medewerker
+  // alleen als de gedeelde instelling het toestaat. (Server dwingt dit óók af
+  // via de kosten_zicht-view; dit is puur voor de UI.)
+  magPrijzenZien() {
+    if (_rol === 'beheerder') return true;
+    try { return !!(typeof Settings !== 'undefined' && Settings.get('medewerker_ziet_prijzen')); }
+    catch (_) { return false; }
+  },
   current() {
     if (!_session) return null;
     const u = _session.user;
@@ -89,7 +97,7 @@ const Cloud = {
     try {
       const [d, k, n, kim, blm, etn, gz, ld, pf, pl] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
-        sb.from('kosten').select('*').order('id', { ascending: true }),
+        sb.from('kosten_zicht').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
         sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
