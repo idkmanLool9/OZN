@@ -87,6 +87,7 @@ function snapshotDossierForm(formEl) {
     .map(row => ({
       label: (row.querySelector('.extra-bezit-label')?.value || '').trim(),
       aantal: parseInt(row.querySelector('.extra-bezit-aantal')?.value, 10) || 0,
+      foto_pad: (row.querySelector('.extra-bezit-foto')?.value || '').trim() || null,
     }))
     .filter(x => x.label);
   return data;
@@ -139,6 +140,11 @@ function applyDossierDraft(formEl, data) {
       lijst.innerHTML = data.__extra_bezittingen.map(b => `
         <div class="extra-bezit-row" style="display:flex; flex-direction:row; align-items:center; gap:.6rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
           <input type="text" class="extra-bezit-label" value="${esc(b.label || '')}" placeholder="bv. Ketting, horloge…" style="flex:1;">
+          <input type="hidden" class="extra-bezit-foto" value="${esc(b.foto_pad || '')}">
+          <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+            <span class="extra-bezit-foto-status">${b.foto_pad ? '✓📷' : '📷'}</span>
+            <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
+          </label>
           <span class="muted small">aantal</span>
           <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(b.aantal || '')}" style="width:4.5rem;">
           <button type="button" class="btn btn-sm btn-ghost extra-bezit-del" title="Verwijder">×</button>
@@ -300,12 +306,18 @@ function renderDossierForm(params) {
               ['bezit_armbanden', 'Armband(en)'],
             ].map(([naam, label]) => {
               const aan = dossier[naam] === 'ja';
+              const fotoPad = dossier[naam + '_foto'] || '';
               return `
               <div style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
                 <label style="display:flex; flex-direction:row; align-items:center; gap:.6rem; margin:0; cursor:pointer; font-weight:500; flex:1;">
                   <input type="checkbox" name="${naam}" data-aantal-row="${naam}-aantal-row" ${aan ? 'checked' : ''} style="width:1.15rem; height:1.15rem; flex:0 0 auto; accent-color:var(--primary,#2563eb);"> <span>${label}</span>
                 </label>
                 <span id="${naam}-aantal-row" style="display:flex; flex-direction:row; align-items:center; gap:.5rem; flex:0 0 auto;" ${aan ? '' : 'hidden'}>
+                  <input type="hidden" name="${naam}_foto" value="${esc(fotoPad)}">
+                  <label class="btn btn-sm btn-ghost bezit-foto-btn" data-bezit-tag="${esc(naam)}" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+                    <span class="bezit-foto-status">${fotoPad ? '✓📷' : '📷'}</span>
+                    <input type="file" class="bezit-foto-input" data-bezit-tag="${esc(naam)}" accept="image/*" capture="environment" hidden>
+                  </label>
                   <span class="muted small">aantal</span>
                   <input type="number" name="${naam}_aantal" min="0" inputmode="numeric" style="width:4.5rem;" value="${v(naam + '_aantal')}">
                 </span>
@@ -318,6 +330,11 @@ function renderDossierForm(params) {
               return extras.map((b, i) => `
                 <div class="extra-bezit-row" style="display:flex; flex-direction:row; align-items:center; gap:.6rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
                   <input type="text" class="extra-bezit-label" value="${esc(b.label || '')}" placeholder="bv. Ketting, horloge…" style="flex:1;">
+                  <input type="hidden" class="extra-bezit-foto" value="${esc(b.foto_pad || '')}">
+                  <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+                    <span class="extra-bezit-foto-status">${b.foto_pad ? '✓📷' : '📷'}</span>
+                    <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
+                  </label>
                   <span class="muted small">aantal</span>
                   <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(b.aantal || '')}" style="width:4.5rem;">
                   <button type="button" class="btn btn-sm btn-ghost extra-bezit-del" title="Verwijder">×</button>
@@ -672,12 +689,17 @@ function renderDossierForm(params) {
     const lijst = document.getElementById('extra-bezit-lijst');
     const addBtn = document.getElementById('extra-bezit-add');
     if (!lijst || !addBtn) return;
-    const maakRij = (label = '', aantal = '') => {
+    const maakRij = (label = '', aantal = '', fotoPad = '') => {
       const div = document.createElement('div');
       div.className = 'extra-bezit-row';
       div.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:.6rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);';
       div.innerHTML = `
         <input type="text" class="extra-bezit-label" value="${esc(label)}" placeholder="bv. Ketting, horloge…" style="flex:1;">
+        <input type="hidden" class="extra-bezit-foto" value="${esc(fotoPad)}">
+        <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+          <span class="extra-bezit-foto-status">${fotoPad ? '✓📷' : '📷'}</span>
+          <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
+        </label>
         <span class="muted small">aantal</span>
         <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(aantal)}" style="width:4.5rem;">
         <button type="button" class="btn btn-sm btn-ghost extra-bezit-del" title="Verwijder">×</button>`;
@@ -690,6 +712,66 @@ function renderDossierForm(params) {
     lijst.addEventListener('click', (e) => {
       const del = e.target.closest('.extra-bezit-del');
       if (del) del.closest('.extra-bezit-row').remove();
+    });
+  })();
+
+  // ── Foto-upload bij bezittingen (standaard 3 + extra items) ──────────────
+  // Uploadt naar 'documenten' bucket via BezittingenFotos; zet het pad in
+  // het bijbehorende hidden veld. Bij vervangen wordt de oude foto verwijderd.
+  (function initBezitFotos() {
+    const bezitForm = document.getElementById('dossier-form');
+    if (!bezitForm) return;
+
+    async function upload(inp, tag) {
+      const file = inp.files && inp.files[0];
+      if (!file) return null;
+      if (!navigator.onLine) {
+        Modal.show({ type: 'offline', title: 'Geen internet', message: 'Foto uploaden lukt alleen online.' });
+        return null;
+      }
+      try {
+        return await BezittingenFotos.upload(file, tag);
+      } catch (_) { return null; }
+    }
+
+    // Standaard 3 sieraden: file-input per rij, hidden veld met naam ${naam}_foto
+    bezitForm.querySelectorAll('.bezit-foto-input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        const tag = inp.getAttribute('data-bezit-tag');
+        const wrap = inp.closest('.bezit-foto-btn');
+        const status = wrap ? wrap.querySelector('.bezit-foto-status') : null;
+        if (status) status.textContent = '⏳';
+        const nieuw = await upload(inp, tag);
+        inp.value = '';
+        if (!nieuw) { if (status) status.textContent = '📷'; return; }
+        const hidden = bezitForm.querySelector(`input[type="hidden"][name="${tag}_foto"]`);
+        const oud = hidden ? hidden.value : '';
+        if (hidden) {
+          hidden.value = nieuw;
+          hidden.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (oud && oud !== nieuw) BezittingenFotos.remove(oud);
+        if (status) status.textContent = '✓📷';
+      });
+    });
+
+    // Extra bezittingen: file-input in dezelfde rij, hidden .extra-bezit-foto
+    bezitForm.addEventListener('change', async (e) => {
+      const inp = e.target.closest('.extra-bezit-foto-input');
+      if (!inp) return;
+      const row = inp.closest('.extra-bezit-row');
+      if (!row) return;
+      const label = (row.querySelector('.extra-bezit-label')?.value || 'extra').trim() || 'extra';
+      const status = row.querySelector('.extra-bezit-foto-status');
+      if (status) status.textContent = '⏳';
+      const nieuw = await upload(inp, label);
+      inp.value = '';
+      if (!nieuw) { if (status) status.textContent = '📷'; return; }
+      const hidden = row.querySelector('.extra-bezit-foto');
+      const oud = hidden ? hidden.value : '';
+      if (hidden) hidden.value = nieuw;
+      if (oud && oud !== nieuw) BezittingenFotos.remove(oud);
+      if (status) status.textContent = '✓📷';
     });
   })();
 
@@ -1449,11 +1531,12 @@ function renderDossierForm(params) {
     data.rouwgoederen_lijst = [...document.querySelectorAll('#dossier-form .rouwgoed-cb')]
       .filter(cb => cb.checked).map(cb => cb.value);
 
-    // Extra bezittingen (naast de standaard 3) → JSONB-array van {label, aantal}
+    // Extra bezittingen (naast de standaard 3) → JSONB-array van {label, aantal, foto_pad}
     data.extra_bezittingen = [...document.querySelectorAll('#dossier-form .extra-bezit-row')]
       .map(row => ({
         label: (row.querySelector('.extra-bezit-label')?.value || '').trim(),
         aantal: parseInt(row.querySelector('.extra-bezit-aantal')?.value, 10) || 0,
+        foto_pad: (row.querySelector('.extra-bezit-foto')?.value || '').trim() || null,
       }))
       .filter(x => x.label);
 

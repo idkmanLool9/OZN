@@ -354,6 +354,31 @@ const ArtsVerklaring = {
   },
 };
 
+// ─── Bezittingen-foto's (privé, bucket 'documenten', prefix 'bezittingen/') ─
+// Foto's van sieraden e.d. Zelfde patroon als ArtsVerklaring — signed URLs
+// om te bekijken; RLS op documenten (documenten_zicht) beperkt tot zichtbare
+// dossiers.
+const BezittingenFotos = {
+  async upload(file, tag = 'item') {
+    const compressed = await compressImage(file, 1600, 0.85);
+    const safe = (tag || 'item').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `bezittingen/${Date.now()}-${safe}.jpg`;
+    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
+    if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
+    return path;
+  },
+  async signedUrl(path, seconds = 300) {
+    if (!path) return null;
+    const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
+    if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
+    return data.signedUrl;
+  },
+  async remove(path) {
+    if (!path) return;
+    await sb.storage.from('documenten').remove([path]).catch(() => {});
+  },
+};
+
 // ─── Kist-voorraad (beheerder-only) ─────────────────────────────────────────
 const KistVoorraad = {
   // Alles synchroon uit de cache: welke rij hoort bij deze kist-naam?

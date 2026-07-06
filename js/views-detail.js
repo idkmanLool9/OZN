@@ -78,16 +78,25 @@ function renderDossierDetail(params) {
         </dl>
         ${(() => {
           const items = [
-            ['Oorbel(en)',  d.bezit_oorbellen, d.bezit_oorbellen_aantal],
-            ['Ring(en)',    d.bezit_ringen,    d.bezit_ringen_aantal],
-            ['Armband(en)', d.bezit_armbanden, d.bezit_armbanden_aantal],
+            ['Oorbel(en)',  d.bezit_oorbellen, d.bezit_oorbellen_aantal, d.bezit_oorbellen_foto],
+            ['Ring(en)',    d.bezit_ringen,    d.bezit_ringen_aantal,    d.bezit_ringen_foto],
+            ['Armband(en)', d.bezit_armbanden, d.bezit_armbanden_aantal, d.bezit_armbanden_foto],
           ].filter(([, heeft]) => heeft === 'ja');
           const extras = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.filter(x => x && x.label) : [];
           if (!items.length && !extras.length) return '';
+          const rijMet = (label, aantal, foto) => {
+            const txt = aantal ? `${aantal} stuk(s)` : 'ja';
+            // dlRow escapt strings behalve als ze met '<' beginnen; dus prefix
+            // met een <span> zodat de knop-HTML intact blijft.
+            const inhoud = foto
+              ? `<span>${esc(txt)}</span> <button type="button" class="link-btn" data-bezit-foto="${esc(foto)}">📷 Bekijk foto</button>`
+              : txt;
+            return dlRow(label, inhoud);
+          };
           return `<h3>Bezittingen</h3><dl class="dl">${
-            items.map(([label, , aantal]) => dlRow(label, aantal ? `${aantal} stuk(s)` : 'ja')).join('')
+            items.map(([label, , aantal, foto]) => rijMet(label, aantal, foto)).join('')
           }${
-            extras.map(x => dlRow(x.label, x.aantal ? `${x.aantal} stuk(s)` : '')).join('')
+            extras.map(x => rijMet(x.label, x.aantal, x.foto_pad)).join('')
           }</dl>`;
         })()}
         <h3>Opbaren &amp; locatie</h3>
@@ -728,6 +737,15 @@ function bindDetailEvents(id) {
       openUrlAsync(ArtsVerklaring.signedUrl(dRow.overdraagformulier_pad, 300));
     });
   }
+
+  // Bezittings-foto bekijken (via signed URL — 5 min geldig)
+  document.querySelectorAll('[data-bezit-foto]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pad = btn.getAttribute('data-bezit-foto');
+      if (!pad) return;
+      openUrlAsync((typeof BezittingenFotos !== 'undefined' ? BezittingenFotos : ArtsVerklaring).signedUrl(pad, 300));
+    });
+  });
 
   // Archiveren / uit archief halen (alleen beheerder)
   const archBtn = $('#btn-archief');
