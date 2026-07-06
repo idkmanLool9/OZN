@@ -177,6 +177,19 @@ function renderDossierForm(params) {
                 </select>`;
               })()}
             </label>
+            <label class="span-3"><span>Extra personeel <span class="muted small">(aanvinken uit accounts)</span></span>
+              ${(() => {
+                const accounts = [...new Set((DB.list(KEYS.PROFIELEN) || []).map(p => (p.naam || '').trim()).filter(Boolean))].sort();
+                const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
+                if (!accounts.length) return '<span class="muted small">Nog geen accounts — voeg toe in <a href="#/account#rollen">Account</a>.</span>';
+                return `<div style="display:flex; flex-wrap:wrap; gap:.5rem;">
+                  ${accounts.map(naam => `
+                    <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
+                      <input type="checkbox" class="extra-personeel-cb" value="${esc(naam)}" ${gekozen.includes(naam) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(naam)}</span>
+                    </label>`).join('')}
+                </div>`;
+              })()}
+            </label>
           </div>
         </fieldset>
 
@@ -1154,6 +1167,10 @@ function renderDossierForm(params) {
       else data[f] = (inp.value || '').trim();
     });
     if (!data.status) data.status = 'nieuw';
+
+    // Extra personeel: aangevinkte accountnamen → JSONB-array
+    data.extra_personeel = [...document.querySelectorAll('#dossier-form .extra-personeel-cb')]
+      .filter(cb => cb.checked).map(cb => cb.value);
 
     // Handtekeningen niet meer in het formulier — bestaande behouden.
     data.handtekeningen = existingSigs;
