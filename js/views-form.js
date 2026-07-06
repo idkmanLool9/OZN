@@ -151,7 +151,7 @@ function renderDossierForm(params) {
 
         <nav class="wizard-nav" id="wizard-nav" aria-label="Voortgang">
           <button type="button" class="wizard-step" data-go="1"><span class="num">1</span><span class="lbl">NAW gegevens</span></button>
-          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Uitvaart</span></button>
+          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Opbaren &amp; locatie</span></button>
           <button type="button" class="wizard-step" data-go="3"><span class="num">3</span><span class="lbl">Kosten</span></button>
           <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Bijzonderheden</span></button>
           <button type="button" class="wizard-step" data-go="5"><span class="num">5</span><span class="lbl">Handtekeningen</span></button>
@@ -225,7 +225,7 @@ function renderDossierForm(params) {
           </div>
         </fieldset>
 
-        <fieldset class="card" data-step="1">
+        <fieldset class="card" data-step="2">
           <legend>Opbaren &amp; locatie</legend>
           <div class="grid-3">
             <label><span>Ophalen of thuis opbaren?</span>
@@ -381,9 +381,8 @@ function renderDossierForm(params) {
   // Aanbevolen velden per stap — bepalen kleur (rood/oranje/groen)
   const STEP_FIELDS = {
     1: ['opdrachtgever_naam','achternaam','voornaam','geboortedatum','overlijdensdatum',
-        'adres_overledene','postcode_overledene','woonplaats_overledene',
-        'opbaring_type','opbaarlocatie_type'],
-    2: ['uitvaart_type','uitvaart_datum',
+        'adres_overledene','postcode_overledene','woonplaats_overledene'],
+    2: ['opbaring_type','opbaarlocatie_type','uitvaart_type','uitvaart_datum',
         'uitvaart_tijd','kerk_locatie','begraafplaats'],
     3: [], // kosten + kist/bloemen via catalogus-pagina, geen verplichte velden
     4: [],  // bijzonderheden is volledig optioneel
