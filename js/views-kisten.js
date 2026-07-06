@@ -712,7 +712,7 @@ function renderKistenVoorraad(msg) {
                   <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="min_aantal"    value="${esc(m || '')}"           placeholder="—"></td>
                   <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="gewenst_peil"  value="${esc(g)}"                 placeholder="—"></td>
                   <td class="num"><input type="number" min="0" step="1" inputmode="numeric" data-vr-field="levertijd_dagen" value="${esc(l)}"               placeholder="—"></td>
-                  <td class="vr-status-cell">${statusHtml}<span class="vr-save-hint" hidden>💾</span></td>
+                  <td class="vr-status-cell">${statusHtml}</td>
                 </tr>`;
               }).join('')}
               ${gefilterd.length === 0 ? '<tr><td colspan="6" class="muted center">Geen kisten passen bij dit filter.</td></tr>' : ''}
@@ -758,30 +758,24 @@ function renderKistenVoorraad(msg) {
         setTimeout(() => inp.classList.remove('vr-input-error'), 1500);
         return;
       }
-      const bestaand = KistVoorraad.byNaam(naam) || {};
       const patch = { [veld]: val };
-      // 'aantal' en 'min_aantal' zijn NOT NULL in DB → default naar 0/1 als leeg
+      // 'aantal' en 'min_aantal' zijn NOT NULL in DB → default naar 0 als leeg
       if (veld === 'aantal'      && val == null) patch.aantal      = 0;
       if (veld === 'min_aantal'  && val == null) patch.min_aantal  = 0;
-      // Kleine "opslaan"-indicator
-      const hint = tr.querySelector('.vr-save-hint');
-      if (hint) { hint.hidden = false; hint.textContent = '💾'; hint.className = 'vr-save-hint is-busy'; }
       try {
         const nieuw = await KistVoorraad.upsert(naam, patch);
-        // Status-cel bijwerken zonder de rest van de tabel te herrender
+        // Alleen de status-tekst van deze ene rij bijwerken (geen ruimte-shift).
+        const cel = tr.querySelector('.vr-status-cell');
         const a = nieuw.aantal || 0, m = nieuw.min_aantal || 0;
         const leeg = a === 0, laag = a < m;
-        const statusEl = tr.querySelector('.kist-voorraad-status') || (() => {
-          const s = document.createElement('span');
-          tr.querySelector('.vr-status-cell').prepend(s);
-          return s;
-        })();
+        let statusEl = cel.querySelector('.kist-voorraad-status');
+        if (!statusEl) {
+          statusEl = document.createElement('span');
+          cel.innerHTML = ''; cel.appendChild(statusEl);
+        }
         statusEl.className = 'kist-voorraad-status ' + (leeg ? 'is-leeg' : (laag ? 'is-laag' : 'is-ok'));
         statusEl.textContent = leeg ? '⚠ Leeg' : (laag ? '⚠ Laag' : '✓ Op peil');
-        if (hint) { hint.textContent = '✓'; hint.className = 'vr-save-hint is-ok';
-          setTimeout(() => { hint.hidden = true; }, 1200); }
       } catch (err) {
-        if (hint) { hint.textContent = '⚠'; hint.className = 'vr-save-hint is-err'; }
         Modal.show({ type:'error', title:'Opslaan mislukt', message: err.message || String(err) });
       }
     });
