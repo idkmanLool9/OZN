@@ -12,15 +12,7 @@ function renderDossierDetail(params) {
   const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
-  const verzekerd = d.verzekering_status === 'met verzekering';
-  // Verzekeringsdekking via centrale helper: 'categorie'-modus voor DELA
-  // wanneer een pakket-template met categorieen is gekozen, anders 'flat'.
-  const dekkingInfo  = computeDekking(kosten, d, Settings.all());
-  const verzDekking  = Number(d.verzekering_dekking) || 0;
-  const dekking      = dekkingInfo.dekking;
-  const familieTotaal  = Math.max(0, totaal - dekking);
   const moetNogBetalen = Math.max(0, totaal - betaald);
-  const familieMoetNog = Math.max(0, familieTotaal - betaald);
 
   $('#view').innerHTML = `
     <div class="page">
@@ -187,8 +179,6 @@ function renderDossierDetail(params) {
           const orderedCats = orderIds.filter(id => buckets[id])
             .concat(Object.keys(buckets).filter(id => !orderIds.includes(id)));
 
-          const colspanFront = 1; // omschrijving
-          const colspanBack  = (verzekerd ? 1 : 0) + 1 + 1; // wie + status + delete
           return `
           <div class="kosten-groups">
             ${orderedCats.map(cat => {
@@ -205,22 +195,18 @@ function renderDossierDetail(params) {
                     <col class="kc-col-omschrijving">
                     <col class="kc-col-aantal">
                     ${magPrijzen ? '<col class="kc-col-bedrag">' : ''}
-                    ${(magPrijzen && dekkingInfo.mode === 'categorie') ? '<col class="kc-col-dekking">' : ''}
                     ${kanBewerken ? '<col class="kc-col-del">' : ''}
                   </colgroup>
                   <tbody>
                     ${items.map(k => {
                       const aantal = Number(k.aantal) || 1;
                       const stuk   = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
-                      const dekt   = (dekkingInfo.perKost && dekkingInfo.perKost[k.id]) || 0;
-                      const familieDeel = Math.max(0, (Number(k.bedrag) || 0) - dekt);
                       return `<tr>
                       <td class="kc-omschrijving">${esc(k.omschrijving)}${(magPrijzen && aantal !== 1) ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}${k.betaald ? ' <span class="badge badge-green" title="Afgevinkt / betaald">✓</span>' : ''}</td>
                       <td class="kc-aantal">${kanBewerken
                         ? `<input type="number" class="kc-aantal-input" data-id="${k.id}" data-stuk="${stuk}" value="${esc(aantal)}" min="0" step="1" inputmode="numeric">`
                         : `<span class="muted">${esc(aantal)}×</span>`}</td>
                       ${magPrijzen ? `<td class="kc-bedrag num">${fmtEUR(k.bedrag)}</td>` : ''}
-                      ${(magPrijzen && dekkingInfo.mode === 'categorie') ? `<td class="kc-dekking num small">${dekt > 0 ? `<span class="dekking-deel">🛡 ${fmtEUR(dekt)}</span>${familieDeel > 0 ? `<br><span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>` : ''}` : `<span class="familie-deel muted">👥 ${fmtEUR(familieDeel)}</span>`}</td>` : ''}
                       ${kanBewerken ? `<td class="kc-del"><button type="button" class="btn-icon" data-action="del-kosten" data-id="${k.id}" title="Verwijderen">×</button></td>` : ''}
                     </tr>`;
                     }).join('')}
@@ -249,45 +235,6 @@ function renderDossierDetail(params) {
                 </button>
               </div>`;
             })() : ''}
-            ${(magPrijzen && verzekerd) ? `
-              <div class="kosten-totals-divider"></div>
-              ${dekking === 0 && verzDekking === 0 ? `
-                <div class="alert alert-info" style="margin:.25rem 0 .5rem;font-size:.85rem;">
-                  Vul de <a href="#/dossiers/${d.id}/bewerken#verzekering-met-fields"><strong>maatschappij + pakket + dekkingsbedrag</strong></a>
-                  in bij Verzekering &amp; betaling — voor DELA wordt dan
-                  automatisch per categorie berekend wat verzekerd is.
-                </div>
-              ` : `
-                ${dekkingInfo.mode === 'categorie' ? `
-                  <div class="kosten-total-row muted small" style="font-weight:600;">
-                    <span>${esc((dekkingInfo.pakket && dekkingInfo.pakket.naam) || 'Verzekering')}</span>
-                    <span></span>
-                  </div>
-                  ${Object.entries(dekkingInfo.perCategorie).filter(([,v]) => v > 0).map(([cat, v]) => `
-                    <div class="kosten-total-row muted small" style="padding-left:1rem;">
-                      <span>· ${esc(categorieLabel(cat))}</span>
-                      <span class="num">${fmtEUR(v)}</span>
-                    </div>`).join('')}
-                  ${dekkingInfo.geldStart > 0 ? `
-                    <div class="kosten-total-row muted small" style="padding-left:1rem;">
-                      <span>· Geldverzekering benut</span>
-                      <span class="num">${fmtEUR(dekkingInfo.geldStart - dekkingInfo.geldRest)}${dekkingInfo.geldRest > 0 ? ` <span class="muted">(rest ${fmtEUR(dekkingInfo.geldRest)} aan familie)</span>` : ''}</span>
-                    </div>` : ''}
-                ` : ''}
-                <div class="kosten-total-row">
-                  <span>Verzekering dekt totaal${dekkingInfo.mode === 'categorie' ? '' : (verzDekking > 0 ? ' (uit polis)' : '')}</span>
-                  <strong class="num">${fmtEUR(dekking)}</strong>
-                </div>
-                <div class="kosten-total-row muted small">
-                  <span>Door familie te betalen</span>
-                  <span class="num">${fmtEUR(familieTotaal)}</span>
-                </div>
-                <div class="kosten-total-row total-familie">
-                  <span>Familie moet nog betalen</span>
-                  <strong class="num">${fmtEUR(familieMoetNog)}</strong>
-                </div>
-              `}
-            ` : ''}
           </div>`;
         })()}
         ${!kanBewerken ? '' : `

@@ -3044,3 +3044,18 @@ html { background: var(--bg); }
 @media (min-width: 981px) {
   body:not(.design-v1):not(.in-dossier) .app-main { padding-top: env(safe-area-inset-top); }
 }
+
+/* Vandaag-blok bovenaan dossierlijst */
+.vandaag-blok {
+  background: #eef4ff; border: 1px solid #d5e2fb; border-left: 4px solid var(--primary, #2563eb);
+  border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1rem;
+}
+.vandaag-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .5rem; }
+.vandaag-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.vandaag-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.vandaag-list a { color: var(--primary, #2563eb); text-decoration: none; }
+.vandaag-actie {
+  display: inline-block; padding: .15rem .5rem; border-radius: 999px;
+  background: #fff; border: 1px solid #d5e2fb; font-size: .78rem; color: #244a8a;
+}
+.vandaag-planning { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed #d5e2fb; display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }

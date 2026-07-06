@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 189;
-const APP_VERSION    = '5.63.0';
+const APP_BUILD      = 190;
+const APP_VERSION    = '5.64.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -86,8 +86,6 @@ const Settings = {
     // Push-notificaties (zie PushNotificaties + docs/push-setup.md)
     push_vapid_public_key: 'BFrHC8o3zxJ4e1qirE93vUm5wPZpEdqWIV9OwczE-Omgf3QkoM_hKFI1ZFK2Lon4f7bvwVNKQVUfOZxkFQ6nUmg',
     push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
-    // Begraafplaats-plattegrond (PNG/JPG, getoond bovenaan begraafplaats-view)
-    cemetery_map_url: '',
     // Profielkiezer ("Wie werkt vandaag?") na login tonen. Uit = meteen door
     // naar de app zonder profielkeuze.
     profielkiezer_actief: false,
@@ -121,62 +119,6 @@ const Settings = {
     login_form_title: 'Inloggen',
     login_form_subtitle: 'Voer je e-mailadres en wachtwoord in om door te gaan.',
     login_secretariaat_text: 'Geen account? Vraag het secretariaat.',
-    // Verzekeringsmaatschappijen (datalist in intake)
-    verzekering_maatschappijen: [
-      'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema',
-    ],
-    // Pakket-uitvoeringen — per pakket optioneel een standaard-dekkingsbedrag
-    // dat in het dossier-formulier automatisch wordt voorgesteld bij de
-    // dekkingsbedrag-input. Voor DELA-pakketten is er een 'categorieen'-blok
-    // met max-bedragen per kostencategorie; die worden automatisch gedekt
-    // wanneer maatschappij = DELA én dit pakket is gekozen. De rest gaat uit
-    // de Geldverzekering-bucket (geldverzekering_default of polisbedrag).
-    verzekering_pakketten: [
-      {
-        naam: 'DELA UitvaartPlan in Diensten — externe uitvaartleider',
-        verzekeraar: 'DELA',
-        dekking: '3957',
-        geldverzekering_default: 800,
-        categorieen: {
-          aannametarief: { max: 600, gedekt: true  },
-          vervoer:       { max: 500, gedekt: true  },
-          verzorging:    { max: 200, gedekt: true  },
-          kist:          { max: 600, gedekt: true  },
-          aula:          { max: 300, gedekt: true  },
-          kerk:          { max:   0, gedekt: false },  // niet-DELA-locatie
-          begraafplaats: { max: 800, gedekt: true  },  // alleen algemeen graf
-          bloemen:       { max:   0, gedekt: false },  // via Geldverzekering
-          rouwkaarten:   { max: 250, gedekt: true  },
-          schoonmaak:    { max:   0, gedekt: false },
-          administratie: { max:  50, gedekt: true  },
-          overig:        { max: 657, gedekt: true  },
-        },
-        opmerking: 'Vergoeding bij niet-DELA-uitvaartleider: €3.157 dienstendeel + min. €800 Geldverzekering. Familie betaalt het verschil.',
-      },
-      {
-        naam: 'DELA UitvaartPlan in Geld',
-        verzekeraar: 'DELA',
-        dekking: '',
-        opmerking: 'Vrij te besteden bedrag — vul polisbedrag in als dekking.',
-      },
-      {
-        naam: 'DELA UitvaartPlan in Diensten — DELA verzorgt zelf',
-        verzekeraar: 'DELA',
-        dekking: '8800',
-        opmerking: 'Alleen relevant als DELA de uitvaart zelf verzorgt — zelden van toepassing bij OZN.',
-      },
-      { naam: 'Standaard pakket',  dekking: '' },
-      { naam: 'Uitgebreid pakket', dekking: '' },
-      { naam: 'Vrije keuze',       dekking: '' },
-      { naam: 'Maatwerk',          dekking: '' },
-    ],
-    // Parochies + bijbehorende standaard-priester (Abuna).
-    // Wordt automatisch ingevuld in het intake-formulier wanneer een
-    // parochie wordt gekozen.
-    parochies: [],
-    // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
-    default_kerk_locatie: '',
-    default_begraafplaats: '',
     // Factuur-bedrijfsgegevens (kop + betaalgegevens op de PDF-factuur)
     factuur_bedrijfsnaam: 'OZN Vastgoed B.V.',
     factuur_adres: '',
@@ -576,24 +518,6 @@ const BrandingFotos = {
     await sb.storage.from('branding').remove(exts.map(e => `logo.${e}`)).catch(() => {});
   },
 
-  // Plattegrond van de begraafplaats — getoond als visuele referentie
-  async uploadCemeteryMap(file) {
-    file = await compressImage(file, 2400, 0.92); // grote map mag breder
-    const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const path = `cemetery-map.${ext || 'png'}`;
-    const exts = ['png','jpg','jpeg','svg','webp'].filter(e => e !== ext);
-    if (exts.length) await sb.storage.from('branding').remove(exts.map(e => `cemetery-map.${e}`)).catch(() => {});
-    const { error } = await sb.storage.from('branding').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (error) throw error;
-    const { data } = sb.storage.from('branding').getPublicUrl(path);
-    return data.publicUrl + '?v=' + Date.now();
-  },
-  async removeCemeteryMap() {
-    const exts = ['png','jpg','jpeg','svg','webp'];
-    await sb.storage.from('branding').remove(exts.map(e => `cemetery-map.${e}`)).catch(() => {});
-  },
 };
 
 const Splash = {
@@ -969,11 +893,6 @@ Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
-Router.add('/leden', (p, full) => renderLedenList(p, full));
-Router.add('/leden/nieuw', () => renderGezinForm({}));
-Router.add('/leden/:id', p => renderGezinDetail(p));
-Router.add('/leden/:id/bewerk', p => renderGezinForm(p));
-Router.add('/begraafplaats', () => renderBegraafplaats());
 Router.add('/kisten', () => renderKistenBeheer());
 Router.add('/kisten/voorraad', () => renderKistenVoorraad());
 Router.add('/kisten/bestellijst', () => renderKistenBestellijst());
@@ -1100,7 +1019,7 @@ Router.add('/account', () => renderAccount());
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
   function cleanSessionStorage() {
     ActiveProfile.clear();
-    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [] };
+    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], personeel_namen: [], planning_items: [], kist_voorraad: [] };
     Cloud.loaded = false;
     // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
     // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet

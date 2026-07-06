@@ -1,24 +1,9 @@
 // Dossier intake/edit formulier
 
-// ─── Auto-invullen: bekende naam / gezinsnummer → gegevens overnemen ─────────
-// Zoekt matches in de ledenadministratie (gezinnen/leden) én in eerdere
-// dossiers, en biedt aan om lege velden automatisch te vullen.
+// ─── Auto-invullen: bekende naam uit een eerder dossier → gegevens overnemen ─
 const Autofill = {
   _lc(s) { return String(s == null ? '' : s).trim().toLowerCase(); },
 
-  lidByNaam(voornaam, achternaam) {
-    const vn = Autofill._lc(voornaam), an = Autofill._lc(achternaam);
-    if (!an) return null;
-    const lid = DB.list(KEYS.LEDEN).find(l =>
-      Autofill._lc(l.achternaam) === an && (vn ? Autofill._lc(l.voornaam) === vn : true));
-    if (!lid) return null;
-    return { lid, gezin: (lid.gezin_id != null ? DB.byId(KEYS.GEZINNEN, lid.gezin_id) : null) || {} };
-  },
-  gezinByNummer(nr) {
-    const n = Autofill._lc(nr);
-    if (!n) return null;
-    return DB.list(KEYS.GEZINNEN).find(g => Autofill._lc(g.gezinsnummer) === n) || null;
-  },
   dossierByNaam(voornaam, achternaam, veldVoornaam, veldAchternaam, excludeId) {
     const vn = Autofill._lc(voornaam), an = Autofill._lc(achternaam);
     if (!an) return null;
@@ -1127,34 +1112,20 @@ function renderDossierForm(params) {
   const autofillForm = $('#dossier-form');
   const exclId = isNew ? null : dossier.id;
 
-  // (a) Overledene: bekende naam → persoons- + gezinsgegevens overnemen.
-  //     Bron 1 = ledenadministratie, bron 2 = een eerder dossier.
+  // (a) Overledene: bekende naam → gegevens overnemen uit een eerder dossier.
   const checkOverledene = async () => {
     const voornaam = (autofillForm.elements['voornaam']?.value || '').trim();
     const achternaam = (autofillForm.elements['achternaam']?.value || '').trim();
     if (!voornaam || !achternaam) return;               // pas matchen als beide er zijn
     const naam = `${voornaam} ${achternaam}`;
-    const m = Autofill.lidByNaam(voornaam, achternaam);
-    if (m) {
-      const l = m.lid, g = m.gezin || {};
-      await Autofill.vul(autofillForm, 'Bekend lid',
-        `${naam} staat in de ledenadministratie${g.familienaam ? ` (gezin ${g.familienaam})` : ''}. Bekende gegevens overnemen?`,
-        [['doopnaam', l.doopnaam], ['geslacht', l.geslacht],
-         ['geboortedatum', l.geboortedatum], ['geboorteplaats', l.geboorteplaats],
-         ['adres_overledene', g.adres], ['postcode_overledene', g.postcode],
-         ['woonplaats_overledene', g.woonplaats],
-         ['gezinsnummer', g.gezinsnummer], ['parochie', g.parochie]]);
-      return;
-    }
     const d = Autofill.dossierByNaam(voornaam, achternaam, 'voornaam', 'achternaam', exclId);
     if (d) {
       await Autofill.vul(autofillForm, 'Bekende naam',
         `${naam} kwam eerder voor in dossier ${d.dossier_nummer}. Bekende gegevens overnemen?`,
-        [['doopnaam', d.doopnaam], ['geslacht', d.geslacht],
+        [['geslacht', d.geslacht],
          ['geboortedatum', d.geboortedatum], ['geboorteplaats', d.geboorteplaats],
          ['adres_overledene', d.adres_overledene], ['postcode_overledene', d.postcode_overledene],
-         ['woonplaats_overledene', d.woonplaats_overledene], ['bsn', d.bsn],
-         ['gezinsnummer', d.gezinsnummer], ['parochie', d.parochie]]);
+         ['woonplaats_overledene', d.woonplaats_overledene]]);
     }
   };
   ['voornaam', 'achternaam'].forEach(n => {
@@ -1325,14 +1296,7 @@ function renderDossierForm(params) {
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
       }
 
-      // ─── Automatisering: overledene koppelen aan de ledenadministratie ────
-      // Voegt de overledene toe als lid (status overleden) aan het gezin met
-      // hetzelfde gezinsnummer — en maakt dat gezin aan als het nog niet bestaat.
-      if (typeof LedenSync !== 'undefined' && savedDossier) {
-        await LedenSync.vanDossierMetMelding(savedDossier);
-      }
-
-      // ─── Auto-mail dossier naar klooster bij eerste aanmaak (best-effort) ──
+      // ─── Auto-mail dossier bij eerste aanmaak (best-effort) ──
       // Inclusief kostenoverzicht — net opgeslagen kostenposten staan al
       // in de cloud-cache via de DB.insert hierboven.
       const klooster = (Settings.get('auto_send_dossier_email') || '').trim();

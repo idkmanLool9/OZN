@@ -45,6 +45,51 @@ function renderDossierList(params, path) {
         <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
       </div>
 
+      ${(() => {
+        // Vandaag-overzicht: alle actieve dossiers met een activiteit vandaag/morgen.
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const tom = new Date(today); tom.setDate(tom.getDate() + 1);
+        const iso = (d) => d.toISOString().slice(0, 10);
+        const isoT = iso(today), isoM = iso(tom);
+        // Verzamel per dossier: welke activiteiten vandaag/morgen?
+        const rijen = [];
+        DB.list(KEYS.DOSSIERS).forEach(d => {
+          if (d.gearchiveerd) return;
+          if (['voltooid', 'geannuleerd'].includes(d.status)) return;
+          const acties = [];
+          if (d.thuis_opbaren_datum === isoT) acties.push({ label: '🏠 Thuis opbaren start', tijd: d.thuis_opbaren_tijd || '' });
+          else if (d.thuis_opbaren_datum === isoM) acties.push({ label: '🏠 Thuis opbaren morgen', tijd: d.thuis_opbaren_tijd || '' });
+          if (acties.length) rijen.push({ d, acties });
+        });
+        // Plus planning-items (rouwauto, aula) van vandaag
+        const planningVandaag = (DB.list(KEYS.PLANNING) || []).filter(p => {
+          if (!p.start_ts) return false;
+          try { return p.start_ts.startsWith(isoT); } catch (_) { return false; }
+        });
+        if (rijen.length === 0 && planningVandaag.length === 0) return '';
+        return `
+        <section class="vandaag-blok">
+          <div class="vandaag-head">
+            <strong>📅 Vandaag &amp; morgen</strong>
+            <span class="muted small">${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          </div>
+          ${rijen.length === 0 ? '' : `
+            <ul class="vandaag-list">
+              ${rijen.map(r => `
+                <li>
+                  <a href="#/dossiers/${r.d.id}"><strong>${esc(fullName(r.d) || r.d.dossier_nummer || '—')}</strong></a>
+                  <span class="muted small">${esc(r.d.dossier_nummer || '')}</span>
+                  ${r.acties.map(a => `<span class="vandaag-actie">${a.label}${a.tijd ? ' · ' + esc(a.tijd) : ''}</span>`).join('')}
+                </li>`).join('')}
+            </ul>`}
+          ${planningVandaag.length === 0 ? '' : `
+            <div class="vandaag-planning">
+              <span class="muted small">Planning:</span>
+              ${planningVandaag.map(p => `<span class="vandaag-actie">${esc(p.titel || p.type || 'planning')}${p.start_ts ? ' · ' + esc(p.start_ts.slice(11, 16)) : ''}</span>`).join('')}
+            </div>`}
+        </section>`;
+      })()}
+
       ${(typeof Auth !== 'undefined' && Auth.isBeheerder() && typeof KistVoorraad !== 'undefined') ? (() => {
         const laag = KistVoorraad.laag();
         if (!laag.length) return '';
@@ -740,6 +785,15 @@ function renderAccount(msg) {
           <p class="muted small" style="margin-top:.75rem;">
             Een JSON-export geeft je een volledig lokaal back-upbestand met alle dossiergegevens — voor in een veilige map of op een externe schijf, los van Supabase.
           </p>
+
+          ${(typeof Auth === 'undefined' || Auth.isBeheerder()) ? `
+          <div id="backup-lijst" style="margin-top:1rem;">
+            <h3 style="margin:0 0 .35rem;font-size:.95rem;">Automatische backups</h3>
+            <div class="muted small">Wordt elke maandag om 03:00 UTC automatisch gemaakt (laatste 12 bewaard).</div>
+            <ul id="backup-items" class="muted small" style="margin:.4rem 0 0;padding:0;list-style:none;">
+              <li>laden…</li>
+            </ul>
+          </div>` : ''}
 
           <details style="margin-top:1rem;">
             <summary style="cursor:pointer; font-weight:600;">Wat zijn de limieten van het Supabase Free-plan?</summary>
@@ -1649,6 +1703,45 @@ function renderAccount(msg) {
           </p>`;
       } catch (e) {
         opslagBox.innerHTML = `<p class="muted small">Opslaggebruik kon niet worden geladen${e && e.message ? ' (' + esc(e.message) + ')' : ''}.</p>`;
+      }
+    })();
+  }
+
+  // Automatische backups tonen (alleen beheerder — RLS zorgt daar server-side voor)
+  const backupItems = $('#backup-items');
+  if (backupItems && typeof sb !== 'undefined' && navigator.onLine
+      && !(typeof Demo !== 'undefined' && Demo.isActive())) {
+    (async () => {
+      try {
+        const { data, error } = await sb.storage.from('backups').list('', {
+          limit: 20, sortBy: { column: 'name', order: 'desc' },
+        });
+        if (error) throw error;
+        if (!data || !data.length) { backupItems.innerHTML = '<li>Nog geen backup gemaakt — verschijnt na de eerstvolgende maandag om 03:00.</li>'; return; }
+        backupItems.innerHTML = data.map(f => {
+          const kb = f.metadata && f.metadata.size ? Math.round(f.metadata.size / 1024) : null;
+          return `<li style="display:flex;justify-content:space-between;gap:.5rem;padding:.2rem 0;">
+            <span><strong>${esc(f.name)}</strong>${kb ? ' · ' + kb + ' KB' : ''}</span>
+            <button type="button" class="link-btn" data-backup-dl="${esc(f.name)}">⬇ Download</button>
+          </li>`;
+        }).join('');
+        backupItems.querySelectorAll('[data-backup-dl]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const naam = btn.getAttribute('data-backup-dl');
+            btn.disabled = true; btn.textContent = '…';
+            try {
+              const { data: sign, error: sErr } = await sb.storage.from('backups').createSignedUrl(naam, 300);
+              if (sErr || !sign) throw sErr || new Error('Geen signed URL');
+              window.open(sign.signedUrl, '_blank');
+            } catch (e) {
+              Modal.show({ type:'error', title:'Download mislukt', message: (e && e.message) || String(e) });
+            } finally {
+              btn.disabled = false; btn.textContent = '⬇ Download';
+            }
+          });
+        });
+      } catch (e) {
+        backupItems.innerHTML = `<li>Backups niet geladen (${esc(e.message || String(e))}).</li>`;
       }
     })();
   }

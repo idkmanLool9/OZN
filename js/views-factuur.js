@@ -5,16 +5,10 @@
 // Spec voor de PDF-generator (jsPDF) — voorlopige kostenraming.
 function kostenramingSpec(d, kosten) {
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
-  const verzekerd = d.verzekering_status === 'met verzekering';
-  const dekkingInfo = computeDekking(kosten, d, Settings.all());
-  const gedektTotaal = dekkingInfo.dekking;
-  const familieTotaal = Math.max(0, totaal - gedektTotaal);
   const aanbetaling = Number(d.aanbetaling_bedrag) || 0;
-  const teBetalen = Math.max(0, familieTotaal - aanbetaling);
+  const teBetalen = Math.max(0, totaal - aanbetaling);
 
-  const totals = [['Totaal kosten', fmtEUR(totaal), false]];
-  if (gedektTotaal > 0) totals.push(['Verzekering dekt', '– ' + fmtEUR(gedektTotaal), false]);
-  totals.push(['Door familie te betalen', fmtEUR(familieTotaal), aanbetaling <= 0]);
+  const totals = [['Totaal kosten', fmtEUR(totaal), aanbetaling <= 0]];
   if (aanbetaling > 0) {
     totals.push(['Reeds aanbetaald', '– ' + fmtEUR(aanbetaling), false]);
     totals.push(['Nog te betalen', fmtEUR(teBetalen), true]);
@@ -35,9 +29,7 @@ function kostenramingSpec(d, kosten) {
         d.uitvaart_datum ? 'Uitvaart ' + fmtDate(d.uitvaart_datum) : '',
       ] },
     ],
-    sections: verzekerd ? [{ heading: 'Via verzekering', rows: [
-      ['Maatschappij', d.verzekering_maatschappij], ['Polisnummer', d.polisnummer], ['Pakket', d.verzekering_pakket],
-    ] }] : [],
+    sections: [],
     table: {
       heading: 'Kostenposten',
       rows: kosten.length
@@ -190,14 +182,9 @@ function buildFactuurPdf(d, kosten) {
 }
 
 function buildFactuurDocHTML(d, kosten) {
-  const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
-  const verzekerd = d.verzekering_status === 'met verzekering';
-  const dekkingInfo   = computeDekking(kosten, d, Settings.all());
-  const verzDekking   = Number(d.verzekering_dekking) || 0;
-  const gedektTotaal  = dekkingInfo.dekking;
-  const familieTotaal = Math.max(0, totaal - gedektTotaal);
+  const totaal        = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const aanbetaling   = Number(d.aanbetaling_bedrag) || 0;
-  const teBetalen     = Math.max(0, familieTotaal - aanbetaling);
+  const teBetalen     = Math.max(0, totaal - aanbetaling);
   const s = Settings.all();
 
   return `
@@ -229,11 +216,6 @@ function buildFactuurDocHTML(d, kosten) {
         </div>
       </div>
 
-      ${verzekerd ? `
-        <div class="factuur-verzekering">
-          <strong>Via verzekering:</strong> ${esc(d.verzekering_maatschappij || '—')}${d.polisnummer ? ' — polisnummer ' + esc(d.polisnummer) : ''}${d.verzekering_pakket ? ' — ' + esc(d.verzekering_pakket) : ''}
-        </div>` : ''}
-
       <table class="factuur-table">
         <thead>
           <tr>
@@ -256,16 +238,6 @@ function buildFactuurDocHTML(d, kosten) {
             <td colspan="2" class="num"><strong>Totaal</strong></td>
             <td class="num"><strong>${fmtEUR(totaal)}</strong></td>
           </tr>
-          ${verzekerd && gedektTotaal > 0 ? `
-            <tr>
-              <td colspan="2" class="num muted">Gedekt door verzekering${verzDekking > 0 ? ' (uit polis)' : ''}</td>
-              <td class="num muted">- ${fmtEUR(gedektTotaal)}</td>
-            </tr>
-            <tr class="factuur-totalrow">
-              <td colspan="2" class="num"><strong>Door familie te betalen</strong></td>
-              <td class="num"><strong>${fmtEUR(familieTotaal)}</strong></td>
-            </tr>
-          ` : ''}
           ${aanbetaling > 0 ? `
             <tr>
               <td colspan="2" class="num muted">Aanbetaling${d.aanbetaling_datum ? ' (' + fmtDate(d.aanbetaling_datum) + ')' : ''}</td>

@@ -9,10 +9,6 @@ const KEYS = {
   KOSTEN: 'kosten',
   NOTITIES: 'notities',
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
-  BLOEMEN: 'bloemen_catalogus',
-  ETEN: 'eten_drinken_catalogus',
-  GEZINNEN: 'gezinnen',
-  LEDEN: 'leden',
   PROFIELEN: 'profiles',
   PERSONEEL: 'personeel_namen',   // alleen id+naam (voor personeelskiezer; geen rol-lek)
   PLANNING: 'planning_items',
@@ -89,7 +85,7 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [], gezinnen: [], leden: [], profiles: [], personeel_namen: [], planning_items: [], kist_voorraad: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], personeel_namen: [], planning_items: [], kist_voorraad: [] },
   loaded: false,
   offline: false,
 
@@ -97,17 +93,11 @@ const Cloud = {
     // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, k, n, kim, blm, etn, gz, ld, pf, pn, pl, kv] = await Promise.all([
+      const [d, k, n, kim, pf, pn, pl, kv] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
         sb.from('kosten_zicht').select('*').order('id', { ascending: true }),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
-        sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
-        sb.from('eten_drinken_catalogus').select('*').order('naam', { ascending: true }),
-        // Ledenadministratie — tolerant: als de tabellen nog niet bestaan
-        // (migratie nog niet gedraaid) blijven ze gewoon leeg.
-        sb.from('gezinnen').select('*').order('familienaam', { ascending: true }),
-        sb.from('leden').select('*').order('achternaam', { ascending: true }),
         // Accounts + rollen (RLS: medewerker ziet enkel eigen rij, beheerder alle)
         sb.from('profiles').select('*').order('naam', { ascending: true }),
         // Alleen id+naam voor de personeelskiezer (view, geen rol-lek)
@@ -122,10 +112,6 @@ const Cloud = {
       Cloud.cache.kosten = (k.data || []).map(normKosten);
       Cloud.cache.notities = (n.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
-      Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
-      Cloud.cache.eten_drinken_catalogus = ((etn && etn.data) || []).map(normEten);
-      Cloud.cache.gezinnen = ((gz && gz.data) || []).map(normRow);
-      Cloud.cache.leden = ((ld && ld.data) || []).map(normRow);
       Cloud.cache.profiles = ((pf && pf.data) || []).map(normRow);
       Cloud.cache.personeel_namen = ((pn && pn.data) || []).map(normRow);
       Cloud.cache.planning_items = ((pl && pl.data) || []).map(normRow);
