@@ -1573,21 +1573,61 @@ function renderDossierForm(params) {
     if (status) { status.textContent = 'nog niet ondertekend'; status.classList.remove('signed'); }
   });
 
-  // ─── Extra personeel: klap-open + zoekfilter ────────────────────────
+  // ─── Extra personeel: klap-open + zoekfilter + live summary ─────────
   const exPersToggle = document.getElementById('ex-pers-toggle');
   const exPersLijst  = document.getElementById('ex-pers-lijst');
+  function _profielenList() {
+    return (typeof Settings !== 'undefined' && Array.isArray(Settings.get('profielen')))
+      ? Settings.get('profielen') : [];
+  }
+  function updateExtraPersoneelSummary() {
+    const gekozen = [...document.querySelectorAll('#dossier-form .extra-personeel-cb')]
+      .filter(cb => cb.checked).map(cb => cb.value);
+    const oud = document.getElementById('ex-pers-gekozen') || document.getElementById('ex-pers-leeg');
+    if (!oud) return;
+    const profielen = _profielenList();
+    let nieuw;
+    if (gekozen.length) {
+      const chips = gekozen.map(naam => {
+        const p = profielen.find(o => o && o.name === naam);
+        const c = (p && p.color) || '#6b1e2a';
+        const letter = naam.trim().charAt(0).toUpperCase();
+        return `<span style="display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .6rem .25rem .3rem; background:var(--surface); border:1px solid var(--border,#e5e0d6); border-radius:20px; font-size:.85rem;">
+          <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:${esc(c)}; color:#fff; font-size:.7rem; font-weight:700;">${esc(letter)}</span>
+          <span>${esc(naam)}</span>
+        </span>`;
+      }).join('');
+      nieuw = document.createElement('div');
+      nieuw.id = 'ex-pers-gekozen';
+      nieuw.style.cssText = 'display:flex; flex-wrap:wrap; gap:.4rem; margin:.35rem 0 .5rem;';
+      nieuw.innerHTML = chips;
+    } else {
+      nieuw = document.createElement('p');
+      nieuw.id = 'ex-pers-leeg';
+      nieuw.className = 'muted small';
+      nieuw.style.cssText = 'margin:.25rem 0 .5rem;';
+      nieuw.textContent = 'Nog niemand geselecteerd.';
+    }
+    oud.replaceWith(nieuw);
+  }
   if (exPersToggle && exPersLijst) {
     exPersToggle.addEventListener('click', () => {
       const open = !exPersLijst.hidden;
       exPersLijst.hidden = open;
       exPersToggle.setAttribute('aria-expanded', String(!open));
       exPersToggle.textContent = open ? '+ Kies personeel' : '✓ Klaar';
+      if (open) updateExtraPersoneelSummary();
       if (!open) {
         const zk = document.getElementById('ex-pers-zoek');
         if (zk) setTimeout(() => { try { zk.focus(); } catch (_) {} }, 30);
       }
     });
   }
+  // Elke wijziging in checkboxes werkt de samenvatting direct bij — je
+  // ziet meteen wie er is aangevinkt, ook zonder eerst 'Klaar' te klikken.
+  document.querySelectorAll('#dossier-form .extra-personeel-cb').forEach(cb => {
+    cb.addEventListener('change', updateExtraPersoneelSummary);
+  });
   const exPersZoek = document.getElementById('ex-pers-zoek');
   if (exPersZoek) {
     exPersZoek.addEventListener('input', () => {
