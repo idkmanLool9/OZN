@@ -209,6 +209,34 @@ function kistSVG(materiaal) {
 // "ontbrekende gegevens"-waarschuwing bij opslaan.
 const AANBEVOLEN_VELDEN = [];
 
+// Belangrijke velden die WEL moeten worden ingevuld voor een compleet dossier
+// — wordt gebruikt om een ⚠-badge te tonen op de lijst en detail-pagina als
+// een dossier al 'in behandeling' is maar er nog gaten zitten in de basis.
+const DOSSIER_BELANGRIJKE_VELDEN = [
+  { veld: 'opdrachtgever_naam',  label: 'opdrachtgever' },
+  { veld: 'voornaam',            label: 'voornaam' },
+  { veld: 'achternaam',          label: 'achternaam' },
+  { veld: 'geboortedatum',       label: 'geboortedatum' },
+  { veld: 'overlijdensdatum',    label: 'overlijdensdatum' },
+  { veld: 'opbaring_type',       label: 'ophalen/thuis-keuze' },
+  { veld: 'kist_type',           label: 'kist' },
+  { veld: 'rouwauto',            label: 'rouwauto', test: v => v && v !== 'nee' },
+];
+function dossierMissendeBelangrijkeVelden(d) {
+  if (!d) return [];
+  // Voltooid of geannuleerd → geen waarschuwing meer
+  if (['voltooid', 'geannuleerd'].includes(d.status)) return [];
+  const missend = [];
+  DOSSIER_BELANGRIJKE_VELDEN.forEach(({ veld, label, test }) => {
+    const v = d[veld];
+    const ok = test
+      ? test(v)
+      : (v != null && String(v).trim() !== '');
+    if (!ok) missend.push(label);
+  });
+  return missend;
+}
+
 const DOSSIER_VELDEN = [
   'dossier_nummer',
   'opdrachtgever_naam',

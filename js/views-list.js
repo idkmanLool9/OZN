@@ -137,15 +137,21 @@ function renderDossierList(params, path) {
                 <th>Dossier</th><th>Overledene</th><th>Opdrachtgever</th><th>Overlijden</th><th>Status</th><th>Laatst gewijzigd</th><th aria-hidden="true"></th>
               </tr></thead>
               <tbody>
-                ${dossiers.map(d => `<tr data-id="${d.id}">
+                ${dossiers.map(d => {
+                  const missend = dossierMissendeBelangrijkeVelden(d);
+                  const warn = missend.length
+                    ? `<span class="dossier-warn-badge" title="Nog niet ingevuld: ${esc(missend.join(', '))}">⚠ ${missend.length}</span>`
+                    : '';
+                  return `<tr data-id="${d.id}" class="${missend.length ? 'is-incompleet' : ''}">
                   <td><a href="#/dossiers/${d.id}" class="dossier-link">${esc(d.dossier_nummer)}</a></td>
-                  <td><strong>${esc(fullName(d) || '—')}</strong></td>
+                  <td><strong>${esc(fullName(d) || '—')}</strong> ${warn}</td>
                   <td>${esc(d.opdrachtgever_naam || '—')}</td>
                   <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
                   <td>${dossierStatusBadge(d.status)}</td>
                   <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? '<br>- ' + esc(d.bijgewerkt_door) : ''}</span></td>
                   <td class="dossiers-chevron" aria-hidden="true">›</td>
-                </tr>`).join('')}
+                </tr>`;
+                }).join('')}
               </tbody>
             </table>
           </div>`}
@@ -193,6 +199,14 @@ function renderAccount(msg) {
       </div>`;
     const bo = document.getElementById('btn-medewerker-logout');
     if (bo) bo.addEventListener('click', async () => {
+      const ok = await Modal.confirm({
+        type: 'warning',
+        title: 'Uitloggen?',
+        message: 'Weet je zeker dat je wilt uitloggen?',
+        confirmText: 'Uitloggen',
+        cancelText: 'Annuleren',
+      });
+      if (!ok) return;
       try { await Auth.logout(); } catch (_) {}
       Router.go('/');
     });

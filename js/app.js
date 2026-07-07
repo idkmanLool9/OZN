@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 214;
-const APP_VERSION    = '5.75.3';
+const APP_BUILD      = 215;
+const APP_VERSION    = '5.76.0';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1021,6 +1021,14 @@ Router.add('/account', () => renderAccount());
   });
 
   const doLogout = async () => {
+    const ok = await Modal.confirm({
+      type: 'warning',
+      title: 'Uitloggen?',
+      message: 'Weet je zeker dat je wilt uitloggen? Niet-opgeslagen wijzigingen kunnen verloren gaan.',
+      confirmText: 'Uitloggen',
+      cancelText: 'Annuleren',
+    });
+    if (!ok) return;
     await Auth.logout();
     cleanSessionStorage();
     location.hash = '';
@@ -1059,6 +1067,11 @@ Router.add('/account', () => renderAccount());
     const id = btn.getAttribute('data-profile');
     ActiveProfile.set(id);
     Router.handle();
+    // Bevestiging in beeld: 'Ingelogd als: <naam>' na profielkeuze
+    try {
+      const p = ActiveProfile.current();
+      if (p && p.name) setTimeout(() => Toast.show('Ingelogd als: ' + p.name, 'success'), 60);
+    } catch (_) {}
   });
   const btnProfLogout = document.getElementById('profile-logout');
   if (btnProfLogout) btnProfLogout.addEventListener('click', async () => {

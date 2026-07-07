@@ -1693,6 +1693,17 @@ function renderDossierForm(params) {
   // Conceptkan alleen expliciet worden verwijderd via de 'Concept
   // verwerpen'-link in de gele banner bovenaan.
 
+  // Enter in een input mag NIET het hele formulier submitten (gebeurde per
+  // ongeluk in de intake) — sluit gewoon het toetsenbord. Textareas laten
+  // we ongemoeid, dan werkt Enter daar nog gewoon voor nieuwe regels.
+  $('#dossier-form').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const tag = (e.target.tagName || '').toUpperCase();
+    if (tag === 'TEXTAREA' || tag === 'BUTTON') return;
+    e.preventDefault();
+    try { e.target.blur && e.target.blur(); } catch (_) {}
+  });
+
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
     const data = {};

@@ -56,6 +56,16 @@ function renderDossierDetail(params) {
         <a href="#/dossiers/${d.id}#notities">Notities (${notities.length})</a>
       </nav>
 
+      ${(() => {
+        const missend = dossierMissendeBelangrijkeVelden(d);
+        if (!missend.length) return '';
+        const dagen = d.created_at ? Math.floor((Date.now() - new Date(d.created_at).getTime()) / 86400000) : 0;
+        return `<div class="alert alert-warn dossier-missend-banner">
+          <strong>⚠ Nog niet ingevuld:</strong> ${missend.map(esc).join(', ')}.
+          ${dagen >= 2 ? `<span class="muted small">Dossier is ${dagen} dagen oud — vul aan waar mogelijk.</span>` : ''}
+        </div>`;
+      })()}
+
       <section id="overzicht" class="card">
         <div class="print-header">
           <div><h2 style="border:none;padding:0;background:none;">Dossier</h2><p style="margin:0;">${esc([Settings.get('app_name') || 'OZN', Settings.get('app_tagline')].filter(Boolean).join(' · '))}</p></div>

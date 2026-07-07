@@ -2852,6 +2852,18 @@ fieldset[data-step][hidden] { display: none !important; }
 .kosten-beheer-table td, .kosten-beheer-table th { padding: .35rem .5rem; }
 .kosten-beheer-table tr.is-verborgen { opacity: .55; }
 .kosten-beheer-table tr.is-verborgen strong { text-decoration: line-through; }
+
+/* Waarschuwings-badge in de dossierlijst: missende belangrijke velden */
+.dossier-warn-badge {
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .1rem .45rem; margin-left: .35rem;
+  border-radius: 999px;
+  background: #f8d7a5; color: #7c4a04;
+  font-size: .72rem; font-weight: 700;
+  vertical-align: middle;
+}
+.dossiers-table tr.is-incompleet { background: rgba(248, 215, 165, .18); }
+.dossier-missend-banner { margin: .75rem 0; }
 /* Op smalle kaarten (kleiner scherm of dichte grid): knop op eigen regel */
 @media (max-width: 720px) {
   .kist-card-foot { flex-direction: column; align-items: stretch; }
