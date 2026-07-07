@@ -628,7 +628,27 @@ function renderAccount(msg) {
       ${Auth.isBeheerder() ? `
       <section class="card narrow" id="rollen">
         <h2>Medewerkers &amp; rollen</h2>
-        <p class="muted small">Beheerders zien alles. Medewerkers zien geen afgesloten dossiers en geen prijzen. Nieuwe accounts maak je aan in het Supabase-dashboard (Authentication → Users) — die worden automatisch <em>medewerker</em>.</p>
+        <p class="muted small">Beheerders zien alles. Medewerkers zien geen afgesloten dossiers en geen prijzen.</p>
+        <details style="margin-bottom:.75rem;">
+          <summary style="cursor:pointer; font-weight:600; color:var(--primary,#2563eb);">+ Nieuwe medewerker toevoegen</summary>
+          <form id="nieuwe-medewerker-form" class="form" autocomplete="off" style="margin-top:.5rem; display:flex; flex-direction:column; gap:.5rem;">
+            <label><span>Naam</span><input type="text" name="naam" required placeholder="bv. Rume"></label>
+            <label><span>E-mail</span><input type="email" name="email" required placeholder="rume@ozn.nl"></label>
+            <label><span>Tijdelijk wachtwoord <span class="muted small">(min. 8 tekens — deel per SMS/mondeling met de medewerker)</span></span>
+              <input type="text" name="password" required minlength="8" placeholder="min. 8 tekens">
+            </label>
+            <label><span>Rol</span>
+              <select name="rol">
+                <option value="medewerker" selected>Medewerker</option>
+                <option value="beheerder">Beheerder</option>
+              </select>
+            </label>
+            <div class="form-actions" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Account aanmaken</button>
+            </div>
+            <div id="nieuwe-medewerker-status" class="muted small"></div>
+          </form>
+        </details>
         ${(() => {
           const lijst = DB.list(KEYS.PROFIELEN) || [];
           const mij = (Auth.current() || {}).id;
@@ -1391,6 +1411,37 @@ function renderAccount(msg) {
         renderAccount({ success: 'Rollen opgeslagen.' });
       } catch (err) {
         Modal.show({ type: 'error', title: 'Opslaan mislukt', message: err.message || String(err) });
+      }
+    });
+  }
+
+  // Nieuw medewerker-account aanmaken via Edge Function 'nieuwe-medewerker'
+  const nwForm = $('#nieuwe-medewerker-form');
+  if (nwForm) {
+    nwForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const statusEl = $('#nieuwe-medewerker-status');
+      const btn = f.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'Bezig…';
+      if (statusEl) statusEl.textContent = '';
+      try {
+        const { data, error } = await sb.functions.invoke('nieuwe-medewerker', {
+          body: {
+            naam:     f.naam.value.trim(),
+            email:    f.email.value.trim(),
+            password: f.password.value,
+            rol:      f.rol.value,
+          },
+        });
+        if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
+        // Ververs de profiles-cache zodat de nieuwe medewerker meteen zichtbaar is
+        await Cloud.loadAll();
+        renderAccount({ success: `Account aangemaakt voor ${f.email.value.trim()}. Deel het wachtwoord met de medewerker — ze kunnen direct inloggen.` });
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Account aanmaken';
+        if (statusEl) { statusEl.textContent = '⚠ ' + (err.message || String(err)); statusEl.style.color = '#c0392b'; }
       }
     });
   }
