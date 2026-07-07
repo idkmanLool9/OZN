@@ -431,12 +431,12 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 /* Profielkeuze — "Wie werkt er vandaag?" */
 .profile-screen {
   position: fixed; inset: 0; z-index: 90;
-  display: flex; align-items: center; justify-content: center;
+  display: block;
   background:
     radial-gradient(at 20% 30%, rgba(107, 30, 42, .35) 0%, transparent 45%),
     radial-gradient(at 80% 70%, rgba(42, 93, 107, .30) 0%, transparent 50%),
     linear-gradient(135deg, #1c2541, #0b132b);
-  padding: 1.5rem; overflow: auto;
+  padding: 0; overflow: auto;
 }
 body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 
@@ -457,18 +457,25 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 
 .profile-card {
   position: relative; z-index: 2;
-  width: 100%; max-width: 960px;
-  max-height: calc(100vh - 3rem);
-  overflow-y: auto;
+  width: 100%; max-width: none;
+  min-height: 100vh;
   background: var(--surface);
-  border-radius: 28px;
-  padding: 2.5rem 2.25rem 1.75rem;
-  box-shadow: 0 30px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.04);
+  border-radius: 0;
+  padding: max(2rem, env(safe-area-inset-top)) 2rem max(1.5rem, env(safe-area-inset-bottom));
+  box-shadow: none;
   text-align: center;
+  display: flex; flex-direction: column;
 }
 @media (max-width: 720px) {
-  .profile-card { padding: 1.5rem 1rem 1.25rem; border-radius: 20px; }
+  .profile-card { padding: max(1.25rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom)); }
 }
+/* Container die de tegels centreert op grote schermen */
+.profile-card > .profile-options,
+.profile-card > .profile-search-wrap,
+.profile-card > .profile-foot {
+  width: 100%; max-width: 1200px; margin-left: auto; margin-right: auto;
+}
+.profile-card > .profile-options { flex: 1 1 auto; align-content: start; }
 
 /* Zoekbalk boven de tegels */
 .profile-search-wrap { margin: 0 0 1.25rem; }

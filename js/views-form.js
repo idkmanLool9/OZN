@@ -212,7 +212,7 @@ function renderDossierForm(params) {
         </nav>
 
         <fieldset class="card" data-step="1">
-          <legend>Opdrachtgever <span class="muted small">(uitvaartleider / klant)</span></legend>
+          <legend>Opdrachtgever</legend>
           <label style="display:block;">
             ${(() => {
               const lijst = Settings.get('opdrachtgevers') || [];
@@ -233,7 +233,7 @@ function renderDossierForm(params) {
             <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
               <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
             </label>
-            <label class="span-2"><span>Uitvaartleider(s) <span class="muted small">(aanvinken — uit ingestelde profielen)</span></span>
+            <div class="span-2"><span>Extra personeel</span>
               ${(() => {
                 // Bron = de profielen zoals ingesteld in Account → Profielen.
                 // Actieve profiel filteren we eruit (dat ben jij zelf).
@@ -245,20 +245,42 @@ function renderDossierForm(params) {
                   .filter(p => !actief || p.id !== actief.id);
                 const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
                 if (!opties.length) return '<span class="muted small">Nog geen profielen — voeg toe in <a href="#/account#profielen">Account</a>.</span>';
-                return `<div style="display:flex; flex-wrap:wrap; gap:.5rem;">
-                  ${opties.map(p => {
-                    const letter = (p.name || '?').trim().charAt(0).toUpperCase();
-                    const c = p.color || '#6b1e2a';
-                    return `
-                    <label class="extra-personeel-chip" style="display:flex; flex-direction:row; align-items:center; gap:.5rem; margin:0; padding:.35rem .75rem .35rem .35rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
-                      <input type="checkbox" class="extra-personeel-cb" value="${esc(p.name)}" ${gekozen.includes(p.name) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);">
-                      <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:${esc(c)}; color:#fff; font-size:.75rem; font-weight:700;">${esc(letter)}</span>
-                      <span>${esc(p.name)}</span>
-                    </label>`;
-                  }).join('')}
-                </div>`;
+                // Gekozen namen worden altijd getoond als kleine chip-samenvatting.
+                // De volledige lijst zit verstopt achter "+ Kies personeel"; klap
+                // open bij klik, klap dicht bij nog een klik.
+                const geselecteerdSummary = gekozen.length
+                  ? `<div id="ex-pers-gekozen" style="display:flex; flex-wrap:wrap; gap:.4rem; margin:.35rem 0 .5rem;">
+                      ${gekozen.map(naam => {
+                        const p = opties.find(o => o.name === naam);
+                        const c = p && p.color || '#6b1e2a';
+                        const letter = naam.trim().charAt(0).toUpperCase();
+                        return `<span style="display:inline-flex; align-items:center; gap:.4rem; padding:.25rem .6rem .25rem .3rem; background:var(--surface); border:1px solid var(--border,#e5e0d6); border-radius:20px; font-size:.85rem;">
+                          <span style="display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:${esc(c)}; color:#fff; font-size:.7rem; font-weight:700;">${esc(letter)}</span>
+                          <span>${esc(naam)}</span>
+                        </span>`;
+                      }).join('')}
+                    </div>`
+                  : '<p class="muted small" id="ex-pers-leeg" style="margin:.25rem 0 .5rem;">Nog niemand geselecteerd.</p>';
+                return `
+                  ${geselecteerdSummary}
+                  <button type="button" class="btn btn-sm" id="ex-pers-toggle" aria-expanded="false" aria-controls="ex-pers-lijst">+ Kies personeel</button>
+                  <div id="ex-pers-lijst" hidden style="margin-top:.6rem; padding:.75rem; border:1px solid var(--border,#e5e0d6); border-radius:12px; background:var(--card-bg,#fff);">
+                    <input type="search" id="ex-pers-zoek" placeholder="🔎 Zoek een naam…" autocomplete="off" style="width:100%; max-width:320px; padding:.45rem .8rem; border:1px solid var(--border,#e5e0d6); border-radius:999px; margin-bottom:.6rem;">
+                    <div id="ex-pers-opties" style="display:flex; flex-wrap:wrap; gap:.5rem;">
+                      ${opties.map(p => {
+                        const letter = (p.name || '?').trim().charAt(0).toUpperCase();
+                        const c = p.color || '#6b1e2a';
+                        return `
+                        <label class="extra-personeel-chip" data-naam="${esc((p.name || '').toLowerCase())}" style="display:flex; flex-direction:row; align-items:center; gap:.5rem; margin:0; padding:.35rem .75rem .35rem .35rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
+                          <input type="checkbox" class="extra-personeel-cb" value="${esc(p.name)}" ${gekozen.includes(p.name) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);">
+                          <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:${esc(c)}; color:#fff; font-size:.75rem; font-weight:700;">${esc(letter)}</span>
+                          <span>${esc(p.name)}</span>
+                        </label>`;
+                      }).join('')}
+                    </div>
+                  </div>`;
               })()}
-            </label>
+            </div>
           </div>
         </fieldset>
 
@@ -1493,6 +1515,32 @@ function renderDossierForm(params) {
     const status = $(`[data-status="${id}"]`);
     if (status) { status.textContent = 'nog niet ondertekend'; status.classList.remove('signed'); }
   });
+
+  // ─── Extra personeel: klap-open + zoekfilter ────────────────────────
+  const exPersToggle = document.getElementById('ex-pers-toggle');
+  const exPersLijst  = document.getElementById('ex-pers-lijst');
+  if (exPersToggle && exPersLijst) {
+    exPersToggle.addEventListener('click', () => {
+      const open = !exPersLijst.hidden;
+      exPersLijst.hidden = open;
+      exPersToggle.setAttribute('aria-expanded', String(!open));
+      exPersToggle.textContent = open ? '+ Kies personeel' : '✓ Klaar';
+      if (!open) {
+        const zk = document.getElementById('ex-pers-zoek');
+        if (zk) setTimeout(() => { try { zk.focus(); } catch (_) {} }, 30);
+      }
+    });
+  }
+  const exPersZoek = document.getElementById('ex-pers-zoek');
+  if (exPersZoek) {
+    exPersZoek.addEventListener('input', () => {
+      const q = exPersZoek.value.trim().toLowerCase();
+      document.querySelectorAll('#ex-pers-opties .extra-personeel-chip').forEach(el => {
+        const naam = el.dataset.naam || '';
+        el.style.display = (!q || naam.includes(q)) ? '' : 'none';
+      });
+    });
+  }
 
   // ─── Adres-autocomplete via PDOK Locatieserver ───────────────────────
   // Typ "Straatnaam 12" → kies uit dropdown → alle velden auto-ingevuld.
