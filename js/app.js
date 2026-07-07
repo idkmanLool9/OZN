@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 200;
-const APP_VERSION    = '5.68.1';
+const APP_BUILD      = 201;
+const APP_VERSION    = '5.69.0';
 const APP_BUILD_DATE = '2026-07-06';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -86,14 +86,13 @@ const Settings = {
     // Push-notificaties (zie PushNotificaties + docs/push-setup.md)
     push_vapid_public_key: 'BFrHC8o3zxJ4e1qirE93vUm5wPZpEdqWIV9OwczE-Omgf3QkoM_hKFI1ZFK2Lon4f7bvwVNKQVUfOZxkFQ6nUmg',
     push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
-    // Profielkiezer ("Wie werkt vandaag?") na login tonen. Uit = meteen door
-    // naar de app zonder profielkeuze.
-    profielkiezer_actief: false,
-    // Profielen — Wie werkt vandaag? Beheer in Account
-    profielen: [
-      { id: 'rume',   name: 'Rume',   color: '#6b1e2a' },
-      { id: 'robert', name: 'Robert', color: '#2a5d6b' },
-    ],
+    // Profielkiezer ("Wie werkt vandaag?") wordt bij ELKE app-start getoond
+    // (zolang er profielen zijn geconfigureerd). Zo houdt de app bij wie
+    // wat heeft gedaan zonder dat iedereen een eigen account nodig heeft.
+    profielkiezer_actief: true,
+    // Profielen — Wie werkt vandaag? Beheer in Account → Profielen.
+    // Leeg default: OZN vult zelf het team in.
+    profielen: [],
     // Automatisch dossier mailen naar klooster bij opslaan (leeg = uit)
     auto_send_dossier_email: '',
     // E-mail-footer (handtekening onderaan elke verzonden mail)
@@ -936,6 +935,9 @@ Router.add('/account', () => renderAccount());
       await Settings.loadFromCloud();
       Branding.apply();
     } catch (e) { console.warn('Settings laden faalde:', e.message || e); }
+    // Bij elke app-start opnieuw laten kiezen wie er vandaag werkt —
+    // profiel-keuze wordt niet meer over sessies heen bewaard.
+    try { ActiveProfile.clear(); } catch (_) {}
   }
   updateOfflineUI();
   autoArchiveer();   // afgehandelde dossiers naar archief (indien ingeschakeld)
