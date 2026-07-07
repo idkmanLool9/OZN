@@ -233,21 +233,29 @@ function renderDossierForm(params) {
             <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
               <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
             </label>
-            <label class="span-2"><span>Uitvaartleider(s) <span class="muted small">(aanvinken uit accounts)</span></span>
+            <label class="span-2"><span>Uitvaartleider(s) <span class="muted small">(aanvinken — uit ingestelde profielen)</span></span>
               ${(() => {
-                const meId = (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().id : null;
-                const personeel = (DB.list(KEYS.PERSONEEL) || []);
-                const bron = personeel.length ? personeel : (DB.list(KEYS.PROFIELEN) || []);
-                const accounts = [...new Set(bron
-                  .filter(p => !meId || p.id !== meId)
-                  .map(p => (p.naam || '').trim()).filter(Boolean))].sort();
+                // Bron = de profielen zoals ingesteld in Account → Profielen.
+                // Actieve profiel filteren we eruit (dat ben jij zelf).
+                const actief = (typeof ActiveProfile !== 'undefined') ? ActiveProfile.current() : null;
+                const profielen = (typeof Settings !== 'undefined' && Array.isArray(Settings.get('profielen')))
+                  ? Settings.get('profielen') : [];
+                const opties = profielen
+                  .filter(p => p && p.name)
+                  .filter(p => !actief || p.id !== actief.id);
                 const gekozen = Array.isArray(dossier.extra_personeel) ? dossier.extra_personeel : [];
-                if (!accounts.length) return '<span class="muted small">Nog geen accounts — voeg toe in <a href="#/account#rollen">Account</a>.</span>';
+                if (!opties.length) return '<span class="muted small">Nog geen profielen — voeg toe in <a href="#/account#profielen">Account</a>.</span>';
                 return `<div style="display:flex; flex-wrap:wrap; gap:.5rem;">
-                  ${accounts.map(naam => `
-                    <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
-                      <input type="checkbox" class="extra-personeel-cb" value="${esc(naam)}" ${gekozen.includes(naam) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(naam)}</span>
-                    </label>`).join('')}
+                  ${opties.map(p => {
+                    const letter = (p.name || '?').trim().charAt(0).toUpperCase();
+                    const c = p.color || '#6b1e2a';
+                    return `
+                    <label class="extra-personeel-chip" style="display:flex; flex-direction:row; align-items:center; gap:.5rem; margin:0; padding:.35rem .75rem .35rem .35rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
+                      <input type="checkbox" class="extra-personeel-cb" value="${esc(p.name)}" ${gekozen.includes(p.name) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);">
+                      <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:${esc(c)}; color:#fff; font-size:.75rem; font-weight:700;">${esc(letter)}</span>
+                      <span>${esc(p.name)}</span>
+                    </label>`;
+                  }).join('')}
                 </div>`;
               })()}
             </label>

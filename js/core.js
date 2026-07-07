@@ -1292,7 +1292,7 @@ function showProfilePicker() {
         const letter = (p.name || '?').trim().charAt(0).toUpperCase();
         const c = p.color || '#6b1e2a';
         return `
-          <button type="button" class="profile-option" data-profile="${esc(p.id)}">
+          <button type="button" class="profile-option" data-profile="${esc(p.id)}" data-name="${esc((p.name || '').toLowerCase())}">
             <span class="profile-avatar-wrap">
               <span class="profile-avatar-ring" style="--ring-color:${esc(c)};"></span>
               <span class="profile-avatar" style="background:${esc(c)};">${esc(letter)}</span>
@@ -1300,6 +1300,24 @@ function showProfilePicker() {
             <span class="profile-name">${esc(p.name)}</span>
           </button>`;
       }).join('');
+    }
+  }
+  // Zoekfilter — verbergt/toont knoppen live terwijl je typt.
+  const zoek = $('#profile-search');
+  if (zoek) {
+    zoek.value = '';
+    const filter = () => {
+      const q = zoek.value.trim().toLowerCase();
+      mount.querySelectorAll('.profile-option').forEach(btn => {
+        const naam = btn.dataset.name || '';
+        btn.style.display = (!q || naam.includes(q)) ? '' : 'none';
+      });
+    };
+    zoek.addEventListener('input', filter);
+    // Auto-focus alleen op grotere schermen (op tablets/desktops) zodat op
+    // een echte tablet direct kan worden getypt zonder toetsenbord-hop.
+    if (window.matchMedia && window.matchMedia('(min-width: 720px)').matches) {
+      setTimeout(() => { try { zoek.focus(); } catch (_) {} }, 50);
     }
   }
 }
