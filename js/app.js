@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 212;
-const APP_VERSION    = '5.75.1';
+const APP_BUILD      = 213;
+const APP_VERSION    = '5.75.2';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1060,7 +1060,8 @@ Router.add('/account', () => renderAccount());
     ActiveProfile.set(id);
     Router.handle();
   });
-  document.getElementById('profile-logout').addEventListener('click', async () => {
+  const btnProfLogout = document.getElementById('profile-logout');
+  if (btnProfLogout) btnProfLogout.addEventListener('click', async () => {
     await Auth.logout();
     cleanSessionStorage();
     location.hash = '';
