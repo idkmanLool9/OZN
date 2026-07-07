@@ -712,9 +712,11 @@ function renderAccount(msg) {
           const lijst = Settings.get('opdrachtgevers') || [];
           return `
           <form id="opdrachtgever-form" class="form" autocomplete="off">
+            <p class="muted small" style="margin:.25rem 0 .5rem;">Sleep aan de <strong>≡</strong>-greep om de volgorde te veranderen. Klik Opslaan om te bewaren.</p>
             <div id="opdrachtgever-rows" class="parochie-rows">
               ${lijst.map((o, i) => `
-                <div class="parochie-row" data-idx="${i}">
+                <div class="parochie-row opdr-drag-row" draggable="true" data-idx="${i}">
+                  <span class="drag-grip" title="Sleep om te verplaatsen">≡</span>
                   <input type="text" class="opdrachtgever-naam" value="${esc(o.naam || o || '')}" placeholder="bv. Uitvaartzorg Jansen">
                   <button type="button" class="btn-icon" data-action="del-opdrachtgever" title="verwijderen">×</button>
                 </div>`).join('')}
@@ -1517,19 +1519,49 @@ function renderAccount(msg) {
     });
   }
 
-  // Opdrachtgevers beheer
+  // Opdrachtgevers beheer (met drag-and-drop volgorde)
   const opdrForm = $('#opdrachtgever-form');
   if (opdrForm) {
     $('#btn-add-opdrachtgever').addEventListener('click', () => {
       const rows = $('#opdrachtgever-rows');
       const div = document.createElement('div');
-      div.className = 'parochie-row';
+      div.className = 'parochie-row opdr-drag-row';
+      div.draggable = true;
       div.innerHTML = `
+        <span class="drag-grip" title="Sleep om te verplaatsen">≡</span>
         <input type="text" class="opdrachtgever-naam" value="" placeholder="bv. Uitvaartzorg Jansen">
         <button type="button" class="btn-icon" data-action="del-opdrachtgever" title="verwijderen">×</button>`;
       rows.appendChild(div);
       div.querySelector('.opdrachtgever-naam').focus();
     });
+
+    // Drag-and-drop: sleep rijen om ze te herordenen
+    const rowsEl = $('#opdrachtgever-rows');
+    if (rowsEl) {
+      let dragEl = null;
+      rowsEl.addEventListener('dragstart', (e) => {
+        const row = e.target.closest('.opdr-drag-row');
+        if (!row) return;
+        dragEl = row;
+        row.classList.add('is-dragging');
+        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (_) {}
+      });
+      rowsEl.addEventListener('dragend', () => {
+        if (dragEl) dragEl.classList.remove('is-dragging');
+        dragEl = null;
+      });
+      rowsEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const na = [...rowsEl.querySelectorAll('.opdr-drag-row:not(.is-dragging)')];
+        const boven = na.find(r => {
+          const box = r.getBoundingClientRect();
+          return e.clientY < box.top + box.height / 2;
+        });
+        if (!dragEl) return;
+        if (boven) rowsEl.insertBefore(dragEl, boven);
+        else rowsEl.appendChild(dragEl);
+      });
+    }
     opdrForm.addEventListener('click', e => {
       const del = e.target.closest('button[data-action="del-opdrachtgever"]');
       if (!del) return;

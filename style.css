@@ -3076,3 +3076,31 @@ html { background: var(--bg); }
   background: #fff; border: 1px solid #d5e2fb; font-size: .78rem; color: #244a8a;
 }
 .vandaag-planning { margin-top: .5rem; padding-top: .5rem; border-top: 1px dashed #d5e2fb; display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+
+/* Opbaring-checkbox chips (Ophalen / Thuis / Bed / Kist) */
+.opbaar-chip {
+  display: inline-flex; flex-direction: row; align-items: center; gap: .5rem;
+  padding: .5rem .85rem; margin: 0;
+  border: 1px solid var(--border, #e5e0d6); border-radius: 22px;
+  cursor: pointer; font-weight: 500; background: var(--surface, #fff);
+}
+.opbaar-chip:has(input:checked) {
+  background: var(--primary-soft, #eef4ff);
+  border-color: var(--primary, #2563eb);
+  color: var(--primary, #2563eb);
+}
+
+/* Verzorging-blok structuur */
+.verzorging-blok { display: flex; flex-direction: column; gap: 1rem; }
+.verzorging-item { padding: .5rem .75rem; border: 1px solid var(--border, #e5e0d6); border-radius: 10px; background: #f8f6f2; }
+.verzorging-vinkjes { padding: .5rem 0; }
+
+/* Drag-grip voor opdrachtgevers (sleepbaar) */
+.drag-grip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; margin-right: .35rem;
+  font-size: 1.1rem; color: #999; cursor: grab; user-select: none;
+  flex-shrink: 0;
+}
+.opdr-drag-row.is-dragging { opacity: .35; }
+.opdr-drag-row { transition: transform .15s ease; }

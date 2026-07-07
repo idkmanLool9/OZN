@@ -67,13 +67,22 @@ function vindDubbelDossier(data, exclId) {
 function dossierDraftKey(isNew, id) {
   return `sok_draft_${isNew ? 'new' : id}`;
 }
+// Velden die in de DB als BOOLEAN staan — checkboxen daarvoor moeten als
+// true/false worden verzonden i.p.v. 'ja'/'nee' (anders gooit Postgres).
+const BOOL_VELDEN = new Set([
+  'opbaren_ophalen', 'opbaren_thuis',
+  'opbaring_bed', 'opbaring_kist',
+  'mond_gehecht', 'oogkapjes', 'buikpunctie',
+  'peacemaker_verwijderd', 'thanatopraxie',
+]);
 function snapshotDossierForm(formEl) {
   const data = {};
   DOSSIER_VELDEN.forEach(f => {
     const inp = formEl.elements[f];
     if (!inp) return;
-    if (inp.type === 'checkbox') data[f] = inp.checked ? 'ja' : 'nee';
-    else data[f] = inp.value;
+    if (inp.type === 'checkbox') {
+      data[f] = BOOL_VELDEN.has(f) ? inp.checked : (inp.checked ? 'ja' : 'nee');
+    } else data[f] = inp.value;
   });
   // Extra personeel (checkboxes zonder name, buiten DOSSIER_VELDEN) meenemen
   // zodat de keuze een autosave-restore overleeft bij een nieuw dossier.
@@ -205,7 +214,7 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="1">
           <legend>Opdrachtgever <span class="muted small">(uitvaartleider / klant)</span></legend>
-          <label>
+          <label style="display:block;">
             ${(() => {
               const lijst = Settings.get('opdrachtgevers') || [];
               const huidig = v('opdrachtgever_naam');
@@ -221,17 +230,12 @@ function renderDossierForm(params) {
               </select>`;
             })()}
           </label>
-        </fieldset>
-
-        <fieldset class="card" data-step="1">
-          <legend>Personeel</legend>
-          <div class="grid-3">
+          <div class="grid-3" style="margin-top:.75rem;">
             <label><span>Dossiernummer <span class="muted small">(handmatig, voor administratie)</span></span>
               <input type="text" name="dossier_nummer" value="${isNew ? '' : esc(dossier.dossier_nummer || '')}" placeholder="leeg = automatisch">
             </label>
-            <label class="span-2"><span>Extra personeel <span class="muted small">(aanvinken uit accounts)</span></span>
+            <label class="span-2"><span>Uitvaartleider(s) <span class="muted small">(aanvinken uit accounts)</span></span>
               ${(() => {
-                // Jezelf niet tonen: filter het eigen profiel (op auth-id) weg.
                 const meId = (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().id : null;
                 const personeel = (DB.list(KEYS.PERSONEEL) || []);
                 const bron = personeel.length ? personeel : (DB.list(KEYS.PROFIELEN) || []);
@@ -266,7 +270,6 @@ function renderDossierForm(params) {
             <label><span>Geboortedatum</span><input type="date" name="geboortedatum" value="${v('geboortedatum')}"></label>
             <label><span>Geboorteplaats</span><input type="text" name="geboorteplaats" value="${v('geboorteplaats')}"></label>
             <label><span>Overlijdensdatum</span><input type="date" name="overlijdensdatum" value="${v('overlijdensdatum')}"></label>
-            <label><span>Plaats van overlijden</span><input type="text" name="overlijdensplaats" value="${v('overlijdensplaats')}" placeholder="ziekenhuis, thuis..."></label>
             <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}"></label>
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
@@ -304,6 +307,9 @@ function renderDossierForm(params) {
               ['bezit_oorbellen', 'Oorbel(en)'],
               ['bezit_ringen',    'Ring(en)'],
               ['bezit_armbanden', 'Armband(en)'],
+              ['bezit_ketting',   'Ketting(en)'],
+              ['bezit_bril',      'Bril'],
+              ['bezit_horloge',   'Horloge'],
             ].map(([naam, label]) => {
               const aan = dossier[naam] === 'ja';
               const fotoPad = dossier[naam + '_foto'] || '';
@@ -346,84 +352,140 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="2">
           <legend>Opbaren &amp; locatie</legend>
-          <div class="grid-3">
-            <label><span>Ophalen of thuis opbaren?</span>
-              <select name="opbaring_type" id="opbaring-type-select">
-                <option value="">—</option>
-                <option value="ophalen" ${sel('opbaring_type','ophalen')}>Ophalen</option>
-                <option value="thuis" ${sel('opbaring_type','thuis')}>Thuis opbaren</option>
-              </select>
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset class="card" data-step="2" id="opbaring-detail-fieldset" ${dossier.opbaring_type ? '' : 'hidden'}>
-          <legend id="opbaring-detail-legend">${dossier.opbaring_type === 'thuis' ? 'Thuis opbaren' : (dossier.opbaring_type === 'ophalen' ? 'Ophalen' : '')}</legend>
-
-          <!-- ── OPHALEN: meerdere locaties + eindbestemming ─────────────── -->
-          <div class="opbaring-ophalen" ${dossier.opbaring_type === 'ophalen' ? '' : 'hidden'}>
-            <label style="display:block;"><span>Brengen naar <span class="muted small">(één of meerdere locaties, bv. eerst ziekenhuis, daarna aula)</span></span>
-              <div id="brengen-naar-lijst" style="display:flex; flex-direction:column; gap:.4rem;">
-                ${(() => {
-                  const arr = Array.isArray(dossier.brengen_naar) && dossier.brengen_naar.length
-                    ? dossier.brengen_naar : [''];
-                  return arr.map((loc, i) => `
-                    <div class="brengen-naar-row" style="display:flex; gap:.5rem; align-items:center;">
-                      <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc || '')}" placeholder="" style="flex:1;">
-                      <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
-                    </div>`).join('');
-                })()}
-              </div>
-              <button type="button" class="btn btn-sm" id="brengen-naar-add" style="margin-top:.4rem;">+ Locatie toevoegen</button>
-            </label>
-          </div>
-
-          <!-- ── THUIS OPBAREN: datum/tijd + eindtijd + rouwgoederen ─────── -->
-          <div class="opbaring-thuis" ${dossier.opbaring_type === 'thuis' ? '' : 'hidden'}>
-            <div class="grid-3">
-              <label><span>Startdatum</span>
-                <input type="date" name="thuis_opbaren_datum" value="${v('thuis_opbaren_datum')}">
+          <div style="display:flex; flex-direction:column; gap:.5rem;">
+            <div class="muted small">Kies wat van toepassing is — mag ook allebei tegelijk (bv. eerst ophalen, daarna thuis opbaren).</div>
+            <div style="display:flex; flex-wrap:wrap; gap:.5rem;">
+              <label class="opbaar-chip">
+                <input type="checkbox" name="opbaren_ophalen" id="cb-ophalen" value="ja" ${dossier.opbaren_ophalen ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Ophalen / overbrengen</span>
               </label>
-              <label><span>Begintijd</span>
-                <input type="time" name="thuis_opbaren_tijd" value="${v('thuis_opbaren_tijd')}">
+              <label class="opbaar-chip">
+                <input type="checkbox" name="opbaren_thuis" id="cb-thuis" value="ja" ${dossier.opbaren_thuis ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Thuis opbaren</span>
               </label>
-              <label><span>Einddatum</span>
-                <input type="date" name="thuis_opbaren_einddatum" value="${v('thuis_opbaren_einddatum')}">
+              <label class="opbaar-chip">
+                <input type="checkbox" name="opbaring_bed" value="ja" ${dossier.opbaring_bed ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Bed-opbaring</span>
               </label>
-              <label><span>Eindtijd</span>
-                <input type="time" name="thuis_opbaren_eindtijd" value="${v('thuis_opbaren_eindtijd')}">
-              </label>
-              <label class="span-3"><span>Benodigde rouwgoederen</span>
-                <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.25rem;">
-                  ${(() => {
-                    const opties = Settings.get('rouwgoederen_opties') || [];
-                    const gekozen = Array.isArray(dossier.rouwgoederen_lijst) ? dossier.rouwgoederen_lijst : [];
-                    return opties.map(g => `
-                      <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
-                        <input type="checkbox" class="rouwgoed-cb" value="${esc(g)}" ${gekozen.includes(g) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(g)}</span>
-                      </label>`).join('');
-                  })()}
-                </div>
+              <label class="opbaar-chip">
+                <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
               </label>
             </div>
+            <label style="margin-top:.5rem;"><span>Overlijdenslocatie</span>
+              <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${esc(v('overlijdensplaats'))}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
+            </label>
           </div>
-
-          <!-- ── OPBAARLOCATIE (vrije invoer + adressenboekje-suggesties) ── -->
-          <label style="display:block; margin-top:.75rem;"><span>Opbaarlocatie</span>
-            <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${esc(v('opbaarlocatie_type'))}" autocomplete="off">
-          </label>
           <datalist id="locatie-suggesties">
             ${(() => {
-              // Suggesties uit alle eerder gebruikte opbaarlocaties + brengen-naar
-              // entries. Puur uit echte data — geen hardcoded voorbeelden.
               const s = new Set();
               DB.list(KEYS.DOSSIERS).forEach(d => {
                 if (d.opbaarlocatie_type) s.add(d.opbaarlocatie_type);
+                if (d.overlijdensplaats) s.add(d.overlijdensplaats);
                 if (Array.isArray(d.brengen_naar)) d.brengen_naar.forEach(x => x && s.add(x));
               });
               return [...s].sort().map(x => `<option value="${esc(x)}"></option>`).join('');
             })()}
           </datalist>
+        </fieldset>
+
+        <!-- ── OPHALEN / OVERBRENGEN ─────────────────────────────────────── -->
+        <fieldset class="card" data-step="2" id="ophalen-fieldset" ${dossier.opbaren_ophalen ? '' : 'hidden'}>
+          <legend>Ophalen / overbrengen</legend>
+          <label style="display:block;"><span>Overbrengingen <span class="muted small">(één of meerdere, bv. eerst ziekenhuis → aula)</span></span>
+            <div id="brengen-naar-lijst" style="display:flex; flex-direction:column; gap:.4rem;">
+              ${(() => {
+                const arr = Array.isArray(dossier.brengen_naar) && dossier.brengen_naar.length
+                  ? dossier.brengen_naar : [''];
+                return arr.map((loc) => `
+                  <div class="brengen-naar-row" style="display:flex; gap:.5rem; align-items:center;">
+                    <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc || '')}" placeholder="" style="flex:1;">
+                    <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
+                  </div>`).join('');
+              })()}
+            </div>
+            <button type="button" class="btn btn-sm" id="brengen-naar-add" style="margin-top:.4rem;">+ Extra overbrenging</button>
+          </label>
+        </fieldset>
+
+        <!-- ── THUIS OPBAREN ─────────────────────────────────────────────── -->
+        <fieldset class="card" data-step="2" id="thuis-fieldset" ${dossier.opbaren_thuis ? '' : 'hidden'}>
+          <legend>Thuis opbaren</legend>
+          <div class="grid-3">
+            <label><span>Startdatum</span>
+              <input type="date" name="thuis_opbaren_datum" value="${v('thuis_opbaren_datum')}">
+            </label>
+            <label><span>Begintijd</span>
+              <input type="time" name="thuis_opbaren_tijd" value="${v('thuis_opbaren_tijd')}">
+            </label>
+            <label><span>Einddatum</span>
+              <input type="date" name="thuis_opbaren_einddatum" value="${v('thuis_opbaren_einddatum')}">
+            </label>
+            <label><span>Eindtijd</span>
+              <input type="time" name="thuis_opbaren_eindtijd" value="${v('thuis_opbaren_eindtijd')}">
+            </label>
+            <label class="span-2"><span>Opbaarlocatie</span>
+              <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${esc(v('opbaarlocatie_type'))}" autocomplete="off">
+            </label>
+            <label class="span-3"><span>Benodigde rouwgoederen</span>
+              <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.25rem;">
+                ${(() => {
+                  const opties = Settings.get('rouwgoederen_opties') || [];
+                  const gekozen = Array.isArray(dossier.rouwgoederen_lijst) ? dossier.rouwgoederen_lijst : [];
+                  return opties.map(g => `
+                    <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
+                      <input type="checkbox" class="rouwgoed-cb" value="${esc(g)}" ${gekozen.includes(g) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(g)}</span>
+                    </label>`).join('');
+                })()}
+              </div>
+            </label>
+          </div>
+        </fieldset>
+
+        <!-- ── VERZORGING ────────────────────────────────────────────────── -->
+        <fieldset class="card" data-step="2">
+          <legend>Verzorging</legend>
+          <div class="verzorging-blok">
+            <div class="verzorging-item">
+              <strong>Verzorgd / Gekleed</strong>
+              <div class="grid-3" style="margin-top:.35rem;">
+                <label><span>Datum</span><input type="date" name="verzorgd_gekleed_datum" value="${v('verzorgd_gekleed_datum')}"></label>
+                <label><span>Waar</span><input type="text" name="verzorgd_gekleed_waar" list="locatie-suggesties" value="${esc(v('verzorgd_gekleed_waar'))}"></label>
+                <label><span>Met/zonder familie</span>
+                  <select name="verzorgd_gekleed_familie">
+                    <option value="">—</option>
+                    <option value="met" ${sel('verzorgd_gekleed_familie','met')}>Met familie</option>
+                    <option value="zonder" ${sel('verzorgd_gekleed_familie','zonder')}>Zonder familie</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="verzorging-item">
+              <strong>Gekist</strong>
+              <div class="grid-3" style="margin-top:.35rem;">
+                <label><span>Datum</span><input type="date" name="gekist_datum" value="${v('gekist_datum')}"></label>
+                <label class="span-2"><span>Waar</span><input type="text" name="gekist_waar" list="locatie-suggesties" value="${esc(v('gekist_waar'))}"></label>
+              </div>
+            </div>
+
+            <div class="verzorging-vinkjes" style="display:flex; flex-wrap:wrap; gap:.5rem;">
+              <label class="opbaar-chip"><input type="checkbox" name="mond_gehecht" value="ja" ${dossier.mond_gehecht ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Mond gehecht</span></label>
+              <label class="opbaar-chip"><input type="checkbox" name="oogkapjes" value="ja" ${dossier.oogkapjes ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Oogkapjes</span></label>
+              <label class="opbaar-chip"><input type="checkbox" name="buikpunctie" value="ja" ${dossier.buikpunctie ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Buikpunctie</span></label>
+            </div>
+
+            <div class="verzorging-item">
+              <label class="opbaar-chip" style="width:auto;"><input type="checkbox" name="peacemaker_verwijderd" id="cb-peace" value="ja" ${dossier.peacemaker_verwijderd ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <strong>Peacemaker verwijderd</strong></label>
+              <div id="peace-datum-wrap" style="margin-top:.35rem; max-width:280px; ${dossier.peacemaker_verwijderd ? '' : 'display:none;'}">
+                <label><span>Datum</span><input type="date" name="peacemaker_verwijderd_datum" value="${v('peacemaker_verwijderd_datum')}"></label>
+              </div>
+            </div>
+
+            <div class="verzorging-item">
+              <label class="opbaar-chip" style="width:auto;"><input type="checkbox" name="thanatopraxie" id="cb-thana" value="ja" ${dossier.thanatopraxie ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <strong>Thanatopraxie</strong></label>
+              <div id="thana-wrap" class="grid-3" style="margin-top:.35rem; ${dossier.thanatopraxie ? '' : 'display:none;'}">
+                <label><span>Datum</span><input type="date" name="thanatopraxie_datum" value="${v('thanatopraxie_datum')}"></label>
+                <label class="span-2"><span>Waar</span><input type="text" name="thanatopraxie_waar" list="locatie-suggesties" value="${esc(v('thanatopraxie_waar'))}"></label>
+              </div>
+            </div>
+          </div>
         </fieldset>
 
         <fieldset class="card" data-step="2">
@@ -520,7 +582,7 @@ function renderDossierForm(params) {
   const STEP_FIELDS = {
     1: ['opdrachtgever_naam','achternaam','voornaam','geboortedatum','overlijdensdatum',
         'adres_overledene','postcode_overledene','woonplaats_overledene'],
-    2: ['opbaring_type'],
+    2: ['opbaren_ophalen', 'opbaren_thuis'],
     3: [], // kosten + kist via catalogus-pagina, geen verplichte velden
     4: [],  // bijzonderheden is volledig optioneel
   };
@@ -586,25 +648,33 @@ function renderDossierForm(params) {
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
 
-  // Ophalen / thuis opbaren → dynamisch blauw kopje met de gekozen optie,
-  // met de bijbehorende vervolgvragen (waar voorheen 'Uitvaart' stond).
+  // Ophalen + Thuis kunnen beide tegelijk aan. Elke checkbox toont zijn eigen
+  // fieldset. Verzorging staat er altijd.
   function updateOpbaring() {
-    const sel = document.getElementById('opbaring-type-select');
-    const fs = document.getElementById('opbaring-detail-fieldset');
-    const lg = document.getElementById('opbaring-detail-legend');
-    if (!sel || !fs) return;
-    const val = sel.value;
-    if (!val) { fs.hidden = true; return; }
-    fs.hidden = false;
-    if (lg) lg.textContent = val === 'thuis' ? 'Thuis opbaren' : 'Ophalen';
-    fs.querySelectorAll('.opbaring-ophalen').forEach(e => { e.hidden = (val !== 'ophalen'); });
-    fs.querySelectorAll('.opbaring-thuis').forEach(e => { e.hidden = (val !== 'thuis'); });
+    const cbOp = document.getElementById('cb-ophalen');
+    const cbTh = document.getElementById('cb-thuis');
+    const fsOp = document.getElementById('ophalen-fieldset');
+    const fsTh = document.getElementById('thuis-fieldset');
+    if (fsOp) fsOp.hidden = !(cbOp && cbOp.checked);
+    if (fsTh) fsTh.hidden = !(cbTh && cbTh.checked);
   }
-  const opbaringSel = document.getElementById('opbaring-type-select');
-  if (opbaringSel) {
-    opbaringSel.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
-  }
+  document.getElementById('cb-ophalen')?.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
+  document.getElementById('cb-thuis')?.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
   updateOpbaring();
+
+  // Verzorging: peacemaker + thanatopraxie klap-effecten
+  const cbPeace = document.getElementById('cb-peace');
+  const peaceWrap = document.getElementById('peace-datum-wrap');
+  if (cbPeace && peaceWrap) {
+    const upd = () => { peaceWrap.style.display = cbPeace.checked ? '' : 'none'; };
+    cbPeace.addEventListener('change', upd); upd();
+  }
+  const cbThana = document.getElementById('cb-thana');
+  const thanaWrap = document.getElementById('thana-wrap');
+  if (cbThana && thanaWrap) {
+    const upd = () => { thanaWrap.style.display = cbThana.checked ? '' : 'none'; };
+    cbThana.addEventListener('change', upd); upd();
+  }
 
   // ── Brengen naar (bij ophalen): + / − knoppen ─────────────────────────────
   (function initBrengenNaar() {
@@ -1526,8 +1596,14 @@ function renderDossierForm(params) {
     DOSSIER_VELDEN.forEach(f => {
       const inp = e.target.elements[f];
       if (!inp) return;
-      if (inp.type === 'checkbox') data[f] = inp.checked ? 'ja' : 'nee';
-      else data[f] = (inp.value || '').trim();
+      if (inp.type === 'checkbox') {
+        data[f] = BOOL_VELDEN.has(f) ? inp.checked : (inp.checked ? 'ja' : 'nee');
+      } else {
+        const val = (inp.value || '').trim();
+        // Lege datum-inputs mogen null zijn (postgres accepteert '' niet voor date)
+        if (inp.type === 'date' && !val) data[f] = null;
+        else data[f] = val;
+      }
     });
     if (!data.status) data.status = 'nieuw';
 
