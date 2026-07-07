@@ -177,12 +177,12 @@ function renderKistenBeheer(msg) {
           <strong class="kist-card-naam">${esc(k.naam)}</strong>
           <span class="muted small">${esc(k.materiaal)}</span>
           ${vStatus}
-          <div class="kist-card-foot">
-            <div class="kist-card-foot-meta">
+          <div class="kist-card-foot ${magPrijzen ? '' : 'kist-card-foot-nopr'}">
+            ${(magPrijzen || vChip) ? `<div class="kist-card-foot-meta">
               ${magPrijzen ? `<span class="kist-price">${fmtEUR(k.bedrag)}</span>` : ''}
               ${vChip}
-            </div>
-            ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
+            </div>` : ''}
+            ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn ${magPrijzen ? '' : 'kist-kies-btn-full'}" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
           ${adminMode ? `
             <div class="kist-card-actions">

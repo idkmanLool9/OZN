@@ -47,7 +47,9 @@ const KOSTEN_PRESETS = [
 // bewaard en kan een gebruiker eenvoudig terugzetten.
 function effectieveKostenPresets({ includeHidden = false } = {}) {
   const ov = (typeof Settings !== 'undefined' && Settings.get('kosten_overrides')) || {};
-  return KOSTEN_PRESETS
+  const extra = (typeof Settings !== 'undefined' && Array.isArray(Settings.get('kosten_extra')))
+    ? Settings.get('kosten_extra') : [];
+  const base = KOSTEN_PRESETS
     .filter(p => p.nav || includeHidden || !(ov[p.omschrijving] && ov[p.omschrijving].hidden))
     .map(p => {
       if (p.nav) return p;
@@ -58,6 +60,22 @@ function effectieveKostenPresets({ includeHidden = false } = {}) {
       if (o.hidden) out._hidden = true;
       return out;
     });
+  // Beheerder-aangemaakte kostenposten toevoegen na de standaardlijst.
+  const eigen = extra
+    .filter(p => p && p.omschrijving)
+    .filter(p => includeHidden || !(ov[p.omschrijving] && ov[p.omschrijving].hidden))
+    .map(p => {
+      const out = { omschrijving: p.omschrijving, categorie: p.categorie || 'overig', bedrag: p.bedrag != null ? Number(p.bedrag) : null, _custom: true };
+      const o = ov[p.omschrijving];
+      if (o) {
+        if (o.bedrag != null) { out.bedrag = Number(o.bedrag); out._customBedrag = true; }
+        if (o.hidden) out._hidden = true;
+      }
+      return out;
+    });
+  const insertIdx = base.findIndex(p => p.nav === 'extra');
+  if (insertIdx >= 0) return [...base.slice(0, insertIdx), ...eigen, ...base.slice(insertIdx)];
+  return [...base, ...eigen];
 }
 function effectieveKistenCatalogus({ includeHidden = false } = {}) {
   const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};

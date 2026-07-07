@@ -1321,6 +1321,15 @@ function showApp() {
     const se = $('#side-user-email'); if (se) se.textContent = s.email || '';
     const av = $('#side-avatar'); if (av) av.textContent = initialen(naam);
   }
+  // Verberg de Account-tegels/tabs voor niet-beheerders — die krijgen alsnog
+  // een blokkade in renderAccount, maar hier gaan we die pagina niet eens
+  // aanbieden in de navigatie.
+  try {
+    const magAccount = (typeof Auth === 'undefined') || Auth.isBeheerder();
+    document.querySelectorAll('a[data-route="/account"]').forEach(a => {
+      a.hidden = !magAccount;
+    });
+  } catch (_) {}
   ActiveProfile.renderChip();
 }
 

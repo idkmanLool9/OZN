@@ -2779,6 +2779,12 @@ fieldset[data-step][hidden] { display: none !important; }
 .kist-card-foot-meta { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; min-width: 0; }
 .kist-card-foot .kist-price { font-size: .95rem; }
 .kist-kies-btn { white-space: nowrap; }
+/* Zonder prijs: knop pakt de volledige breedte van de voet-strook */
+.kist-card-foot-nopr { flex-direction: column; align-items: stretch; }
+.kist-kies-btn-full { width: 100%; }
+.kosten-beheer-table td, .kosten-beheer-table th { padding: .35rem .5rem; }
+.kosten-beheer-table tr.is-verborgen { opacity: .55; }
+.kosten-beheer-table tr.is-verborgen strong { text-decoration: line-through; }
 /* Op smalle kaarten (kleiner scherm of dichte grid): knop op eigen regel */
 @media (max-width: 720px) {
   .kist-card-foot { flex-direction: column; align-items: stretch; }

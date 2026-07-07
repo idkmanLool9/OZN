@@ -176,6 +176,28 @@ function renderDossierList(params, path) {
 
 function renderAccount(msg) {
   const u = Auth.current();
+  // Alleen beheerders mogen bij de account-instellingen. Medewerkers krijgen
+  // een korte melding — hun profiel-instellingen (naam / wachtwoord) doen we
+  // niet in deze view; die kunnen via een beheerder.
+  if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) {
+    $('#view').innerHTML = `
+      <div class="page">
+        <div class="page-head"><h1>Mijn account</h1></div>
+        <section class="card narrow">
+          <p>Account-instellingen zijn alleen beschikbaar voor beheerders. Neem contact op met een beheerder als je iets wilt aanpassen.</p>
+          <p class="muted small">Ingelogd als: <strong>${esc(u && u.email || '')}</strong></p>
+          <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn" id="btn-medewerker-logout">Uitloggen</button>
+          </div>
+        </section>
+      </div>`;
+    const bo = document.getElementById('btn-medewerker-logout');
+    if (bo) bo.addEventListener('click', async () => {
+      try { await Auth.logout(); } catch (_) {}
+      Router.go('/');
+    });
+    return;
+  }
   // Instellingen op functieniveau beschikbaar. Losse secties definiëren hun
   // eigen `s` in een IIFE; de Factuur-sectie leunt op deze buitenste `s`.
   const s = Settings.all();
@@ -195,6 +217,7 @@ function renderAccount(msg) {
         <a href="#/account#factuur-instellingen">Factuur</a>
         <a href="#/account#push-instellingen">Push-notificaties</a>
         <a href="#/account#snelstart-instellingen">SnelStart</a>
+        <a href="#/account#kostenposten">Kostenposten</a>
         <a href="#/account#profielen">Profielen</a>
         <a href="#/account#opdrachtgevers">Opdrachtgevers</a>
         <a href="#/account#acc-data">Data &amp; sync</a>
@@ -703,6 +726,48 @@ function renderAccount(msg) {
           <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_prijzen" ${Settings.get('medewerker_ziet_prijzen') ? 'checked' : ''}> Medewerkers mogen prijzen zien</label>
           <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
         </form>
+      </section>
+
+      <section class="card narrow" id="kostenposten">
+        <h2>Kostenposten beheren</h2>
+        <p class="muted small">Beheer hier de standaard-kostenposten die medewerkers via 'Snel toevoegen' in een dossier kunnen prikken. Pas prijs aan, verberg posten die je niet meer gebruikt, of voeg een eigen post toe. Wijzigingen gelden voor alle dossiers.</p>
+        ${(() => {
+          const lijst = effectieveKostenPresets({ includeHidden: true }).filter(p => !p.nav);
+          return `
+          <table class="table kosten-beheer-table">
+            <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Prijs</th><th></th></tr></thead>
+            <tbody>
+              ${lijst.map(p => {
+                const bedrag = p.bedrag != null ? (Number(p.bedrag) || 0).toFixed(2).replace('.', ',') : '';
+                return `<tr class="${p._hidden ? 'is-verborgen' : ''}" data-oms="${esc(p.omschrijving)}">
+                  <td><strong>${esc(p.omschrijving)}</strong>${p._custom ? ' <span class="badge badge-amber" title="Zelf toegevoegd">eigen</span>' : ''}${p.vraagPrijs ? ' <span class="badge badge-amber" title="Richtprijs">±</span>' : ''}${p.food ? ' <span class="badge badge-amber" title="Aantal × prijs per stuk">×N</span>' : ''}</td>
+                  <td class="muted small">${esc(categorieLabel(p.categorie))}</td>
+                  <td class="num"><input type="text" inputmode="decimal" class="kb-prijs" value="${esc(bedrag)}" placeholder="0,00" style="max-width:110px;text-align:right;"></td>
+                  <td class="row-form" style="justify-content:flex-end;gap:.35rem;">
+                    <button type="button" class="btn btn-sm" data-kb-save title="Prijs opslaan">💾</button>
+                    ${p._customBedrag ? '<button type="button" class="btn btn-sm btn-ghost" data-kb-reset title="Terug naar standaardprijs">↺</button>' : ''}
+                    ${p._hidden
+                      ? '<button type="button" class="btn btn-sm btn-ghost" data-kb-show title="Weer tonen">👁</button>'
+                      : '<button type="button" class="btn btn-sm btn-ghost" data-kb-hide title="Verbergen uit lijst">🗑</button>'}
+                    ${p._custom ? '<button type="button" class="btn btn-sm btn-ghost btn-danger" data-kb-del title="Definitief verwijderen (alleen eigen posten)">✕</button>' : ''}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <details style="margin-top:.75rem;">
+            <summary style="cursor:pointer;"><strong>+ Nieuwe kostenpost aanmaken</strong></summary>
+            <form id="kb-add-form" class="row-form" style="margin-top:.5rem;flex-wrap:wrap;gap:.4rem;">
+              <input type="text" name="omschrijving" placeholder="Omschrijving..." required style="flex:1;min-width:180px;">
+              <select name="categorie">
+                <option value="">Categorie</option>
+                ${KOSTEN_CATEGORIEEN.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
+              </select>
+              <input type="text" name="bedrag" placeholder="Prijs" inputmode="decimal" style="max-width:110px;">
+              <button type="submit" class="btn btn-sm btn-primary">+ Toevoegen</button>
+            </form>
+          </details>`;
+        })()}
       </section>` : ''}
 
       <section class="card narrow" id="opdrachtgevers">
@@ -1516,6 +1581,93 @@ function renderAccount(msg) {
       e.preventDefault();
       Settings.set({ medewerker_ziet_prijzen: e.target.medewerker_ziet_prijzen.checked });
       renderAccount({ success: 'Prijs-instellingen opgeslagen.' });
+    });
+  }
+
+  // Kostenposten beheren (alleen beheerder)
+  const kostenSectie = $('#kostenposten');
+  if (kostenSectie) {
+    function _kostenPatchOverride(oms, patch) {
+      const cur = Object.assign({}, Settings.get('kosten_overrides') || {});
+      const entry = Object.assign({}, cur[oms] || {}, patch);
+      if (entry.bedrag == null) delete entry.bedrag;
+      if (!entry.hidden)        delete entry.hidden;
+      if (Object.keys(entry).length === 0) delete cur[oms];
+      else                                  cur[oms] = entry;
+      Settings.set({ kosten_overrides: cur });
+    }
+    kostenSectie.querySelectorAll('tbody tr').forEach(tr => {
+      const oms = tr.dataset.oms;
+      const inp = tr.querySelector('.kb-prijs');
+      const btnSave = tr.querySelector('[data-kb-save]');
+      const btnReset = tr.querySelector('[data-kb-reset]');
+      const btnHide  = tr.querySelector('[data-kb-hide]');
+      const btnShow  = tr.querySelector('[data-kb-show]');
+      const btnDel   = tr.querySelector('[data-kb-del]');
+      if (btnSave) btnSave.addEventListener('click', () => {
+        const bedrag = parseEUR(inp.value);
+        if (!isFinite(bedrag) || bedrag < 0) {
+          Modal.show({ type:'warning', title:'Ongeldige prijs', message:'Vul een geldig bedrag in (bv. 45,00).' });
+          return;
+        }
+        // Bij eigen kostenposten schrijven we direct in kosten_extra, niet override
+        const extra = (Settings.get('kosten_extra') || []).slice();
+        const idx = extra.findIndex(x => x.omschrijving === oms);
+        if (idx >= 0) {
+          extra[idx] = Object.assign({}, extra[idx], { bedrag });
+          Settings.set({ kosten_extra: extra });
+        } else {
+          _kostenPatchOverride(oms, { bedrag });
+        }
+        renderAccount({ success: `Prijs van "${oms}" opgeslagen.` });
+      });
+      if (btnReset) btnReset.addEventListener('click', () => {
+        _kostenPatchOverride(oms, { bedrag: null });
+        renderAccount({ success: `Standaardprijs voor "${oms}" hersteld.` });
+      });
+      if (btnHide) btnHide.addEventListener('click', () => {
+        _kostenPatchOverride(oms, { hidden: true });
+        renderAccount({ success: `"${oms}" verborgen uit de lijst.` });
+      });
+      if (btnShow) btnShow.addEventListener('click', () => {
+        _kostenPatchOverride(oms, { hidden: false });
+        renderAccount({ success: `"${oms}" weer toegevoegd aan de lijst.` });
+      });
+      if (btnDel) btnDel.addEventListener('click', async () => {
+        const ok = await Modal.confirm({
+          type:'warning',
+          title:'Kostenpost definitief verwijderen?',
+          message:`"${oms}" wordt uit je eigen lijst verwijderd. Bestaande kostenposten in dossiers blijven staan.`,
+          confirmText:'Verwijderen',
+        });
+        if (!ok) return;
+        const extra = (Settings.get('kosten_extra') || []).filter(x => x.omschrijving !== oms);
+        Settings.set({ kosten_extra: extra });
+        renderAccount({ success: `"${oms}" verwijderd.` });
+      });
+    });
+    const kbAddForm = $('#kb-add-form');
+    if (kbAddForm) kbAddForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const oms = f.omschrijving.value.trim();
+      if (!oms) return;
+      const cat = f.categorie.value || 'overig';
+      const bedragRaw = f.bedrag.value.trim();
+      const bedrag = bedragRaw ? parseEUR(bedragRaw) : null;
+      if (bedragRaw && (!isFinite(bedrag) || bedrag < 0)) {
+        Modal.show({ type:'warning', title:'Ongeldige prijs', message:'Vul een geldig bedrag in (bv. 45,00) of laat leeg.' });
+        return;
+      }
+      const alle = effectieveKostenPresets({ includeHidden: true });
+      if (alle.some(p => (p.omschrijving || '').toLowerCase() === oms.toLowerCase())) {
+        Modal.show({ type:'warning', title:'Bestaat al', message:`Er bestaat al een kostenpost met de omschrijving "${oms}". Pas de bestaande post aan in plaats van een nieuwe aan te maken.` });
+        return;
+      }
+      const extra = (Settings.get('kosten_extra') || []).slice();
+      extra.push({ omschrijving: oms, categorie: cat, bedrag });
+      Settings.set({ kosten_extra: extra });
+      renderAccount({ success: `Kostenpost "${oms}" aangemaakt.` });
     });
   }
 
