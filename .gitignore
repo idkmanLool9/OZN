@@ -8,7 +8,9 @@ ios/
 android/
 .capacitor/
 
-# Uitzondering: het eigen document-scanner-plugin bevat een 'ios'-map met
-# Swift-broncode die WEL mee moet (anders faalt cap sync op de builder).
+# Uitzondering: eigen Capacitor-plugins bevatten platformcode (ios/ + android/)
+# die WEL mee moet naar de builder — anders faalt `cap sync` bij de APK-workflow.
 !local-plugins/**/ios/
 !local-plugins/**/ios/**
+!local-plugins/**/android/
+!local-plugins/**/android/**
