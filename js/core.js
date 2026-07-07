@@ -513,7 +513,7 @@ const Postcode = {
       const straat = straatEl.value.trim();
       const huis   = huisnummerEl ? huisnummerEl.value.trim() : '';
       const q = (straat + ' ' + huis).trim();
-      if (q.length < 3) { ddown.hidden = true; results = []; return; }
+      if (q.length < 2) { ddown.hidden = true; results = []; return; }
 
       if (abortCtrl) abortCtrl.abort();
       abortCtrl = new AbortController();

@@ -272,7 +272,7 @@ function renderDossierForm(params) {
             <label class="span-2"><span>Overlijdenslocatie</span>
               <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${esc(v('overlijdensplaats'))}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
             </label>
-            <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}"></label>
+            <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}" placeholder="Typ straat + huisnummer — kies uit lijst" autocomplete="off"></label>
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
             <label class="span-3"><span>Artsverklaring (overlijdensverklaring)</span>
