@@ -441,6 +441,10 @@ function renderAccount(msg) {
               <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''}>
               Beheermodus voor de kistencatalogus (toont knoppen om foto's te vervangen en prijzen aan te passen)
             </label>
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="dossier_admin_mode" ${s.dossier_admin_mode ? 'checked' : ''}>
+              Beheermodus voor dossier-labels (klik op titels/knop-teksten in het intake-formulier om ze te hernoemen)
+            </label>
             <div class="form-actions" style="justify-content:flex-end;">
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
@@ -1107,6 +1111,7 @@ function renderAccount(msg) {
         font_id: f.font_id.value,
         form_density: f.form_density.value,
         catalog_admin_mode: f.catalog_admin_mode.checked,
+        dossier_admin_mode: f.dossier_admin_mode.checked,
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });

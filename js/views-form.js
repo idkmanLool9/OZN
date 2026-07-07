@@ -221,14 +221,14 @@ function renderDossierForm(params) {
         <input type="hidden" name="status" value="${esc(dossier.status || 'nieuw')}">
 
         <nav class="wizard-nav" id="wizard-nav" aria-label="Voortgang">
-          <button type="button" class="wizard-step" data-go="1"><span class="num">1</span><span class="lbl">NAW gegevens</span></button>
-          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span><span class="lbl">Opbaren &amp; locatie</span></button>
-          <button type="button" class="wizard-step" data-go="3"><span class="num">3</span><span class="lbl">Kosten</span></button>
-          <button type="button" class="wizard-step" data-go="4"><span class="num">4</span><span class="lbl">Bijzonderheden</span></button>
+          <button type="button" class="wizard-step" data-go="1"><span class="num">1</span>${dLabelSpan('step_1', 'NAW gegevens', 'span', 'lbl')}</button>
+          <button type="button" class="wizard-step" data-go="2"><span class="num">2</span>${dLabelSpan('step_2', 'Opbaren & locatie', 'span', 'lbl')}</button>
+          <button type="button" class="wizard-step" data-go="3"><span class="num">3</span>${dLabelSpan('step_3', 'Kosten', 'span', 'lbl')}</button>
+          <button type="button" class="wizard-step" data-go="4"><span class="num">4</span>${dLabelSpan('step_4', 'Bijzonderheden', 'span', 'lbl')}</button>
         </nav>
 
         <fieldset class="card" data-step="1">
-          <legend>Opdrachtgever</legend>
+          <legend>${dLabelSpan("sect_opdrachtgever", "Opdrachtgever")}</legend>
           <label style="display:block;">
             ${(() => {
               const lijst = Settings.get('opdrachtgevers') || [];
@@ -301,7 +301,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="1">
-          <legend>Gegevens overledene</legend>
+          <legend>${dLabelSpan("sect_overledene", "Gegevens overledene")}</legend>
           <div class="grid-3">
             <label><span>Achternaam</span><input type="text" name="achternaam" value="${v('achternaam')}"></label>
             <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}"></label>
@@ -348,7 +348,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="1">
-          <legend>Bezittingen</legend>
+          <legend>${dLabelSpan("sect_bezittingen", "Bezittingen")}</legend>
           <p class="muted small">Streep aan welke sieraden de overledene bij zich heeft en vul het aantal in. Voeg extra bezittingen toe via de knop onderaan.</p>
           <div style="display:flex; flex-direction:column; gap:.5rem;">
             ${[
@@ -399,7 +399,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="2">
-          <legend>Opbaren &amp; locatie</legend>
+          <legend>${dLabelSpan("sect_opbaren", "Opbaren &amp; locatie")}</legend>
           <div class="grid-3">
             <label><span>Ophalen of thuis opbaren?</span>
               <select name="opbaring_type" id="opbaring-type-select">
@@ -434,7 +434,7 @@ function renderDossierForm(params) {
 
         <!-- ── OPHALEN / OVERBRENGEN ─────────────────────────────────────── -->
         <fieldset class="card" data-step="2" id="ophalen-fieldset" ${(dossier.opbaring_type === 'ophalen' || dossier.opbaring_type === 'beide') ? '' : 'hidden'}>
-          <legend>Ophalen / overbrengen</legend>
+          <legend>${dLabelSpan("sect_ophalen", "Ophalen / overbrengen")}</legend>
           <div class="grid-3">
             <label><span>Ophaaldatum</span>
               <input type="date" name="ophalen_datum" value="${v('ophalen_datum')}">
@@ -462,7 +462,7 @@ function renderDossierForm(params) {
 
         <!-- ── THUIS OPBAREN ─────────────────────────────────────────────── -->
         <fieldset class="card" data-step="2" id="thuis-fieldset" ${(dossier.opbaring_type === 'thuis' || dossier.opbaring_type === 'beide') ? '' : 'hidden'}>
-          <legend>Thuis opbaren</legend>
+          <legend>${dLabelSpan("sect_thuis", "Thuis opbaren")}</legend>
           <div class="grid-3">
             <label><span>Startdatum</span>
               <input type="date" name="thuis_opbaren_datum" value="${v('thuis_opbaren_datum')}">
@@ -514,7 +514,7 @@ function renderDossierForm(params) {
 
         <!-- ── VERZORGING ────────────────────────────────────────────────── -->
         <fieldset class="card" data-step="2">
-          <legend>Verzorging</legend>
+          <legend>${dLabelSpan("sect_verzorging", "Verzorging")}</legend>
           <div class="verzorging-blok">
             <div class="verzorging-item">
               <strong>Verzorgd / Gekleed</strong>
@@ -563,7 +563,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="2">
-          <legend>Kist &amp; vervoer</legend>
+          <legend>${dLabelSpan("sect_kist", "Kist &amp; vervoer")}</legend>
           <div class="grid-3">
             <label class="span-2"><span>Kist</span>
               <input type="hidden" name="kist_type" value="${esc(v('kist_type'))}">
@@ -599,13 +599,13 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="3">
-          <legend>Kosten</legend>
+          <legend>${dLabelSpan("sect_kosten", "Kosten")}</legend>
           <h3 style="margin:0 0 .5rem;">Kostenoverzicht</h3>
           <div id="wizard-kosten-mount"></div>
         </fieldset>
 
         <fieldset class="card" data-step="4">
-          <legend>Bijzonderheden</legend>
+          <legend>${dLabelSpan("sect_bijzonderheden", "Bijzonderheden")}</legend>
           <label class="full"><span>Notities / wensen familie</span>
             <textarea name="bijzonderheden" rows="5">${v('bijzonderheden')}</textarea>
           </label>
@@ -614,9 +614,9 @@ function renderDossierForm(params) {
         <div class="form-actions wizard-actions">
           <a href="${isNew ? '#/dossiers' : '#/dossiers/' + dossier.id}" class="btn btn-ghost" id="btn-back-form" title="Terug — je concept blijft bewaard">← Terug naar dossiers</a>
           <div class="wizard-actions-right">
-            <button type="button" class="btn btn-ghost" id="btn-wizard-prev" hidden>← Vorige</button>
-            <button type="button" class="btn btn-primary" id="btn-wizard-next">Verder →</button>
-            <button type="submit" class="btn btn-primary" id="btn-wizard-submit" hidden>${isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan'}</button>
+            <button type="button" class="btn btn-ghost" id="btn-wizard-prev" hidden>${dLabelSpan('btn_prev', '← Vorige')}</button>
+            <button type="button" class="btn btn-primary" id="btn-wizard-next">${dLabelSpan('btn_next', 'Verder →')}</button>
+            <button type="submit" class="btn btn-primary" id="btn-wizard-submit" hidden>${dLabelSpan(isNew ? 'btn_submit_new' : 'btn_submit_edit', isNew ? 'Dossier aanmaken' : 'Wijzigingen opslaan')}</button>
           </div>
         </div>
       </form>
@@ -726,6 +726,33 @@ function renderDossierForm(params) {
   });
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
+
+  // ─── Beheermodus: labels/knop-teksten inline hernoemen ─────────────
+  // Wanneer beheerder + dossier_admin_mode aan staan, hebben titels de
+  // klasse 'dossier-label-edit' + contenteditable. Op blur slaan we de
+  // nieuwe tekst op in Settings.dossier_labels. Enter → einde bewerking.
+  if (typeof Auth !== 'undefined' && Auth.isBeheerder()
+      && typeof Settings !== 'undefined' && Settings.get('dossier_admin_mode')) {
+    document.querySelectorAll('#dossier-form .dossier-label-edit, .wizard-steps .dossier-label-edit, .wizard-actions .dossier-label-edit')
+      .forEach(el => {
+        el.addEventListener('keydown', ev => {
+          if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
+        });
+        el.addEventListener('blur', () => {
+          const key = el.dataset.labelKey;
+          const def = el.dataset.labelDefault || '';
+          const nieuw = (el.textContent || '').trim();
+          const cur = Object.assign({}, Settings.get('dossier_labels') || {});
+          if (!nieuw || nieuw === def) delete cur[key];
+          else cur[key] = nieuw;
+          Settings.set({ dossier_labels: cur });
+          Toast.show('Label opgeslagen', 'success');
+        });
+        // Ook een klik op de wizard-step-knop moet het label kunnen bewerken
+        // zonder de step-navigatie te triggeren.
+        el.addEventListener('click', ev => ev.stopPropagation());
+      });
+  }
 
   // Ophalen / Thuis opbaren / Beide → toont het bijhorende fieldset.
   function updateOpbaring() {

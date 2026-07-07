@@ -222,6 +222,26 @@ const DOSSIER_BELANGRIJKE_VELDEN = [
   { veld: 'kist_type',           label: 'kist' },
   { veld: 'rouwauto',            label: 'rouwauto', test: v => v && v !== 'nee' },
 ];
+// Label-helper voor beheermodus: geeft óf de override uit
+// Settings.dossier_labels[key] óf het standaardlabel terug. Wanneer
+// beheerder + dossier_admin_mode aan staan, wordt het element bewerkbaar
+// gemaakt (data-attribuut voor de listener in views-form.js).
+function dLabel(key, defaultTxt) {
+  const overrides = (typeof Settings !== 'undefined' && Settings.get('dossier_labels')) || {};
+  return overrides[key] || defaultTxt;
+}
+function dLabelSpan(key, defaultTxt, tag = 'span', extraClass = '') {
+  const txt = dLabel(key, defaultTxt);
+  const magBewerken = (typeof Auth !== 'undefined' && Auth.isBeheerder())
+    && (typeof Settings !== 'undefined' && Settings.get('dossier_admin_mode'));
+  const cls = (extraClass + (magBewerken ? ' dossier-label-edit' : '')).trim();
+  const clsAttr = cls ? ' class="' + esc(cls) + '"' : '';
+  const editAttrs = magBewerken
+    ? ' contenteditable="plaintext-only" spellcheck="false" data-label-key="' + esc(key) + '" data-label-default="' + esc(defaultTxt) + '" title="Klik om te hernoemen"'
+    : '';
+  return `<${tag}${clsAttr}${editAttrs}>${esc(txt)}</${tag}>`;
+}
+
 function dossierMissendeBelangrijkeVelden(d) {
   if (!d) return [];
   // Voltooid of geannuleerd → geen waarschuwing meer

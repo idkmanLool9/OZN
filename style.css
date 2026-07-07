@@ -2854,6 +2854,22 @@ fieldset[data-step][hidden] { display: none !important; }
 .kosten-beheer-table tr.is-verborgen strong { text-decoration: line-through; }
 
 /* Waarschuwings-badge in de dossierlijst: missende belangrijke velden */
+/* Beheermodus voor dossier-labels: subtiele stippellijn onder klikbare
+   titels/knop-teksten zodat je ziet wat bewerkbaar is. */
+.dossier-label-edit {
+  outline: none;
+  border-bottom: 1px dashed rgba(107, 30, 42, .45);
+  cursor: text;
+  padding: 0 .1em;
+  border-radius: 2px;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.dossier-label-edit:hover { background: rgba(107, 30, 42, .06); }
+.dossier-label-edit:focus {
+  background: rgba(107, 30, 42, .12);
+  border-bottom-color: var(--primary, #2563eb);
+}
+
 .dossier-warn-badge {
   display: inline-flex; align-items: center; gap: .25rem;
   padding: .1rem .45rem; margin-left: .35rem;

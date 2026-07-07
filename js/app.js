@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 217;
-const APP_VERSION    = '5.76.2';
+const APP_BUILD      = 218;
+const APP_VERSION    = '5.77.0';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -60,6 +60,11 @@ const Settings = {
     // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
     // catalogi (kisten, bloemen, eten & drinken)
     catalog_admin_mode: false,
+    // Beheermodus voor de dossier-intake: laat beheerder titels, legendes
+    // en knop-teksten inline aanpassen. Overrides worden opgeslagen in
+    // Settings.dossier_labels als { key: 'nieuwe tekst', … }.
+    dossier_admin_mode: false,
+    dossier_labels: {},
     // Archief: afgehandelde dossiers automatisch archiveren (rouwauto geweest
     // + alle datums voorbij). En: mogen medewerkers het archief zien?
     // (medewerker_ziet_archief wordt server-side afgedwongen via RLS.)
