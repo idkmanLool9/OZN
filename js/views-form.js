@@ -705,8 +705,13 @@ function renderDossierForm(params) {
     document.getElementById('btn-wizard-prev').hidden = (currentStep === 1);
     document.getElementById('btn-wizard-next').hidden = (currentStep === TOTAL_STEPS);
     document.getElementById('btn-wizard-submit').hidden = (currentStep !== TOTAL_STEPS);
-    const form = document.getElementById('dossier-form');
-    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Bij stap-wisseling terug naar de top van de pagina — de vorige stap
+    // eindigt vaak onderaan (Verder-knop) en je wilt niet halverwege de
+    // volgende stap beginnen. Vensterscroll is de betrouwbare route.
+    try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (_) { window.scrollTo(0, 0); }
+    // Voor de zekerheid ook eventuele interne scroll-container resetten
+    const main = document.querySelector('.app-main') || document.scrollingElement;
+    if (main && typeof main.scrollTo === 'function') { try { main.scrollTo(0, 0); } catch (_) {} }
     try {
       localStorage.setItem(stepKey, String(currentStep));
       localStorage.setItem(maxKey,  String(maxStepReached));
