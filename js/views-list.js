@@ -57,8 +57,8 @@ function renderDossierList(params, path) {
           if (d.gearchiveerd) return;
           if (['voltooid', 'geannuleerd'].includes(d.status)) return;
           const acties = [];
-          if (d.thuis_opbaren_datum === isoT) acties.push({ label: '🏠 Thuis opbaren start', tijd: d.thuis_opbaren_tijd || '' });
-          else if (d.thuis_opbaren_datum === isoM) acties.push({ label: '🏠 Thuis opbaren morgen', tijd: d.thuis_opbaren_tijd || '' });
+          if (d.thuis_opbaren_datum === isoT) acties.push({ label: '🏠 Thuis opbaren start', tijd: d.thuis_opbaren_tijd || '', wanneer: 'vandaag' });
+          else if (d.thuis_opbaren_datum === isoM) acties.push({ label: '🏠 Thuis opbaren morgen', tijd: d.thuis_opbaren_tijd || '', wanneer: 'morgen' });
           if (acties.length) rijen.push({ d, acties });
         });
         // Plus planning-items (rouwauto, aula) van vandaag
@@ -67,10 +67,16 @@ function renderDossierList(params, path) {
           try { return p.start_ts.startsWith(isoT); } catch (_) { return false; }
         });
         if (rijen.length === 0 && planningVandaag.length === 0) return '';
+        // Dynamische kop: alleen 'Vandaag', alleen 'Morgen', of beide.
+        const heeftVandaag = rijen.some(r => r.acties.some(a => a.wanneer === 'vandaag')) || planningVandaag.length > 0;
+        const heeftMorgen  = rijen.some(r => r.acties.some(a => a.wanneer === 'morgen'));
+        const kop = heeftVandaag && heeftMorgen ? '📅 Vandaag &amp; morgen'
+                  : heeftVandaag ? '📅 Vandaag'
+                  : '📅 Morgen';
         return `
         <section class="vandaag-blok">
           <div class="vandaag-head">
-            <strong>📅 Vandaag &amp; morgen</strong>
+            <strong>${kop}</strong>
             <span class="muted small">${new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
           </div>
           ${rijen.length === 0 ? '' : `
