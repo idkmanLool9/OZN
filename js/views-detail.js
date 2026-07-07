@@ -104,6 +104,8 @@ function renderDossierDetail(params) {
           ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : '')))}
           ${((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') && Array.isArray(d.brengen_naar) && d.brengen_naar.length)
             ? dlRow('Brengen naar', d.brengen_naar.map(esc).join(' → ')) : ''}
+          ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && Array.isArray(d.thuis_overbrengingen) && d.thuis_overbrengingen.length)
+            ? dlRow('Overbrengingen (thuis)', d.thuis_overbrengingen.map(esc).join(' → ')) : ''}
           ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? dlRow('Start thuis-opbaring', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
           ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? dlRow('Einde thuis-opbaring', [fmtDate(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd && 'om ' + d.thuis_opbaren_eindtijd].filter(Boolean).join(' ')) : ''}
           ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length)

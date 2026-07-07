@@ -2814,6 +2814,41 @@ fieldset[data-step][hidden] { display: none !important; }
 /* Zonder prijs: knop pakt de volledige breedte van de voet-strook */
 .kist-card-foot-nopr { flex-direction: column; align-items: stretch; }
 .kist-kies-btn-full { width: 100%; }
+
+/* Route-lijst: verticale tijdlijn met genummerde bolletjes */
+.route-lijst {
+  display: flex; flex-direction: column; gap: .6rem;
+  position: relative;
+  padding-left: 2px;
+}
+.route-row {
+  position: relative;
+  display: flex; align-items: center; gap: .5rem;
+}
+.route-row > input[type="text"] { flex: 1; }
+.route-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--primary, #2563eb); color: #fff;
+  font-size: .8rem; font-weight: 700;
+  flex: 0 0 26px;
+  position: relative; z-index: 2;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+/* Verticaal streepje dat de bolletjes verbindt — loopt van bolletje N
+   naar bolletje N+1 door de tussenruimte. Alleen tussen rijen, niet
+   onder de laatste. */
+.route-row:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;                  /* midden van de 26px-bol */
+  top: 26px;                   /* onderkant bol */
+  height: calc(100% + .6rem);  /* rijhoogte + gap */
+  width: 2px;
+  background: var(--primary, #2563eb);
+  opacity: .35;
+  z-index: 1;
+}
 .kosten-beheer-table td, .kosten-beheer-table th { padding: .35rem .5rem; }
 .kosten-beheer-table tr.is-verborgen { opacity: .55; }
 .kosten-beheer-table tr.is-verborgen strong { text-decoration: line-through; }
