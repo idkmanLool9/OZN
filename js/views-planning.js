@@ -61,9 +61,9 @@ function planningWaarschuwingen() {
   actief.forEach(d => {
     const missend = [];
     if (!d.opbaring_type) missend.push('ophalen/thuis nog niet gekozen');
-    if (d.opbaring_type === 'thuis' && !d.thuis_opbaren_datum) missend.push('geen datum thuis opbaren');
+    if ((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && !d.thuis_opbaren_datum) missend.push('geen datum thuis opbaren');
     if (!d.kist_type) missend.push('kist nog niet gekozen');
-    if (d.rouwauto !== 'ja') missend.push('rouwauto nog niet geregeld');
+    if (!d.rouwauto || d.rouwauto === 'nee') missend.push('rouwauto nog niet geregeld');
     if (missend.length) out.push({ dossier: d, missend });
   });
   return out;

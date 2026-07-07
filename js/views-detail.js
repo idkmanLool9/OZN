@@ -111,7 +111,30 @@ function renderDossierDetail(params) {
           ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && d.benodigde_rouwgoederen)
             ? `<div><dt>Extra (vrije tekst)</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
           ${dlRow('Opbaarlocatie', d.opbaarlocatie_type)}
+          ${(d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') ? dlRow('Ophaaldatum', [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')) : ''}
+          ${d.opbaring_bed ? dlRow('Bed-opbaring', 'Ja') : ''}
+          ${d.opbaring_kist ? dlRow('Kist-opbaring', 'Ja') : ''}
         </dl>
+        ${(() => {
+          // Verzorging: alleen tonen als er iets is ingevuld
+          const items = [
+            [d.verzorgd_gekleed_datum || d.verzorgd_gekleed_waar || d.verzorgd_gekleed_familie,
+              'Verzorgd / gekleed',
+              [fmtDate(d.verzorgd_gekleed_datum), d.verzorgd_gekleed_waar && 'te ' + d.verzorgd_gekleed_waar, d.verzorgd_gekleed_familie && '(' + d.verzorgd_gekleed_familie + ' familie)'].filter(Boolean).join(' ')],
+            [d.gekist_datum || d.gekist_waar,
+              'Gekist',
+              [fmtDate(d.gekist_datum), d.gekist_waar && 'te ' + d.gekist_waar].filter(Boolean).join(' ')],
+            [d.mond_gehecht, 'Mond gehecht', 'Ja'],
+            [d.oogkapjes, 'Oogkapjes', 'Ja'],
+            [d.buikpunctie, 'Buikpunctie', 'Ja'],
+            [d.peacemaker_verwijderd, 'Peacemaker verwijderd',
+              [d.peacemaker_verwijderd_datum && 'op ' + fmtDate(d.peacemaker_verwijderd_datum)].filter(Boolean).join(' ') || 'Ja'],
+            [d.thanatopraxie, 'Thanatopraxie',
+              [d.thanatopraxie_datum && 'op ' + fmtDate(d.thanatopraxie_datum), d.thanatopraxie_waar && 'te ' + d.thanatopraxie_waar].filter(Boolean).join(' ') || 'Ja'],
+          ].filter(([has]) => has);
+          if (!items.length) return '';
+          return `<h3>Verzorging</h3><dl class="dl">${items.map(([, label, val]) => dlRow(label, val)).join('')}</dl>`;
+        })()}
         ${(() => {
           const rows = [];
           if (d.kist_type) rows.push(dlRow('Kist', kistRowValue(d.kist_type, magPrijzen)));
@@ -429,6 +452,7 @@ function _kostenInPresetVolgorde(kosten) {
 // Spec voor de PDF-generator (jsPDF) — volledig dossieroverzicht.
 function dossierSpec(d, kosten) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
+  const magPrijs = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
   const kostenLijst = Array.isArray(kosten) ? _kostenInPresetVolgorde(kosten) : [];
   const totaal = kostenLijst.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
 
@@ -470,13 +494,19 @@ function dossierSpec(d, kosten) {
     title: 'DOSSIER',
     meta: ['Dossier: ' + (d.dossier_nummer || ''), 'Datum: ' + new Date().toLocaleDateString('nl-NL')],
     sections,
-    table: kostenLijst.length ? { heading: 'Kostenoverzicht', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', fmtEUR(k.bedrag)]) } : null,
-    totals: kostenLijst.length ? [['Totaal', fmtEUR(totaal), true]] : [],
+    // Medewerkers: kostenoverzicht zonder bedragen (alleen omschrijving + categorie + aantal)
+    table: kostenLijst.length
+      ? (magPrijs
+          ? { heading: 'Kostenoverzicht', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', fmtEUR(k.bedrag)]) }
+          : { heading: 'Kostenposten', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', String(k.aantal || 1) + ' stuk(s)']) })
+      : null,
+    totals: (kostenLijst.length && magPrijs) ? [['Totaal', fmtEUR(totaal), true]] : [],
   };
 }
 
 function buildDossierEmail(d, kosten) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
+  const magPrijs = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
 
   const parts = [];
   parts.push(`<p style="margin:0 0 12px;">Beste,</p>`);
@@ -528,7 +558,7 @@ function buildDossierEmail(d, kosten) {
   const totaalKost = kostenLijst.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaaldKost = kostenLijst.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const openKost = Math.max(0, totaalKost - betaaldKost);
-  parts.push(emH3('Kostenoverzicht'));
+  parts.push(emH3(magPrijs ? 'Kostenoverzicht' : 'Kostenposten'));
   if (kostenLijst.length === 0) {
     parts.push(`<p style="color:#6f6a62;font-style:italic;margin:6px 0 14px;">Geen kostenposten geregistreerd.</p>`);
   } else {
@@ -538,7 +568,7 @@ function buildDossierEmail(d, kosten) {
           <th align="left"  style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Omschrijving</th>
           <th align="left"  style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Categorie</th>
           <th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Aantal</th>
-          <th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Bedrag</th>
+          ${magPrijs ? '<th align="right" style="padding:7px 10px;border-bottom:1px solid #e5e2da;font-weight:600;color:#6f6a62;text-transform:uppercase;font-size:11px;letter-spacing:.04em;">Bedrag</th>' : ''}
         </tr>
       </thead>
       <tbody>
@@ -546,23 +576,23 @@ function buildDossierEmail(d, kosten) {
           const aantal = Number(k.aantal) || 1;
           const stuk = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
           return `<tr>
-            <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${esc(k.omschrijving)}${aantal !== 1 ? ` <span style="color:#8a847b;font-size:11px;">(${esc(fmtEUR(stuk))} per stuk)</span>` : ''}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;">${esc(k.omschrijving)}${(magPrijs && aantal !== 1) ? ` <span style="color:#8a847b;font-size:11px;">(${esc(fmtEUR(stuk))} per stuk)</span>` : ''}</td>
             <td style="padding:7px 10px;border-bottom:1px solid #f0eee8;color:#6f6a62;">${esc(categorieLabel(k.categorie))}</td>
             <td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${aantal}</td>
-            <td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${esc(fmtEUR(k.bedrag))}${k.betaald ? ' <span style="color:#2a7a3a;font-size:11px;">✓</span>' : ''}</td>
+            ${magPrijs ? `<td align="right" style="padding:7px 10px;border-bottom:1px solid #f0eee8;font-variant-numeric:tabular-nums;">${esc(fmtEUR(k.bedrag))}${k.betaald ? ' <span style="color:#2a7a3a;font-size:11px;">✓</span>' : ''}</td>` : ''}
           </tr>`;
         }).join('')}
       </tbody>
       <tfoot>
-        <tr>
+        ${magPrijs ? `<tr>
           <td colspan="3" align="right" style="padding:8px 10px;font-weight:600;border-top:2px solid #d8d4ca;">Totaal</td>
           <td align="right" style="padding:8px 10px;font-weight:600;font-variant-numeric:tabular-nums;border-top:2px solid #d8d4ca;">${esc(fmtEUR(totaalKost))}</td>
-        </tr>
-        ${betaaldKost > 0 ? `<tr>
+        </tr>` : ''}
+        ${(magPrijs && betaaldKost > 0) ? `<tr>
           <td colspan="3" align="right" style="padding:6px 10px;color:#2a7a3a;">Reeds betaald</td>
           <td align="right" style="padding:6px 10px;color:#2a7a3a;font-variant-numeric:tabular-nums;">- ${esc(fmtEUR(betaaldKost))}</td>
         </tr>` : ''}
-        ${openKost > 0 ? `<tr>
+        ${(magPrijs && openKost > 0) ? `<tr>
           <td colspan="3" align="right" style="padding:8px 10px;font-weight:700;color:#b34;">Open saldo</td>
           <td align="right" style="padding:8px 10px;font-weight:700;color:#b34;font-variant-numeric:tabular-nums;">${esc(fmtEUR(openKost))}</td>
         </tr>` : ''}

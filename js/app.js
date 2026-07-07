@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 206;
-const APP_VERSION    = '5.72.1';
+const APP_BUILD      = 207;
+const APP_VERSION    = '5.73.0';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -885,7 +885,7 @@ async function autoArchiveer() {
     const planning = DB.list(KEYS.PLANNING) || [];
     const kandidaten = (DB.list(KEYS.DOSSIERS) || []).filter(d => {
       if (d.gearchiveerd) return false;
-      if (d.rouwauto !== 'ja') return false;
+      if (!d.rouwauto || d.rouwauto === 'nee') return false;
       const dates = [];
       if (d.thuis_opbaren_datum) dates.push(new Date(d.thuis_opbaren_datum + 'T00:00:00'));
       planning.forEach(p => { if (p.dossier_id === d.id && p.start_ts) dates.push(new Date(p.start_ts)); });

@@ -269,6 +269,9 @@ function renderDossierForm(params) {
             <label><span>Geboortedatum</span><input type="date" name="geboortedatum" value="${v('geboortedatum')}"></label>
             <label><span>Geboorteplaats</span><input type="text" name="geboorteplaats" value="${v('geboorteplaats')}"></label>
             <label><span>Overlijdensdatum</span><input type="date" name="overlijdensdatum" value="${v('overlijdensdatum')}"></label>
+            <label class="span-2"><span>Overlijdenslocatie</span>
+              <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${esc(v('overlijdensplaats'))}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
+            </label>
             <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}"></label>
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
@@ -360,14 +363,11 @@ function renderDossierForm(params) {
                 <option value="beide"   ${sel('opbaring_type','beide')}>Ophalen + Thuis opbaren</option>
               </select>
             </label>
-            <label class="span-2"><span>Overlijdenslocatie</span>
-              <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${esc(v('overlijdensplaats'))}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
+            <label class="span-2"><span>Opbaarlocatie</span>
+              <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${esc(v('opbaarlocatie_type'))}" autocomplete="off" placeholder="bv. aula, uitvaartcentrum, thuis…">
             </label>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
-            <label class="opbaar-chip">
-              <input type="checkbox" name="opbaring_bed" value="ja" ${dossier.opbaring_bed ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Bed-opbaring</span>
-            </label>
             <label class="opbaar-chip">
               <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
             </label>
@@ -388,7 +388,15 @@ function renderDossierForm(params) {
         <!-- ── OPHALEN / OVERBRENGEN ─────────────────────────────────────── -->
         <fieldset class="card" data-step="2" id="ophalen-fieldset" ${(dossier.opbaring_type === 'ophalen' || dossier.opbaring_type === 'beide') ? '' : 'hidden'}>
           <legend>Ophalen / overbrengen</legend>
-          <label style="display:block;"><span>Overbrengingen <span class="muted small">(één of meerdere, bv. eerst ziekenhuis → aula)</span></span>
+          <div class="grid-3">
+            <label><span>Ophaaldatum</span>
+              <input type="date" name="ophalen_datum" value="${v('ophalen_datum')}">
+            </label>
+            <label><span>Ophaaltijd</span>
+              <input type="time" name="ophalen_tijd" value="${v('ophalen_tijd')}">
+            </label>
+          </div>
+          <label style="display:block; margin-top:.5rem;"><span>Overbrengingen <span class="muted small">(één of meerdere, bv. eerst ziekenhuis → aula)</span></span>
             <div id="brengen-naar-lijst" style="display:flex; flex-direction:column; gap:.4rem;">
               ${(() => {
                 const arr = Array.isArray(dossier.brengen_naar) && dossier.brengen_naar.length
@@ -420,22 +428,25 @@ function renderDossierForm(params) {
             <label><span>Eindtijd</span>
               <input type="time" name="thuis_opbaren_eindtijd" value="${v('thuis_opbaren_eindtijd')}">
             </label>
-            <label class="span-2"><span>Opbaarlocatie</span>
-              <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${esc(v('opbaarlocatie_type'))}" autocomplete="off">
-            </label>
-            <label class="span-3"><span>Benodigde rouwgoederen</span>
-              <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.25rem;">
-                ${(() => {
-                  const opties = Settings.get('rouwgoederen_opties') || [];
-                  const gekozen = Array.isArray(dossier.rouwgoederen_lijst) ? dossier.rouwgoederen_lijst : [];
-                  return opties.map(g => `
-                    <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
-                      <input type="checkbox" class="rouwgoed-cb" value="${esc(g)}" ${gekozen.includes(g) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(g)}</span>
-                    </label>`).join('');
-                })()}
-              </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
+            <label class="opbaar-chip">
+              <input type="checkbox" name="opbaring_bed" value="ja" ${dossier.opbaring_bed ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Bed-opbaring</span>
             </label>
           </div>
+          <label class="span-3" style="display:block; margin-top:.5rem;"><span>Benodigde rouwgoederen</span>
+            <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.25rem;">
+              ${(() => {
+                const opties = Settings.get('rouwgoederen_opties') || [];
+                const gekozen = Array.isArray(dossier.rouwgoederen_lijst) ? dossier.rouwgoederen_lijst : [];
+                return opties.map(g => `
+                  <label style="display:flex; flex-direction:row; align-items:center; gap:.4rem; margin:0; padding:.35rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:20px; cursor:pointer; font-weight:500;">
+                    <input type="checkbox" class="rouwgoed-cb" value="${esc(g)}" ${gekozen.includes(g) ? 'checked' : ''} style="width:1rem; height:1rem; accent-color:var(--primary,#2563eb);"> <span>${esc(g)}</span>
+                  </label>`).join('');
+              })()}
+            </div>
+            <textarea name="benodigde_rouwgoederen" rows="2" placeholder="Extra opmerkingen over rouwgoederen (optioneel)" style="width:100%; margin-top:.4rem;">${esc(v('benodigde_rouwgoederen'))}</textarea>
+          </label>
         </fieldset>
 
         <!-- ── VERZORGING ────────────────────────────────────────────────── -->
@@ -1205,7 +1216,7 @@ function renderDossierForm(params) {
     if (isNew) {
       // Verwijder eerdere auto-post uit buffer
       kostenBuffer = kostenBuffer.filter(k => !(k.omschrijving || '').startsWith(prefix));
-      if (naam && naam !== 'anders' && bedrag != null) {
+      if (naam && naam !== 'anders') {
         kostenBuffer.push({
           omschrijving: prefix + naam,
           categorie,
@@ -1223,7 +1234,7 @@ function renderDossierForm(params) {
       for (const k of oude) {
         try { await DB.remove(KEYS.KOSTEN, k.id); } catch (_) {}
       }
-      if (naam && naam !== 'anders' && bedrag != null) {
+      if (naam && naam !== 'anders') {
         try {
           await DB.insert(KEYS.KOSTEN, {
             dossier_id: dossier.id,
@@ -1672,9 +1683,9 @@ function renderDossierForm(params) {
           try { await KistVoorraad.reserveer1(data.kist_type); } catch (_) {}
         }
         // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
-        // Alleen beheerders beheren kosten (server-side geblokkeerd voor medewerkers).
+        // Medewerkers mogen kosten toevoegen; prijzen zijn NULL en beheerder
+        // vult later aan indien nodig.
         try {
-          if (typeof Auth === 'undefined' || Auth.isBeheerder())
           await Promise.all((kostenBuffer || []).map(p => DB.insert(KEYS.KOSTEN, {
             dossier_id: created.id,
             omschrijving: p.omschrijving,

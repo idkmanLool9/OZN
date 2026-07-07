@@ -473,12 +473,13 @@ function renderKistenBeheer(msg) {
     if (zoom) {
       const naam = zoom.getAttribute('data-naam');
       const k = vindKist(naam); if (!k) return;
+      const magPrijs = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
       Lightbox.show({
         src: KistFotos.urlVoor(k.naam) || null,
         svgFallback: kistSVG(k.materiaal),
         title: k.naam,
         subtitle: k.materiaal,
-        price: fmtEUR(k.bedrag),
+        price: magPrijs ? fmtEUR(k.bedrag) : null,
       });
       return;
     }
