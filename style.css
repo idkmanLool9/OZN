@@ -436,7 +436,7 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
     radial-gradient(at 20% 30%, rgba(107, 30, 42, .35) 0%, transparent 45%),
     radial-gradient(at 80% 70%, rgba(42, 93, 107, .30) 0%, transparent 50%),
     linear-gradient(135deg, #1c2541, #0b132b);
-  padding: 0; overflow: hidden;
+  padding: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 
@@ -458,14 +458,14 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 .profile-card {
   position: relative; z-index: 2;
   width: 100%; max-width: none;
-  height: 100vh;
+  min-height: 100vh;
   background: var(--surface);
   border-radius: 0;
   padding: max(1.5rem, env(safe-area-inset-top)) 2rem max(1rem, env(safe-area-inset-bottom));
   box-shadow: none;
   text-align: center;
   display: flex; flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 @media (max-width: 720px) {
   .profile-card { padding: max(1rem, env(safe-area-inset-top)) 1rem max(.75rem, env(safe-area-inset-bottom)); }
@@ -475,7 +475,6 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
   flex: 1 1 auto;
   width: 100%;
   align-content: center;
-  overflow: hidden;
 }
 
 /* Zoekbalk boven de tegels */
