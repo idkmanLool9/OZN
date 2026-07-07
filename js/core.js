@@ -1267,16 +1267,6 @@ function showProfilePicker() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = false;
   $('#app').hidden = true;
-  // Vul de greeting in op basis van tijd van de dag
-  const greetEl = $('#profile-greeting');
-  if (greetEl) {
-    const h = new Date().getHours();
-    greetEl.textContent =
-      h < 6  ? 'Goedenacht' :
-      h < 12 ? 'Goedemorgen' :
-      h < 18 ? 'Goedemiddag' :
-               'Goedenavond';
-  }
   // Render alle profielen dynamisch uit Settings
   const mount = $('#profile-options-mount');
   if (mount) {
@@ -1300,24 +1290,6 @@ function showProfilePicker() {
             <span class="profile-name">${esc(p.name)}</span>
           </button>`;
       }).join('');
-    }
-  }
-  // Zoekfilter — verbergt/toont knoppen live terwijl je typt.
-  const zoek = $('#profile-search');
-  if (zoek) {
-    zoek.value = '';
-    const filter = () => {
-      const q = zoek.value.trim().toLowerCase();
-      mount.querySelectorAll('.profile-option').forEach(btn => {
-        const naam = btn.dataset.name || '';
-        btn.style.display = (!q || naam.includes(q)) ? '' : 'none';
-      });
-    };
-    zoek.addEventListener('input', filter);
-    // Auto-focus alleen op grotere schermen (op tablets/desktops) zodat op
-    // een echte tablet direct kan worden getypt zonder toetsenbord-hop.
-    if (window.matchMedia && window.matchMedia('(min-width: 720px)').matches) {
-      setTimeout(() => { try { zoek.focus(); } catch (_) {} }, 50);
     }
   }
 }
