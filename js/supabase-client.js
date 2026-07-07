@@ -95,13 +95,15 @@ const Cloud = {
     try {
       const [d, k, n, kim, pf, pn, pl, kv] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
-        sb.from('kosten_zicht').select('*').order('id', { ascending: true }),
+        // Kosten via SECURITY DEFINER-RPC (bedrag gemaskeerd voor medewerker,
+        // rij-filter gelijk aan dossiers_select).
+        sb.rpc('get_kosten_zicht'),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
         // Accounts + rollen (RLS: medewerker ziet enkel eigen rij, beheerder alle)
         sb.from('profiles').select('*').order('naam', { ascending: true }),
-        // Alleen id+naam voor de personeelskiezer (view, geen rol-lek)
-        sb.from('personeel_namen').select('*').order('naam', { ascending: true }),
+        // Alleen id+naam voor de personeelskiezer, via SECURITY DEFINER-RPC.
+        sb.rpc('get_personeel_namen'),
         // Planning-agenda (tolerant als de tabel nog niet bestaat)
         sb.from('planning_items').select('*').order('start_ts', { ascending: true }),
         // Kist-voorraad (RLS: beheerder-only; medewerker krijgt lege lijst)
@@ -109,7 +111,8 @@ const Cloud = {
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
-      Cloud.cache.kosten = (k.data || []).map(normKosten);
+      // RPC returns unordered; sorteer in JS op id
+      Cloud.cache.kosten = ((k.data || []).slice().sort((a, b) => (a.id||0) - (b.id||0))).map(normKosten);
       Cloud.cache.notities = (n.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
       Cloud.cache.profiles = ((pf && pf.data) || []).map(normRow);
