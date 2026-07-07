@@ -8,7 +8,7 @@ function renderDossierDetail(params) {
   const kosten = DB.where(KEYS.KOSTEN, k => k.dossier_id === id).sort((a, b) => a.id - b.id);
   // Mag deze gebruiker prijzen zien en kosten bewerken? (server dwingt óók af)
   const magPrijzen  = (typeof Auth !== 'undefined' && typeof Auth.magPrijzenZien === 'function') ? Auth.magPrijzenZien() : true;
-  const kanBewerken = (typeof Auth === 'undefined') || Auth.isBeheerder(); // toevoegen/verwijderen kosten
+  const kanBewerken = true; // medewerkers mogen ook kosten toevoegen/verwijderen (prijzen blijven verborgen)
   const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === id).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
   const totaal = kosten.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
   const betaald = kosten.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
@@ -269,8 +269,10 @@ function renderDossierDetail(params) {
               const cls = 'btn preset-btn'
                 + (p.nav ? ' preset-nav preset-nav-' + p.nav : '')
                 + (p._hidden ? ' is-hidden-preset' : '');
-              const trailing = (p.bedrag != null && p.bedrag !== '')
-                ? `<strong>${p.vraagPrijs ? '± ' : ''}${fmtEUR(p.bedrag)}${p._customBedrag && !p.vraagPrijs ? ' ✏️' : ''}</strong>`
+              const trailing = magPrijzen
+                ? ((p.bedrag != null && p.bedrag !== '')
+                    ? `<strong>${p.vraagPrijs ? '± ' : ''}${fmtEUR(p.bedrag)}${p._customBedrag && !p.vraagPrijs ? ' ✏️' : ''}</strong>`
+                    : (p.nav ? '<strong class="muted">→</strong>' : ''))
                 : (p.nav ? '<strong class="muted">→</strong>' : '');
               const adminCtrls = (adminMode && !p.nav)
                 ? `<span class="preset-admin">
@@ -299,7 +301,7 @@ function renderDossierDetail(params) {
               `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
           </select>
           <input type="number" name="aantal" placeholder="Aantal" min="1" step="1" inputmode="numeric" value="1" style="max-width:80px;">
-          <input type="text" name="bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">
+          ${magPrijzen ? '<input type="text" name="bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">' : ''}
           <label class="checkbox-inline"><input type="checkbox" name="betaald"> betaald</label>
           <button type="submit" class="btn">+ Toevoegen</button>
         </form>`}
@@ -887,8 +889,8 @@ function bindDetailEvents(id) {
     const omsch = f.omschrijving.value.trim(); if (!omsch) return;
     const aantal = parseInt(f.aantal.value, 10);
     if (!isFinite(aantal) || aantal < 1) { Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' }); return; }
-    const stuk = parseEUR(f.bedrag.value);
-    const bedrag = +(stuk * aantal).toFixed(2);
+    const stuk = (f.bedrag ? parseEUR(f.bedrag.value) : 0);
+    const bedrag = magPrijzen ? +(stuk * aantal).toFixed(2) : null;
     try {
       await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag, aantal, betaald: f.betaald.checked });
       await DB.touchDossier(id);
@@ -1024,8 +1026,8 @@ function bindDetailEvents(id) {
         // 'vraagPrijs' = richtprijs, vraag het werkelijke bedrag.
         // 'food' = aantal × prijs per stuk (totaal automatisch berekend).
         let aantalPreset = 1;
-        let bedragPreset = p.bedrag;
-        if (p.vraagPrijs) {
+        let bedragPreset = magPrijzen ? p.bedrag : null;
+        if (magPrijzen && p.vraagPrijs) {
           const input = window.prompt(
             `Wat heeft "${p.omschrijving}" gekost? (richtprijs — vul het werkelijke bedrag in €)`,
             ''
@@ -1039,7 +1041,9 @@ function bindDetailEvents(id) {
         } else if (p.food) {
           const stuk = Number(p.bedrag) || 0;
           const input = window.prompt(
-            `Hoeveel ${p.omschrijving}? (prijs per stuk: ${fmtEUR(stuk)})`,
+            magPrijzen
+              ? `Hoeveel ${p.omschrijving}? (prijs per stuk: ${fmtEUR(stuk)})`
+              : `Hoeveel ${p.omschrijving}?`,
             '1'
           );
           if (input == null) return;
@@ -1048,7 +1052,7 @@ function bindDetailEvents(id) {
             Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' });
             return;
           }
-          bedragPreset = +((stuk * aantalPreset).toFixed(2));
+          bedragPreset = magPrijzen ? +((stuk * aantalPreset).toFixed(2)) : null;
         }
         // Bestaat al een rij met dezelfde omschrijving + categorie?
         // Dan aantal ophogen en bedrag bijtellen (geen dubbele rij).
@@ -1060,8 +1064,11 @@ function bindDetailEvents(id) {
         if (existing.length > 0) {
           const e = existing[0];
           const newAantal = (Number(e.aantal) || 1) + aantalPreset;
-          const newBedrag = +((Number(e.bedrag) || 0) + bedragPreset).toFixed(2);
-          await DB.update(KEYS.KOSTEN, e.id, { aantal: newAantal, bedrag: newBedrag });
+          const patch = { aantal: newAantal };
+          if (magPrijzen && bedragPreset != null) {
+            patch.bedrag = +((Number(e.bedrag) || 0) + bedragPreset).toFixed(2);
+          }
+          await DB.update(KEYS.KOSTEN, e.id, patch);
         } else {
           await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: p.omschrijving, categorie: p.categorie, bedrag: bedragPreset, aantal: aantalPreset, betaald: false });
         }

@@ -931,29 +931,9 @@ function renderDossierForm(params) {
         if (a._rank[0] !== b._rank[0]) return a._rank[0] - b._rank[0];
         return a._rank[1] - b._rank[1];
       });
-    // Medewerkers mogen geen prijzen zien en geen kosten beheren (server-side
-    // afgedwongen). Toon een alleen-lezen lijst zonder bedragen en zonder
-    // schrijf-acties; aftikken kan in het dossier zelf.
-    const kanKosten = (typeof Auth === 'undefined') || Auth.isBeheerder();
-    if (!kanKosten) {
-      mount.innerHTML = `
-        ${kosten.length === 0
-          ? '<p class="muted small">Nog geen kostenposten.</p>'
-          : `<table class="table wizard-kosten-table">
-              <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Aantal</th><th></th></tr></thead>
-              <tbody>${kosten.map(k => {
-                const aantal = Number(k.aantal) || 1;
-                return `<tr>
-                  <td>${esc(k.omschrijving)}</td>
-                  <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
-                  <td class="num">${aantal}</td>
-                  <td>${k.betaald ? '<span class="badge badge-green" title="Afgevinkt">✓</span>' : ''}</td>
-                </tr>`;
-              }).join('')}</tbody>
-            </table>`}
-        <p class="muted small" style="margin-top:.5rem;">Bedragen en het beheren van kostenposten zijn voorbehouden aan de beheerder. Aftikken kan in het dossier zelf.</p>`;
-      return;
-    }
+    // Medewerkers mogen kosten toevoegen/verwijderen, maar prijzen blijven
+    // verborgen. Beheerders zien alle bedragen. Server dwingt óók af.
+    const magPrijzen = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
 
     const totaal = kosten.reduce((s,k) => s + (Number(k.bedrag)||0), 0);
     const betaald = kosten.filter(k => k.betaald).reduce((s,k) => s + (Number(k.bedrag)||0), 0);
@@ -963,23 +943,23 @@ function renderDossierForm(params) {
     mount.innerHTML = `
       ${kosten.length === 0 ? '<p class="muted small">Nog geen kostenposten. Voeg toe via een snelknop of handmatig hieronder.</p>' : `
       <table class="table wizard-kosten-table">
-        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Aantal</th><th class="num">Bedrag</th><th></th></tr></thead>
+        <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Aantal</th>${magPrijzen ? '<th class="num">Bedrag</th>' : ''}<th></th></tr></thead>
         <tbody>
           ${kosten.map(k => {
             const aantal = Number(k.aantal) || 1;
             const stuk = aantal > 0 ? (Number(k.bedrag) || 0) / aantal : 0;
             return `<tr>
-              <td>${esc(k.omschrijving)}${aantal !== 1 ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}</td>
+              <td>${esc(k.omschrijving)}${(magPrijzen && aantal !== 1) ? ` <span class="muted small">(${fmtEUR(stuk)} per stuk)</span>` : ''}</td>
               <td class="muted small">${esc(categorieLabel(k.categorie))}</td>
               <td class="num">${aantal}</td>
-              <td class="num">${fmtEUR(k.bedrag)}</td>
+              ${magPrijzen ? `<td class="num">${fmtEUR(k.bedrag)}</td>` : ''}
               <td><button type="button" class="btn-icon" data-wk-del="${k.id}" title="Verwijderen">×</button></td>
             </tr>`;
           }).join('')}
         </tbody>
       </table>
       <div class="wizard-kosten-totals">
-        <span>Totaal factuur: <strong>${fmtEUR(totaal)}</strong></span>
+        ${magPrijzen ? `<span>Totaal factuur: <strong>${fmtEUR(totaal)}</strong></span>` : '<span></span>'}
         <button type="button" class="kost-toggle kost-toggle-big ${allesBetaald ? 'on-betaald' : 'off-betaald'}" id="wk-status-toggle">
           ${allesBetaald ? '✓ Volledig betaald' : '○ Nog open'}
         </button>
@@ -988,19 +968,21 @@ function renderDossierForm(params) {
 
       <section class="wizard-kosten-presets" id="wk-presets-details" style="margin-top:.85rem;">
         <h4 class="wizard-kosten-presets-title">Snel toevoegen uit standaardlijst</h4>
-        ${adminMode ? '<p class="muted small" style="margin:.25rem 0 0;">Beheermodus aan — klik op het potlood om een prijs aan te passen of op de prullenbak om een post uit de lijst te verbergen.</p>' : ''}
+        ${(adminMode && magPrijzen) ? '<p class="muted small" style="margin:.25rem 0 0;">Beheermodus aan — klik op het potlood om een prijs aan te passen of op de prullenbak om een post uit de lijst te verbergen.</p>' : ''}
         <div class="wizard-preset-grid">
-          ${effectieveKostenPresets({ includeHidden: adminMode }).map((p, i) => {
+          ${effectieveKostenPresets({ includeHidden: adminMode && magPrijzen }).map((p, i) => {
             const cls = 'btn btn-sm btn-ghost wizard-preset-btn'
               + (p.nav ? ' wizard-preset-nav wizard-preset-nav-' + p.nav : '')
               + (p._hidden ? ' is-hidden-preset' : '');
             const prijsTekst = p.vraagPrijs
               ? `± ${fmtEUR(p.bedrag || 0)}`
               : `${fmtEUR(p.bedrag)}${p._customBedrag ? ' ✏️' : ''}`;
-            const prijs = (p.bedrag != null && p.bedrag !== '')
-              ? `<span class="muted small">${prijsTekst}</span>`
+            const prijs = magPrijzen
+              ? ((p.bedrag != null && p.bedrag !== '')
+                  ? `<span class="muted small">${prijsTekst}</span>`
+                  : (p.nav ? '<span class="muted small">→</span>' : ''))
               : (p.nav ? '<span class="muted small">→</span>' : '');
-            const adminCtrls = (adminMode && !p.nav)
+            const adminCtrls = (adminMode && magPrijzen && !p.nav)
               ? `<span class="wizard-preset-admin">
                   <button type="button" class="wizard-preset-edit" data-wk-edit="${i}" title="Prijs aanpassen">✏️</button>
                   ${p._hidden
@@ -1026,7 +1008,7 @@ function renderDossierForm(params) {
           ${KOSTEN_CATEGORIEEN.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
         </select>
         <input type="number" id="wk-aantal" placeholder="Aantal" min="1" step="1" inputmode="numeric" value="1" style="max-width:80px;">
-        <input type="text" id="wk-bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">
+        ${magPrijzen ? '<input type="text" id="wk-bedrag" placeholder="Prijs per stuk" inputmode="decimal" style="max-width:130px;">' : ''}
         <button type="button" class="btn btn-sm" id="wk-add-btn">+ Toevoegen</button>
       </div>`;
 
@@ -1061,10 +1043,10 @@ function renderDossierForm(params) {
     // ── Acties: preset toevoegen ──
     const addPreset = async (p) => {
       let aantal = 1;
-      let bedrag = p.bedrag;
+      let bedrag = magPrijzen ? p.bedrag : null;
       // 'vraagPrijs'-items (zoals Koffie/thee/water) hebben een richtprijs
       // die per dossier verschilt — vraag het werkelijke bedrag.
-      if (p.vraagPrijs) {
+      if (magPrijzen && p.vraagPrijs) {
         const input = window.prompt(
           `Wat heeft "${p.omschrijving}" gekost? (richtprijs — vul het werkelijke bedrag in €)`,
           ''
@@ -1079,7 +1061,9 @@ function renderDossierForm(params) {
         // Voor 'eten'-items vragen we eerst hoeveel — totaal = aantal × prijs.
         const stuk = Number(p.bedrag) || 0;
         const input = window.prompt(
-          `Hoeveel ${p.omschrijving}? (prijs per stuk: ${fmtEUR(stuk)})`,
+          magPrijzen
+            ? `Hoeveel ${p.omschrijving}? (prijs per stuk: ${fmtEUR(stuk)})`
+            : `Hoeveel ${p.omschrijving}?`,
           '1'
         );
         if (input == null) return;
@@ -1088,7 +1072,7 @@ function renderDossierForm(params) {
           Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' });
           return;
         }
-        bedrag = +((stuk * aantal).toFixed(2));
+        bedrag = magPrijzen ? +((stuk * aantal).toFixed(2)) : null;
       }
       if (isNew) {
         kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag, aantal, betaald: false });
@@ -1183,7 +1167,7 @@ function renderDossierForm(params) {
     if (fillBtn) fillBtn.addEventListener('click', () => {
       // Navigatie-tegels (kist/bloemen/extra) overslaan — die hebben geen prijs
       KOSTEN_PRESETS.filter(p => !p.nav).forEach(p =>
-        kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: p.bedrag, aantal: 1, betaald: false }));
+        kostenBuffer.push({ omschrijving: p.omschrijving, categorie: p.categorie, bedrag: magPrijzen ? p.bedrag : null, aantal: 1, betaald: false }));
       saveBuffer(); renderWizardKosten();
     });
     // ── Acties: handmatig toevoegen (met aantal × prijs per stuk) ──
@@ -1194,8 +1178,9 @@ function renderDossierForm(params) {
       const cat = mount.querySelector('#wk-categorie').value || null;
       const aantal = parseInt(mount.querySelector('#wk-aantal').value, 10);
       if (!isFinite(aantal) || aantal < 1) { Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' }); return; }
-      const stuk = parseEUR(mount.querySelector('#wk-bedrag').value);
-      const bedrag = +(stuk * aantal).toFixed(2);
+      const bedragInp = mount.querySelector('#wk-bedrag');
+      const stuk = bedragInp ? parseEUR(bedragInp.value) : 0;
+      const bedrag = magPrijzen ? +(stuk * aantal).toFixed(2) : null;
       if (isNew) {
         kostenBuffer.push({ omschrijving: oms, categorie: cat, bedrag, aantal, betaald: false });
         saveBuffer(); renderWizardKosten();
@@ -1213,9 +1198,10 @@ function renderDossierForm(params) {
   const KIST_PREFIX = 'Kist: ';
 
   async function syncAutoKost(prefix, categorie, naam, bedrag) {
-    // Medewerkers beheren geen kosten (server-side geblokkeerd) — auto-kosten
-    // overslaan zodat er geen mislukte schrijfacties/foutmeldingen ontstaan.
-    if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) { renderWizardKosten(); return; }
+    // Medewerkers mogen ook kist-posten syncen, maar zonder prijs. Beheerder
+    // vult later de bedragen aan indien nodig.
+    const magPrijs = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
+    if (!magPrijs) bedrag = null;
     if (isNew) {
       // Verwijder eerdere auto-post uit buffer
       kostenBuffer = kostenBuffer.filter(k => !(k.omschrijving || '').startsWith(prefix));

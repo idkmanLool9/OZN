@@ -136,6 +136,7 @@ function renderKistenBeheer(msg) {
   const pagina = gefilterd.slice(start, start + KISTEN_PER_PAGINA);
 
   const isBeheerder = (typeof Auth !== 'undefined') && Auth.isBeheerder();
+  const magPrijzen = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
   const kaart = (k) => {
     const url = KistFotos.urlVoor(k.naam);
     const hidden = !!k._hidden;
@@ -178,7 +179,7 @@ function renderKistenBeheer(msg) {
           ${vStatus}
           <div class="kist-card-foot">
             <div class="kist-card-foot-meta">
-              <span class="kist-price">${fmtEUR(k.bedrag)}</span>
+              ${magPrijzen ? `<span class="kist-price">${fmtEUR(k.bedrag)}</span>` : ''}
               ${vChip}
             </div>
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
@@ -251,10 +252,10 @@ function renderKistenBeheer(msg) {
           <option value="">Kleur</option>
           ${kleurGroepen.map(g => `<option value="${esc(g)}" ${_kistKleur === g ? 'selected' : ''}>${esc(g)}</option>`).join('')}
         </select>
-        <select class="catalog-chip" id="kist-f-prijs">
+        ${magPrijzen ? `<select class="catalog-chip" id="kist-f-prijs">
           <option value="">Prijs</option>
           ${KIST_PRIJS_RANGES.map(r => `<option value="${esc(r.key)}" ${_kistPrijs === r.key ? 'selected' : ''}>${esc(r.label)}</option>`).join('')}
-        </select>
+        </select>` : ''}
         ${_kistFiltersActief() ? '<button type="button" class="catalog-wis" id="kist-filter-clear">↺ Wis filters</button>' : ''}
         <span class="catalog-count">${gefilterd.length} resultaten</span>
         <div class="catalog-view">
