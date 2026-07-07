@@ -603,7 +603,7 @@ function renderAccount(msg) {
 
       <section class="card narrow" id="profielen">
         <h2>Profielen — "Wie werkt vandaag?"</h2>
-        <p class="muted small">De namen die verschijnen op het profielkeuze-scherm. Wijzigingen in de naam blijven bij bestaande dossiers behouden (tracking-velden veranderen niet met terugwerkende kracht).</p>
+        <p class="muted small">De namen die verschijnen op het profielkeuze-scherm. Elke profiel heeft ook een <strong>rol</strong> — die bepaalt of dat profiel prijzen en archief mag zien. Een medewerker-profiel op een beheerder-account krijgt de medewerker-view.</p>
         ${(() => {
           const lijst = (Settings.get('profielen') || []);
           return `
@@ -612,7 +612,11 @@ function renderAccount(msg) {
               ${lijst.map((p, i) => `
                 <div class="profielen-row" data-idx="${i}">
                   <span class="profielen-avatar" style="background:${esc(p.color || '#6b1e2a')};">${esc((p.name || '?').charAt(0).toUpperCase())}</span>
-                  <input type="text" class="profielen-naam" value="${esc(p.name || '')}" placeholder="bv. Rume" maxlength="40">
+                  <input type="text" class="profielen-naam" value="${esc(p.name || '')}" placeholder="Naam" maxlength="40">
+                  <select class="profielen-rol" title="Rol van dit profiel">
+                    <option value="medewerker" ${p.rol !== 'beheerder' ? 'selected' : ''}>Medewerker</option>
+                    <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
+                  </select>
                   <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
                   <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
                 </div>`).join('')}
@@ -1332,7 +1336,11 @@ function renderAccount(msg) {
       div.dataset.idx = idx;
       div.innerHTML = `
         <span class="profielen-avatar" style="background:${esc(kleur)};">${esc(letter)}</span>
-        <input type="text" class="profielen-naam" value="${esc(naam)}" placeholder="bv. Rume" maxlength="40">
+        <input type="text" class="profielen-naam" value="${esc(naam)}" placeholder="Naam" maxlength="40">
+        <select class="profielen-rol" title="Rol van dit profiel">
+          <option value="medewerker" selected>Medewerker</option>
+          <option value="beheerder">Beheerder</option>
+        </select>
         <input type="color" class="profielen-kleur" value="${esc(kleur)}" title="Kleur van de avatar">
         <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${idx}" title="Verwijderen">×</button>`;
       rows.appendChild(div);
@@ -1377,6 +1385,8 @@ function renderAccount(msg) {
         const naam = r.querySelector('.profielen-naam').value.trim();
         if (!naam) return;
         const kleur = r.querySelector('.profielen-kleur').value || '#6b1e2a';
+        const rolSel = r.querySelector('.profielen-rol');
+        const rol = rolSel && rolSel.value === 'beheerder' ? 'beheerder' : 'medewerker';
         // Behoud het oude id als de naam overeenkomt; anders genereer een nieuwe
         let id = huidigLijst[idx]?.id;
         if (!id || gebruikteIds.has(id)) {
@@ -1386,7 +1396,7 @@ function renderAccount(msg) {
           while (gebruikteIds.has(id)) id = base + '_' + (n++);
         }
         gebruikteIds.add(id);
-        profielen.push({ id, name: naam, color: kleur });
+        profielen.push({ id, name: naam, color: kleur, rol });
       });
       if (profielen.length === 0) {
         Modal.show({ type: 'warning', title: 'Geen profielen', message: 'Voeg minstens één profiel toe.' });

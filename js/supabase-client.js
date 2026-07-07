@@ -40,13 +40,33 @@ const Auth = {
       _rol = (data && data.rol) || 'medewerker';
     } catch (_) { _rol = 'medewerker'; }
   },
-  rol() { return _rol || 'medewerker'; },
-  isBeheerder() { return _rol === 'beheerder'; },
-  // Mag deze gebruiker prijzen/bedragen zien? Beheerder altijd; medewerker
-  // alleen als de gedeelde instelling het toestaat. (Server dwingt dit óók af
-  // via de kosten_zicht-view; dit is puur voor de UI.)
+  // Effectieve rol = laagste van (account-rol, actieve profiel-rol). Zo kan
+  // een beheerder-account per profiel worden beperkt tot medewerker-view.
+  // Een medewerker-account kan nooit ineens beheerder worden — server-side
+  // (RLS) blijft de account-rol de baas.
+  _effectieveRol() {
+    const acc = _rol || 'medewerker';
+    let prof = 'beheerder';
+    try {
+      if (typeof ActiveProfile !== 'undefined') {
+        const p = ActiveProfile.current();
+        if (p && p.rol) prof = p.rol;
+      }
+    } catch (_) {}
+    return (acc === 'beheerder' && prof === 'beheerder') ? 'beheerder' : 'medewerker';
+  },
+  rol() { return Auth._effectieveRol(); },
+  isBeheerder() { return Auth._effectieveRol() === 'beheerder'; },
+  // Rauwe account-rol (zonder profiel-beperking) — voor UI-plekken die
+  // moeten weten of het account onderliggend beheerder is (bv. om aan te
+  // geven waarom een medewerker-profiel is gekozen).
+  accountRol() { return _rol || 'medewerker'; },
+  // Mag deze gebruiker prijzen/bedragen zien? Effectieve beheerder altijd;
+  // effectieve medewerker alleen als de gedeelde instelling het toestaat.
+  // (Server dwingt dit óók af via mag_prijzen_zien() als het account
+  // medewerker is; als het account beheerder is, is server sowieso open.)
   magPrijzenZien() {
-    if (_rol === 'beheerder') return true;
+    if (Auth._effectieveRol() === 'beheerder') return true;
     try { return !!(typeof Settings !== 'undefined' && Settings.get('medewerker_ziet_prijzen')); }
     catch (_) { return false; }
   },
