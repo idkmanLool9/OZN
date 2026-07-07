@@ -70,7 +70,6 @@ function dossierDraftKey(isNew, id) {
 // Velden die in de DB als BOOLEAN staan — checkboxen daarvoor moeten als
 // true/false worden verzonden i.p.v. 'ja'/'nee' (anders gooit Postgres).
 const BOOL_VELDEN = new Set([
-  'opbaren_ophalen', 'opbaren_thuis',
   'opbaring_bed', 'opbaring_kist',
   'mond_gehecht', 'oogkapjes', 'buikpunctie',
   'peacemaker_verwijderd', 'thanatopraxie',
@@ -352,24 +351,25 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="2">
           <legend>Opbaren &amp; locatie</legend>
-          <div style="display:flex; flex-direction:column; gap:.5rem;">
-            <div class="muted small">Kies wat van toepassing is — mag ook allebei tegelijk (bv. eerst ophalen, daarna thuis opbaren).</div>
-            <div style="display:flex; flex-wrap:wrap; gap:.5rem;">
-              <label class="opbaar-chip">
-                <input type="checkbox" name="opbaren_ophalen" id="cb-ophalen" value="ja" ${dossier.opbaren_ophalen ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Ophalen / overbrengen</span>
-              </label>
-              <label class="opbaar-chip">
-                <input type="checkbox" name="opbaren_thuis" id="cb-thuis" value="ja" ${dossier.opbaren_thuis ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Thuis opbaren</span>
-              </label>
-              <label class="opbaar-chip">
-                <input type="checkbox" name="opbaring_bed" value="ja" ${dossier.opbaring_bed ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Bed-opbaring</span>
-              </label>
-              <label class="opbaar-chip">
-                <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
-              </label>
-            </div>
-            <label style="margin-top:.5rem;"><span>Overlijdenslocatie</span>
+          <div class="grid-3">
+            <label><span>Ophalen of thuis opbaren?</span>
+              <select name="opbaring_type" id="opbaring-type-select">
+                <option value="">—</option>
+                <option value="ophalen" ${sel('opbaring_type','ophalen')}>Ophalen</option>
+                <option value="thuis"   ${sel('opbaring_type','thuis')}>Thuis opbaren</option>
+                <option value="beide"   ${sel('opbaring_type','beide')}>Ophalen + Thuis opbaren</option>
+              </select>
+            </label>
+            <label class="span-2"><span>Overlijdenslocatie</span>
               <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${esc(v('overlijdensplaats'))}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
+            </label>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
+            <label class="opbaar-chip">
+              <input type="checkbox" name="opbaring_bed" value="ja" ${dossier.opbaring_bed ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Bed-opbaring</span>
+            </label>
+            <label class="opbaar-chip">
+              <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
             </label>
           </div>
           <datalist id="locatie-suggesties">
@@ -386,7 +386,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <!-- ── OPHALEN / OVERBRENGEN ─────────────────────────────────────── -->
-        <fieldset class="card" data-step="2" id="ophalen-fieldset" ${dossier.opbaren_ophalen ? '' : 'hidden'}>
+        <fieldset class="card" data-step="2" id="ophalen-fieldset" ${(dossier.opbaring_type === 'ophalen' || dossier.opbaring_type === 'beide') ? '' : 'hidden'}>
           <legend>Ophalen / overbrengen</legend>
           <label style="display:block;"><span>Overbrengingen <span class="muted small">(één of meerdere, bv. eerst ziekenhuis → aula)</span></span>
             <div id="brengen-naar-lijst" style="display:flex; flex-direction:column; gap:.4rem;">
@@ -405,7 +405,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <!-- ── THUIS OPBAREN ─────────────────────────────────────────────── -->
-        <fieldset class="card" data-step="2" id="thuis-fieldset" ${dossier.opbaren_thuis ? '' : 'hidden'}>
+        <fieldset class="card" data-step="2" id="thuis-fieldset" ${(dossier.opbaring_type === 'thuis' || dossier.opbaring_type === 'beide') ? '' : 'hidden'}>
           <legend>Thuis opbaren</legend>
           <div class="grid-3">
             <label><span>Startdatum</span>
@@ -582,7 +582,7 @@ function renderDossierForm(params) {
   const STEP_FIELDS = {
     1: ['opdrachtgever_naam','achternaam','voornaam','geboortedatum','overlijdensdatum',
         'adres_overledene','postcode_overledene','woonplaats_overledene'],
-    2: ['opbaren_ophalen', 'opbaren_thuis'],
+    2: ['opbaring_type'],
     3: [], // kosten + kist via catalogus-pagina, geen verplichte velden
     4: [],  // bijzonderheden is volledig optioneel
   };
@@ -648,18 +648,16 @@ function renderDossierForm(params) {
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
 
-  // Ophalen + Thuis kunnen beide tegelijk aan. Elke checkbox toont zijn eigen
-  // fieldset. Verzorging staat er altijd.
+  // Ophalen / Thuis opbaren / Beide → toont het bijhorende fieldset.
   function updateOpbaring() {
-    const cbOp = document.getElementById('cb-ophalen');
-    const cbTh = document.getElementById('cb-thuis');
+    const sel = document.getElementById('opbaring-type-select');
+    const val = sel ? sel.value : '';
     const fsOp = document.getElementById('ophalen-fieldset');
     const fsTh = document.getElementById('thuis-fieldset');
-    if (fsOp) fsOp.hidden = !(cbOp && cbOp.checked);
-    if (fsTh) fsTh.hidden = !(cbTh && cbTh.checked);
+    if (fsOp) fsOp.hidden = !(val === 'ophalen' || val === 'beide');
+    if (fsTh) fsTh.hidden = !(val === 'thuis'   || val === 'beide');
   }
-  document.getElementById('cb-ophalen')?.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
-  document.getElementById('cb-thuis')?.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
+  document.getElementById('opbaring-type-select')?.addEventListener('change', () => { updateOpbaring(); updateStepColors(); });
   updateOpbaring();
 
   // Verzorging: peacemaker + thanatopraxie klap-effecten

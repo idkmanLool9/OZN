@@ -101,14 +101,14 @@ function renderDossierDetail(params) {
         })()}
         <h3>Opbaren &amp; locatie</h3>
         <dl class="dl">
-          ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : ''))}
-          ${(d.opbaring_type === 'ophalen' && Array.isArray(d.brengen_naar) && d.brengen_naar.length)
+          ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : '')))}
+          ${((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') && Array.isArray(d.brengen_naar) && d.brengen_naar.length)
             ? dlRow('Brengen naar', d.brengen_naar.map(esc).join(' → ')) : ''}
-          ${d.opbaring_type === 'thuis' ? dlRow('Start thuis-opbaring', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
-          ${d.opbaring_type === 'thuis' ? dlRow('Einde thuis-opbaring', [fmtDate(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd && 'om ' + d.thuis_opbaren_eindtijd].filter(Boolean).join(' ')) : ''}
-          ${(d.opbaring_type === 'thuis' && Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length)
+          ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? dlRow('Start thuis-opbaring', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
+          ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? dlRow('Einde thuis-opbaring', [fmtDate(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd && 'om ' + d.thuis_opbaren_eindtijd].filter(Boolean).join(' ')) : ''}
+          ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length)
             ? dlRow('Benodigde rouwgoederen', d.rouwgoederen_lijst.map(esc).join(', ')) : ''}
-          ${(d.opbaring_type === 'thuis' && d.benodigde_rouwgoederen)
+          ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && d.benodigde_rouwgoederen)
             ? `<div><dt>Extra (vrije tekst)</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
           ${dlRow('Opbaarlocatie', d.opbaarlocatie_type)}
         </dl>
@@ -444,8 +444,8 @@ function dossierSpec(d, kosten) {
       ['Adres', adresO],
     ] },
     { heading: 'Opbaren & locatie', rows: [
-      ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : '')],
-      ...(d.opbaring_type === 'thuis' ? [
+      ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : ''))],
+      ...((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? [
         ['Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
         ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
       ] : []),
@@ -497,8 +497,8 @@ function buildDossierEmail(d, kosten) {
   ]);
 
   pushSection('Opbaren & locatie', [
-    ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : '')],
-    ...(d.opbaring_type === 'thuis' ? [
+    ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : ''))],
+    ...((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? [
       ['Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
       ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
     ] : []),
@@ -1399,8 +1399,8 @@ function buildDossierDocHTML(d) {
 
       <h3 style="margin-top:1rem;">Opbaren &amp; locatie</h3>
       <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="padding:4px 0;width:35%;color:#666;">Ophalen / thuis opbaren</td><td>${esc(d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : '—'))}</td></tr>
-        ${d.opbaring_type === 'thuis' ? `<tr><td style="padding:4px 0;color:#666;">Datum &amp; begintijd</td><td>${esc([fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ') || '—')}</td></tr>` : ''}
+        <tr><td style="padding:4px 0;width:35%;color:#666;">Ophalen / thuis opbaren</td><td>${esc(d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : '—')))}</td></tr>
+        ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? `<tr><td style="padding:4px 0;color:#666;">Datum &amp; begintijd</td><td>${esc([fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ') || '—')}</td></tr>` : ''}
         <tr><td style="padding:4px 0;color:#666;">Opbaarlocatie</td><td>${esc(d.opbaarlocatie_type || '—')}</td></tr>
       </table>
 
