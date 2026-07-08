@@ -403,7 +403,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="2">
-          <legend>${dLabelSpan("sect_opbaren", "Opbaren &amp; locatie")}</legend>
+          <legend>${dLabelSpan("sect_opbaren", "Opbaren & locatie")}</legend>
           <div class="grid-3">
             <label><span>Ophalen of thuis opbaren?</span>
               <select name="opbaring_type" id="opbaring-type-select">
@@ -567,7 +567,7 @@ function renderDossierForm(params) {
         </fieldset>
 
         <fieldset class="card" data-step="2">
-          <legend>${dLabelSpan("sect_kist", "Kist &amp; vervoer")}</legend>
+          <legend>${dLabelSpan("sect_kist", "Kist & vervoer")}</legend>
           <div class="grid-3">
             <label class="span-2"><span>Kist</span>
               <input type="hidden" name="kist_type" value="${esc(v('kist_type'))}">
