@@ -1341,8 +1341,10 @@ const ActiveProfile = {
     } catch (_) { return null; }
   },
   set(id) {
-    if (!ActiveProfile.byId(id)) return;
+    const p = ActiveProfile.byId(id);
+    if (!p) return;
     try { localStorage.setItem(ActiveProfile.STORAGE_KEY, id); } catch (_) {}
+    try { if (typeof AuditLog !== 'undefined') AuditLog.log('profiel', null, id, { naam: p.name }); } catch (_) {}
   },
   clear() {
     try { localStorage.removeItem(ActiveProfile.STORAGE_KEY); } catch (_) {}

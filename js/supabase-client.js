@@ -80,9 +80,13 @@ const Auth = {
     if (error) return error.message;
     _session = data.session;
     await Auth.loadRol();
+    try { if (typeof AuditLog !== 'undefined') AuditLog.log('login', null, null, { email: email.trim() }); } catch (_) {}
     return null;
   },
-  async logout() { await sb.auth.signOut(); _session = null; },
+  async logout() {
+    try { if (typeof AuditLog !== 'undefined') await AuditLog.log('logout', null, null, null); } catch (_) {}
+    await sb.auth.signOut(); _session = null;
+  },
   // Auth-metadata van de huidige gebruiker (per-account; alleen zichtbaar voor
   // deze ingelogde gebruiker). Wordt gebruikt voor gevoelige, per-account
   // instellingen zoals API-sleutels.
@@ -262,6 +266,7 @@ const DB = {
     const data = await insertWithTrackFallback(tbl, row);
     const norm = normalize(tbl, data);
     Cloud.cache[tbl].push(norm);
+    AuditLog.log('insert', tbl, norm && norm.id, { row: sanitizeForAudit(row) });
     return norm;
   },
 
@@ -282,10 +287,12 @@ const DB = {
       p.bijgewerkt_door = profielNaam;
     }
     cleanEmpty(p);
+    const oud = (Cloud.cache[tbl] || []).find(x => x.id === id);
     const data = await updateWithTrackFallback(tbl, id, p);
     const norm = normalize(tbl, data);
     const i = Cloud.cache[tbl].findIndex(x => x.id === id);
     if (i >= 0) Cloud.cache[tbl][i] = norm;
+    AuditLog.log('update', tbl, id, { patch: sanitizeForAudit(p), oud: oud ? diffKeys(oud, norm) : null });
     return norm;
   },
 
@@ -299,12 +306,14 @@ const DB = {
       });
       throw new Error('offline');
     }
+    const oud = (Cloud.cache[tbl] || []).find(x => x.id === id);
     const { error } = await sb.from(tbl).delete().eq('id', id);
     if (error) {
       Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: error.message });
       throw error;
     }
     Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => x.id !== id);
+    AuditLog.log('delete', tbl, id, { was: oud ? sanitizeForAudit(oud) : null });
   },
 
   async removeWhere(tbl, fn) {
@@ -507,6 +516,64 @@ const KistVoorraad = {
     if (!cur) return;
     const nieuw = (cur.aantal || 0) + 1;
     try { await KistVoorraad.upsert(naam, { aantal: nieuw }); } catch (_) {}
+  },
+};
+
+// ─── Audit-log ──────────────────────────────────────────────────────────────
+// Alle mutaties, logins, logouts en profielwissels worden via de RPC
+// `audit_log_schrijf` in de tabel `audit_log` geschreven. Alleen beheerders
+// mogen lezen (RLS). Client-side hulp om entries te loggen én op te halen.
+function sanitizeForAudit(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const OUT_MAX = 5000;
+  const out = {};
+  for (const k in obj) {
+    const v = obj[k];
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'string' && v.length > 400) out[k] = v.slice(0, 400) + '…';
+    else if (Array.isArray(v)) out[k] = v.length > 20 ? v.slice(0, 20).concat(['…+' + (v.length - 20)]) : v;
+    else out[k] = v;
+  }
+  const s = JSON.stringify(out);
+  return s.length > OUT_MAX ? { _truncated: true, keys: Object.keys(out) } : out;
+}
+function diffKeys(oud, nieuw) {
+  if (!oud || !nieuw) return null;
+  const changed = {};
+  for (const k in nieuw) {
+    if (k === 'updated_at' || k === 'bijgewerkt_door') continue;
+    if (JSON.stringify(oud[k]) !== JSON.stringify(nieuw[k])) {
+      changed[k] = { was: oud[k], nu: nieuw[k] };
+    }
+  }
+  return Object.keys(changed).length ? sanitizeForAudit(changed) : null;
+}
+const AuditLog = {
+  async log(actie, tabel, recordId, detail) {
+    try {
+      if (!navigator.onLine) return; // stil overslaan als offline; niet blokkerend
+      const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+        ? ActiveProfile.current().name : null;
+      const rid = recordId != null ? String(recordId) : null;
+      await sb.rpc('audit_log_schrijf', {
+        p_actie: actie,
+        p_tabel: tabel || null,
+        p_record_id: rid,
+        p_detail: detail || null,
+        p_profiel_naam: profielNaam,
+      });
+    } catch (_) { /* logging faalt nooit hard */ }
+  },
+  async fetch({ limit = 200, offset = 0, actie = null, tabel = null, sinds = null } = {}) {
+    if (!navigator.onLine) return [];
+    let q = sb.from('audit_log').select('*').order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (actie) q = q.eq('actie', actie);
+    if (tabel) q = q.eq('tabel', tabel);
+    if (sinds) q = q.gte('created_at', sinds);
+    const { data, error } = await q;
+    if (error) return [];
+    return data || [];
   },
 };
 

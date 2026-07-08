@@ -235,6 +235,7 @@ function renderAccount(msg) {
         <a href="#/account#profielen">Profielen</a>
         <a href="#/account#opdrachtgevers">Opdrachtgevers</a>
         <a href="#/account#acc-data">Data &amp; sync</a>
+        <a href="#/logboek">Logboek</a>
       </nav>
 
       <section class="card narrow" id="acc-versie">
@@ -961,6 +962,15 @@ function renderAccount(msg) {
           </details>`;
         })()}
       </section>
+
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="acc-logboek" style="margin-top:1rem;">
+        <h2>Logboek</h2>
+        <p class="muted small">Volledig audit-log van alle wijzigingen, logins en profielwissels. Alleen zichtbaar voor beheerders.</p>
+        <div class="form-actions" style="justify-content:flex-start;">
+          <a href="#/logboek" class="btn btn-primary">📖 Open logboek</a>
+        </div>
+      </section>` : ''}
     </div>`;
 
   // Branding-instellingen
@@ -2141,4 +2151,107 @@ function renderAccount(msg) {
 
 function render404() {
   $('#view').innerHTML = `<div class="page"><div class="card narrow center"><h1>404</h1><p>Deze pagina bestaat niet.</p><a href="#/" class="btn btn-primary">Terug naar dashboard</a></div></div>`;
+}
+
+// ─── Logboek (audit-log) — alleen beheerder ───────────────────────────────
+async function renderLogboek() {
+  if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) {
+    $('#view').innerHTML = `<div class="page"><section class="card narrow"><h1>Logboek</h1>
+      <p>Het logboek is alleen zichtbaar voor beheerders.</p>
+      <a href="#/account" class="btn">← Terug naar Account</a></section></div>`;
+    return;
+  }
+  const url = new URL(location.href);
+  const params = url.hash.split('?')[1] ? new URLSearchParams(url.hash.split('?')[1]) : new URLSearchParams();
+  const filterActie = params.get('actie') || '';
+  const filterTabel = params.get('tabel') || '';
+
+  $('#view').innerHTML = `
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <a href="#/account" class="back-link">← Account</a>
+          <h1>Logboek</h1>
+          <p class="muted">Volledig audit-log — mutaties, logins, profielwissels. Nieuwste bovenaan.</p>
+        </div>
+      </div>
+      <form id="logboek-filters" class="dossiers-controls" style="margin-bottom:1rem;">
+        <select name="actie" class="dossiers-control">
+          <option value="">Alle acties</option>
+          ${['insert','update','delete','login','logout','profiel'].map(a =>
+            `<option value="${a}" ${filterActie === a ? 'selected' : ''}>${a}</option>`).join('')}
+        </select>
+        <select name="tabel" class="dossiers-control">
+          <option value="">Alle tabellen</option>
+          ${['dossiers','kosten','notities','planning_items','kist_voorraad','profiles'].map(t =>
+            `<option value="${t}" ${filterTabel === t ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <button type="submit" class="dossiers-control dossiers-filter-btn">Filter</button>
+        ${(filterActie || filterTabel) ? '<a href="#/logboek" class="dossiers-wis">↺ Wis</a>' : ''}
+      </form>
+      <div class="dossiers-kaart">
+        <div id="logboek-body" style="padding:1rem;">
+          <p class="muted">Laden…</p>
+        </div>
+      </div>
+    </div>`;
+
+  const filterForm = $('#logboek-filters');
+  if (filterForm) filterForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const p = new URLSearchParams();
+    if (e.target.actie.value) p.set('actie', e.target.actie.value);
+    if (e.target.tabel.value) p.set('tabel', e.target.tabel.value);
+    location.hash = '#/logboek' + (p.toString() ? '?' + p.toString() : '');
+  });
+
+  const body = $('#logboek-body');
+  try {
+    const rows = await AuditLog.fetch({
+      limit: 500,
+      actie: filterActie || null,
+      tabel: filterTabel || null,
+    });
+    if (!rows.length) {
+      body.innerHTML = '<p class="muted center" style="padding:1rem;">Nog geen logboek-entries voor deze filters.</p>';
+      return;
+    }
+    body.innerHTML = `
+      <table class="table dossiers-table">
+        <thead>
+          <tr><th>Wanneer</th><th>Wie</th><th>Actie</th><th>Tabel</th><th>ID</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => {
+            const wanneer = r.created_at ? new Date(r.created_at).toLocaleString('nl-NL') : '';
+            const wie = [r.profiel_naam, r.user_email].filter(Boolean).join(' · ');
+            const detailKort = r.detail
+              ? JSON.stringify(r.detail).slice(0, 140) + (JSON.stringify(r.detail).length > 140 ? '…' : '')
+              : '';
+            return `<tr>
+              <td class="muted small" style="white-space:nowrap;">${esc(wanneer)}</td>
+              <td>${esc(wie || '—')}</td>
+              <td><span class="badge badge-${logActieKleur(r.actie)}">${esc(r.actie)}</span></td>
+              <td>${esc(r.tabel || '—')}</td>
+              <td>${esc(r.record_id || '')}</td>
+              <td style="max-width:420px;overflow:hidden;text-overflow:ellipsis;font-family:monospace;font-size:.8rem;">${esc(detailKort)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <p class="muted small" style="padding:.75rem 1rem;">${rows.length} entries getoond.</p>`;
+  } catch (e) {
+    body.innerHTML = `<p class="alert alert-error">Logboek laden mislukt: ${esc(e.message || String(e))}</p>`;
+  }
+}
+function logActieKleur(a) {
+  switch (a) {
+    case 'insert': return 'green';
+    case 'update': return 'amber';
+    case 'delete': return 'red';
+    case 'login':  return 'blue';
+    case 'logout': return 'grey';
+    case 'profiel':return 'blue';
+    default:       return 'grey';
+  }
 }
