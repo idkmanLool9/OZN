@@ -162,16 +162,18 @@ function applyDossierDraft(formEl, data) {
     const lijst = formEl.querySelector('#extra-bezit-lijst');
     if (lijst) {
       lijst.innerHTML = data.__extra_bezittingen.map(b => `
-        <div class="extra-bezit-row" style="display:flex; flex-direction:row; align-items:center; gap:.6rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
-          <input type="text" class="extra-bezit-label" value="${esc(b.label || '')}" placeholder="bv. Ketting, horloge…" style="flex:1;">
-          <input type="hidden" class="extra-bezit-foto" value="${esc(b.foto_pad || '')}">
-          <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
-            <span class="extra-bezit-foto-status">${b.foto_pad ? '✓📷' : '📷'}</span>
-            <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
-          </label>
-          <span class="muted small">aantal</span>
-          <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(b.aantal || '')}" style="width:4.5rem;">
-          <button type="button" class="btn btn-sm btn-ghost extra-bezit-del" title="Verwijder">×</button>
+        <div class="extra-bezit-row" style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
+          <input type="text" class="extra-bezit-label" value="${esc(b.label || '')}" placeholder="bv. Ketting, horloge…" style="flex:1; border:none; background:transparent; font-weight:500; padding:.15rem .25rem; outline:none;">
+          <span style="display:flex; flex-direction:row; align-items:center; gap:.5rem; flex:0 0 auto;">
+            <input type="hidden" class="extra-bezit-foto" value="${esc(b.foto_pad || '')}">
+            <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+              <span class="extra-bezit-foto-status">${b.foto_pad ? '✓📷' : '📷'}</span>
+              <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
+            </label>
+            <span class="muted small">aantal</span>
+            <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(b.aantal || '')}" style="width:4.5rem;">
+            <button type="button" class="btn-icon extra-bezit-del" title="Verwijder">×</button>
+          </span>
         </div>`).join('');
       changed++;
     }
@@ -382,16 +384,18 @@ function renderDossierForm(params) {
             ${(() => {
               const extras = Array.isArray(dossier.extra_bezittingen) ? dossier.extra_bezittingen : [];
               return extras.map((b, i) => `
-                <div class="extra-bezit-row" style="display:flex; flex-direction:row; align-items:center; gap:.6rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
-                  <input type="text" class="extra-bezit-label" value="${esc(b.label || '')}" placeholder="bv. Ketting, horloge…" style="flex:1;">
-                  <input type="hidden" class="extra-bezit-foto" value="${esc(b.foto_pad || '')}">
-                  <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
-                    <span class="extra-bezit-foto-status">${b.foto_pad ? '✓📷' : '📷'}</span>
-                    <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
-                  </label>
-                  <span class="muted small">aantal</span>
-                  <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(b.aantal || '')}" style="width:4.5rem;">
-                  <button type="button" class="btn btn-sm btn-ghost extra-bezit-del" title="Verwijder">×</button>
+                <div class="extra-bezit-row" style="display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);">
+                  <input type="text" class="extra-bezit-label" value="${esc(b.label || '')}" placeholder="bv. Ketting, horloge…" style="flex:1; border:none; background:transparent; font-weight:500; padding:.15rem .25rem; outline:none;">
+                  <span style="display:flex; flex-direction:row; align-items:center; gap:.5rem; flex:0 0 auto;">
+                    <input type="hidden" class="extra-bezit-foto" value="${esc(b.foto_pad || '')}">
+                    <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+                      <span class="extra-bezit-foto-status">${b.foto_pad ? '✓📷' : '📷'}</span>
+                      <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
+                    </label>
+                    <span class="muted small">aantal</span>
+                    <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(b.aantal || '')}" style="width:4.5rem;">
+                    <button type="button" class="btn-icon extra-bezit-del" title="Verwijder">×</button>
+                  </span>
                 </div>`).join('');
             })()}
           </div>
@@ -897,17 +901,19 @@ function renderDossierForm(params) {
     const maakRij = (label = '', aantal = '', fotoPad = '') => {
       const div = document.createElement('div');
       div.className = 'extra-bezit-row';
-      div.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:.6rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);';
+      div.style.cssText = 'display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .85rem; border:1px solid var(--border,#e5e0d6); border-radius:10px; background:var(--card-bg,#fff);';
       div.innerHTML = `
-        <input type="text" class="extra-bezit-label" value="${esc(label)}" placeholder="bv. Ketting, horloge…" style="flex:1;">
-        <input type="hidden" class="extra-bezit-foto" value="${esc(fotoPad)}">
-        <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
-          <span class="extra-bezit-foto-status">${fotoPad ? '✓📷' : '📷'}</span>
-          <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
-        </label>
-        <span class="muted small">aantal</span>
-        <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(aantal)}" style="width:4.5rem;">
-        <button type="button" class="btn btn-sm btn-ghost extra-bezit-del" title="Verwijder">×</button>`;
+        <input type="text" class="extra-bezit-label" value="${esc(label)}" placeholder="bv. Ketting, horloge…" style="flex:1; border:none; background:transparent; font-weight:500; padding:.15rem .25rem; outline:none;">
+        <span style="display:flex; flex-direction:row; align-items:center; gap:.5rem; flex:0 0 auto;">
+          <input type="hidden" class="extra-bezit-foto" value="${esc(fotoPad)}">
+          <label class="btn btn-sm btn-ghost extra-bezit-foto-btn" title="Foto maken/kiezen" style="cursor:pointer; padding:.2rem .5rem;">
+            <span class="extra-bezit-foto-status">${fotoPad ? '✓📷' : '📷'}</span>
+            <input type="file" class="extra-bezit-foto-input" accept="image/*" capture="environment" hidden>
+          </label>
+          <span class="muted small">aantal</span>
+          <input type="number" class="extra-bezit-aantal" min="0" inputmode="numeric" value="${esc(aantal)}" style="width:4.5rem;">
+          <button type="button" class="btn-icon extra-bezit-del" title="Verwijder">×</button>
+        </span>`;
       return div;
     };
     addBtn.addEventListener('click', () => {
