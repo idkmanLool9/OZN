@@ -1741,7 +1741,21 @@ function renderDossierForm(params) {
         // de kist-auto-kost verversen. syncAutoKostKist verwijdert oude
         // auto-posten en voegt de nieuwe toe — idempotent.
         const kHidden = $('input[name="kist_type"]')?.value;
-        if (kHidden) syncAutoKostKist(kHidden);
+        if (kHidden) {
+          syncAutoKostKist(kHidden);
+          // Ook de zichtbare kist-UI (naam-chip + verberg-kies-knoppen)
+          // synchroniseren — anders zie je de nieuw gekozen kist pas na
+          // opslaan + heropen. Hidden-input werd wel gezet in
+          // applyDossierDraft, maar de display niet.
+          const huidig = document.getElementById('kist-huidig');
+          const huidigNaam = document.getElementById('kist-huidig-naam');
+          const kies = document.getElementById('kist-kies-knoppen');
+          if (huidig && huidigNaam && kies) {
+            huidigNaam.innerHTML = `<strong>${esc(kHidden)}</strong>`;
+            huidig.style.display = 'flex';
+            kies.style.display = 'none';
+          }
+        }
       }
     }
   } catch (_) {}

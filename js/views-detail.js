@@ -901,8 +901,18 @@ function bindDetailEvents(id) {
       const nieuw = e.target.value;
       const oud   = d.status || 'nieuw';
       const kistOm = (d.kist_type || '').trim();
+      // UI direct feedback zodat je ziet dat er iets gebeurt, ook als
+      // de DB-update ergens haakt.
+      statusSel.disabled = true;
+      const origLabel = statusSel.className;
       try {
-        await DB.update(KEYS.DOSSIERS, id, { status: nieuw });
+        const updated = await DB.update(KEYS.DOSSIERS, id, { status: nieuw });
+        // Extra zekerheid: als de cache-update in DB.update de rij om welke
+        // reden dan ook niet vond (bijv. type-mismatch), forceer 'm nu.
+        if (updated && Array.isArray(Cloud.cache.dossiers)) {
+          const i = Cloud.cache.dossiers.findIndex(x => Number(x.id) === Number(id));
+          if (i >= 0) Cloud.cache.dossiers[i] = Object.assign({}, Cloud.cache.dossiers[i], updated);
+        }
         // Kist-voorraad rebalance bij annuleren / heractiveren van een
         // dossier met een gekozen kist. Alleen beheerder (RLS blokkade).
         if (kistOm
@@ -916,9 +926,14 @@ function bindDetailEvents(id) {
             }
           } catch (_) {}
         }
+        try { Toast.show('Status: ' + nieuw.replace('_', ' '), 'success'); } catch (_) {}
         renderDossierDetail({ id });
-      } catch (_) {
-        renderDossierDetail({ id });
+      } catch (err) {
+        try { Toast.show('Status opslaan mislukt' + (err && err.message ? ': ' + err.message : ''), 'error'); } catch (_) {}
+        statusSel.disabled = false;
+        statusSel.className = origLabel;
+        // val terug naar de vorige waarde in het select-veld
+        statusSel.value = oud;
       }
     });
   }
