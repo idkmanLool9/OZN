@@ -499,6 +499,15 @@ const KistVoorraad = {
     const nieuw = Math.max(0, (cur.aantal || 0) - 1);
     try { await KistVoorraad.upsert(naam, { aantal: nieuw }); } catch (_) {}
   },
+  // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
+  // verwijderd wordt, geeft de oude voorraad +1 terug.
+  async terug1(naam) {
+    if (!naam) return;
+    const cur = KistVoorraad.byNaam(naam);
+    if (!cur) return;
+    const nieuw = (cur.aantal || 0) + 1;
+    try { await KistVoorraad.upsert(naam, { aantal: nieuw }); } catch (_) {}
+  },
 };
 
 // ─── Kistfoto's (publieke bucket) ───────────────────────────────────────────

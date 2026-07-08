@@ -1901,7 +1901,21 @@ function renderDossierForm(params) {
         localStorage.removeItem(draftKey);
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); localStorage.removeItem(kostenBufKey); } catch (_) {}
       } else {
+        // Onthoud de OUDE kist vóór de update, zodat we bij een kist-wissel
+        // de voorraad kunnen bijstellen (oude +1, nieuwe -1). Alleen als de
+        // waarde daadwerkelijk verandert. Alleen beheerder — server blokkeert
+        // medewerker sowieso.
+        const oudeKist   = (dossier.kist_type || '').trim();
+        const nieuweKist = (data.kist_type || '').trim();
         savedDossier = await DB.update(KEYS.DOSSIERS, dossier.id, data);
+        if (oudeKist !== nieuweKist
+            && typeof KistVoorraad !== 'undefined'
+            && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+          try {
+            if (oudeKist)   await KistVoorraad.terug1(oudeKist);
+            if (nieuweKist) await KistVoorraad.reserveer1(nieuweKist);
+          } catch (_) {}
+        }
         localStorage.removeItem(draftKey);
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
       }
