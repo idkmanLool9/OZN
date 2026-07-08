@@ -899,8 +899,23 @@ function bindDetailEvents(id) {
   if (statusSel) {
     statusSel.addEventListener('change', async e => {
       const nieuw = e.target.value;
+      const oud   = d.status || 'nieuw';
+      const kistOm = (d.kist_type || '').trim();
       try {
         await DB.update(KEYS.DOSSIERS, id, { status: nieuw });
+        // Kist-voorraad rebalance bij annuleren / heractiveren van een
+        // dossier met een gekozen kist. Alleen beheerder (RLS blokkade).
+        if (kistOm
+            && typeof KistVoorraad !== 'undefined'
+            && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+          try {
+            if (oud !== 'geannuleerd' && nieuw === 'geannuleerd') {
+              await KistVoorraad.terug1(kistOm);
+            } else if (oud === 'geannuleerd' && nieuw !== 'geannuleerd') {
+              await KistVoorraad.reserveer1(kistOm);
+            }
+          } catch (_) {}
+        }
         renderDossierDetail({ id });
       } catch (_) {
         renderDossierDetail({ id });
@@ -916,10 +931,20 @@ function bindDetailEvents(id) {
       cancelText: 'Annuleren',
     });
     if (!ok) return;
+    // Als er een kist gekozen was én de voorraad hem afgeboekt heeft, +1 terug.
+    // Alleen relevant als het dossier nog niet 'geannuleerd' was (dan is 'ie
+    // al eerder teruggegeven bij status-wissel).
+    const kistOm = (d.kist_type || '').trim();
+    const alTeruggegeven = d.status === 'geannuleerd';
     try {
       await DB.remove(KEYS.DOSSIERS, id); // cascade verwijdert kosten/notities in DB
       ['kosten','notities'].forEach(t =>
         Cloud.cache[t] = Cloud.cache[t].filter(x => x.dossier_id !== id));
+      if (kistOm && !alTeruggegeven
+          && typeof KistVoorraad !== 'undefined'
+          && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+        try { await KistVoorraad.terug1(kistOm); } catch (_) {}
+      }
       Router.go('/dossiers');
     } catch (e) {}
   });
