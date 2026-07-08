@@ -2815,6 +2815,51 @@ fieldset[data-step][hidden] { display: none !important; }
 .kist-card-foot-nopr { flex-direction: column; align-items: stretch; }
 .kist-kies-btn-full { width: 100%; }
 
+/* Logboek: leesbare tijdlijn ipv technische tabel */
+.logboek-list { list-style: none; margin: 0; padding: 0; }
+.logboek-dag { padding: 0 1rem 1rem; }
+.logboek-dag-kop {
+  font-size: .95rem; font-weight: 700;
+  margin: 1rem 0 .5rem;
+  color: var(--text);
+  border-bottom: 1px solid var(--border, #e5e0d6);
+  padding-bottom: .35rem;
+}
+.logboek-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.logboek-item {
+  display: grid; grid-template-columns: 4rem 12px 1fr;
+  align-items: baseline; gap: .5rem;
+  padding: .5rem .5rem;
+  border-left: 3px solid transparent;
+  border-radius: 4px;
+}
+.logboek-item:hover { background: rgba(0,0,0,.02); }
+.logboek-tijd {
+  font-variant-numeric: tabular-nums;
+  color: #6f6a62; font-size: .85rem;
+}
+.logboek-punt {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #cbc4b8;
+  align-self: center;
+  justify-self: center;
+}
+.logboek-zin { line-height: 1.5; }
+.logboek-zin strong { color: var(--text); font-weight: 600; }
+.logboek-zin em { font-style: normal; color: var(--primary, #6b1e2a); font-weight: 500; }
+.logboek-zin .log-veld { color: #6f6a62; }
+.logboek-zin .log-veld strong { color: var(--text); }
+.logboek-item-green  .logboek-punt { background: #4ba05d; }
+.logboek-item-amber  .logboek-punt { background: #d59a2b; }
+.logboek-item-red    .logboek-punt { background: #b3261e; }
+.logboek-item-blue   .logboek-punt { background: #2b6b9f; }
+.logboek-item-grey   .logboek-punt { background: #8c847a; }
+.logboek-item-green  { border-left-color: #4ba05d; }
+.logboek-item-amber  { border-left-color: #d59a2b; }
+.logboek-item-red    { border-left-color: #b3261e; }
+.logboek-item-blue   { border-left-color: #2b6b9f; }
+.logboek-item-grey   { border-left-color: #8c847a; }
+
 /* Route-lijst: verticale tijdlijn met genummerde bolletjes */
 .route-lijst {
   display: flex; flex-direction: column; gap: .6rem;

@@ -2216,33 +2216,125 @@ async function renderLogboek() {
       body.innerHTML = '<p class="muted center" style="padding:1rem;">Nog geen logboek-entries voor deze filters.</p>';
       return;
     }
-    body.innerHTML = `
-      <table class="table dossiers-table">
-        <thead>
-          <tr><th>Wanneer</th><th>Wie</th><th>Actie</th><th>Tabel</th><th>ID</th><th>Detail</th></tr>
-        </thead>
-        <tbody>
-          ${rows.map(r => {
-            const wanneer = r.created_at ? new Date(r.created_at).toLocaleString('nl-NL') : '';
-            const wie = [r.profiel_naam, r.user_email].filter(Boolean).join(' · ');
-            const detailKort = r.detail
-              ? JSON.stringify(r.detail).slice(0, 140) + (JSON.stringify(r.detail).length > 140 ? '…' : '')
-              : '';
-            return `<tr>
-              <td class="muted small" style="white-space:nowrap;">${esc(wanneer)}</td>
-              <td>${esc(wie || '—')}</td>
-              <td><span class="badge badge-${logActieKleur(r.actie)}">${esc(r.actie)}</span></td>
-              <td>${esc(r.tabel || '—')}</td>
-              <td>${esc(r.record_id || '')}</td>
-              <td style="max-width:420px;overflow:hidden;text-overflow:ellipsis;font-family:monospace;font-size:.8rem;">${esc(detailKort)}</td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-      <p class="muted small" style="padding:.75rem 1rem;">${rows.length} entries getoond.</p>`;
+    // Groepeer op datum voor leesbaarheid ("Vandaag", "Gisteren", "9 juli 2026")
+    const groepen = new Map();
+    rows.forEach(r => {
+      const dag = _logDagLabel(r.created_at);
+      if (!groepen.has(dag)) groepen.set(dag, []);
+      groepen.get(dag).push(r);
+    });
+    body.innerHTML = `<ul class="logboek-list">
+      ${[...groepen.entries()].map(([dag, items]) => `
+        <li class="logboek-dag">
+          <h3 class="logboek-dag-kop">${esc(dag)}</h3>
+          <ol class="logboek-items">
+            ${items.map(r => {
+              const tijd = r.created_at ? new Date(r.created_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '';
+              const wieNaam = r.profiel_naam || (r.user_email ? r.user_email.split('@')[0] : 'Onbekend');
+              const zin = _logZinSchrijf(r, wieNaam);
+              const kleur = logActieKleur(r.actie);
+              return `<li class="logboek-item logboek-item-${esc(kleur)}">
+                <span class="logboek-tijd">${esc(tijd)}</span>
+                <span class="logboek-punt" aria-hidden="true"></span>
+                <span class="logboek-zin">${zin}</span>
+              </li>`;
+            }).join('')}
+          </ol>
+        </li>`).join('')}
+    </ul>
+    <p class="muted small" style="padding:.75rem 1rem;">${rows.length} entries getoond.</p>`;
   } catch (e) {
     body.innerHTML = `<p class="alert alert-error">Logboek laden mislukt: ${esc(e.message || String(e))}</p>`;
   }
+}
+
+// Datum-label voor de dag-koppen (Vandaag / Gisteren / '9 juli 2026')
+function _logDagLabel(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const nu = new Date(); nu.setHours(0,0,0,0);
+  const dan = new Date(d); dan.setHours(0,0,0,0);
+  const dagenGeleden = Math.floor((nu.getTime() - dan.getTime()) / 86400000);
+  if (dagenGeleden === 0) return 'Vandaag';
+  if (dagenGeleden === 1) return 'Gisteren';
+  return d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Zin bouwen zoals "Kevin heeft dossier #12 aangemaakt"
+function _logZinSchrijf(r, wieNaam) {
+  const wie = `<strong>${esc(wieNaam)}</strong>`;
+  const detail = r.detail || {};
+  const tabelLabel = _logTabelLabel(r.tabel);
+  const id = r.record_id || '';
+  const link = id && r.tabel === 'dossiers' ? ` <a href="#/dossiers/${esc(id)}">#${esc(id)}</a>` : (id ? ` <span class="muted">#${esc(id)}</span>` : '');
+  const dossierRef = (r.tabel === 'dossiers') ? '' : (detail.row && detail.row.dossier_id ? ` (dossier <a href="#/dossiers/${esc(detail.row.dossier_id)}">#${esc(detail.row.dossier_id)}</a>)` : '');
+
+  switch (r.actie) {
+    case 'login':
+      return `${wie} heeft <em>ingelogd</em>${detail.email ? ' als <span class="muted">' + esc(detail.email) + '</span>' : ''}.`;
+    case 'logout':
+      return `${wie} heeft <em>uitgelogd</em>.`;
+    case 'profiel':
+      return `${wie} is <em>overgeschakeld naar profiel</em> <strong>${esc(detail.naam || wieNaam)}</strong>.`;
+    case 'insert':
+      return `${wie} heeft een nieuw ${esc(tabelLabel)}${link} <em>aangemaakt</em>${dossierRef}.`;
+    case 'delete':
+      return `${wie} heeft ${esc(tabelLabel)}${link} <em>verwijderd</em>${dossierRef}.`;
+    case 'update': {
+      // Toon de daadwerkelijk gewijzigde velden
+      const oud = detail.oud || {};
+      const kortelijst = Object.keys(oud).slice(0, 4);
+      if (!kortelijst.length) {
+        return `${wie} heeft ${esc(tabelLabel)}${link} <em>bijgewerkt</em>${dossierRef}.`;
+      }
+      const veldenTxt = kortelijst.map(k => {
+        const v = oud[k];
+        const was = _fmtWaarde(v && v.was);
+        const nu  = _fmtWaarde(v && v.nu);
+        return `<span class="log-veld"><strong>${esc(_veldLabel(k))}</strong>: ${esc(was)} → ${esc(nu)}</span>`;
+      }).join(', ');
+      const meer = Object.keys(oud).length > kortelijst.length ? ` (+${Object.keys(oud).length - kortelijst.length} meer)` : '';
+      return `${wie} heeft ${esc(tabelLabel)}${link} <em>bijgewerkt</em>: ${veldenTxt}${meer}${dossierRef}.`;
+    }
+    default:
+      return `${wie} — <em>${esc(r.actie)}</em> ${esc(tabelLabel)}${link}`;
+  }
+}
+function _logTabelLabel(t) {
+  return ({
+    dossiers: 'dossier',
+    kosten: 'kostenpost',
+    notities: 'notitie',
+    planning_items: 'planning-item',
+    kist_voorraad: 'kist-voorraad',
+    profiles: 'profiel',
+    documenten: 'document',
+  })[t] || (t || 'item');
+}
+function _veldLabel(k) {
+  return ({
+    status: 'status',
+    kist_type: 'kist',
+    rouwauto: 'rouwauto',
+    opbaring_type: 'ophalen/thuis',
+    opdrachtgever_naam: 'opdrachtgever',
+    bedrag: 'bedrag',
+    aantal: 'aantal',
+    betaald: 'betaald',
+    thuis_opbaren_datum: 'startdatum thuis',
+    gearchiveerd: 'gearchiveerd',
+  })[k] || k;
+}
+function _fmtWaarde(v) {
+  if (v == null || v === '') return '—';
+  if (v === true) return 'ja';
+  if (v === false) return 'nee';
+  if (typeof v === 'object') {
+    try { const s = JSON.stringify(v); return s.length > 40 ? s.slice(0, 40) + '…' : s; }
+    catch (_) { return '[object]'; }
+  }
+  const s = String(v);
+  return s.length > 40 ? s.slice(0, 40) + '…' : s;
 }
 function logActieKleur(a) {
   switch (a) {
