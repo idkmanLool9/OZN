@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 233;
-const APP_VERSION    = '5.79.2';
+const APP_BUILD      = 234;
+const APP_VERSION    = '5.79.3';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -429,9 +429,11 @@ const Branding = {
     // Footer (dynamisch op basis van de branding)
     setText('footer-brand', `Intern systeem · ${s.app_name}${s.app_tagline ? ' · ' + s.app_tagline : ''} · gegevens veilig opgeslagen in de cloud`);
 
-    // Document-titel — kort houden zodat de titelbalk niet vol staat met
-    // 'OZN - Opdrachtformulier - Overledenen Zorg Nederland B.V.'
-    document.title = s.app_name || 'OZN';
+    // Document-titel — zo kort mogelijk zodat de fallback-titelbalk (waar
+    // Window Controls Overlay uit staat) alleen 'OZN' toont naast de
+    // venster-knoppen. Wel via een korte lookup: sommige gebruikers hebben
+    // app_name = 'Opdrachtformulier'; toch overrulen naar 'OZN'.
+    document.title = 'OZN';
 
     // Logo: vervang het merkteken door <img> als er een eigen logo is;
     // anders een neutraal 'OZN'-monogram (geen kruis).
@@ -472,11 +474,13 @@ const Branding = {
       if (iconLink)  iconLink.href  = s.logo_data_url;
       if (appleLink) appleLink.href = s.logo_data_url;
 
-      // Dynamische manifest met eigen logo + naam + kleur
+      // Dynamische manifest met eigen logo + kleur. Naam bewust kort ('OZN')
+      // zodat de venster-titelbalk niet vol staat met 'Opdrachtformulier —
+      // Overledenen Zorg Nederland B.V.'.
       if (manifestLink) {
         const manifest = {
-          name: `${s.app_name} — ${s.app_tagline}`,
-          short_name: s.app_name || 'OZN',
+          name: 'OZN',
+          short_name: 'OZN',
           start_url: './',
           scope: './',
           display: 'standalone',
