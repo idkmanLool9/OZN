@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" ry="96" fill="#2563eb"/>
-  <text x="256" y="256" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="150" text-anchor="middle" dominant-baseline="central">OZN</text>
+  <defs>
+    <linearGradient id="ozn-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7d2a3a"/>
+      <stop offset="100%" stop-color="#5a1522"/>
+    </linearGradient>
+    <radialGradient id="ozn-shine" cx="0.3" cy="0.25" r="0.7">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Zachte, afgeronde rechthoek als Windows/iOS-icon-vorm (maskable) -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#ozn-bg)"/>
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#ozn-shine)"/>
+  <!-- Ronde brand-mark cirkel in het midden, subtiele witte outline -->
+  <circle cx="256" cy="256" r="184" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="4"/>
+  <text x="256" y="256" fill="#ffffff" font-family="Georgia, 'Times New Roman', serif" font-weight="700" font-size="152" text-anchor="middle" dominant-baseline="central" letter-spacing="4">OZN</text>
 </svg>

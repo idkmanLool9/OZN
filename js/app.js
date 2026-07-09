@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 232;
-const APP_VERSION    = '5.79.1';
+const APP_BUILD      = 233;
+const APP_VERSION    = '5.79.2';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -396,9 +396,12 @@ const Branding = {
     if (s.primary_color) root.style.setProperty('--primary', s.primary_color);
     if (s.accent_color)  root.style.setProperty('--accent',  s.accent_color);
 
-    // Theme-color voor mobiele statusbalk
+    // Theme-color voor mobiele statusbalk + Windows PWA-titelbalk.
+    // We houden 'm bewust op de crème surface-kleur ('#f6f4ef') zodat de
+    // titelbalk op Windows netjes past bij de topbar; de app-primary blijft
+    // gebruiken voor accenten binnen de app zelf.
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta && s.primary_color) meta.setAttribute('content', s.primary_color);
+    if (meta) meta.setAttribute('content', '#f6f4ef');
 
     // Tekst overal
     document.querySelectorAll('.brand-text strong').forEach(el => el.textContent = s.app_name);
@@ -426,8 +429,9 @@ const Branding = {
     // Footer (dynamisch op basis van de branding)
     setText('footer-brand', `Intern systeem · ${s.app_name}${s.app_tagline ? ' · ' + s.app_tagline : ''} · gegevens veilig opgeslagen in de cloud`);
 
-    // Document-titel
-    document.title = `${s.app_name} · ${s.app_tagline}`;
+    // Document-titel — kort houden zodat de titelbalk niet vol staat met
+    // 'OZN - Opdrachtformulier - Overledenen Zorg Nederland B.V.'
+    document.title = s.app_name || 'OZN';
 
     // Logo: vervang het merkteken door <img> als er een eigen logo is;
     // anders een neutraal 'OZN'-monogram (geen kruis).
@@ -472,14 +476,17 @@ const Branding = {
       if (manifestLink) {
         const manifest = {
           name: `${s.app_name} — ${s.app_tagline}`,
-          short_name: s.app_name,
+          short_name: s.app_name || 'OZN',
           start_url: './',
           scope: './',
           display: 'standalone',
+          display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
           background_color: '#f6f4ef',
-          theme_color: s.primary_color,
+          theme_color: '#f6f4ef',
           lang: 'nl',
           icons: [
+            { src: s.logo_data_url, sizes: '512x512', purpose: 'any' },
+            { src: s.logo_data_url, sizes: '512x512', purpose: 'maskable' },
             { src: s.logo_data_url, sizes: 'any', purpose: 'any maskable' }
           ],
         };
