@@ -67,6 +67,19 @@ function vindDubbelDossier(data, exclId) {
 function dossierDraftKey(isNew, id) {
   return `sok_draft_${isNew ? 'new' : id}`;
 }
+// Route-item normaliseren: kan string zijn (legacy) of {locatie, datum}.
+function _normRouteItem(item) {
+  if (item == null) return { locatie: '', datum: '' };
+  if (typeof item === 'string') return { locatie: item, datum: '' };
+  return { locatie: (item.locatie || '').toString(), datum: (item.datum || '').toString() };
+}
+function _collectRouteRows(root, rowSelector, inputSelector, datumSelector) {
+  return [...root.querySelectorAll(rowSelector)].map(row => {
+    const loc = (row.querySelector(inputSelector)?.value || '').trim();
+    const dat = (row.querySelector(datumSelector)?.value || '').trim();
+    return { locatie: loc, datum: dat };
+  }).filter(x => x.locatie || x.datum);
+}
 // Velden die in de DB als BOOLEAN staan — checkboxen daarvoor moeten als
 // true/false worden verzonden i.p.v. 'ja'/'nee' (anders gooit Postgres).
 const BOOL_VELDEN = new Set([
@@ -87,10 +100,8 @@ function snapshotDossierForm(formEl) {
   // zodat de keuze een autosave-restore overleeft bij een nieuw dossier.
   data.__extra_personeel = [...formEl.querySelectorAll('.extra-personeel-cb')]
     .filter(cb => cb.checked).map(cb => cb.value);
-  data.__brengen_naar = [...formEl.querySelectorAll('.brengen-naar-input')]
-    .map(inp => (inp.value || '').trim()).filter(Boolean);
-  data.__thuis_overbrengingen = [...formEl.querySelectorAll('.thuis-overbr-input')]
-    .map(inp => (inp.value || '').trim()).filter(Boolean);
+  data.__brengen_naar = _collectRouteRows(formEl, '.brengen-naar-row', '.brengen-naar-input', '.brengen-naar-datum');
+  data.__thuis_overbrengingen = _collectRouteRows(formEl, '.thuis-overbr-row', '.thuis-overbr-input', '.thuis-overbr-datum');
   data.__rouwgoederen = [...formEl.querySelectorAll('.rouwgoed-cb')]
     .filter(cb => cb.checked).map(cb => cb.value);
   data.__extra_bezittingen = [...formEl.querySelectorAll('.extra-bezit-row')]
@@ -135,12 +146,16 @@ function applyDossierDraft(formEl, data) {
   if (Array.isArray(data.__brengen_naar) && data.__brengen_naar.length) {
     const lijst = formEl.querySelector('#brengen-naar-lijst');
     if (lijst) {
-      lijst.innerHTML = data.__brengen_naar.map((loc, i) => `
+      lijst.innerHTML = data.__brengen_naar.map((item, i) => {
+        const it = _normRouteItem(item);
+        return `
         <div class="brengen-naar-row route-row">
           <span class="route-dot" aria-hidden="true">${i + 1}</span>
-          <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc)}" placeholder="Locatie ${i + 1}">
+          <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+          <input type="date" class="brengen-naar-datum" value="${esc(it.datum || '')}" title="Datum">
           <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
-        </div>`).join('');
+        </div>`;
+      }).join('');
       changed++;
     }
   }
@@ -148,12 +163,16 @@ function applyDossierDraft(formEl, data) {
   if (Array.isArray(data.__thuis_overbrengingen) && data.__thuis_overbrengingen.length) {
     const lijst = formEl.querySelector('#thuis-overbr-lijst');
     if (lijst) {
-      lijst.innerHTML = data.__thuis_overbrengingen.map((loc, i) => `
+      lijst.innerHTML = data.__thuis_overbrengingen.map((item, i) => {
+        const it = _normRouteItem(item);
+        return `
         <div class="thuis-overbr-row route-row">
           <span class="route-dot" aria-hidden="true">${i + 1}</span>
-          <input type="text" class="thuis-overbr-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc)}" placeholder="Locatie ${i + 1}">
+          <input type="text" class="thuis-overbr-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+          <input type="date" class="thuis-overbr-datum" value="${esc(it.datum || '')}" title="Datum">
           <button type="button" class="btn btn-sm btn-ghost thuis-overbr-del" title="Verwijder">×</button>
-        </div>`).join('');
+        </div>`;
+      }).join('');
       changed++;
     }
   }
@@ -428,8 +447,8 @@ function renderDossierForm(params) {
               DB.list(KEYS.DOSSIERS).forEach(d => {
                 if (d.opbaarlocatie_type) s.add(d.opbaarlocatie_type);
                 if (d.overlijdensplaats) s.add(d.overlijdensplaats);
-                if (Array.isArray(d.brengen_naar)) d.brengen_naar.forEach(x => x && s.add(x));
-                if (Array.isArray(d.thuis_overbrengingen)) d.thuis_overbrengingen.forEach(x => x && s.add(x));
+                if (Array.isArray(d.brengen_naar)) d.brengen_naar.forEach(x => { const it = _normRouteItem(x); if (it.locatie) s.add(it.locatie); });
+                if (Array.isArray(d.thuis_overbrengingen)) d.thuis_overbrengingen.forEach(x => { const it = _normRouteItem(x); if (it.locatie) s.add(it.locatie); });
               });
               return [...s].sort().map(x => `<option value="${esc(x)}"></option>`).join('');
             })()}
@@ -451,13 +470,17 @@ function renderDossierForm(params) {
             <div id="brengen-naar-lijst" class="route-lijst">
               ${(() => {
                 const arr = Array.isArray(dossier.brengen_naar) && dossier.brengen_naar.length
-                  ? dossier.brengen_naar : [''];
-                return arr.map((loc, i) => `
+                  ? dossier.brengen_naar : [{ locatie: '', datum: '' }];
+                return arr.map((item, i) => {
+                  const it = _normRouteItem(item);
+                  return `
                   <div class="brengen-naar-row route-row">
                     <span class="route-dot" aria-hidden="true">${i + 1}</span>
-                    <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc || '')}" placeholder="Locatie ${i + 1}">
+                    <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+                    <input type="date" class="brengen-naar-datum" value="${esc(it.datum || '')}" title="Datum">
                     <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
-                  </div>`).join('');
+                  </div>`;
+                }).join('');
               })()}
             </div>
             <button type="button" class="btn btn-sm" id="brengen-naar-add" style="margin-top:.4rem;">+ Extra overbrenging</button>
@@ -490,13 +513,17 @@ function renderDossierForm(params) {
             <div id="thuis-overbr-lijst" class="route-lijst">
               ${(() => {
                 const arr = Array.isArray(dossier.thuis_overbrengingen) && dossier.thuis_overbrengingen.length
-                  ? dossier.thuis_overbrengingen : [''];
-                return arr.map((loc, i) => `
+                  ? dossier.thuis_overbrengingen : [{ locatie: '', datum: '' }];
+                return arr.map((item, i) => {
+                  const it = _normRouteItem(item);
+                  return `
                   <div class="thuis-overbr-row route-row">
                     <span class="route-dot" aria-hidden="true">${i + 1}</span>
-                    <input type="text" class="thuis-overbr-input" list="locatie-suggesties" autocomplete="off" value="${esc(loc || '')}" placeholder="Locatie ${i + 1}">
+                    <input type="text" class="thuis-overbr-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+                    <input type="date" class="thuis-overbr-datum" value="${esc(it.datum || '')}" title="Datum">
                     <button type="button" class="btn btn-sm btn-ghost thuis-overbr-del" title="Verwijder">×</button>
-                  </div>`).join('');
+                  </div>`;
+                }).join('');
               })()}
             </div>
             <button type="button" class="btn btn-sm" id="thuis-overbr-add" style="margin-top:.4rem;">+ Extra overbrenging</button>
@@ -785,7 +812,7 @@ function renderDossierForm(params) {
   }
 
   // ── Route-lijstjes (Ophalen + Thuis): + / − knoppen + hernummering ────────
-  function initRouteLijst({ lijstId, addId, rowClass, inputClass, delClass }) {
+  function initRouteLijst({ lijstId, addId, rowClass, inputClass, datumClass, delClass }) {
     const lijstEl = document.getElementById(lijstId);
     const addBtn = document.getElementById(addId);
     if (!lijstEl || !addBtn) return;
@@ -797,37 +824,43 @@ function renderDossierForm(params) {
         if (inp && !inp.value) inp.placeholder = 'Locatie ' + (i + 1);
       });
     };
-    const maakRij = (val = '') => {
+    const maakRij = (loc = '', datum = '') => {
       const div = document.createElement('div');
       div.className = rowClass + ' route-row';
       div.innerHTML = `
         <span class="route-dot" aria-hidden="true">•</span>
-        <input type="text" class="${inputClass}" list="locatie-suggesties" autocomplete="off" value="${esc(val)}" placeholder="Locatie">
+        <input type="text" class="${inputClass}" list="locatie-suggesties" autocomplete="off" value="${esc(loc)}" placeholder="Locatie">
+        <input type="date" class="${datumClass}" value="${esc(datum)}" title="Datum">
         <button type="button" class="btn btn-sm btn-ghost ${delClass}" title="Verwijder">×</button>`;
       return div;
     };
     addBtn.addEventListener('click', () => {
       lijstEl.appendChild(maakRij());
       hernummer();
-      lijstEl.lastElementChild.querySelector('input').focus();
+      lijstEl.lastElementChild.querySelector('input[type="text"]').focus();
     });
     lijstEl.addEventListener('click', (e) => {
       const del = e.target.closest('.' + delClass);
       if (!del) return;
       const rijen = lijstEl.querySelectorAll('.' + rowClass);
       if (rijen.length > 1) del.closest('.' + rowClass).remove();
-      else del.closest('.' + rowClass).querySelector('input').value = '';
+      else {
+        const row = del.closest('.' + rowClass);
+        row.querySelectorAll('input').forEach(i => i.value = '');
+      }
       hernummer();
     });
     hernummer();
   }
   initRouteLijst({
     lijstId: 'brengen-naar-lijst', addId: 'brengen-naar-add',
-    rowClass: 'brengen-naar-row', inputClass: 'brengen-naar-input', delClass: 'brengen-naar-del',
+    rowClass: 'brengen-naar-row', inputClass: 'brengen-naar-input',
+    datumClass: 'brengen-naar-datum', delClass: 'brengen-naar-del',
   });
   initRouteLijst({
     lijstId: 'thuis-overbr-lijst', addId: 'thuis-overbr-add',
-    rowClass: 'thuis-overbr-row', inputClass: 'thuis-overbr-input', delClass: 'thuis-overbr-del',
+    rowClass: 'thuis-overbr-row', inputClass: 'thuis-overbr-input',
+    datumClass: 'thuis-overbr-datum', delClass: 'thuis-overbr-del',
   });
 
   // ── Kist-keuze: catalogus-knop / 3e partij inline invoer ──────────────────
@@ -1817,13 +1850,12 @@ function renderDossierForm(params) {
     data.extra_personeel = [...document.querySelectorAll('#dossier-form .extra-personeel-cb')]
       .filter(cb => cb.checked).map(cb => cb.value);
 
-    // Brengen naar (bij ophalen): meerdere locaties → JSONB-array
-    data.brengen_naar = [...document.querySelectorAll('#dossier-form .brengen-naar-input')]
-      .map(inp => (inp.value || '').trim()).filter(Boolean);
-
-    // Thuis-overbrengingen (bij thuis opbaren): idem
-    data.thuis_overbrengingen = [...document.querySelectorAll('#dossier-form .thuis-overbr-input')]
-      .map(inp => (inp.value || '').trim()).filter(Boolean);
+    // Brengen naar (bij ophalen): meerdere locaties + datum → JSONB-array
+    // van {locatie, datum}. Rijen zonder locatie én zonder datum worden
+    // eruit gefilterd.
+    const _form = document.getElementById('dossier-form');
+    data.brengen_naar = _collectRouteRows(_form, '.brengen-naar-row', '.brengen-naar-input', '.brengen-naar-datum');
+    data.thuis_overbrengingen = _collectRouteRows(_form, '.thuis-overbr-row', '.thuis-overbr-input', '.thuis-overbr-datum');
 
     // Rouwgoederen (bij thuis opbaren): aangevinkte items → JSONB-array
     data.rouwgoederen_lijst = [...document.querySelectorAll('#dossier-form .rouwgoed-cb')]

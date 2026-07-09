@@ -113,9 +113,9 @@ function renderDossierDetail(params) {
         <dl class="dl">
           ${dlRow('Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : '')))}
           ${((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') && Array.isArray(d.brengen_naar) && d.brengen_naar.length)
-            ? dlRow('Brengen naar', d.brengen_naar.map(esc).join(' → ')) : ''}
+            ? `<div><dt>Brengen naar</dt><dd>${d.brengen_naar.map(_routeStr).filter(Boolean).join(' → ')}</dd></div>` : ''}
           ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && Array.isArray(d.thuis_overbrengingen) && d.thuis_overbrengingen.length)
-            ? dlRow('Overbrengingen (thuis)', d.thuis_overbrengingen.map(esc).join(' → ')) : ''}
+            ? `<div><dt>Overbrengingen (thuis)</dt><dd>${d.thuis_overbrengingen.map(_routeStr).filter(Boolean).join(' → ')}</dd></div>` : ''}
           ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? dlRow('Start thuis-opbaring', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')) : ''}
           ${(d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? dlRow('Einde thuis-opbaring', [fmtDate(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd && 'om ' + d.thuis_opbaren_eindtijd].filter(Boolean).join(' ')) : ''}
           ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length)
@@ -758,6 +758,16 @@ function _mailToPlainText(html) {
   return s;
 }
 
+function _routeStr(item) {
+  if (item == null) return '';
+  if (typeof item === 'string') return esc(item);
+  const loc = item.locatie || '';
+  const dat = item.datum || '';
+  if (!loc && !dat) return '';
+  if (!dat) return esc(loc);
+  const fmt = (typeof fmtDate === 'function') ? fmtDate(dat) : dat;
+  return esc(loc) + ' <span class="muted small">(' + esc(fmt) + ')</span>';
+}
 function dlRow(label, value) {
   const v = value && String(value).trim() ? value : '—';
   // value mag al HTML zijn als 'ie van kistRowValue komt; anders escapen
