@@ -437,6 +437,14 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
     radial-gradient(at 80% 70%, rgba(42, 93, 107, .30) 0%, transparent 50%),
     linear-gradient(135deg, #1c2541, #0b132b);
   padding: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  /* Extra kleur boven en onder in de safe-area zodat er nooit een crème-strook door de body zichtbaar wordt. */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+}
+/* De achtergrond doortrekken tot in de safe-area (notch/status-bar) */
+html, body:has(#profile-screen:not([hidden])) {
+  background: #0b132b;
 }
 body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 
@@ -459,7 +467,8 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
   position: relative; z-index: 2;
   width: 100%; max-width: none;
   min-height: 100vh;
-  background: var(--surface);
+  min-height: 100dvh; /* iOS Safari: gebruik dynamic viewport height als beschikbaar */
+  background: transparent; /* laat gradient van .profile-screen doorschijnen — geen naad */
   border-radius: 0;
   padding: max(1.5rem, env(safe-area-inset-top)) 2rem max(1rem, env(safe-area-inset-bottom));
   box-shadow: none;
@@ -470,7 +479,8 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
 @media (max-width: 720px) {
   .profile-card { padding: max(1rem, env(safe-area-inset-top)) 1rem max(.75rem, env(safe-area-inset-bottom)); }
 }
-.profile-card > .profile-title { margin: 0 0 1.25rem; }
+/* Titel goed leesbaar tegen donkere gradient */
+.profile-card > .profile-title { margin: 0 0 1.25rem; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.35); }
 .profile-card > .profile-options {
   flex: 1 1 auto;
   width: 100%;
@@ -629,8 +639,14 @@ body:has(#profile-screen:not([hidden])) { overflow: hidden; }
   display: flex; align-items: stretch;
   background: var(--bg);
   overflow: hidden;
+  /* Tot in de safe-area zodat er onder / boven geen bodybalk zichtbaar is */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
-body:has(#login-screen:not([hidden])) { overflow: hidden; }
+body:has(#login-screen:not([hidden])) { overflow: hidden; background: var(--bg); }
 .login-brand {
   flex: 1 1 50%;
   position: relative; overflow: hidden;
