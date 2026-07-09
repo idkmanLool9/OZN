@@ -1,4 +1,4 @@
-// Service worker voor offline-modus
+// Service worker voor offline-modus (kick 2026-07-09)
 // Cache-strategie:
 //  - App-shell (HTML/CSS/JS/icon/manifest): cache-first, fall back naar netwerk
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
