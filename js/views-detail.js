@@ -714,9 +714,48 @@ function buildFactuurEmail(d, kosten) {
   return parts.join('\n');
 }
 
-function openMailto(to, subject, body) {
-  const url = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = url;
+// Open de mail-app met to+subject; bij een lange body (mailto URL loopt vast
+// rond ~2000 tekens op iOS) knippen we de inhoud af en zetten we de volledige
+// tekst op het klembord — de gebruiker plakt 'm dan in de mail.
+async function openMailto(to, subject, body) {
+  const MAX_URL = 1800;
+  let effectiveBody = body || '';
+  let clipped = false;
+  // Ruwe HTML → platte tekst voor de mail-app (mail apps kunnen geen HTML
+  // via mailto:).
+  const plat = _mailToPlainText(effectiveBody);
+  let url = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plat)}`;
+  if (url.length > MAX_URL) {
+    clipped = true;
+    const kort = plat.slice(0, 400) + '\n\n(De volledige tekst is gekopieerd — plak deze in de mail met Cmd+V of houd ingedrukt → Plakken.)';
+    url = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(kort)}`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(plat);
+      }
+    } catch (_) {}
+  }
+  try { window.location.href = url; } catch (_) {}
+  return { clipped };
+}
+
+function _mailToPlainText(html) {
+  if (!html) return '';
+  // Behoud paragraaf-structuur, zet links om naar 'tekst (url)', strip tags.
+  let s = String(html);
+  s = s.replace(/<br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/p>/gi, '\n\n');
+  s = s.replace(/<\/tr>/gi, '\n');
+  s = s.replace(/<\/li>/gi, '\n');
+  s = s.replace(/<a[^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/gi, '$2 ($1)');
+  s = s.replace(/<[^>]+>/g, '');
+  // HTML-entities terug decoderen
+  const div = document.createElement('div');
+  div.innerHTML = s;
+  s = div.textContent || div.innerText || s;
+  // Overtollige whitespace opruimen
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return s;
 }
 
 function dlRow(label, value) {
@@ -1404,10 +1443,14 @@ const MailComposer = {
           status.className = 'mail-status mail-status-success';
           status.textContent = `✓ ${ok} mail(s) verstuurd.`;
         } else {
-          // Geen EmailJS — open mailclient met de eerste To (CC in tekst)
-          openMailto(to.join(','), subj, bodyMetBijlage);
+          // Geen EmailJS — open de mail-app van het apparaat met to+subject.
+          // Bij een lange body wordt de tekst naar het klembord gekopieerd
+          // en moet de gebruiker 'm plakken (zie openMailto).
+          const r = await openMailto([...to, ...cc].join(','), subj, bodyMetBijlage);
           status.className = 'mail-status mail-status-info';
-          status.textContent = '✓ Mail-app geopend met tekst klaar. Klik op Verzenden in je mail-app.';
+          status.textContent = r && r.clipped
+            ? '✓ Mail-app geopend. De volledige inhoud staat op het klembord — plak deze in het mail-bericht (Cmd+V of houd ingedrukt → Plakken).'
+            : '✓ Mail-app geopend met tekst klaar. Klik op Verzenden in je mail-app.';
         }
 
         // 3) Adresboek bijwerken in Supabase (alleen nieuwe adressen)
