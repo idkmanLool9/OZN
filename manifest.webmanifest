@@ -5,9 +5,10 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#f6f4ef",
-  "theme_color": "#2563eb",
+  "theme_color": "#f6f4ef",
   "lang": "nl",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }

@@ -1313,9 +1313,9 @@ function showApp() {
   $('#app').hidden = false;
   document.body.classList.remove('profile-active');
   document.body.classList.remove('login-active');
-  // Herstel de standaard theme-color voor de app
+  // Herstel de standaard theme-color voor de app (matcht de topbar-surface)
   const tc = document.querySelector('meta[name="theme-color"]');
-  if (tc) tc.setAttribute('content', '#2563eb');
+  if (tc) tc.setAttribute('content', '#f6f4ef');
   const s = Auth.current();
   if (s) {
     const naam = s.fullName || s.email;

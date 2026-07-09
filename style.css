@@ -55,18 +55,30 @@ h1 { font-size: 1.7rem; margin: 0 0 .25rem; }
 h2 { font-size: 1.2rem; margin: 0 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); }
 h3 { font-size: 1rem; margin: 1.25rem 0 .5rem; color: var(--primary); }
 
-/* Topbar (met safe-area voor iOS PWA op iPad — statusbalk over de topbar) */
+/* Topbar (met safe-area voor iOS PWA op iPad — statusbalk over de topbar).
+   Op Windows/macOS PWA met Window Controls Overlay wordt de topbar tevens
+   de venster-titelbalk (draggable) — de venster-knoppen (min/max/sluit)
+   zitten rechts en krijgen ruimte via env(titlebar-area-width). */
 .topbar {
   background: var(--surface); border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 50;
   padding-top: env(safe-area-inset-top);
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 .topbar-inner {
   max-width: 1200px; margin: 0 auto;
   padding: .75rem 1.25rem;
-  padding-left:  max(1.25rem, env(safe-area-inset-left));
-  padding-right: max(1.25rem, env(safe-area-inset-right));
+  padding-left:  max(1.25rem, env(safe-area-inset-left), env(titlebar-area-x, 0px));
+  padding-right: max(1.25rem, env(safe-area-inset-right), calc(100% - env(titlebar-area-x, 100%) - env(titlebar-area-width, 100%) + 1.25rem));
   display: flex; align-items: center; gap: 1.5rem;
+}
+/* Alle interactieve elementen in de topbar moeten NIET draggable zijn,
+   anders kun je ze niet klikken op Windows/macOS PWA. */
+.topbar a, .topbar button, .topbar input, .topbar select, .topbar .topnav,
+.topbar .user-area, .topbar .brand {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 .brand { display: flex; align-items: center; gap: .75rem; text-decoration: none; color: var(--text); flex: none; min-width: 0; }
 .brand:hover { text-decoration: none; }
