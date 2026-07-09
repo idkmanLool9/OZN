@@ -1262,11 +1262,19 @@ function showLogin() {
   $('#login-screen').hidden = false;
   $('#profile-screen').hidden = true;
   $('#app').hidden = true;
+  document.body.classList.remove('profile-active');
+  document.body.classList.add('login-active');
 }
 function showProfilePicker() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = false;
   $('#app').hidden = true;
+  document.body.classList.remove('login-active');
+  document.body.classList.add('profile-active');
+  // iOS statusbar-tint mee laten donkeren met de gradient — anders zie je
+  // een lichte streep bij black-translucent.
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.setAttribute('content', '#0b132b');
   // Render alle profielen dynamisch uit Settings
   const mount = $('#profile-options-mount');
   if (mount) {
@@ -1303,6 +1311,11 @@ function showApp() {
   $('#login-screen').hidden = true;
   $('#profile-screen').hidden = true;
   $('#app').hidden = false;
+  document.body.classList.remove('profile-active');
+  document.body.classList.remove('login-active');
+  // Herstel de standaard theme-color voor de app
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.setAttribute('content', '#2563eb');
   const s = Auth.current();
   if (s) {
     const naam = s.fullName || s.email;
