@@ -26,3 +26,5 @@ create policy kosten_dossier_toegang on public.kosten
                   and ((not coalesce(d.gearchiveerd,false)) or public.medewerker_ziet_archief())))
     )
   );
+
+notify pgrst, 'reload schema';

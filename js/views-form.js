@@ -207,6 +207,12 @@ function renderDossierForm(params) {
   const dossier = isNew ? { dossier_nummer: '(wordt automatisch toegekend)', status: 'nieuw' } : DB.byId(KEYS.DOSSIERS, parseInt(params.id, 10));
   if (!isNew && !dossier) return render404();
 
+  // Abort eventuele window-listeners uit een vorige render (voorheen bleven
+  // ze zich stapelen bij elke navigatie terug naar de wizard).
+  try { if (window._wizardListenerCtrl) window._wizardListenerCtrl.abort(); } catch (_) {}
+  window._wizardListenerCtrl = new AbortController();
+  const _formSignal = window._wizardListenerCtrl.signal;
+
   // Scan-intake prefill: bij nieuw dossier de uit OCR herkende velden
   // overnemen (eenmalig, daarna verwijderen uit localStorage)
   let _scannedFields = null;
@@ -250,6 +256,7 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="1">
           <legend>${dLabelSpan("sect_opdrachtgever", "Opdrachtgever")}</legend>
+          <input type="hidden" name="bsn" value="${esc(v('bsn'))}">
           <label style="display:block;">
             ${(() => {
               const lijst = Settings.get('opdrachtgevers') || [];
@@ -923,7 +930,7 @@ function renderDossierForm(params) {
         const cur = JSON.parse(localStorage.getItem(e.key) || '{}');
         if (cur.kist_type && cur.kist_type !== hidden.value) zetKist(cur.kist_type);
       } catch (_) {}
-    });
+    }, { signal: _formSignal });
   })();
 
   // ── Extra bezittingen: + / − ───────────────────────────────────────────────
@@ -1460,7 +1467,7 @@ function renderDossierForm(params) {
         }
       }
     } catch (_) {}
-  });
+  }, { signal: _formSignal });
 
   // Artsverklaring scan/upload
   const avInput = document.getElementById('artsverklaring-input');
@@ -1751,6 +1758,12 @@ function renderDossierForm(params) {
       const draft = JSON.parse(raw);
       const restored = applyDossierDraft(formEl, draft);
       if (restored > 0) {
+        // Draft-restore zet .value / .checked direct — geen change-events.
+        // Roep hier alle afhankelijke sync-functies aan zodat stap-kleuren,
+        // Opbaren-fieldsets en autoKostKist meteen kloppen.
+        try { if (typeof updateStepColors === 'function') updateStepColors(); } catch (_) {}
+        try { if (typeof updateOpbaring === 'function') updateOpbaring(); } catch (_) {}
+        try { if (typeof updateExtraPersoneelSummary === 'function') updateExtraPersoneelSummary(); } catch (_) {}
         banner.hidden = false;
         banner.innerHTML = `Niet-opgeslagen wijzigingen hersteld. <a href="#" id="btn-discard-draft">Concept verwerpen</a>`;
         $('#btn-discard-draft').addEventListener('click', async e => {

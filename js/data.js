@@ -260,6 +260,7 @@ function dossierMissendeBelangrijkeVelden(d) {
 const DOSSIER_VELDEN = [
   'dossier_nummer',
   'opdrachtgever_naam',
+  'bsn',
   'voornaam','achternaam','geslacht','geboortedatum','geboorteplaats',
   'overlijdensdatum','overlijdensplaats',
   'adres_overledene','postcode_overledene','woonplaats_overledene',

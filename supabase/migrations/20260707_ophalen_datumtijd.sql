@@ -4,3 +4,5 @@
 alter table public.dossiers
   add column if not exists ophalen_datum date,
   add column if not exists ophalen_tijd  text;
+
+notify pgrst, 'reload schema';

@@ -3,3 +3,5 @@
 -- brengen_naar (JSONB-array van strings).
 alter table public.dossiers
   add column if not exists thuis_overbrengingen jsonb;
+
+notify pgrst, 'reload schema';

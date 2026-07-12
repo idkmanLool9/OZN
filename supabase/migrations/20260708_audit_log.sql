@@ -51,3 +51,5 @@ end;
 $$;
 
 grant execute on function public.audit_log_schrijf(text, text, text, jsonb, text) to authenticated;
+
+notify pgrst, 'reload schema';

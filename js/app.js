@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 235;
-const APP_VERSION    = '5.80.0';
+const APP_BUILD      = 236;
+const APP_VERSION    = '5.80.1';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -481,6 +481,7 @@ const Branding = {
         const manifest = {
           name: 'OZN',
           short_name: 'OZN',
+          description: (s.app_name || 'OZN') + ' — ' + (s.app_tagline || ''),
           start_url: './',
           scope: './',
           display: 'standalone',
@@ -489,8 +490,6 @@ const Branding = {
           theme_color: '#f6f4ef',
           lang: 'nl',
           icons: [
-            { src: s.logo_data_url, sizes: '512x512', purpose: 'any' },
-            { src: s.logo_data_url, sizes: '512x512', purpose: 'maskable' },
             { src: s.logo_data_url, sizes: 'any', purpose: 'any maskable' }
           ],
         };

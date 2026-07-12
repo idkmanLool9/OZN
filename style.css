@@ -74,9 +74,14 @@ h3 { font-size: 1rem; margin: 1.25rem 0 .5rem; color: var(--primary); }
   display: flex; align-items: center; gap: 1.5rem;
 }
 /* Alle interactieve elementen in de topbar moeten NIET draggable zijn,
-   anders kun je ze niet klikken op Windows/macOS PWA. */
+   anders kun je ze niet klikken op Windows/macOS PWA. Kinderen van svgs
+   en spans binnen brand-mark / user-chip erven -webkit-app-region NIET,
+   dus alles wat klikbaar is expliciet resetten. */
 .topbar a, .topbar button, .topbar input, .topbar select, .topbar .topnav,
-.topbar .user-area, .topbar .brand {
+.topbar .user-area, .topbar .brand,
+.topbar svg, .topbar .brand-mark, .topbar .brand-mark *,
+.topbar .active-profile-chip, .topbar .active-profile-chip *,
+.topbar .side-avatar, .topbar .offline-badge {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
@@ -3198,9 +3203,15 @@ select.dossiers-control {
 /* ─── Toast-meldingen ────────────────────────────────────────────────────── */
 #toast-host {
   position: fixed; left: 0; right: 0;
-  top: calc(1rem + env(safe-area-inset-top));
+  /* Onder de topbar (~60px) blijven zodat we de nav niet blokkeren */
+  top: calc(4.5rem + env(safe-area-inset-top));
   display: flex; flex-direction: column; align-items: center; gap: .4rem;
   z-index: 3000; pointer-events: none;
+}
+/* Op profielkiezer en login is er geen topbar — dan dichter aan de rand */
+body.profile-active #toast-host,
+body.login-active #toast-host {
+  top: calc(1rem + env(safe-area-inset-top));
 }
 .toast {
   background: #2b3a4a; color: #fff;

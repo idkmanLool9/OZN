@@ -47,3 +47,5 @@ as $$
   select p.id, p.naam from public.profiles p order by p.naam;
 $$;
 grant execute on function public.get_personeel_namen() to authenticated;
+
+notify pgrst, 'reload schema';

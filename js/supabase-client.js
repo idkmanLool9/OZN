@@ -245,11 +245,7 @@ const DB = {
   async insert(tbl, payload) {
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.insert(tbl, payload);
     if (!navigator.onLine) {
-      Modal.show({
-        type: 'offline',
-        title: 'Geen internetverbinding',
-        message: 'Wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.',
-      });
+      try { Toast.show('Offline — wijziging niet opgeslagen. Concept blijft in de wizard bewaard.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
     const u = Auth.current();
@@ -277,11 +273,7 @@ const DB = {
   async update(tbl, id, patch) {
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.update(tbl, id, patch);
     if (!navigator.onLine) {
-      Modal.show({
-        type: 'offline',
-        title: 'Geen internetverbinding',
-        message: 'Wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.',
-      });
+      try { Toast.show('Offline — wijziging niet opgeslagen. Concept blijft in de wizard bewaard.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
     const p = Object.assign({}, patch);
@@ -303,11 +295,7 @@ const DB = {
   async remove(tbl, id) {
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.remove(tbl, id);
     if (!navigator.onLine) {
-      Modal.show({
-        type: 'offline',
-        title: 'Geen internetverbinding',
-        message: 'Verwijderen kan niet zolang je offline bent. Probeer opnieuw zodra je weer online bent.',
-      });
+      try { Toast.show('Offline — verwijderen kan niet zolang je geen internet hebt.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
     const oud = (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id));
