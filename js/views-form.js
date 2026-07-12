@@ -256,11 +256,14 @@ function renderDossierForm(params) {
 
         <fieldset class="card" data-step="1">
           <legend>${dLabelSpan("sect_opdrachtgever", "Opdrachtgever")}</legend>
-          <input type="hidden" name="bsn" value="${esc(v('bsn'))}">
+          <input type="hidden" name="bsn" value="${v('bsn')}">
           <label style="display:block;">
             ${(() => {
               const lijst = Settings.get('opdrachtgevers') || [];
-              const huidig = v('opdrachtgever_naam');
+              // Raw waarde ophalen voor correcte vergelijking met o.naam (die is ook raw).
+              // Met v() zou "Sandra & Lia" als "Sandra &amp; Lia" vergeleken worden en
+              // altijd in de "niet in lijst" tak vallen — met dubbele escape tot gevolg.
+              const huidig = dossier.opdrachtgever_naam || '';
               const inLijst = lijst.some(o => (o.naam || o) === huidig);
               return `
               <select name="opdrachtgever_naam" id="opdrachtgever-input">
@@ -344,13 +347,13 @@ function renderDossierForm(params) {
             <label><span>Geboorteplaats</span><input type="text" name="geboorteplaats" value="${v('geboorteplaats')}"></label>
             <label><span>Overlijdensdatum</span><input type="date" name="overlijdensdatum" value="${v('overlijdensdatum')}"></label>
             <label class="span-2"><span>Overlijdenslocatie</span>
-              <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${esc(v('overlijdensplaats'))}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
+              <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${v('overlijdensplaats')}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
             </label>
             <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}" placeholder="Typ straat + huisnummer — kies uit lijst" autocomplete="off"></label>
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
             <label><span>Woonplaats</span><input type="text" name="woonplaats_overledene" value="${v('woonplaats_overledene')}"></label>
             <label class="span-3"><span>Artsverklaring (overlijdensverklaring)</span>
-              <input type="hidden" name="artsverklaring_pad" value="${esc(v('artsverklaring_pad'))}">
+              <input type="hidden" name="artsverklaring_pad" value="${v('artsverklaring_pad')}">
               <div class="artsverklaring-row" id="artsverklaring-row">
                 <button type="button" class="btn btn-sm" id="artsverklaring-scan" hidden>📄 Scan document</button>
                 <label class="btn btn-sm" id="artsverklaring-filelabel" style="cursor:pointer;">
@@ -362,7 +365,7 @@ function renderDossierForm(params) {
               </div>
             </label>
             <label class="span-3"><span>Overdraagformulier</span>
-              <input type="hidden" name="overdraagformulier_pad" value="${esc(v('overdraagformulier_pad'))}">
+              <input type="hidden" name="overdraagformulier_pad" value="${v('overdraagformulier_pad')}">
               <div class="artsverklaring-row" id="overdraag-row">
                 <label class="btn btn-sm" id="overdraag-filelabel" style="cursor:pointer;">
                   📷 Scan / kies bestand
@@ -440,7 +443,7 @@ function renderDossierForm(params) {
               </select>
             </label>
             <label class="span-2"><span>Opbaarlocatie</span>
-              <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${esc(v('opbaarlocatie_type'))}" autocomplete="off" placeholder="bv. aula, uitvaartcentrum, thuis…">
+              <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${v('opbaarlocatie_type')}" autocomplete="off" placeholder="bv. aula, uitvaartcentrum, thuis…">
             </label>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
@@ -546,7 +549,7 @@ function renderDossierForm(params) {
                   </label>`).join('');
               })()}
             </div>
-            <textarea name="benodigde_rouwgoederen" rows="2" placeholder="Extra opmerkingen over rouwgoederen (optioneel)" style="width:100%; margin-top:.4rem;">${esc(v('benodigde_rouwgoederen'))}</textarea>
+            <textarea name="benodigde_rouwgoederen" rows="2" placeholder="Extra opmerkingen over rouwgoederen (optioneel)" style="width:100%; margin-top:.4rem;">${v('benodigde_rouwgoederen')}</textarea>
           </label>
         </fieldset>
 
@@ -558,7 +561,7 @@ function renderDossierForm(params) {
               <strong>Verzorgd / Gekleed</strong>
               <div class="grid-3" style="margin-top:.35rem;">
                 <label><span>Datum</span><input type="date" name="verzorgd_gekleed_datum" value="${v('verzorgd_gekleed_datum')}"></label>
-                <label><span>Waar</span><input type="text" name="verzorgd_gekleed_waar" list="locatie-suggesties" value="${esc(v('verzorgd_gekleed_waar'))}"></label>
+                <label><span>Waar</span><input type="text" name="verzorgd_gekleed_waar" list="locatie-suggesties" value="${v('verzorgd_gekleed_waar')}"></label>
                 <label><span>Met/zonder familie</span>
                   <select name="verzorgd_gekleed_familie">
                     <option value="">—</option>
@@ -573,7 +576,7 @@ function renderDossierForm(params) {
               <strong>Gekist</strong>
               <div class="grid-3" style="margin-top:.35rem;">
                 <label><span>Datum</span><input type="date" name="gekist_datum" value="${v('gekist_datum')}"></label>
-                <label class="span-2"><span>Waar</span><input type="text" name="gekist_waar" list="locatie-suggesties" value="${esc(v('gekist_waar'))}"></label>
+                <label class="span-2"><span>Waar</span><input type="text" name="gekist_waar" list="locatie-suggesties" value="${v('gekist_waar')}"></label>
               </div>
             </div>
 
@@ -594,7 +597,7 @@ function renderDossierForm(params) {
               <label class="opbaar-chip" style="width:auto;"><input type="checkbox" name="thanatopraxie" id="cb-thana" value="ja" ${dossier.thanatopraxie ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <strong>Thanatopraxie</strong></label>
               <div id="thana-wrap" class="grid-3" style="margin-top:.35rem; ${dossier.thanatopraxie ? '' : 'display:none;'}">
                 <label><span>Datum</span><input type="date" name="thanatopraxie_datum" value="${v('thanatopraxie_datum')}"></label>
-                <label class="span-2"><span>Waar</span><input type="text" name="thanatopraxie_waar" list="locatie-suggesties" value="${esc(v('thanatopraxie_waar'))}"></label>
+                <label class="span-2"><span>Waar</span><input type="text" name="thanatopraxie_waar" list="locatie-suggesties" value="${v('thanatopraxie_waar')}"></label>
               </div>
             </div>
           </div>
@@ -604,10 +607,10 @@ function renderDossierForm(params) {
           <legend>${dLabelSpan("sect_kist", "Kist & vervoer")}</legend>
           <div class="grid-3">
             <label class="span-2"><span>Kist</span>
-              <input type="hidden" name="kist_type" value="${esc(v('kist_type'))}">
+              <input type="hidden" name="kist_type" value="${v('kist_type')}">
               <div id="kist-keuze-wrap" style="display:flex; flex-direction:column; gap:.5rem;">
                 <div id="kist-huidig" style="display:${v('kist_type') ? 'flex' : 'none'}; align-items:center; gap:.75rem; padding:.5rem .75rem; border:1px solid var(--border,#e5e0d6); border-radius:8px; background:#f8f6f2;">
-                  <span id="kist-huidig-naam"><strong>${esc(v('kist_type'))}</strong></span>
+                  <span id="kist-huidig-naam"><strong>${v('kist_type')}</strong></span>
                   <button type="button" class="btn btn-sm btn-ghost" id="kist-wissen" title="Verwijder">×</button>
                 </div>
                 <div id="kist-kies-knoppen" style="display:${v('kist_type') ? 'none' : 'flex'}; gap:.5rem; flex-wrap:wrap;">
@@ -625,7 +628,9 @@ function renderDossierForm(params) {
             <label><span>Rouwauto</span>
               ${(() => {
                 const opties = Settings.get('rouwauto_lijst') || [];
-                const huidig = v('rouwauto');
+                // Raw waarde — vergelijking met o (raw uit Settings) mag niet
+                // via de escape-versie lopen anders altijd "niet in lijst".
+                const huidig = dossier.rouwauto || '';
                 return `<select name="rouwauto">
                   <option value="">— geen rouwauto —</option>
                   ${opties.map(o => `<option value="${esc(o)}" ${huidig === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}
