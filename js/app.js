@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 237;
-const APP_VERSION    = '5.80.2';
+const APP_BUILD      = 238;
+const APP_VERSION    = '5.81.0';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -875,6 +875,88 @@ const Updater = {
   },
 };
 
+// ─── APK-updater (alleen native Android via Capacitor) ─────────────────────
+// Vraagt de GitHub-release 'app-latest' op en vergelijkt de asset-publicatie
+// met APP_BUILD_DATE. Als de asset nieuwer is, tonen we een banner boven aan
+// het scherm met een 'Installeer'-knop die de APK downloadt. Voor de web-versie
+// doet dit niks — daar is Updater al voor.
+const ApkUpdater = {
+  RELEASE_API: 'https://api.github.com/repos/idkmanLool9/OZN/releases/tags/app-latest',
+  CHECK_INTERVAL_MS: 6 * 60 * 60 * 1000, // 6 uur
+  LAST_CHECK_KEY: 'ozn_apk_last_check',
+  DISMISSED_KEY:  'ozn_apk_dismissed_ts',
+
+  isApp() {
+    try { return !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()); }
+    catch (_) { return false; }
+  },
+
+  async check({ force = false } = {}) {
+    if (!ApkUpdater.isApp()) return null;
+    if (!navigator.onLine)  return null;
+    if (!force) {
+      const last = parseInt(localStorage.getItem(ApkUpdater.LAST_CHECK_KEY) || '0', 10);
+      if (Date.now() - last < ApkUpdater.CHECK_INTERVAL_MS) return null;
+    }
+    try {
+      const r = await fetch(ApkUpdater.RELEASE_API, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      localStorage.setItem(ApkUpdater.LAST_CHECK_KEY, String(Date.now()));
+      const asset = (j.assets || []).find(a => a && a.name && a.name.toLowerCase().endsWith('.apk'));
+      if (!asset) return null;
+      // Vergelijk asset.updated_at met APP_BUILD_DATE. Als de asset op zijn
+      // laatst UPDATED is nádat de app werd gebouwd, is er iets nieuws.
+      const remoteTs = new Date(asset.updated_at || asset.created_at || 0).getTime();
+      const localTs  = new Date(APP_BUILD_DATE + 'T00:00:00Z').getTime();
+      const nieuwer = remoteTs > localTs + 12 * 60 * 60 * 1000; // 12u marge tegen tijdzone-slop
+      const info = {
+        hasUpdate: nieuwer,
+        remoteTs, localTs,
+        downloadUrl: asset.browser_download_url,
+        releaseName: j.name || 'app-latest',
+        commitSha: (j.body || '').match(/commit `([a-f0-9]+)`/i)?.[1] || null,
+        assetUpdated: asset.updated_at,
+      };
+      if (nieuwer) ApkUpdater.showBanner(info);
+      return info;
+    } catch (_) { return null; }
+  },
+
+  showBanner(info) {
+    const dismissed = localStorage.getItem(ApkUpdater.DISMISSED_KEY);
+    if (dismissed && dismissed === String(info.remoteTs)) return; // gebruiker heeft déze versie al weggeklikt
+    const el = document.getElementById('apk-update-banner');
+    const txt = document.getElementById('apk-update-banner-info');
+    const btn = document.getElementById('apk-update-banner-install');
+    const dis = document.getElementById('apk-update-banner-dismiss');
+    if (!el || !txt || !btn) return;
+    const dagOud = Math.max(0, Math.round((info.remoteTs - info.localTs) / 86400000));
+    txt.textContent = `Nieuwe versie op de release-pagina ${dagOud > 0 ? '(' + dagOud + ' dag' + (dagOud === 1 ? '' : 'en') + ' nieuwer)' : ''}. Installeer om de laatste verbeteringen te krijgen.`;
+    btn.href = info.downloadUrl;
+    btn.setAttribute('target', '_blank');
+    btn.setAttribute('rel', 'noopener');
+    // Op Android/iOS met Capacitor: forceer externe browser zodat de APK-
+    // download en installer-prompt triggeren. Anders blijft de webview
+    // hangen op de github.com-pagina.
+    btn.onclick = (e) => {
+      try {
+        if (typeof Native !== 'undefined' && Native.isApp()) {
+          e.preventDefault();
+          Native.openUrl(info.downloadUrl);
+        }
+      } catch (_) {}
+    };
+    el.hidden = false;
+    document.body.classList.add('has-apk-banner');
+    if (dis) dis.onclick = () => {
+      localStorage.setItem(ApkUpdater.DISMISSED_KEY, String(info.remoteTs));
+      el.hidden = true;
+      document.body.classList.remove('has-apk-banner');
+    };
+  },
+};
+
 function updateOfflineUI() {
   const offline = !navigator.onLine || !!Cloud.offline;
   const badge = document.getElementById('offline-badge');
@@ -1107,4 +1189,11 @@ Router.add('/logboek', () => renderLogboek());
   });
 
   Router.start();
+
+  // APK-update-check op de achtergrond. Doet alleen iets als de app als
+  // APK draait (Capacitor native platform). Wacht 4s zodat de app eerst
+  // rustig laadt en de gebruiker niet meteen een banner in beeld krijgt.
+  setTimeout(() => { try { ApkUpdater.check(); } catch (_) {} }, 4000);
+  // En elk uur opnieuw kijken zolang de tablet aanstaat.
+  setInterval(() => { try { ApkUpdater.check(); } catch (_) {} }, 60 * 60 * 1000);
 })();

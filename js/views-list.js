@@ -1267,6 +1267,19 @@ function renderAccount(msg) {
       updBtn.textContent = 'Bezig met controleren...';
       result.innerHTML = '';
       try {
+        // In de APK: check op nieuwere APK i.p.v. de web-versie.
+        if (typeof ApkUpdater !== 'undefined' && ApkUpdater.isApp()) {
+          const info = await ApkUpdater.check({ force: true });
+          if (info && info.hasUpdate) {
+            result.innerHTML = `<div class="alert alert-info">📦 Nieuwe APK beschikbaar. <a href="${esc(info.downloadUrl)}" target="_blank" rel="noopener" class="btn btn-sm btn-primary" style="margin-left:.5rem;">Installeer</a></div>`;
+          } else if (info) {
+            result.innerHTML = `<div class="alert alert-success">Je draait al de laatste APK (${esc(APP_VERSION)}, ${esc(APP_BUILD_DATE)}).</div>`;
+          } else {
+            result.innerHTML = `<div class="alert alert-error">Kon niet controleren — offline of GitHub-release onbereikbaar.</div>`;
+          }
+          updBtn.disabled = false; updBtn.textContent = orig;
+          return;
+        }
         const r = await Updater.check();
         if (r.hasUpdate) {
           result.innerHTML = `<div class="alert alert-info">Nieuwe versie beschikbaar: <strong>${esc(r.remoteVersion)}</strong> (jij draait ${esc(r.currentVersion)}). De pagina wordt over enkele seconden ververst.</div>`;

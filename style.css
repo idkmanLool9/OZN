@@ -2809,6 +2809,26 @@ fieldset[data-step][hidden] { display: none !important; }
 .kist-card-foot-nopr { flex-direction: column; align-items: stretch; }
 .kist-kies-btn-full { width: 100%; }
 
+/* APK-update-banner (alleen in native Android/iOS via Capacitor) */
+.apk-update-banner {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  background: linear-gradient(135deg, #2b6b9f, #1c4a72);
+  color: #fff;
+  padding: .6rem 1rem;
+  padding-top: calc(.6rem + env(safe-area-inset-top));
+  box-shadow: 0 3px 8px rgba(0,0,0,.15);
+}
+.apk-update-banner-text { flex: 1 1 auto; min-width: 0; font-size: .92rem; }
+.apk-update-banner-text strong { margin-right: .35rem; }
+.apk-update-banner-acties { display: flex; gap: .5rem; flex: 0 0 auto; }
+.apk-update-banner .btn-primary { background: #fff; color: #1c4a72; border: none; }
+.apk-update-banner .btn-ghost   { color: rgba(255,255,255,.85); }
+.apk-update-banner .btn-ghost:hover { color: #fff; background: rgba(255,255,255,.12); }
+/* Topbar iets minder padding-top als banner al de safe-area heeft opgevangen */
+body.has-apk-banner .topbar { padding-top: 0; }
+
 /* Logboek: leesbare tijdlijn ipv technische tabel */
 .logboek-list { list-style: none; margin: 0; padding: 0; }
 .logboek-dag { padding: 0 1rem 1rem; }

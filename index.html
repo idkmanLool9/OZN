@@ -207,6 +207,18 @@
             </div>
           </div>
         </header>
+        <!-- APK-update-banner (verschijnt alleen als er een nieuwere APK is
+             gepubliceerd op de GitHub-release en de app als APK draait) -->
+        <div id="apk-update-banner" class="apk-update-banner" hidden>
+          <span class="apk-update-banner-text">
+            <strong>📦 Nieuwe update:</strong>
+            <span id="apk-update-banner-info">nieuwe versie beschikbaar</span>
+          </span>
+          <span class="apk-update-banner-acties">
+            <a href="#" id="apk-update-banner-install" class="btn btn-sm btn-primary">Installeer</a>
+            <button type="button" id="apk-update-banner-dismiss" class="btn btn-sm btn-ghost" title="Verberg tot volgende versie">Later</button>
+          </span>
+        </div>
         <main id="view" class="main"></main>
         <footer class="footer">
           <div class="footer-inner">
