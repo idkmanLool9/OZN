@@ -156,6 +156,9 @@ const Modal = {
     document.getElementById('modal-icon').innerHTML = Modal._iconFor(type);
     m.className = 'modal modal-' + type;
     m.hidden = false;
+    // Focus onthouden — na sluiten geven we 'm terug aan de trigger-knop
+    // zodat toetsenbord/screen-reader-gebruikers niet terug bij <body> vallen.
+    const _priorFocus = document.activeElement;
     requestAnimationFrame(() => m.classList.add('shown'));
     setTimeout(() => btn.focus(), 60);
 
@@ -172,6 +175,7 @@ const Modal = {
           m.hidden = true;
           m.classList.remove('fading');
           Modal._busy = false;
+          try { _priorFocus && _priorFocus.focus && _priorFocus.focus(); } catch (_) {}
           resolve(result);
           if (Modal._queue.length) {
             const next = Modal._queue.shift();

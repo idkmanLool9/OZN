@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 236;
-const APP_VERSION    = '5.80.1';
+const APP_BUILD      = 237;
+const APP_VERSION    = '5.80.2';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1061,7 +1061,7 @@ Router.add('/logboek', () => renderLogboek());
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
   function cleanSessionStorage() {
     ActiveProfile.clear();
-    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], personeel_namen: [], planning_items: [], kist_voorraad: [] };
+    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], planning_items: [], kist_voorraad: [] };
     Cloud.loaded = false;
     // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
     // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet

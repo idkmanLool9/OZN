@@ -203,12 +203,6 @@ function kistSVG(materiaal) {
     </svg>`;
 }
 
-// Velden die we als 'aangeraden in te vullen' beschouwen — bij opslaan
-// zonder deze waardes verschijnt een waarschuwingspop-up.
-// Niets is verplicht in het dossier — leeg laten betekent geen
-// "ontbrekende gegevens"-waarschuwing bij opslaan.
-const AANBEVOLEN_VELDEN = [];
-
 // Belangrijke velden die WEL moeten worden ingevuld voor een compleet dossier
 // — wordt gebruikt om een ⚠-badge te tonen op de lijst en detail-pagina als
 // een dossier al 'in behandeling' is maar er nog gaten zitten in de basis.

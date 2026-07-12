@@ -1069,7 +1069,8 @@ function bindDetailEvents(id) {
     });
   });
 
-  $('#add-notitie').addEventListener('submit', async e => {
+  const _addNotitieForm = $('#add-notitie');
+  if (_addNotitieForm) _addNotitieForm.addEventListener('submit', async e => {
     e.preventDefault();
     const tekst = e.target.tekst.value.trim(); if (!tekst) return;
     const profiel = ActiveProfile.current();

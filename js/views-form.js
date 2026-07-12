@@ -1888,30 +1888,6 @@ function renderDossierForm(params) {
     // Handtekeningen niet meer in het formulier — bestaande behouden.
     data.handtekeningen = existingSigs;
 
-    // Aanbevolen-velden check
-    const ontbrekend = AANBEVOLEN_VELDEN.filter(f => !data[f.name] || !String(data[f.name]).trim());
-    if (ontbrekend.length > 0) {
-      const lijst = '<ul>' + ontbrekend.map(f => `<li>${esc(f.label)}</li>`).join('') + '</ul>';
-      const html = `<p>De volgende gegevens zijn nog niet ingevuld:</p>${lijst}<p>Wat wil je doen?</p>`;
-      const wantsToSave = await Modal.confirm({
-        type: 'warning',
-        title: 'Ontbrekende gegevens',
-        html,
-        confirmText: 'Toch opslaan',
-        cancelText: 'Ga terug en invullen',
-      });
-      if (!wantsToSave) {
-        // Ga naar het eerste lege veld
-        const first = ontbrekend[0];
-        const inp = e.target.elements[first.name];
-        if (inp) {
-          inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          setTimeout(() => { try { inp.focus(); } catch (_) {} }, 350);
-        }
-        return;
-      }
-    }
-
     // Dubbel-dossier / persoon-detectie (niet-blokkerend, wel waarschuwen).
     const dubbel = vindDubbelDossier(data, isNew ? null : dossier.id);
     if (dubbel) {

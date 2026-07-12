@@ -10,7 +10,6 @@ const KEYS = {
   NOTITIES: 'notities',
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
   PROFIELEN: 'profiles',
-  PERSONEEL: 'personeel_namen',   // alleen id+naam (voor personeelskiezer; geen rol-lek)
   PLANNING: 'planning_items',
   KIST_VOORRAAD: 'kist_voorraad', // voorraad per kist-naam (beheerder-only)
 };
@@ -109,7 +108,7 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], personeel_namen: [], planning_items: [], kist_voorraad: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], planning_items: [], kist_voorraad: [] },
   loaded: false,
   offline: false,
 
@@ -117,7 +116,7 @@ const Cloud = {
     // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
     if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, k, n, kim, pf, pn, pl, kv] = await Promise.all([
+      const [d, k, n, kim, pf, pl, kv] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
         // Kosten via SECURITY DEFINER-RPC (bedrag gemaskeerd voor medewerker,
         // rij-filter gelijk aan dossiers_select).
@@ -126,8 +125,6 @@ const Cloud = {
         sb.from('kist_afbeeldingen').select('*'),
         // Accounts + rollen (RLS: medewerker ziet enkel eigen rij, beheerder alle)
         sb.from('profiles').select('*').order('naam', { ascending: true }),
-        // Alleen id+naam voor de personeelskiezer, via SECURITY DEFINER-RPC.
-        sb.rpc('get_personeel_namen'),
         // Planning-agenda (tolerant als de tabel nog niet bestaat)
         sb.from('planning_items').select('*').order('start_ts', { ascending: true }),
         // Kist-voorraad (RLS: beheerder-only; medewerker krijgt lege lijst)
@@ -140,7 +137,6 @@ const Cloud = {
       Cloud.cache.notities = (n.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
       Cloud.cache.profiles = ((pf && pf.data) || []).map(normRow);
-      Cloud.cache.personeel_namen = ((pn && pn.data) || []).map(normRow);
       Cloud.cache.planning_items = ((pl && pl.data) || []).map(normRow);
       Cloud.cache.kist_voorraad = ((kv && kv.data) || []).map(normRow);
       Cloud.loaded = true;
