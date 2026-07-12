@@ -59,6 +59,8 @@ function renderDossierList(params, path) {
           const acties = [];
           if (d.thuis_opbaren_datum === isoT) acties.push({ label: '🏠 Thuis opbaren start', tijd: d.thuis_opbaren_tijd || '', wanneer: 'vandaag' });
           else if (d.thuis_opbaren_datum === isoM) acties.push({ label: '🏠 Thuis opbaren morgen', tijd: d.thuis_opbaren_tijd || '', wanneer: 'morgen' });
+          if (d.ophalen_datum === isoT) acties.push({ label: '🚐 Ophalen', tijd: d.ophalen_tijd || '', wanneer: 'vandaag' });
+          else if (d.ophalen_datum === isoM) acties.push({ label: '🚐 Ophalen morgen', tijd: d.ophalen_tijd || '', wanneer: 'morgen' });
           if (acties.length) rijen.push({ d, acties });
         });
         // Plus planning-items (rouwauto, aula) van vandaag

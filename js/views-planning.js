@@ -62,8 +62,13 @@ function planningWaarschuwingen() {
     const missend = [];
     if (!d.opbaring_type) missend.push('ophalen/thuis nog niet gekozen');
     if ((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && !d.thuis_opbaren_datum) missend.push('geen datum thuis opbaren');
+    if ((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') && !d.ophalen_datum) missend.push('geen ophaaldatum');
+    if ((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide')
+        && (!Array.isArray(d.brengen_naar) || !d.brengen_naar.some(x => x && (typeof x === 'string' ? x : x.locatie))))
+      missend.push('geen overbrenging-locatie(s)');
     if (!d.kist_type) missend.push('kist nog niet gekozen');
-    if (!d.rouwauto || d.rouwauto === 'nee') missend.push('rouwauto nog niet geregeld');
+    // Alleen bij écht leeg triggeren; expliciete 'nee' is een gemaakte keuze.
+    if (!d.rouwauto) missend.push('rouwauto nog niet geregeld');
     if (missend.length) out.push({ dossier: d, missend });
   });
   return out;

@@ -44,7 +44,7 @@ function renderDossierDetail(params) {
               <button type="button" class="btn btn-ghost btn-block" id="btn-print">📄 Opslaan / delen als PDF</button>
               <button type="button" class="btn btn-ghost btn-block" id="btn-copy-nr">⧉ Kopieer dossiernummer</button>
               ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `<button type="button" class="btn btn-ghost btn-block" id="btn-archief">${d.gearchiveerd ? '📤 Uit archief halen' : '📦 Archiveren'}</button>` : ''}
-              <button type="button" class="btn btn-danger btn-block" id="btn-delete">🗑 Verwijderen</button>
+              ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `<button type="button" class="btn btn-danger btn-block" id="btn-delete">🗑 Verwijderen</button>` : ''}
             </div>
           </details>
         </div>
@@ -483,8 +483,13 @@ function dossierSpec(d, kosten) {
     ] },
     { heading: 'Opbaren & locatie', rows: [
       ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : ''))],
+      ...((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') ? [
+        ['Ophaaldatum', [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')],
+        ['Brengen naar', Array.isArray(d.brengen_naar) ? d.brengen_naar.map(_routePlain).filter(Boolean).join(' → ') : ''],
+      ] : []),
       ...((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? [
         ['Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
+        ['Overbrengingen thuis', Array.isArray(d.thuis_overbrengingen) ? d.thuis_overbrengingen.map(_routePlain).filter(Boolean).join(' → ') : ''],
         ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
       ] : []),
       ['Opbaarlocatie', d.opbaarlocatie_type],
@@ -542,8 +547,13 @@ function buildDossierEmail(d, kosten) {
 
   pushSection('Opbaren & locatie', [
     ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : ''))],
+    ...((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') ? [
+      ['Ophaaldatum', [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')],
+      ['Brengen naar', Array.isArray(d.brengen_naar) ? d.brengen_naar.map(_routePlain).filter(Boolean).join(' → ') : ''],
+    ] : []),
     ...((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? [
       ['Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
+      ['Overbrengingen thuis', Array.isArray(d.thuis_overbrengingen) ? d.thuis_overbrengingen.map(_routePlain).filter(Boolean).join(' → ') : ''],
       ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
     ] : []),
     ['Opbaarlocatie', d.opbaarlocatie_type],
@@ -758,6 +768,17 @@ function _mailToPlainText(html) {
   return s;
 }
 
+// Plain-text (voor PDF/e-mail; geen HTML): 'Locatie (11-06-2026)' of alleen locatie.
+function _routePlain(item) {
+  if (item == null) return '';
+  if (typeof item === 'string') return item;
+  const loc = item.locatie || '';
+  const dat = item.datum || '';
+  if (!loc && !dat) return '';
+  if (!dat) return loc;
+  const fmt = (typeof fmtDate === 'function') ? fmtDate(dat) : dat;
+  return loc + ' (' + fmt + ')';
+}
 function _routeStr(item) {
   if (item == null) return '';
   if (typeof item === 'string') return esc(item);

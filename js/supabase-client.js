@@ -233,9 +233,13 @@ function normalize(tbl, row) {
 }
 
 // DB façade — sync reads uit cache, async writes naar Supabase
+// LET OP: id-vergelijking gebeurt ALTIJD als string. Router levert ids als
+// string uit URL, Supabase levert ze als number. Zonder deze coercie mist
+// findIndex zelfs bij een simpele update — zie audit 2026-07-09 bug J.
+function _idEq(a, b) { return String(a) === String(b); }
 const DB = {
   list(tbl) { return Cloud.cache[tbl] || []; },
-  byId(tbl, id) { return (Cloud.cache[tbl] || []).find(x => x.id === id); },
+  byId(tbl, id) { return (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id)); },
   where(tbl, fn) { return (Cloud.cache[tbl] || []).filter(fn); },
 
   async insert(tbl, payload) {
@@ -287,10 +291,10 @@ const DB = {
       p.bijgewerkt_door = profielNaam;
     }
     cleanEmpty(p);
-    const oud = (Cloud.cache[tbl] || []).find(x => x.id === id);
+    const oud = (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id));
     const data = await updateWithTrackFallback(tbl, id, p);
     const norm = normalize(tbl, data);
-    const i = Cloud.cache[tbl].findIndex(x => x.id === id);
+    const i = Cloud.cache[tbl].findIndex(x => _idEq(x.id, id));
     if (i >= 0) Cloud.cache[tbl][i] = norm;
     AuditLog.log('update', tbl, id, { patch: sanitizeForAudit(p), oud: oud ? diffKeys(oud, norm) : null });
     return norm;
@@ -306,13 +310,13 @@ const DB = {
       });
       throw new Error('offline');
     }
-    const oud = (Cloud.cache[tbl] || []).find(x => x.id === id);
+    const oud = (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id));
     const { error } = await sb.from(tbl).delete().eq('id', id);
     if (error) {
       Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: error.message });
       throw error;
     }
-    Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => x.id !== id);
+    Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => !_idEq(x.id, id));
     AuditLog.log('delete', tbl, id, { was: oud ? sanitizeForAudit(oud) : null });
   },
 
@@ -501,21 +505,24 @@ const KistVoorraad = {
     return data;
   },
   // Reserveer 1 stuk (bij dossier-koppeling). Fout is niet-fataal.
-  async reserveer1(naam) {
+  async reserveer1(naam) { return KistVoorraad._delta(naam, -1); },
+  // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
+  // verwijderd wordt, geeft de oude voorraad +1 terug.
+  async terug1(naam) { return KistVoorraad._delta(naam, +1); },
+  // Atomaire delta via RPC — voorkomt race tussen twee gelijktijdige
+  // reserveringen die anders beide dezelfde 'was'-waarde zouden lezen.
+  async _delta(naam, delta) {
     if (!naam) return;
     const cur = KistVoorraad.byNaam(naam);
     if (!cur) return; // nog geen voorraadregel = niet bijhouden
-    const nieuw = Math.max(0, (cur.aantal || 0) - 1);
-    try { await KistVoorraad.upsert(naam, { aantal: nieuw }); } catch (_) {}
-  },
-  // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
-  // verwijderd wordt, geeft de oude voorraad +1 terug.
-  async terug1(naam) {
-    if (!naam) return;
-    const cur = KistVoorraad.byNaam(naam);
-    if (!cur) return;
-    const nieuw = (cur.aantal || 0) + 1;
-    try { await KistVoorraad.upsert(naam, { aantal: nieuw }); } catch (_) {}
+    try {
+      const { data, error } = await sb.rpc('kist_voorraad_delta', { p_naam: naam, p_delta: delta });
+      if (error) throw error;
+      const nieuw = (typeof data === 'number') ? data : Math.max(0, (cur.aantal || 0) + delta);
+      const arr = Cloud.cache.kist_voorraad;
+      const i = arr.findIndex(r => r.naam === naam);
+      if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: nieuw });
+    } catch (_) {}
   },
 };
 

@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 234;
-const APP_VERSION    = '5.79.3';
+const APP_BUILD      = 235;
+const APP_VERSION    = '5.80.0';
 const APP_BUILD_DATE = '2026-07-07';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -901,9 +901,13 @@ async function autoArchiveer() {
     const planning = DB.list(KEYS.PLANNING) || [];
     const kandidaten = (DB.list(KEYS.DOSSIERS) || []).filter(d => {
       if (d.gearchiveerd) return false;
-      if (!d.rouwauto || d.rouwauto === 'nee') return false;
+      // Alleen wanneer geen rouwauto is gekozen (leeg) is 't dossier
+      // "niet klaar". Bewuste 'nee' is ook een gemaakte keuze.
+      if (!d.rouwauto) return false;
       const dates = [];
       if (d.thuis_opbaren_datum) dates.push(new Date(d.thuis_opbaren_datum + 'T00:00:00'));
+      if (d.thuis_opbaren_einddatum) dates.push(new Date(d.thuis_opbaren_einddatum + 'T00:00:00'));
+      if (d.ophalen_datum) dates.push(new Date(d.ophalen_datum + 'T00:00:00'));
       planning.forEach(p => { if (p.dossier_id === d.id && p.start_ts) dates.push(new Date(p.start_ts)); });
       if (!dates.length) return false;             // geen datum → niet 'afgehandeld'
       return dates.every(dt => !isNaN(dt.getTime()) && dt < vandaag);
