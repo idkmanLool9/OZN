@@ -1,0 +1,14 @@
+{
+  "name": "capacitor-google-services-installer",
+  "version": "1.0.0",
+  "description": "Vraag Google Play Services om alle optionele modules te installeren (bv. ML Kit Document Scanner).",
+  "license": "MIT",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "files": [
+    "android/"
+  ]
+}

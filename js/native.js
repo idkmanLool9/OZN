@@ -229,6 +229,28 @@ Native.scanFoto = async function () {
   } catch (_) { return null; }
 };
 
+// ─── Google Play Services module-installer (Android) ───────────────────────
+// Vraagt Google Play Services om ALLE optionele modules die de app gebruikt
+// te installeren (ML Kit Document Scanner, en toekomstige uitbreidingen).
+// Op iOS/web een no-op.
+Native.googleServicesStatus = async function () {
+  if (!Native.isApp()) return { platform: 'web' };
+  if (Native.platform() !== 'android') return { platform: 'ios' };
+  const GS = Native._plugin('GoogleServices');
+  if (!GS) return { platform: 'android', unavailable: true };
+  try { return { platform: 'android', ...(await GS.status()) }; }
+  catch (e) { return { platform: 'android', error: (e && e.message) || String(e) }; }
+};
+
+Native.installGoogleServices = async function () {
+  if (!Native.isApp() || Native.platform() !== 'android') {
+    throw new Error('Alleen op de Android-app beschikbaar.');
+  }
+  const GS = Native._plugin('GoogleServices');
+  if (!GS) throw new Error('Google Services-plugin niet in deze app-build.');
+  return await GS.installAll();
+};
+
 // ─── Live Activity (lockscreen-aftelwidget voor een uitvaart vandaag) ─────
 Native._la = function () {
   if (!Native.isApp()) return null;

@@ -245,15 +245,24 @@ function renderAccount(msg) {
         <dl class="dl">
           <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
-          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Apple-documentscanner</dt><dd id="scanner-status" class="muted small">controleren…</dd></div>' : ''}
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Documentscanner</dt><dd id="scanner-status" class="muted small">controleren…</dd></div>' : ''}
           ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Live Activity</dt><dd id="la-status" class="muted small">controleren…</dd></div>' : ''}
+          ${(typeof Native !== 'undefined' && Native.isApp() && Native.platform && Native.platform() === 'android') ? '<div><dt>Google-diensten</dt><dd id="gs-status" class="muted small">controleren…</dd></div>' : ''}
         </dl>
         ${(typeof Native !== 'undefined' && Native.isApp()) ? `
           <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .75rem;">
             <button type="button" class="btn btn-sm" id="btn-la-test">▶︎ Test Live Activity</button>
             <button type="button" class="btn btn-sm btn-ghost" id="btn-la-stop">Stop</button>
           </div>
-          <div id="la-test-result" class="muted small" style="margin-bottom:.5rem;"></div>` : ''}
+          <div id="la-test-result" class="muted small" style="margin-bottom:.5rem;"></div>
+          ${Native.platform && Native.platform() === 'android' ? `
+            <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .5rem;">
+              <button type="button" class="btn btn-sm" id="btn-gs-install">🛠 Zet alle Google-diensten aan</button>
+            </div>
+            <p class="muted small" style="margin-bottom:.75rem;">Vraagt Google Play Services om álle optionele modules (nu: documentscanner) én toekomstige uitbreidingen te downloaden en te activeren. Handig als je de vraag eerder hebt weggeklikt.</p>
+            <div id="gs-install-result" class="muted small" style="margin-bottom:.5rem;"></div>
+          ` : ''}
+        ` : ''}
         <div id="update-result"></div>
         <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;">
           <button type="button" class="btn btn-primary" id="btn-check-update">Check op updates</button>
@@ -1214,21 +1223,56 @@ function renderAccount(msg) {
     });
   }
 
-  // Diagnose: is de native Apple-documentscanner geladen in deze app-build?
+  // Diagnose: is de native documentscanner-plugin geladen in deze app-build?
   const scanEl = $('#scanner-status');
   if (scanEl && typeof Native !== 'undefined' && Native.scannerStatus) {
+    const isAndroid = Native.platform && Native.platform() === 'android';
     Native.scannerStatus().then(st => {
       if (st === 'native') {
-        scanEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ actief</span> — echte Apple-scanner beschikbaar';
+        scanEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ actief</span> — ' +
+          (isAndroid ? 'ML Kit scanner beschikbaar' : 'Apple VisionKit scanner beschikbaar');
       } else if (st === 'native-unsupported') {
         scanEl.textContent = 'plugin geladen, maar dit toestel ondersteunt de scanner niet';
       } else if (st === 'unavailable') {
-        scanEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span> — maak een nieuwe TestFlight-build';
+        scanEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span> — maak een nieuwe ' +
+          (isAndroid ? 'APK' : 'TestFlight-build');
       } else {
         scanEl.textContent = 'alleen in de app (niet in de browser)';
       }
     }).catch(() => { scanEl.textContent = 'kon status niet bepalen'; });
   }
+
+  // Diagnose + installer: Google Play Services (alleen Android-app)
+  const gsEl = $('#gs-status');
+  if (gsEl && typeof Native !== 'undefined' && Native.googleServicesStatus) {
+    Native.googleServicesStatus().then(st => {
+      if (st.unavailable) gsEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ plugin niet in deze build</span>';
+      else if (st.available === true) gsEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ beschikbaar</span>';
+      else if (st.available === false) gsEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet beschikbaar</span> — ' + esc(st.description || 'onbekende reden');
+      else gsEl.textContent = 'kon status niet bepalen';
+    }).catch(() => { gsEl.textContent = 'kon status niet bepalen'; });
+  }
+  const gsInstallBtn = $('#btn-gs-install');
+  if (gsInstallBtn) gsInstallBtn.addEventListener('click', async () => {
+    const res = $('#gs-install-result');
+    gsInstallBtn.disabled = true; const orig = gsInstallBtn.textContent;
+    gsInstallBtn.textContent = 'Bezig — volg de systeem-dialoog…';
+    if (res) res.textContent = '';
+    try {
+      const r = await Native.installGoogleServices();
+      if (r && r.nothingToDo) {
+        if (res) res.innerHTML = '<span style="color:#1f7a3a;">✓ Niets te installeren — deze build gebruikt geen optionele Google-modules.</span>';
+      } else if (r && r.alreadyInstalled) {
+        if (res) res.innerHTML = '<span style="color:#1f7a3a;">✓ Alle Google-modules stonden al aan.</span>';
+      } else {
+        if (res) res.innerHTML = '<span style="color:#1f7a3a;">✓ Installatie aangevraagd — Google Play Services regelt de download op de achtergrond.</span>';
+      }
+    } catch (e) {
+      if (res) res.innerHTML = '<span style="color:#b34;">' + esc((e && e.message) || String(e)) + '</span>';
+    } finally {
+      gsInstallBtn.disabled = false; gsInstallBtn.textContent = orig;
+    }
+  });
 
   // Diagnose + test: Live Activity
   const laEl = $('#la-status');
