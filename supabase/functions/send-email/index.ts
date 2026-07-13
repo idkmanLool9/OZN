@@ -1,24 +1,15 @@
 // send-email — verstuur een HTML-mail via SMTP (Hotmail/Outlook) vanuit
-// het OZN-account. Aanroep vanuit de app:
-//   supabase.functions.invoke('send-email', {
-//     body: { to, subject, html, replyTo? }
-//   })
+// het OZN-account.
 //
-// Beveiliging:
-//   - verify_jwt = true (moet ingelogde gebruiker zijn)
-//   - Rate-limit: max 60 mails per gebruiker per uur
-//
-// Secrets (supabase secrets set NAAM=VALUE):
-//   SMTP_HOST   — smtp-mail.outlook.com  (default als leeg)
+// Secrets:
+//   SMTP_HOST   — smtp-mail.outlook.com  (default)
 //   SMTP_PORT   — 587                    (default; STARTTLS)
 //   SMTP_USER   — jouw@hotmail.com
-//   SMTP_PASS   — app-wachtwoord uit https://account.microsoft.com/security
-//                 (NIET je gewone Microsoft-wachtwoord — 2FA moet aan
-//                 staan om een app-wachtwoord te kunnen aanmaken)
-//   SMTP_FROM   — bv. "OZN <jouw@hotmail.com>" (optioneel — anders SMTP_USER)
+//   SMTP_PASS   — app-wachtwoord (2FA vereist)
+//   SMTP_FROM   — bv. "OZN <jouw@hotmail.com>"  (default: SMTP_USER)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+import nodemailer from 'npm:nodemailer@6.9.14';
 
 const SUPABASE_URL          = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -43,9 +34,6 @@ function jsonResp(body: unknown, status = 200): Response {
   });
 }
 
-// Zet een HTML-body om in een grove plain-text-versie (voor de text/plain
-// alternate van de e-mail — verhoogt afleverbaarheid + toont iets leesbaars
-// in mail-clients die geen HTML renderen).
 function htmlToPlain(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -119,48 +107,44 @@ Deno.serve(async (req) => {
       return jsonResp({ error: 'rate_limited', limit: RATE_LIMIT_PER_HOUR, window: '1u' }, 429);
     }
 
-    // SMTP-connectie opzetten. Voor Hotmail/Outlook is 587 met STARTTLS
-    // de juiste combinatie (denomailer regelt STARTTLS zelf op poort 587).
-    const client = new SMTPClient({
-      connection: {
-        hostname: SMTP_HOST,
-        port:     SMTP_PORT,
-        tls:      SMTP_PORT === 465,       // 465 = implicit TLS, 587 = STARTTLS
-        auth: {
-          username: SMTP_USER,
-          password: SMTP_PASS,
-        },
+    // Nodemailer SMTP-transport (STARTTLS op 587, of implicit TLS op 465).
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
       },
     });
 
     try {
-      await client.send({
+      const info = await transporter.sendMail({
         from:    SMTP_FROM,
-        to:      to,
+        to:      to.join(', '),
         replyTo: replyTo || undefined,
         subject,
-        content: htmlToPlain(html),
+        text:    htmlToPlain(html),
         html,
       });
+
+      // Loggen (fire-and-forget)
+      svc.from('email_log').insert({
+        user_id:   userId,
+        to:        to,
+        subject,
+        resend_id: info?.messageId || null,
+      }).then(({ error }: any) => { if (error) console.error('email_log insert:', error.message); });
+
+      return jsonResp({ ok: true, messageId: info?.messageId || null });
     } catch (smtpErr: any) {
-      try { await client.close(); } catch { /* ignore */ }
       return jsonResp({
-        error: 'smtp_failed',
+        error:  'smtp_failed',
         detail: smtpErr?.message || String(smtpErr),
+        code:   smtpErr?.code || null,
       }, 502);
     }
-    try { await client.close(); } catch { /* ignore */ }
-
-    // Loggen (fire-and-forget)
-    svc.from('email_log').insert({
-      user_id:   userId,
-      to:        to,
-      subject,
-      resend_id: null,
-    }).then(({ error }: any) => { if (error) console.error('email_log insert:', error.message); });
-
-    return jsonResp({ ok: true });
   } catch (e: any) {
-    return jsonResp({ error: 'unhandled', detail: e?.message || String(e) }, 500);
+    return jsonResp({ error: 'unhandled', detail: e?.message || String(e), stack: e?.stack || null }, 500);
   }
 });

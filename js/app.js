@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 244;
-const APP_VERSION    = '5.83.2';
+const APP_BUILD      = 245;
+const APP_VERSION    = '5.83.3';
 const APP_BUILD_DATE = '2026-07-13';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -775,19 +775,41 @@ const EmailService = {
     };
     if (opts.replyTo) payload.replyTo = opts.replyTo;
 
-    const { data, error } = await s.functions.invoke('send-email', { body: payload });
-    if (error) {
-      // Supabase functions.invoke geeft de HTTP-body via `error.context.body`
-      // door — probeer daaruit een nette foutmelding te halen.
-      let detail = error.message || '';
-      try {
-        const body = await error.context?.response?.json?.();
-        if (body?.error) detail = body.error + (body.detail ? ': ' + JSON.stringify(body.detail) : '');
-      } catch (_) {}
-      throw new Error('Mail niet verzonden — ' + detail);
+    // supabase.functions.invoke geeft bij een non-2xx alleen een generieke
+    // 'Edge Function returned a non-2xx status code'. Om de échte fout uit
+    // de body te krijgen doen we handmatig fetch met dezelfde JWT.
+    const { data: sess } = await s.auth.getSession();
+    const jwt = sess?.session?.access_token;
+    if (!jwt) throw new Error('Niet ingelogd (geen sessie).');
+
+    const url = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') + '/functions/v1/send-email';
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + jwt,
+          'apikey': (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : ''),
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (netErr) {
+      throw new Error('Netwerkfout: ' + (netErr.message || String(netErr)));
     }
-    if (data && data.error) throw new Error('Mail niet verzonden — ' + data.error);
-    return data;
+
+    let bodyJson = null;
+    try { bodyJson = await resp.json(); } catch (_) {}
+
+    if (!resp.ok || (bodyJson && bodyJson.error)) {
+      const parts = [];
+      if (bodyJson?.error)  parts.push(bodyJson.error);
+      if (bodyJson?.detail) parts.push(typeof bodyJson.detail === 'string' ? bodyJson.detail : JSON.stringify(bodyJson.detail));
+      if (bodyJson?.code)   parts.push('(' + bodyJson.code + ')');
+      if (!parts.length)    parts.push('HTTP ' + resp.status);
+      throw new Error(parts.join(' — '));
+    }
+    return bodyJson;
   },
 };
 
