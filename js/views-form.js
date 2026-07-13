@@ -680,6 +680,10 @@ function renderDossierForm(params) {
       localStorage.removeItem(maxKey);
     } catch (_) {}
   }
+  // Sessie-vlag: 'ik ben nu bezig met dossier X'. De kisten-pagina toont
+  // alleen actief-dossier-banners voor drafts met deze vlag. Zonder vlag
+  // is een oude localStorage-draft dus geen 'actief dossier' meer.
+  try { sessionStorage.setItem('sok_actief_' + _draftKeyEarly, '1'); } catch (_) {}
   let currentStep = (() => {
     try {
       const saved = parseInt(localStorage.getItem(stepKey), 10);
@@ -1975,6 +1979,7 @@ function renderDossierForm(params) {
         }
         localStorage.removeItem(draftKey);
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}
+        try { sessionStorage.removeItem('sok_actief_' + draftKey); } catch (_) {}
       }
 
       // ─── Auto-mail dossier bij eerste aanmaak (best-effort) ──

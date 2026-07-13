@@ -2,12 +2,25 @@
 
 // Detecteer alle actieve dossier-drafts in localStorage zodat we direct
 // een kist kunnen koppelen aan een dossier-in-bewerking.
+//
+// Belangrijk: we tonen ALLEEN drafts waarvoor deze sessie ook echt
+// het intake-formulier is geopend (sessionStorage-vlag). Zonder die
+// vlag is 't een oude, blijven-hangen-concept van een vorige keer
+// die niet als 'ik zit nu in dossier X' geïnterpreteerd mag worden.
 function _activeDossierDrafts() {
   const drafts = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key || !key.startsWith('sok_draft_')) continue;
+      // Filter: alleen drafts die deze sessie zijn aangeraakt tellen als
+      // 'actief'. Oude localStorage-drafts blijven bestaan (kan resumen
+      // in het formulier), maar spammen niet meer de kisten-banner.
+      let sessionActive = false;
+      try { sessionActive = sessionStorage.getItem('sok_actief_' + key) === '1'; }
+      catch (_) {}
+      if (!sessionActive) continue;
+
       let data = null;
       try { data = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) {}
       if (!data) continue;
