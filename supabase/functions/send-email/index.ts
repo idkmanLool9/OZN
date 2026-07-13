@@ -1,23 +1,20 @@
-// send-email — verstuur een HTML-mail via SMTP (Hotmail/Outlook) vanuit
-// het OZN-account.
+// send-email — verstuur een HTML-mail via Brevo (voorheen Sendinblue).
+// Brevo laat je verzenden vanaf elk email-adres na click-verificatie
+// (geen domein-verificatie nodig, dus @hotmail.com werkt gewoon).
 //
-// Secrets:
-//   SMTP_HOST   — smtp-mail.outlook.com  (default)
-//   SMTP_PORT   — 587                    (default; STARTTLS)
-//   SMTP_USER   — jouw@hotmail.com
-//   SMTP_PASS   — app-wachtwoord (2FA vereist)
-//   SMTP_FROM   — bv. "OZN <jouw@hotmail.com>"  (default: SMTP_USER)
+// Secrets (Project Settings → Edge Functions → Secrets):
+//   BREVO_API_KEY   — API-key van brevo.com (Settings → SMTP & API → API Keys)
+//   EMAIL_FROM      — bv. "ozndossier@hotmail.com"  (moet als sender
+//                     geverifieerd zijn in Brevo)
+//   EMAIL_FROM_NAME — bv. "OZN"  (weergavenaam, optioneel)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import nodemailer from 'npm:nodemailer@6.9.14';
 
 const SUPABASE_URL          = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const SMTP_HOST = Deno.env.get('SMTP_HOST') || 'smtp-mail.outlook.com';
-const SMTP_PORT = parseInt(Deno.env.get('SMTP_PORT') || '587', 10);
-const SMTP_USER = Deno.env.get('SMTP_USER') || '';
-const SMTP_PASS = Deno.env.get('SMTP_PASS') || '';
-const SMTP_FROM = Deno.env.get('SMTP_FROM') || SMTP_USER;
+const BREVO_API_KEY   = Deno.env.get('BREVO_API_KEY') || '';
+const EMAIL_FROM      = Deno.env.get('EMAIL_FROM') || '';
+const EMAIL_FROM_NAME = Deno.env.get('EMAIL_FROM_NAME') || 'OZN';
 
 const RATE_LIMIT_PER_HOUR = 60;
 
@@ -58,8 +55,8 @@ Deno.serve(async (req) => {
     const missing: string[] = [];
     if (!SUPABASE_URL)          missing.push('SUPABASE_URL');
     if (!SUPABASE_SERVICE_ROLE) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-    if (!SMTP_USER)             missing.push('SMTP_USER');
-    if (!SMTP_PASS)             missing.push('SMTP_PASS');
+    if (!BREVO_API_KEY)         missing.push('BREVO_API_KEY');
+    if (!EMAIL_FROM)            missing.push('EMAIL_FROM');
     if (missing.length) return jsonResp({ error: 'missing_secrets', missing }, 500);
 
     const authHeader = req.headers.get('authorization') || '';
@@ -107,43 +104,42 @@ Deno.serve(async (req) => {
       return jsonResp({ error: 'rate_limited', limit: RATE_LIMIT_PER_HOUR, window: '1u' }, 429);
     }
 
-    // Nodemailer SMTP-transport (STARTTLS op 587, of implicit TLS op 465).
-    const transporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_PORT === 465,
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
+    // Brevo API-aanroep
+    const brevoResp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept':       'application/json',
+        'content-type': 'application/json',
+        'api-key':      BREVO_API_KEY,
       },
+      body: JSON.stringify({
+        sender:  { name: EMAIL_FROM_NAME, email: EMAIL_FROM },
+        to:      to.map((email: string) => ({ email })),
+        subject,
+        htmlContent: html,
+        textContent: htmlToPlain(html),
+        replyTo: replyTo ? { email: replyTo } : undefined,
+      }),
     });
+    const brevoBody = await brevoResp.json().catch(() => ({}));
 
-    try {
-      const info = await transporter.sendMail({
-        from:    SMTP_FROM,
-        to:      to.join(', '),
-        replyTo: replyTo || undefined,
-        subject,
-        text:    htmlToPlain(html),
-        html,
-      });
-
-      // Loggen (fire-and-forget)
-      svc.from('email_log').insert({
-        user_id:   userId,
-        to:        to,
-        subject,
-        resend_id: info?.messageId || null,
-      }).then(({ error }: any) => { if (error) console.error('email_log insert:', error.message); });
-
-      return jsonResp({ ok: true, messageId: info?.messageId || null });
-    } catch (smtpErr: any) {
+    if (!brevoResp.ok) {
       return jsonResp({
-        error:  'smtp_failed',
-        detail: smtpErr?.message || String(smtpErr),
-        code:   smtpErr?.code || null,
+        error:  'brevo_failed',
+        status: brevoResp.status,
+        detail: brevoBody?.message || brevoBody?.code || JSON.stringify(brevoBody),
       }, 502);
     }
+
+    // Loggen (fire-and-forget)
+    svc.from('email_log').insert({
+      user_id:   userId,
+      to:        to,
+      subject,
+      resend_id: brevoBody?.messageId || null,
+    }).then(({ error }: any) => { if (error) console.error('email_log insert:', error.message); });
+
+    return jsonResp({ ok: true, messageId: brevoBody?.messageId || null });
   } catch (e: any) {
     return jsonResp({ error: 'unhandled', detail: e?.message || String(e), stack: e?.stack || null }, 500);
   }

@@ -467,29 +467,26 @@ function renderAccount(msg) {
       <section class="card narrow" id="email-instellingen">
         <h2>E-mail verzenden (server-side)</h2>
         <p class="muted small">
-          De app stuurt e-mails rechtstreeks via <strong>SMTP</strong>
-          vanuit jouw eigen Hotmail/Outlook-adres. Geen mail-app openen,
-          en de mails komen echt bij jouw verzonden-map terecht.
+          De app stuurt e-mails direct via <strong>Brevo</strong> (voorheen
+          Sendinblue) vanuit een geverifieerd adres. Werkt met elk e-mailadres
+          (ook @hotmail.com/@gmail.com) na een simpele click-verificatie.
+          Geen mail-app openen, geen 2FA-gedoe.
         </p>
         <details style="margin: .5rem 0 1rem;">
           <summary style="cursor:pointer; font-weight:600;">Eenmalige serversetup (beheerder)</summary>
           <ol class="muted small" style="padding-left:1.5rem; line-height:1.55; margin-top:.5rem;">
-            <li>Zet <strong>tweestapsverificatie</strong> aan op je
-              Microsoft-account (verplicht om een app-wachtwoord te
-              kunnen genereren).</li>
-            <li>Ga naar <a href="https://account.microsoft.com/security" target="_blank" rel="noopener">account.microsoft.com/security</a> → <em>Geavanceerde beveiligingsopties</em> → <em>App-wachtwoorden</em> → <em>Nieuw app-wachtwoord maken</em>.</li>
-            <li>Kopieer het gegenereerde wachtwoord (bewaar 'm — je ziet 'm maar één keer).</li>
+            <li>Maak een gratis account op <a href="https://www.brevo.com" target="_blank" rel="noopener">brevo.com</a> (300 mails/dag gratis).</li>
+            <li>Ga naar <strong>Senders, Domains &amp; Dedicated IPs</strong> → <em>Senders</em> → <em>Add a sender</em>. Vul je e-mailadres in (bv. <code>ozndossier@hotmail.com</code>). Brevo stuurt je een verificatiemail — klik de link.</li>
+            <li>Ga naar <strong>SMTP &amp; API</strong> → tab <em>API Keys</em> → <em>Generate a new API key</em>. Kopieer 'm.</li>
             <li>Stel de secrets in bij Supabase (Project Settings → Edge Functions → Secrets):
-              <pre style="background:#f6f4ef;padding:.5rem .75rem;border-radius:6px;overflow-x:auto;">SMTP_USER = jouw@hotmail.com
-SMTP_PASS = &lt;app-wachtwoord van stap 3&gt;
-SMTP_FROM = OZN &lt;jouw@hotmail.com&gt;</pre>
-              <span class="muted small">SMTP_HOST en SMTP_PORT hoeven niet
-              — die staan al standaard op <code>smtp-mail.outlook.com:587</code>.</span>
+              <pre style="background:#f6f4ef;padding:.5rem .75rem;border-radius:6px;overflow-x:auto;">BREVO_API_KEY   = xkeysib-xxxxx...
+EMAIL_FROM      = ozndossier@hotmail.com
+EMAIL_FROM_NAME = OZN</pre>
             </li>
             <li>Test onderaan met <em>Test verzenden</em>.</li>
           </ol>
           <p class="muted small" style="margin-top:.5rem;">
-            Microsoft-limiet: ~500 mails per dag. Bij hoger volume: overweeg alsnog een eigen domein + Resend.
+            Brevo-limieten: 300 mails/dag gratis (geen dagcap in Edge Function; deze zit ingebouwd op 60/uur/user).
           </p>
         </details>
 
