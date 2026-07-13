@@ -467,24 +467,30 @@ function renderAccount(msg) {
       <section class="card narrow" id="email-instellingen">
         <h2>E-mail verzenden (server-side)</h2>
         <p class="muted small">
-          De app stuurt e-mails direct via <strong>Resend</strong> vanuit
-          jouw eigen adres (bv. <code>info@ozn.nl</code>). Geen mail-app
-          openen, geen sleutel in de browser — de Edge Function op de
-          server regelt het.
+          De app stuurt e-mails rechtstreeks via <strong>SMTP</strong>
+          vanuit jouw eigen Hotmail/Outlook-adres. Geen mail-app openen,
+          en de mails komen echt bij jouw verzonden-map terecht.
         </p>
         <details style="margin: .5rem 0 1rem;">
           <summary style="cursor:pointer; font-weight:600;">Eenmalige serversetup (beheerder)</summary>
           <ol class="muted small" style="padding-left:1.5rem; line-height:1.55; margin-top:.5rem;">
-            <li>Maak een account op <a href="https://resend.com" target="_blank" rel="noopener">resend.com</a> (3000 mails/maand gratis).</li>
-            <li>Voeg je domein <code>ozn.nl</code> toe en zet de DNS-records (SPF, DKIM, DMARC) die Resend toont.</li>
-            <li>Wacht tot het domein 'verified' is (kan een paar minuten duren).</li>
-            <li>Maak een API-key aan (<em>API Keys → Create API Key</em>).</li>
-            <li>Stel de secrets in bij Supabase:
-              <pre style="background:#f6f4ef;padding:.5rem .75rem;border-radius:6px;overflow-x:auto;">supabase secrets set RESEND_API_KEY="re_xxxxxxxx"
-supabase secrets set RESEND_FROM="OZN &lt;info@ozn.nl&gt;"</pre>
+            <li>Zet <strong>tweestapsverificatie</strong> aan op je
+              Microsoft-account (verplicht om een app-wachtwoord te
+              kunnen genereren).</li>
+            <li>Ga naar <a href="https://account.microsoft.com/security" target="_blank" rel="noopener">account.microsoft.com/security</a> → <em>Geavanceerde beveiligingsopties</em> → <em>App-wachtwoorden</em> → <em>Nieuw app-wachtwoord maken</em>.</li>
+            <li>Kopieer het gegenereerde wachtwoord (bewaar 'm — je ziet 'm maar één keer).</li>
+            <li>Stel de secrets in bij Supabase (Project Settings → Edge Functions → Secrets):
+              <pre style="background:#f6f4ef;padding:.5rem .75rem;border-radius:6px;overflow-x:auto;">SMTP_USER = jouw@hotmail.com
+SMTP_PASS = &lt;app-wachtwoord van stap 3&gt;
+SMTP_FROM = OZN &lt;jouw@hotmail.com&gt;</pre>
+              <span class="muted small">SMTP_HOST en SMTP_PORT hoeven niet
+              — die staan al standaard op <code>smtp-mail.outlook.com:587</code>.</span>
             </li>
             <li>Test onderaan met <em>Test verzenden</em>.</li>
           </ol>
+          <p class="muted small" style="margin-top:.5rem;">
+            Microsoft-limiet: ~500 mails per dag. Bij hoger volume: overweeg alsnog een eigen domein + Resend.
+          </p>
         </details>
 
         ${(() => {
