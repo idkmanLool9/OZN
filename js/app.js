@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 243;
-const APP_VERSION    = '5.83.1';
+const APP_BUILD      = 244;
+const APP_VERSION    = '5.83.2';
 const APP_BUILD_DATE = '2026-07-13';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -755,9 +755,10 @@ const EmailService = {
   // caller op de mailto-fallback kan vallen.
   isConfigured() {
     try {
-      const s = window.sb || null;
-      if (!s) return false;
-      return !!(s.auth && s.auth.getSession);
+      // sb wordt in supabase-client.js met const gedeclareerd — dat is
+      // globaal binnen de non-module script-scope maar niet als window.sb
+      // te bereiken. Vandaar de directe verwijzing.
+      return !!(typeof sb !== 'undefined' && sb && sb.auth && sb.auth.getSession);
     } catch (_) { return false; }
   },
 
@@ -765,7 +766,7 @@ const EmailService = {
   // html  = volledige HTML-body (zoals buildDossierEmail teruggeeft)
   // Optioneel: opts.replyTo, opts.plainFallback (voor toekomstig gebruik).
   async send(to, subject, html, opts = {}) {
-    const s = window.sb;
+    const s = (typeof sb !== 'undefined') ? sb : null;
     if (!s) throw new Error('Supabase-client niet geladen.');
     const payload = {
       to:      Array.isArray(to) ? to : [to],
