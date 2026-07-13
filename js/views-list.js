@@ -173,6 +173,42 @@ function renderDossierList(params, path) {
   const statusSel = $('#dossiers-status');
   if (statusSel) statusSel.addEventListener('change', () => navigeerFilter(statusSel.form));
 
+  // Live zoeken: filter rijen direct in de DOM tijdens typen, zonder
+  // pagina-refresh en met behoud van cursor/focus. Submit (Enter) commit
+  // 'm nog wel netjes naar de URL zodat delen/back-knop blijft werken.
+  const zoekInput = $('#filter-form input[type="search"]');
+  if (zoekInput) {
+    const rijen = $$('#view tbody tr[data-id]');
+    const filterRijen = () => {
+      const term = zoekInput.value.trim().toLowerCase();
+      let zichtbaar = 0;
+      rijen.forEach(tr => {
+        if (!term) { tr.hidden = false; zichtbaar++; return; }
+        const match = tr.textContent.toLowerCase().includes(term);
+        tr.hidden = !match;
+        if (match) zichtbaar++;
+      });
+      // Leeg-state onder de tabel tonen/verbergen
+      let legeMelding = $('#dossiers-live-leeg');
+      if (zichtbaar === 0 && term) {
+        if (!legeMelding) {
+          const kaart = $('.dossiers-kaart');
+          if (kaart) {
+            legeMelding = document.createElement('p');
+            legeMelding.id = 'dossiers-live-leeg';
+            legeMelding.className = 'muted center';
+            legeMelding.style.padding = '1.5rem';
+            legeMelding.textContent = 'Geen dossiers gevonden voor deze zoekterm.';
+            kaart.appendChild(legeMelding);
+          }
+        }
+      } else if (legeMelding) {
+        legeMelding.remove();
+      }
+    };
+    zoekInput.addEventListener('input', filterRijen);
+  }
+
   // Hele rij klikbaar → naar dossier-detail (behalve op links/knoppen)
   $$('#view tr[data-id]').forEach(tr => {
     tr.addEventListener('click', e => {

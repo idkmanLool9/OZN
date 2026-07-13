@@ -256,7 +256,6 @@ function renderKistenBeheer(msg) {
 
       <div class="catalog-zoekbalk">
         <div class="catalog-search">
-          <span class="catalog-search-icon">🔍</span>
           <input type="search" id="kist-filter-q" value="${esc(_kistFilter)}" placeholder="Zoek op naam, materiaal of kenmerk…" autocomplete="off">
         </div>
         <button type="button" class="btn catalog-filters-toggle" id="kist-filters-toggle">⛛ Filters</button>
