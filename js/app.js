@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 241;
-const APP_VERSION    = '5.82.1';
+const APP_BUILD      = 242;
+const APP_VERSION    = '5.83.0';
 const APP_BUILD_DATE = '2026-07-13';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -744,24 +744,49 @@ const PushNotificaties = {
   },
 };
 
-// ─── E-mail-service (EmailJS) ───────────────────────────────────────────────
+// ─── E-mail-service (Resend via send-email Edge Function) ───────────────────
+// Server-side verzenden vanuit info@ozn.nl (of wat er in RESEND_FROM staat).
+// De sleutel + FROM-adres zitten uitsluitend in de Edge Function-secrets,
+// niet in de client — dus geen sleutel-lek en geen per-user config.
 const EmailService = {
+  // Server-side altijd 'geconfigureerd' zolang je online bent — de
+  // beschikbaarheid van de sleutels is een server-verantwoordelijkheid.
+  // We geven wél 'false' terug wanneer we niet ingelogd zijn, zodat de
+  // caller op de mailto-fallback kan vallen.
   isConfigured() {
-    const s = Settings.all();
-    return !!(s.emailjs_public_key && s.emailjs_service_id && s.emailjs_template_id);
+    try {
+      const s = window.sb || null;
+      if (!s) return false;
+      return !!(s.auth && s.auth.getSession);
+    } catch (_) { return false; }
   },
-  async send(toEmail, subject, message) {
-    if (!EmailService.isConfigured()) throw new Error('E-mail-koppeling niet ingesteld in Account.');
-    if (!window.emailjs) throw new Error('E-mail-bibliotheek niet geladen — controleer internet.');
-    const s = Settings.all();
-    emailjs.init({ publicKey: s.emailjs_public_key });
-    return emailjs.send(s.emailjs_service_id, s.emailjs_template_id, {
-      to_email: toEmail,
-      subject: subject,
-      message: message,
-      from_name: s.app_name || 'Uitvaartleider',
-      reply_to: '',
-    });
+
+  // to    = string of array van adressen
+  // html  = volledige HTML-body (zoals buildDossierEmail teruggeeft)
+  // Optioneel: opts.replyTo, opts.plainFallback (voor toekomstig gebruik).
+  async send(to, subject, html, opts = {}) {
+    const s = window.sb;
+    if (!s) throw new Error('Supabase-client niet geladen.');
+    const payload = {
+      to:      Array.isArray(to) ? to : [to],
+      subject: subject || '',
+      html:    html    || '',
+    };
+    if (opts.replyTo) payload.replyTo = opts.replyTo;
+
+    const { data, error } = await s.functions.invoke('send-email', { body: payload });
+    if (error) {
+      // Supabase functions.invoke geeft de HTTP-body via `error.context.body`
+      // door — probeer daaruit een nette foutmelding te halen.
+      let detail = error.message || '';
+      try {
+        const body = await error.context?.response?.json?.();
+        if (body?.error) detail = body.error + (body.detail ? ': ' + JSON.stringify(body.detail) : '');
+      } catch (_) {}
+      throw new Error('Mail niet verzonden — ' + detail);
+    }
+    if (data && data.error) throw new Error('Mail niet verzonden — ' + data.error);
+    return data;
   },
 };
 

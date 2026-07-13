@@ -465,29 +465,25 @@ function renderAccount(msg) {
       </section>
 
       <section class="card narrow" id="email-instellingen">
-        <h2>E-mail verzenden (automatisch)</h2>
+        <h2>E-mail verzenden (server-side)</h2>
         <p class="muted small">
-          Standaard openen de e-mail-knoppen je mail-app met de tekst klaar.
-          Wil je dat de app de e-mail <strong>direct verstuurt</strong> (geen mail-app nodig),
-          koppel dan een gratis EmailJS-account.
+          De app stuurt e-mails direct via <strong>Resend</strong> vanuit
+          jouw eigen adres (bv. <code>info@ozn.nl</code>). Geen mail-app
+          openen, geen sleutel in de browser — de Edge Function op de
+          server regelt het.
         </p>
-
         <details style="margin: .5rem 0 1rem;">
-          <summary style="cursor:pointer; font-weight:600;">Eenmalige setup (5 minuten) — klik voor instructies</summary>
+          <summary style="cursor:pointer; font-weight:600;">Eenmalige serversetup (beheerder)</summary>
           <ol class="muted small" style="padding-left:1.5rem; line-height:1.55; margin-top:.5rem;">
-            <li>Maak een gratis account op <a href="https://emailjs.com" target="_blank" rel="noopener">emailjs.com</a> (200 mails/maand gratis)</li>
-            <li>In <strong>Email Services</strong>: voeg je Gmail of Outlook toe en klik <em>Connect Account</em>. Onthoud de <strong>Service ID</strong> (begint met <code>service_</code>)</li>
-            <li>In <strong>Email Templates</strong>: maak een nieuw template aan
-              <ul>
-                <li>To Email: <code>{{to_email}}</code></li>
-                <li>From Name: <code>{{from_name}}</code></li>
-                <li>Subject: <code>{{subject}}</code></li>
-                <li>Content: <code>{{message}}</code></li>
-              </ul>
-              Sla op en onthoud de <strong>Template ID</strong> (begint met <code>template_</code>)
+            <li>Maak een account op <a href="https://resend.com" target="_blank" rel="noopener">resend.com</a> (3000 mails/maand gratis).</li>
+            <li>Voeg je domein <code>ozn.nl</code> toe en zet de DNS-records (SPF, DKIM, DMARC) die Resend toont.</li>
+            <li>Wacht tot het domein 'verified' is (kan een paar minuten duren).</li>
+            <li>Maak een API-key aan (<em>API Keys → Create API Key</em>).</li>
+            <li>Stel de secrets in bij Supabase:
+              <pre style="background:#f6f4ef;padding:.5rem .75rem;border-radius:6px;overflow-x:auto;">supabase secrets set RESEND_API_KEY="re_xxxxxxxx"
+supabase secrets set RESEND_FROM="OZN &lt;info@ozn.nl&gt;"</pre>
             </li>
-            <li>In <strong>Account → General</strong>: kopieer je <strong>Public Key</strong></li>
-            <li>Plak alle drie hieronder en klik <em>Test verzenden</em></li>
+            <li>Test onderaan met <em>Test verzenden</em>.</li>
           </ol>
         </details>
 
@@ -495,9 +491,6 @@ function renderAccount(msg) {
           const s = Settings.all();
           return `
           <form id="email-form" class="form" autocomplete="off">
-            <label><span>EmailJS Public Key</span><input type="text" name="emailjs_public_key" value="${esc(s.emailjs_public_key)}" placeholder="bv. xK_abc123..."></label>
-            <label><span>EmailJS Service ID</span><input type="text" name="emailjs_service_id" value="${esc(s.emailjs_service_id)}" placeholder="bv. service_abc123"></label>
-            <label><span>EmailJS Template ID</span><input type="text" name="emailjs_template_id" value="${esc(s.emailjs_template_id)}" placeholder="bv. template_abc123"></label>
             <label>
               <span>📧 Auto-mail dossier bij opslaan naar</span>
               <input type="email" name="auto_send_dossier_email" value="${esc(s.auto_send_dossier_email)}" placeholder="leeg = uit">
@@ -1139,16 +1132,13 @@ function renderAccount(msg) {
     });
   }
 
-  // EmailJS-instellingen
+  // E-mail-instellingen (Resend)
   const emailForm = $('#email-form');
   if (emailForm) {
     emailForm.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
       Settings.set({
-        emailjs_public_key: f.emailjs_public_key.value.trim(),
-        emailjs_service_id: f.emailjs_service_id.value.trim(),
-        emailjs_template_id: f.emailjs_template_id.value.trim(),
         auto_send_dossier_email: f.auto_send_dossier_email.value.trim(),
       });
       renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
@@ -1201,22 +1191,20 @@ function renderAccount(msg) {
       const result = $('#email-test-result');
       result.innerHTML = '';
       if (!to) { result.innerHTML = '<div class="alert alert-error">Vul eerst een test-e-mailadres in.</div>'; return; }
-      // Tijdelijk toepassen wat in het formulier staat (zonder eerst opslaan)
-      Settings.set({
-        emailjs_public_key: f.emailjs_public_key.value.trim(),
-        emailjs_service_id: f.emailjs_service_id.value.trim(),
-        emailjs_template_id: f.emailjs_template_id.value.trim(),
-      });
       const btn = $('#btn-email-test');
       btn.disabled = true; const orig = btn.textContent;
       btn.textContent = 'Bezig met verzenden...';
       try {
-        await EmailService.send(to,
-          'Test — ' + (Settings.get('app_name') || 'Uitvaart Intake'),
-          'Dit is een test-e-mail vanuit je Uitvaart Intake-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
+        const appName = esc(Settings.get('app_name') || 'OZN');
+        const html = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+          <h2 style="color:#6b1e2a;margin:0 0 12px;">Test-e-mail</h2>
+          <p>Dit is een test-e-mail vanuit <strong>${appName}</strong>. Als je dit ontvangt, werkt de Resend-koppeling correct.</p>
+          <p style="color:#8a847b;font-size:13px;margin-top:24px;">Verstuurd via Supabase Edge Function → Resend.</p>
+        </div>`;
+        await EmailService.send(to, 'Test — ' + (Settings.get('app_name') || 'OZN'), html);
         result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Controleer de inbox (en spam-map).</div>`;
       } catch (e) {
-        result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.text ? e.text : (e.message || String(e)))}</div>`;
+        result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.message ? e.message : String(e))}</div>`;
       } finally {
         btn.disabled = false; btn.textContent = orig;
       }

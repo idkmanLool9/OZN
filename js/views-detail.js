@@ -1432,7 +1432,7 @@ const MailComposer = {
 
       try {
         // 1) PDF genereren + uploaden (indien gevraagd)
-        let bodyMetBijlage = body;
+        let bodyHtml = body;
         if (wantsPdf) {
           sendBtn.textContent = 'PDF maken...';
           status.hidden = false;
@@ -1447,10 +1447,14 @@ const MailComposer = {
           }
           sendBtn.textContent = 'Uploaden...';
           const up = await PdfGen.uploadAsAttachment(d.id, pdfBlob, type);
-          bodyMetBijlage += `\n\n— Bijlage —\n📎 ${type === 'factuur' ? 'Kostenraming' : 'Dossier-overzicht'} (PDF): ${up.url}\n(link is 7 dagen geldig)`;
+          const bijlLabel = type === 'factuur' ? 'Kostenraming' : 'Dossier-overzicht';
+          bodyHtml += `<div style="margin-top:18px;padding:12px 14px;background:#f6f4ef;border-radius:8px;font-size:14px;">
+            <div style="font-weight:600;color:#6f6a62;margin-bottom:4px;">📎 Bijlage</div>
+            <div><a href="${esc(up.url)}" style="color:#2a5a8a;text-decoration:underline;">${esc(bijlLabel)} (PDF)</a> <span style="color:#8a847b;font-size:12px;">(link is 7 dagen geldig)</span></div>
+          </div>`;
         }
         if (cc.length) {
-          bodyMetBijlage += `\n\nDeze e-mail is ook gestuurd naar: ${cc.join(', ')}.`;
+          bodyHtml += `<p style="margin-top:14px;font-size:12px;color:#8a847b;">Deze e-mail is ook gestuurd naar: ${esc(cc.join(', '))}.</p>`;
         }
 
         // 2) Versturen
@@ -1459,30 +1463,35 @@ const MailComposer = {
         status.textContent = `Versturen naar ${to.length + cc.length} ontvanger(s)...`;
 
         const alle = [...to, ...cc];
-        if (EmailService.isConfigured()) {
-          // Per ontvanger een aparte mail (EmailJS Free heeft geen native cc)
-          let ok = 0, fout = [];
-          for (const adres of alle) {
-            try { await EmailService.send(adres, subj, bodyMetBijlage); ok++; }
-            catch (e) { fout.push(`${adres}: ${(e && e.text) || e.message || String(e)}`); }
-          }
-          if (fout.length) {
+        if (EmailService.isConfigured() && navigator.onLine) {
+          try {
+            // Resend accepteert meerdere ontvangers in één call (to + cc-achtig).
+            await EmailService.send(alle, subj, bodyHtml);
+            status.className = 'mail-status mail-status-success';
+            status.textContent = `✓ Verstuurd naar ${alle.length} ontvanger(s).`;
+          } catch (e) {
             status.className = 'mail-status mail-status-error';
-            status.textContent = `${ok} verstuurd, ${fout.length} mislukt: ${fout.join(' · ')}`;
+            status.textContent = (e && e.message) || String(e);
             sendBtn.disabled = false; sendBtn.textContent = origLabel;
             return;
           }
-          status.className = 'mail-status mail-status-success';
-          status.textContent = `✓ ${ok} mail(s) verstuurd.`;
         } else {
-          // Geen EmailJS — open de mail-app van het apparaat met to+subject.
-          // Bij een lange body wordt de tekst naar het klembord gekopieerd
-          // en moet de gebruiker 'm plakken (zie openMailto).
-          const r = await openMailto([...to, ...cc].join(','), subj, bodyMetBijlage);
+          // Fallback (offline of geen server-mail beschikbaar): mail-app openen.
+          // Voor de body een simpele plain-text-conversie zodat er iets leesbaars
+          // in de mail-app komt.
+          const plainBody = bodyHtml
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<br\s*\/?>(\s*)/gi, '\n')
+            .replace(/<\/?(p|h1|h2|h3|h4|tr|div)>/gi, '\n')
+            .replace(/<[^>]+>/g, '')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+          const r = await openMailto([...to, ...cc].join(','), subj, plainBody);
           status.className = 'mail-status mail-status-info';
           status.textContent = r && r.clipped
-            ? '✓ Mail-app geopend. De volledige inhoud staat op het klembord — plak deze in het mail-bericht (Cmd+V of houd ingedrukt → Plakken).'
-            : '✓ Mail-app geopend met tekst klaar. Klik op Verzenden in je mail-app.';
+            ? '✓ Mail-app geopend. De volledige inhoud staat op het klembord — plak deze in het mail-bericht.'
+            : '✓ Mail-app geopend met tekst klaar.';
         }
 
         // 3) Adresboek bijwerken in Supabase (alleen nieuwe adressen)
