@@ -71,7 +71,7 @@ jobs:
         run: npx cap add android || npx cap sync android
 
       - name: Bak Android-icoontjes uit assets/icon.png
-        run: npx @capacitor/assets generate --android --iconBackgroundColor '#2563eb'
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#f6f2e7'
 
       - name: APK bouwen (debug)
         working-directory: android

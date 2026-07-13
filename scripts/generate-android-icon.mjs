@@ -6,13 +6,13 @@ import sharp from 'sharp';
 
 const svg = fs.readFileSync('icon.svg');
 await sharp(svg, { density: 384 })
-  .resize(1024, 1024, { fit: 'contain', background: { r: 37, g: 99, b: 235, alpha: 1 } })
+  .resize(1024, 1024, { fit: 'contain', background: { r: 246, g: 242, b: 231, alpha: 1 } })
   .png()
   .toFile('assets/icon.png');
 
 // Foreground-only (voor adaptive-icon voorgrond). Zelfde beeld, transparante rand.
 await sharp(svg, { density: 384 })
-  .resize(1024, 1024, { fit: 'contain', background: { r: 37, g: 99, b: 235, alpha: 1 } })
+  .resize(1024, 1024, { fit: 'contain', background: { r: 246, g: 242, b: 231, alpha: 1 } })
   .png()
   .toFile('assets/icon-foreground.png');
 
