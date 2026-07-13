@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 252;
-const APP_VERSION    = '5.86.0';
+const APP_BUILD      = 253;
+const APP_VERSION    = '5.86.1';
 const APP_BUILD_DATE = '2026-07-13';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -819,12 +819,22 @@ const Updater = {
     let remoteVersion = null;
     let remoteBuild = null;
     try {
-      // Vraag app.js opnieuw op met cache-bypass om de versie te lezen
-      const r = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
-      const text = await r.text();
-      // Pak APP_BUILD (monotoon nummer) — ondubbelzinnig voor update-detectie.
-      // APP_VERSION (semver) is voor weergave; voor cache-vergelijking gebruiken
-      // we het buildnummer.
+      // Alleen de eerste 800 bytes van app.js ophalen — bevat APP_BUILD +
+      // APP_VERSION, en scheelt honderden KB downloaden per check.
+      // Bij servers die Range niet honoreren valt fetch terug op de volle
+      // body; we werken alsnog met .text() en kappen zelf af.
+      let text = '';
+      try {
+        const r = await fetch('./js/app.js?_check=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Range': 'bytes=0-800' },
+        });
+        text = await r.text();
+      } catch (_) {
+        // Fallback zonder Range
+        const r2 = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
+        text = (await r2.text()).slice(0, 1500);
+      }
       const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
       const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
       if (mb) {
@@ -837,50 +847,16 @@ const Updater = {
 
     const hasUpdate = !!(remoteBuild && remoteBuild > APP_BUILD);
 
-    // Niet de moeite om de SW te triggeren als er sowieso geen update is
-    let swReady = false;
+    // SW-update in de achtergrond triggeren — de UI hoeft niet te wachten.
+    // reloadHard() dat hierna volgt haalt de nieuwe files sowieso met een
+    // cache-buster op, dus we hoeven niet meer op controllerchange te
+    // wachten voordat we returnen.
     if (hasUpdate && 'serviceWorker' in navigator) {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          // VOOR de update-trigger al een controllerchange-listener opzetten,
-          // anders missen we de event omdat-ie direct na SKIP_WAITING vuurt
-          const controllerChange = new Promise(resolve => {
-            navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
-          });
-
-          await reg.update();
-
-          // Wacht tot een eventueel installerende SW de installed-fase haalt
-          if (reg.installing) {
-            await new Promise(resolve => {
-              const sw = reg.installing;
-              const onchange = () => {
-                if (sw.state === 'installed' || sw.state === 'activated' || sw.state === 'redundant') {
-                  sw.removeEventListener('statechange', onchange);
-                  resolve();
-                }
-              };
-              sw.addEventListener('statechange', onchange);
-              setTimeout(resolve, 5000);
-            });
-          }
-
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            // Wacht tot de nieuwe SW de pagina overneemt vóór we returnen.
-            // Race met 3s safety zodat we niet eeuwig blokkeren.
-            await Promise.race([
-              controllerChange,
-              new Promise(resolve => setTimeout(resolve, 3000)),
-            ]);
-            swReady = true;
-          } else if (reg.active) {
-            // SW al actief en niets in waiting — niets te doen
-            swReady = true;
-          }
-        }
-      } catch (_) {}
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (!reg) return;
+        reg.update().catch(() => {});
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }).catch(() => {});
     }
 
     const currentLabel = `${APP_VERSION} (build ${APP_BUILD})`;
@@ -888,7 +864,10 @@ const Updater = {
       currentVersion: currentLabel,
       remoteVersion,
       hasUpdate,
-      swUpdated: swReady,
+      // Geen aparte SW-only-flow meer: de SW-update loopt fire-and-forget
+      // in de achtergrond en de reloadHard() bij hasUpdate=true haalt de
+      // verse files sowieso op met een cache-buster.
+      swUpdated: false,
     };
   },
 
