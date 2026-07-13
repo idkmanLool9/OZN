@@ -367,6 +367,7 @@ function renderDossierForm(params) {
             <label class="span-3"><span>Overdraagformulier</span>
               <input type="hidden" name="overdraagformulier_pad" value="${v('overdraagformulier_pad')}">
               <div class="artsverklaring-row" id="overdraag-row">
+                <button type="button" class="btn btn-sm" id="overdraag-scan" hidden>📄 Scan document</button>
                 <label class="btn btn-sm" id="overdraag-filelabel" style="cursor:pointer;">
                   📷 Scan / kies bestand
                   <input type="file" id="overdraag-input" accept="image/*,application/pdf" capture="environment" hidden>
@@ -1599,6 +1600,20 @@ function renderDossierForm(params) {
       const file = e.target.files[0];
       await doOverdraagUpload(file);
       odInput.value = '';
+    });
+  }
+  // Native documentscanner voor overdraagformulier (zoals bij artsverklaring):
+  // in de app tonen we alleen de echte scanner-knop, de file-input verbergen we.
+  const odScan = document.getElementById('overdraag-scan');
+  if (odScan && typeof Native !== 'undefined' && Native.isApp && Native.isApp()) {
+    odScan.hidden = false;
+    const fileLabel = document.getElementById('overdraag-filelabel');
+    if (fileLabel) fileLabel.hidden = true;
+    odScan.addEventListener('click', async () => {
+      odStatus.textContent = 'Scanner openen...';
+      const file = await Native.scanDocument();
+      if (!file) { odStatus.textContent = odHidden.value ? '✓ geüpload' : 'nog geen bestand'; return; }
+      await doOverdraagUpload(file);
     });
   }
   bindOverdraagButtons();
