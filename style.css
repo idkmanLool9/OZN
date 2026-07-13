@@ -2702,6 +2702,21 @@ fieldset[data-step][hidden] { display: none !important; }
   padding: .35rem .55rem; border: 1px solid var(--border);
   border-radius: 6px; font: inherit;
 }
+.kist-draft-banner-close {
+  margin-left: auto;
+  padding: .35rem .75rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  font: inherit; font-size: .85rem; color: inherit;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+  white-space: nowrap;
+}
+.kist-draft-banner-close:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.15);
+}
 
 /* Grote dossier-level betaald-status toggle */
 .kost-toggle-big {

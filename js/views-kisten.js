@@ -107,7 +107,13 @@ function _kistFiltersActief() {
 function renderKistenBeheer(msg) {
   const adminMode = !!Settings.get('catalog_admin_mode');
   const drafts = _activeDossierDrafts();
-  const hasDraft = drafts.length > 0;
+  // Gebruiker kan de banner voor deze sessie verbergen ('Rustig kijken'-modus).
+  // Vlag zit in sessionStorage → weg na app-herstart, of via "Toon banner"-link.
+  const bannerVerborgen = (() => {
+    try { return sessionStorage.getItem('sok_hide_kistdraft_banner') === '1'; }
+    catch (_) { return false; }
+  })();
+  const hasDraft = drafts.length > 0 && !bannerVerborgen;
   const favs = _kistFavs();
   const meestGekozen = _meestGekozenKist();
 
@@ -273,7 +279,14 @@ function renderKistenBeheer(msg) {
             ? `<span>${esc(drafts[0].naam)}${drafts[0].kist ? ' — huidige kist: <em>' + esc(drafts[0].kist) + '</em>' : ''}</span>`
             : `<select id="kist-draft-picker">${drafts.map((d, i) => `<option value="${i}">${esc(d.naam)}${d.kist ? ' — ' + esc(d.kist) : ''}</option>`).join('')}</select>`}
           <span class="muted small">— klik op "Kies deze kist" om hem in het dossier te zetten</span>
+          <button type="button" class="kist-draft-banner-close" id="kist-draft-verberg" title="Verberg banner — concept blijft bewaard, komt terug bij herstart of via link onderaan">
+            👀 Alleen rondkijken
+          </button>
         </div>` : ''}
+      ${(drafts.length > 0 && bannerVerborgen) ? `
+        <p class="muted small center" style="margin:.75rem 0 1.25rem;">
+          Banner verborgen — <a href="#" id="kist-draft-tonen">toon actief dossier weer</a>
+        </p>` : ''}
 
       ${gefilterd.length === 0
         ? '<div class="card"><p class="muted center">Geen kisten gevonden met deze filters.</p></div>'
@@ -353,6 +366,19 @@ function renderKistenBeheer(msg) {
   }
 
   $('#view').onclick = async e => {
+    // ── Actief-dossier-banner: verbergen / terugtonen ──
+    const verbergBtn = e.target.closest('#kist-draft-verberg');
+    if (verbergBtn) {
+      try { sessionStorage.setItem('sok_hide_kistdraft_banner', '1'); } catch (_) {}
+      renderKistenBeheer(); return;
+    }
+    const toonLink = e.target.closest('#kist-draft-tonen');
+    if (toonLink) {
+      e.preventDefault();
+      try { sessionStorage.removeItem('sok_hide_kistdraft_banner'); } catch (_) {}
+      renderKistenBeheer(); return;
+    }
+
     // ── Filters: eco-toggle, wis, weergave, paginering, favoriet ──
     const wisBtn = e.target.closest('#kist-filter-clear');
     if (wisBtn) {
