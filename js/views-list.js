@@ -722,9 +722,9 @@ function renderAccount(msg) {
       ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
       <section class="card narrow" id="archief">
         <h2>Archief</h2>
-        <p class="muted small">Afgehandelde dossiers (rouwauto geweest + alle datums voorbij) automatisch naar het archief. Medewerkers zien het archief niet — tenzij je dat hieronder toestaat (server-side afgedwongen).</p>
+        <p class="muted small">Dossiers kunnen handmatig gearchiveerd worden vanuit het detailscherm. Wil je dat afgehandelde dossiers (rouwauto geweest + alle datums voorbij) automatisch naar het archief gaan? Zet 't hieronder aan. Medewerkers zien het archief niet — tenzij je dat toestaat (server-side afgedwongen).</p>
         <form id="archief-form" class="form" autocomplete="off">
-          <label class="checkbox-inline"><input type="checkbox" name="auto_archief_actief" ${Settings.get('auto_archief_actief') ? 'checked' : ''}> Afgehandelde dossiers automatisch archiveren</label>
+          <label class="checkbox-inline"><input type="checkbox" name="auto_archief_actief" ${Settings.get('auto_archief_actief') ? 'checked' : ''}> Automatisch archiveren aanzetten <span class="muted small">(standaard uit)</span></label>
           <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_archief" ${Settings.get('medewerker_ziet_archief') ? 'checked' : ''}> Medewerkers mogen het archief zien</label>
           <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
         </form>
