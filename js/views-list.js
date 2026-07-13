@@ -124,12 +124,62 @@ function renderDossierList(params, path) {
           <option value="geannuleerd" ${status==='geannuleerd'?'selected':''}>Geannuleerd</option>
           ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `<option value="gearchiveerd" ${status==='gearchiveerd'?'selected':''}>📦 Archief</option>` : ''}
         </select>
-        <button type="submit" class="dossiers-control dossiers-filter-btn">
+        <button type="button" class="dossiers-control dossiers-filter-btn" id="dossiers-filter-toggle" aria-expanded="false" aria-controls="dossiers-filter-paneel">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
-          Filteren
+          Filteren <span class="filter-badge" id="dossiers-filter-count" hidden></span>
         </button>
         ${q || status ? '<a href="#/dossiers" class="dossiers-wis">↺ Wis</a>' : ''}
       </form>
+
+      ${(() => {
+        // Verzamel filter-dimensies uit Settings en huidige dossierset.
+        const opdrLijst = (Settings.get('opdrachtgevers') || []).map(o => o.naam || o).filter(Boolean);
+        const kistLijst = [...new Set(DB.list(KEYS.DOSSIERS).map(d => d.kist_type).filter(Boolean))].sort();
+        const persLijst = (Settings.get('profielen') || []).map(p => p.name).filter(Boolean);
+        const rouwLijst = (Settings.get('rouwauto_lijst') || []).filter(Boolean);
+        const cb = (naam, waarde, label) => `
+          <label class="dfilter-chip">
+            <input type="checkbox" data-filter="${esc(naam)}" value="${esc(waarde)}">
+            <span>${esc(label)}</span>
+          </label>`;
+        const groep = (titel, items) => items.length ? `
+          <div class="dfilter-groep">
+            <div class="dfilter-titel">${esc(titel)}</div>
+            <div class="dfilter-chips">${items}</div>
+          </div>` : '';
+        return `
+        <div class="dfilter-paneel" id="dossiers-filter-paneel" hidden>
+          <div class="dfilter-groep">
+            <div class="dfilter-titel">Snel</div>
+            <div class="dfilter-chips">
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="onvolledig" value="1">
+                <span>⚠ Onvolledig ingevuld</span>
+              </label>
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="openkosten" value="1">
+                <span>💶 Nog openstaande kosten</span>
+              </label>
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="mijnzaken" value="1">
+                <span>👤 Alleen mijn dossiers</span>
+              </label>
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="geenkist" value="1">
+                <span>📦 Kist nog niet gekozen</span>
+              </label>
+            </div>
+          </div>
+          ${groep('Opdrachtgever', opdrLijst.map(v => cb('opdrachtgever', v, v)).join(''))}
+          ${groep('Kist',          kistLijst.map(v => cb('kist',          v, v)).join(''))}
+          ${groep('Personeel',     persLijst.map(v => cb('personeel',     v, v)).join(''))}
+          ${groep('Rouwauto',      rouwLijst.map(v => cb('rouwauto',      v, v)).join(''))}
+          <div class="dfilter-actions">
+            <button type="button" class="btn btn-sm btn-ghost" id="dfilter-wis">↺ Wis alle filters</button>
+            <span class="muted small" id="dfilter-resultaat"></span>
+          </div>
+        </div>`;
+      })()}
 
       ${dossiers.length === 0
         ? '<div class="dossiers-kaart"><p class="muted center" style="padding:2.5rem;">Geen dossiers gevonden.</p></div>'
@@ -144,7 +194,19 @@ function renderDossierList(params, path) {
                   const warn = missend.length
                     ? `<span class="dossier-warn-badge" title="Nog niet ingevuld: ${esc(missend.join(', '))}">⚠ ${missend.length}</span>`
                     : '';
-                  return `<tr data-id="${d.id}" class="${missend.length ? 'is-incompleet' : ''}">
+                  // Kostenposten voor deze dossier — voor 'openkosten'-filter
+                  const kostenD = DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id) || [];
+                  const heeftOpenKosten = kostenD.some(k => !k.betaald && Number(k.bedrag) > 0);
+                  const persoonNamen = Array.isArray(d.extra_personeel) ? d.extra_personeel.join('|') : '';
+                  return `<tr data-id="${d.id}"
+                    class="${missend.length ? 'is-incompleet' : ''}"
+                    data-opdrachtgever="${esc((d.opdrachtgever_naam || '').toLowerCase())}"
+                    data-kist="${esc((d.kist_type || '').toLowerCase())}"
+                    data-rouwauto="${esc((d.rouwauto || '').toLowerCase())}"
+                    data-personeel="${esc(persoonNamen.toLowerCase())}"
+                    data-onvolledig="${missend.length ? '1' : '0'}"
+                    data-openkosten="${heeftOpenKosten ? '1' : '0'}"
+                    data-geenkist="${d.kist_type ? '0' : '1'}">
                   <td><a href="#/dossiers/${d.id}" class="dossier-link">${esc(d.dossier_nummer)}</a></td>
                   <td><strong>${esc(fullName(d) || '—')}</strong> ${warn}</td>
                   <td>${esc(d.opdrachtgever_naam || '—')}</td>
@@ -173,40 +235,88 @@ function renderDossierList(params, path) {
   const statusSel = $('#dossiers-status');
   if (statusSel) statusSel.addEventListener('change', () => navigeerFilter(statusSel.form));
 
-  // Live zoeken: filter rijen direct in de DOM tijdens typen, zonder
-  // pagina-refresh en met behoud van cursor/focus. Submit (Enter) commit
-  // 'm nog wel netjes naar de URL zodat delen/back-knop blijft werken.
+  // Live filteren: zoekterm + checkbox-filters worden direct in de DOM
+  // toegepast, geen re-render. Submit (Enter) commit alleen de zoekterm
+  // + status naar de URL, zodat delen/back blijft werken.
   const zoekInput = $('#filter-form input[type="search"]');
-  if (zoekInput) {
-    const rijen = $$('#view tbody tr[data-id]');
-    const filterRijen = () => {
-      const term = zoekInput.value.trim().toLowerCase();
-      let zichtbaar = 0;
-      rijen.forEach(tr => {
-        if (!term) { tr.hidden = false; zichtbaar++; return; }
-        const match = tr.textContent.toLowerCase().includes(term);
-        tr.hidden = !match;
-        if (match) zichtbaar++;
+  const rijen = $$('#view tbody tr[data-id]');
+  const mijnNaam = ((typeof Auth !== 'undefined' && Auth.current()) || {}).naam || '';
+  const filterPaneel = $('#dossiers-filter-paneel');
+
+  function pasFiltersToe() {
+    const term = zoekInput ? zoekInput.value.trim().toLowerCase() : '';
+    // Verzamel actieve checkbox-filters per dimensie.
+    const actief = {};
+    if (filterPaneel) {
+      filterPaneel.querySelectorAll('input[type=checkbox]:checked').forEach(cb => {
+        const dim = cb.getAttribute('data-filter');
+        (actief[dim] = actief[dim] || []).push(cb.value);
       });
-      // Leeg-state onder de tabel tonen/verbergen
-      let legeMelding = $('#dossiers-live-leeg');
-      if (zichtbaar === 0 && term) {
-        if (!legeMelding) {
-          const kaart = $('.dossiers-kaart');
-          if (kaart) {
-            legeMelding = document.createElement('p');
-            legeMelding.id = 'dossiers-live-leeg';
-            legeMelding.className = 'muted center';
-            legeMelding.style.padding = '1.5rem';
-            legeMelding.textContent = 'Geen dossiers gevonden voor deze zoekterm.';
-            kaart.appendChild(legeMelding);
-          }
+    }
+    const heeft = (dim) => Array.isArray(actief[dim]) && actief[dim].length > 0;
+    const bevat = (dim, val) => actief[dim].some(v => (val || '').toLowerCase() === v.toLowerCase());
+
+    let zichtbaar = 0;
+    rijen.forEach(tr => {
+      let match = true;
+      if (term && !tr.textContent.toLowerCase().includes(term)) match = false;
+      if (match && actief.onvolledig)  match = tr.dataset.onvolledig === '1';
+      if (match && actief.openkosten)  match = tr.dataset.openkosten === '1';
+      if (match && actief.geenkist)    match = tr.dataset.geenkist === '1';
+      if (match && actief.mijnzaken)   match = mijnNaam && (tr.dataset.personeel || '').includes(mijnNaam.toLowerCase());
+      if (match && heeft('opdrachtgever')) match = bevat('opdrachtgever', tr.dataset.opdrachtgever);
+      if (match && heeft('kist'))          match = bevat('kist', tr.dataset.kist);
+      if (match && heeft('rouwauto'))      match = bevat('rouwauto', tr.dataset.rouwauto);
+      if (match && heeft('personeel'))     match = actief.personeel.some(n => (tr.dataset.personeel || '').includes(n.toLowerCase()));
+      tr.hidden = !match;
+      if (match) zichtbaar++;
+    });
+
+    // Filter-badge bijwerken
+    const totActief = Object.values(actief).reduce((s, arr) => s + arr.length, 0);
+    const badge = $('#dossiers-filter-count');
+    if (badge) {
+      badge.hidden = totActief === 0;
+      badge.textContent = totActief > 0 ? totActief : '';
+    }
+    const resTekst = $('#dfilter-resultaat');
+    if (resTekst) resTekst.textContent = `${zichtbaar} dossier${zichtbaar === 1 ? '' : 's'} zichtbaar`;
+
+    // Leeg-state onder de tabel tonen/verbergen
+    let legeMelding = $('#dossiers-live-leeg');
+    if (zichtbaar === 0 && (term || totActief > 0)) {
+      if (!legeMelding) {
+        const kaart = $('.dossiers-kaart');
+        if (kaart) {
+          legeMelding = document.createElement('p');
+          legeMelding.id = 'dossiers-live-leeg';
+          legeMelding.className = 'muted center';
+          legeMelding.style.padding = '1.5rem';
+          legeMelding.textContent = 'Geen dossiers gevonden met deze filters.';
+          kaart.appendChild(legeMelding);
         }
-      } else if (legeMelding) {
-        legeMelding.remove();
       }
-    };
-    zoekInput.addEventListener('input', filterRijen);
+    } else if (legeMelding) {
+      legeMelding.remove();
+    }
+  }
+
+  if (zoekInput) zoekInput.addEventListener('input', pasFiltersToe);
+
+  // Filter-paneel toggle
+  const filterToggle = $('#dossiers-filter-toggle');
+  if (filterToggle && filterPaneel) {
+    filterToggle.addEventListener('click', () => {
+      const open = !filterPaneel.hidden;
+      filterPaneel.hidden = open;
+      filterToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+    });
+    filterPaneel.addEventListener('change', pasFiltersToe);
+    const wisBtn = $('#dfilter-wis');
+    if (wisBtn) wisBtn.addEventListener('click', () => {
+      filterPaneel.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = false; });
+      pasFiltersToe();
+    });
   }
 
   // Hele rij klikbaar → naar dossier-detail (behalve op links/knoppen)
