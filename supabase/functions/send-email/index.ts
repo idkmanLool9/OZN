@@ -78,12 +78,23 @@ Deno.serve(async (req) => {
     const subject = String(body?.subject || '').trim();
     const html    = String(body?.html || '').trim();
     const replyTo = String(body?.replyTo || userEmail || '').trim();
+    // Bijlagen: array van { name, contentBase64 } — worden 1-op-1 als
+    // attachment in Brevo doorgegeven zodat ze in de mailbox als
+    // paperclip-attachment verschijnen.
+    const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : [];
+    const attachments = rawAttachments
+      .filter((a: any) => a && typeof a.name === 'string' && typeof a.contentBase64 === 'string')
+      .map((a: any) => ({ name: a.name, content: a.contentBase64 }));
 
     if (!to.length)      return jsonResp({ error: 'missing_to' }, 400);
     if (!subject)        return jsonResp({ error: 'missing_subject' }, 400);
     if (!html)           return jsonResp({ error: 'missing_html' }, 400);
     if (subject.length > 300) return jsonResp({ error: 'subject_too_long' }, 400);
     if (html.length > 500_000) return jsonResp({ error: 'html_too_large' }, 400);
+    // Bijlagen: Brevo max ~10 MB per attachment. Guardrail hier op 12 MB
+    // encoded (~9 MB binair) om requests niet op te blazen.
+    const totalAttachBytes = attachments.reduce((n, a) => n + (a.content?.length || 0), 0);
+    if (totalAttachBytes > 12_000_000) return jsonResp({ error: 'attachments_too_large' }, 413);
 
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     for (const adr of to) {
@@ -119,6 +130,7 @@ Deno.serve(async (req) => {
         htmlContent: html,
         textContent: htmlToPlain(html),
         replyTo: replyTo ? { email: replyTo } : undefined,
+        attachment: attachments.length ? attachments : undefined,
       }),
     });
     const brevoBody = await brevoResp.json().catch(() => ({}));

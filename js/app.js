@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 263;
-const APP_VERSION    = '5.89.1';
+const APP_BUILD      = 264;
+const APP_VERSION    = '5.90.0';
 const APP_BUILD_DATE = '2026-07-13';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -777,6 +777,11 @@ const EmailService = {
       html:    html    || '',
     };
     if (opts.replyTo) payload.replyTo = opts.replyTo;
+    // Bijlagen: array van { name, contentBase64 }. De server accepteert
+    // ze en geeft ze 1-op-1 door aan Brevo als paperclip-attachment.
+    if (Array.isArray(opts.attachments) && opts.attachments.length) {
+      payload.attachments = opts.attachments;
+    }
 
     // supabase.functions.invoke geeft bij een non-2xx alleen een generieke
     // 'Edge Function returned a non-2xx status code'. Om de échte fout uit

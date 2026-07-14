@@ -1356,15 +1356,11 @@ const MailComposer = {
             <input type="text" class="mail-subject" value="${esc(subject)}">
           </label>
 
-          <label class="mail-attach">
-            <input type="checkbox" class="mail-pdf" ${type === 'factuur' ? 'checked' : ''}>
-            <span>📎 ${type === 'factuur' ? 'Factuur als PDF meesturen' : 'Dossier als PDF meesturen'} <span class="muted small">(download-link, 7 dagen geldig)</span></span>
-          </label>
-
-          <details class="mail-preview">
-            <summary>📝 Voorbeeld van mail-inhoud</summary>
-            <pre class="mail-preview-text">${esc(body)}</pre>
-          </details>
+          <div class="mail-attach mail-attach-fixed">
+            <span class="mail-attach-icon">📎</span>
+            <span class="mail-attach-name">${esc(type === 'factuur' ? 'Kostenraming.pdf' : 'Dossier ' + (d.dossier_nummer || '') + '.pdf')}</span>
+            <span class="muted small">wordt automatisch meegestuurd als bijlage</span>
+          </div>
 
           <div class="mail-status" hidden></div>
         </div>
@@ -1467,7 +1463,6 @@ const MailComposer = {
       const to = readTags('to');
       const cc = readTags('cc');
       const subj = overlay.querySelector('.mail-subject').value.trim();
-      const wantsPdf = overlay.querySelector('.mail-pdf').checked;
       const status = overlay.querySelector('.mail-status');
       const sendBtn = overlay.querySelector('.mail-send');
 
@@ -1482,33 +1477,42 @@ const MailComposer = {
       const origLabel = sendBtn.textContent;
 
       try {
-        // 1) PDF genereren + uploaden (indien gevraagd)
-        let bodyHtml = body;
-        if (wantsPdf) {
-          sendBtn.textContent = 'PDF maken...';
-          status.hidden = false;
-          status.className = 'mail-status mail-status-info';
-          status.textContent = 'PDF wordt gemaakt (~10s bij eerste keer)...';
-          let pdfBlob;
-          const ks = kosten || DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id).sort((a,b)=>a.id-b.id);
-          if (type === 'factuur') {
-            pdfBlob = await PdfGen.blobFromSpec(() => buildFactuurPdf(d, ks));
-          } else {
-            pdfBlob = await PdfGen.blobFromSpec(dossierSpec(d, ks));
-          }
-          sendBtn.textContent = 'Uploaden...';
-          const up = await PdfGen.uploadAsAttachment(d.id, pdfBlob, type);
-          const bijlLabel = type === 'factuur' ? 'Kostenraming' : 'Dossier-overzicht';
-          bodyHtml += `<div style="margin-top:18px;padding:12px 14px;background:#f6f4ef;border-radius:8px;font-size:14px;">
-            <div style="font-weight:600;color:#6f6a62;margin-bottom:4px;">📎 Bijlage</div>
-            <div><a href="${esc(up.url)}" style="color:#2a5a8a;text-decoration:underline;">${esc(bijlLabel)} (PDF)</a> <span style="color:#8a847b;font-size:12px;">(link is 7 dagen geldig)</span></div>
-          </div>`;
+        // 1) PDF genereren — altijd, ongeacht keuze. Blob → base64 → attachment.
+        sendBtn.textContent = 'PDF maken...';
+        status.hidden = false;
+        status.className = 'mail-status mail-status-info';
+        status.textContent = 'PDF wordt gemaakt...';
+        let pdfBlob;
+        const ks = kosten || DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id).sort((a,b)=>a.id-b.id);
+        if (type === 'factuur') {
+          pdfBlob = await PdfGen.blobFromSpec(() => buildFactuurPdf(d, ks));
+        } else {
+          pdfBlob = await PdfGen.blobFromSpec(dossierSpec(d, ks));
         }
+        const bijlNaam = type === 'factuur'
+          ? `Kostenraming ${d.dossier_nummer || d.id}.pdf`
+          : `Dossier ${d.dossier_nummer || d.id}.pdf`;
+        const pdfBase64 = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onerror = () => reject(new Error('PDF-inlezen mislukt'));
+          r.onload = () => {
+            const s = String(r.result || '');
+            const idx = s.indexOf(',');
+            resolve(idx >= 0 ? s.slice(idx + 1) : s);
+          };
+          r.readAsDataURL(pdfBlob);
+        });
+
+        // 2) Body: bovenaan een 'PDF-bijlage:'-vermelding, daarna het dossier.
+        let bodyHtml = `<div style="margin:0 0 16px;padding:10px 14px;background:#f6f4ef;border-radius:8px;font-size:13px;color:#4a4a4a;">
+          📎 <strong>Bijlage:</strong> ${esc(bijlNaam)} — zit als PDF bij deze e-mail.
+        </div>` + body;
+
         if (cc.length) {
           bodyHtml += `<p style="margin-top:14px;font-size:12px;color:#8a847b;">Deze e-mail is ook gestuurd naar: ${esc(cc.join(', '))}.</p>`;
         }
 
-        // 2) Versturen
+        // 3) Versturen — PDF gaat als échte attachment mee (paperclip in inbox).
         sendBtn.textContent = 'Verzenden...';
         status.className = 'mail-status mail-status-info';
         status.textContent = `Versturen naar ${to.length + cc.length} ontvanger(s)...`;
@@ -1516,8 +1520,9 @@ const MailComposer = {
         const alle = [...to, ...cc];
         if (EmailService.isConfigured() && navigator.onLine) {
           try {
-            // Resend accepteert meerdere ontvangers in één call (to + cc-achtig).
-            await EmailService.send(alle, subj, bodyHtml);
+            await EmailService.send(alle, subj, bodyHtml, {
+              attachments: [{ name: bijlNaam, contentBase64: pdfBase64 }],
+            });
             status.className = 'mail-status mail-status-success';
             status.textContent = `✓ Verstuurd naar ${alle.length} ontvanger(s).`;
           } catch (e) {

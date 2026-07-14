@@ -1166,6 +1166,19 @@ button.kist-card-img-btn:focus { outline: 2px solid var(--primary); outline-offs
   border-radius: 8px; margin-bottom: .85rem; cursor: pointer;
 }
 .mail-attach input { margin-top: .2rem; }
+.mail-attach-fixed {
+  cursor: default;
+  align-items: center;
+  gap: .55rem;
+  border: 1px solid var(--border, #e5e0d6);
+  background: #fff;
+}
+.mail-attach-fixed .mail-attach-icon { font-size: 1.1rem; }
+.mail-attach-fixed .mail-attach-name {
+  font-weight: 600; color: var(--text, #2a2a2a);
+  font-size: .92rem;
+}
+.mail-attach-fixed .muted { margin-left: auto; font-size: .8rem; }
 .mail-preview { margin-bottom: .5rem; }
 .mail-preview summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
 .mail-preview-text {
