@@ -460,51 +460,114 @@ function _kostenInPresetVolgorde(kosten) {
   });
 }
 
-// Spec voor de PDF-generator (jsPDF) — volledig dossieroverzicht.
+// Placeholder voor lege velden — zowel PDF als e-mail gebruiken dit.
+const LEEG = '—';
+function _or(v) {
+  const s = (v == null) ? '' : String(v).trim();
+  return s || LEEG;
+}
+function _dateOr(v) {
+  const s = fmtDate(v);
+  return s || LEEG;
+}
+function _jaNee(v) {
+  if (v === 'ja') return 'Ja';
+  if (v === 'nee') return 'Nee';
+  return _or(v);
+}
+function _bezit(heeft, aantal) {
+  if (heeft === 'ja') return aantal ? aantal + ' stuk(s)' : 'Ja';
+  if (heeft === 'nee') return 'Nee';
+  return LEEG;
+}
+
+// Spec voor de PDF-generator (jsPDF) — VOLLEDIG dossieroverzicht:
+// alle intake-velden, met '—' voor lege waardes.
 function dossierSpec(d, kosten) {
   const adresO = [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', ');
   const magPrijs = (typeof Auth === 'undefined') || Auth.magPrijzenZien();
   const kostenLijst = Array.isArray(kosten) ? _kostenInPresetVolgorde(kosten) : [];
-  const totaal = kostenLijst.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const totaal   = kostenLijst.reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const betaald  = kostenLijst.filter(k => k.betaald).reduce((s, k) => s + (Number(k.bedrag) || 0), 0);
+  const open     = Math.max(0, totaal - betaald);
 
-  const bezit = [
-    ['Oorbel(en)',  d.bezit_oorbellen, d.bezit_oorbellen_aantal],
-    ['Ring(en)',    d.bezit_ringen,    d.bezit_ringen_aantal],
-    ['Armband(en)', d.bezit_armbanden, d.bezit_armbanden_aantal],
-  ].filter(([, heeft]) => heeft === 'ja');
+  const opbaringLabel = d.opbaring_type === 'thuis'   ? 'Thuis opbaren'
+                       : d.opbaring_type === 'ophalen' ? 'Ophalen'
+                       : d.opbaring_type === 'beide'   ? 'Ophalen + Thuis opbaren'
+                       : LEEG;
+
+  const routeStr = (arr) => (Array.isArray(arr) && arr.length)
+    ? arr.map(_routePlain).filter(Boolean).join(' → ') : LEEG;
+
+  const geboren  = [_dateOr(d.geboortedatum),   d.geboorteplaats  ? 'te ' + d.geboorteplaats  : ''].filter(Boolean).join(' ') || LEEG;
+  const overleden = [_dateOr(d.overlijdensdatum), d.overlijdensplaats ? 'te ' + d.overlijdensplaats : ''].filter(Boolean).join(' ') || LEEG;
 
   const sections = [
+    { heading: 'Opdrachtgever', rows: [
+      ['Opdrachtgever', _or(d.opdrachtgever_naam)],
+      ['Extra personeel', (Array.isArray(d.extra_personeel) && d.extra_personeel.length) ? d.extra_personeel.join(', ') : LEEG],
+    ] },
     { heading: 'Overledene', rows: [
-      ['Naam', fullName(d)], ['Geslacht', d.geslacht],
-      ['Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
-      ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
-      ['Adres', adresO],
+      ['Naam',           _or(fullName(d))],
+      ['BSN',            _or(d.bsn)],
+      ['Geslacht',       _or(d.geslacht)],
+      ['Geboren',        geboren],
+      ['Overleden',      overleden],
+      ['Adres',          _or(adresO)],
+      ['Artsverklaring', d.artsverklaring_pad     ? '✓ geüpload' : LEEG],
+      ['Overdraagformulier', d.overdraagformulier_pad ? '✓ geüpload' : LEEG],
+    ] },
+    { heading: 'Bezittingen', rows: [
+      ['Oorbel(en)',  _bezit(d.bezit_oorbellen,  d.bezit_oorbellen_aantal)],
+      ['Ring(en)',    _bezit(d.bezit_ringen,     d.bezit_ringen_aantal)],
+      ['Armband(en)', _bezit(d.bezit_armbanden,  d.bezit_armbanden_aantal)],
+      ['Ketting',     _bezit(d.bezit_ketting,    null)],
+      ['Bril',        _bezit(d.bezit_bril,       null)],
+      ['Horloge',     _bezit(d.bezit_horloge,    null)],
+      ...((Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen : [])
+          .map(b => [_or(b.label), b.aantal ? b.aantal + ' stuk(s)' : LEEG])),
     ] },
     { heading: 'Opbaren & locatie', rows: [
-      ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : ''))],
-      ...((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') ? [
-        ['Ophaaldatum', [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')],
-        ['Brengen naar', Array.isArray(d.brengen_naar) ? d.brengen_naar.map(_routePlain).filter(Boolean).join(' → ') : ''],
-      ] : []),
-      ...((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? [
-        ['Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
-        ['Overbrengingen thuis', Array.isArray(d.thuis_overbrengingen) ? d.thuis_overbrengingen.map(_routePlain).filter(Boolean).join(' → ') : ''],
-        ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
-      ] : []),
-      ['Opbaarlocatie', d.opbaarlocatie_type],
+      ['Opbaringstype',       opbaringLabel],
+      ['Ophaaldatum',         [_dateOr(d.ophalen_datum), d.ophalen_tijd ? 'om ' + d.ophalen_tijd : ''].filter(Boolean).join(' ') || LEEG],
+      ['Brengen naar',        routeStr(d.brengen_naar)],
+      ['Thuis opbaren start', [_dateOr(d.thuis_opbaren_datum), d.thuis_opbaren_tijd ? 'om ' + d.thuis_opbaren_tijd : ''].filter(Boolean).join(' ') || LEEG],
+      ['Thuis opbaren einde', [_dateOr(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd ? 'om ' + d.thuis_opbaren_eindtijd : ''].filter(Boolean).join(' ') || LEEG],
+      ['Overbrengingen thuis', routeStr(d.thuis_overbrengingen)],
+      ['Benodigde rouwgoederen', _or(d.benodigde_rouwgoederen)],
+      ['Rouwgoederen-lijst',  (Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length) ? d.rouwgoederen_lijst.join(', ') : LEEG],
+      ['Opbaarlocatie',       _or(d.opbaarlocatie_type)],
+    ] },
+    { heading: 'Verzorging', rows: [
+      ['Verzorgd/gekleed datum', _dateOr(d.verzorgd_gekleed_datum)],
+      ['Verzorgd/gekleed waar',  _or(d.verzorgd_gekleed_waar)],
+      ['Familie erbij',          _jaNee(d.verzorgd_gekleed_familie)],
+      ['Gekist datum',           _dateOr(d.gekist_datum)],
+      ['Gekist waar',            _or(d.gekist_waar)],
+      ['Peacemaker verwijderd',  d.peacemaker_verwijderd ? 'Ja' : LEEG],
+      ['Peacemaker datum',       _dateOr(d.peacemaker_verwijderd_datum)],
+      ['Thanatopraxie',          d.thanatopraxie ? 'Ja' : LEEG],
+      ['Thanatopraxie datum',    _dateOr(d.thanatopraxie_datum)],
+      ['Thanatopraxie waar',     _or(d.thanatopraxie_waar)],
+      ['Mond gehecht',           d.mond_gehecht ? 'Ja' : LEEG],
+      ['Buikpunctie',            d.buikpunctie ? 'Ja' : LEEG],
+      ['Oogkapjes',              d.oogkapjes ? 'Ja' : LEEG],
     ] },
     { heading: 'Kist & vervoer', rows: [
-      ['Kist', d.kist_type],
-      ['Rouwauto', d.rouwauto === 'ja' ? 'Ja' : (d.rouwauto === 'nee' ? 'Nee' : d.rouwauto)],
+      ['Kist',     _or(d.kist_type)],
+      ['Rouwauto', _jaNee(d.rouwauto)],
+    ] },
+    { heading: 'Bijzonderheden', rows: [
+      ['Notities / wensen', _or(d.bijzonderheden)],
+    ] },
+    { heading: 'Dossier-metadata', rows: [
+      ['Dossiernummer', _or(d.dossier_nummer)],
+      ['Status',        _or((d.status || '').replace('_', ' '))],
+      ['Aangemaakt',    d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : LEEG],
+      ['Laatst opgeslagen', d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : LEEG],
+      ['Bijgewerkt door', _or(d.bijgewerkt_door)],
     ] },
   ];
-  if (bezit.length) {
-    sections.push({ heading: 'Bezittingen', rows: bezit.map(([label, , aantal]) => [label, aantal ? aantal + ' stuk(s)' : 'ja']) });
-  }
-  sections.push({ heading: 'Opdrachtgever', rows: [
-    ['Naam', d.opdrachtgever_naam],
-    ['Extra personeel', Array.isArray(d.extra_personeel) ? d.extra_personeel.join(', ') : ''],
-  ] });
 
   return {
     title: 'DOSSIER',
@@ -513,10 +576,14 @@ function dossierSpec(d, kosten) {
     // Medewerkers: kostenoverzicht zonder bedragen (alleen omschrijving + categorie + aantal)
     table: kostenLijst.length
       ? (magPrijs
-          ? { heading: 'Kostenoverzicht', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', fmtEUR(k.bedrag)]) }
+          ? { heading: 'Kostenoverzicht', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', fmtEUR(k.bedrag) + (k.betaald ? ' ✓' : '')]) }
           : { heading: 'Kostenposten', rows: kostenLijst.map(k => [k.omschrijving || '', k.categorie || '', String(k.aantal || 1) + ' stuk(s)']) })
-      : null,
-    totals: (kostenLijst.length && magPrijs) ? [['Totaal', fmtEUR(totaal), true]] : [],
+      : { heading: magPrijs ? 'Kostenoverzicht' : 'Kostenposten', rows: [[LEEG, LEEG, LEEG]] },
+    totals: (kostenLijst.length && magPrijs) ? [
+      ['Totaal',        fmtEUR(totaal),  true],
+      ...(betaald > 0 ? [['Reeds betaald', '- ' + fmtEUR(betaald), false]] : []),
+      ...(open > 0    ? [['Open saldo',   fmtEUR(open),   true]] : []),
+    ] : [],
   };
 }
 
@@ -526,58 +593,92 @@ function buildDossierEmail(d, kosten) {
 
   const parts = [];
   parts.push(`<p style="margin:0 0 12px;">Beste,</p>`);
-  parts.push(`<p style="margin:0 0 14px;">Hierbij de gegevens van het uitvaartdossier <strong>${esc(d.dossier_nummer || '')}</strong>${d.status ? ' (status: ' + esc((d.status||'').replace('_',' ')) + ')' : ''}.</p>`);
+  parts.push(`<p style="margin:0 0 14px;">Hierbij het volledige uitvaartdossier <strong>${esc(d.dossier_nummer || '')}</strong>${d.status ? ' (status: ' + esc((d.status||'').replace('_',' ')) + ')' : ''}.</p>`);
 
-  // Alleen secties met inhoud tonen (geen lege kopjes).
+  // Alle secties tonen, ook lege rijen (met '—').
   const pushSection = (titel, rows) => {
-    const gevuld = rows.filter(([, v]) => v && String(v).trim());
-    if (!gevuld.length) return;
     parts.push(emH3(titel));
-    parts.push(emTable(gevuld));
+    parts.push(emTable(rows.map(([k, v]) => [k, (v == null || String(v).trim() === '') ? LEEG : v])));
   };
 
+  const opbaringLabel = d.opbaring_type === 'thuis'   ? 'Thuis opbaren'
+                       : d.opbaring_type === 'ophalen' ? 'Ophalen'
+                       : d.opbaring_type === 'beide'   ? 'Ophalen + Thuis opbaren'
+                       : LEEG;
+  const routeStr = (arr) => (Array.isArray(arr) && arr.length)
+    ? arr.map(_routePlain).filter(Boolean).join(' → ') : '';
+
+  pushSection('Opdrachtgever', [
+    ['Opdrachtgever', d.opdrachtgever_naam],
+    ['Extra personeel', (Array.isArray(d.extra_personeel) && d.extra_personeel.length) ? d.extra_personeel.join(', ') : ''],
+  ]);
+
   pushSection('Overledene', [
-    ['Naam', fullName(d)],
-    ['Geslacht', d.geslacht],
-    ['Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
+    ['Naam',      fullName(d)],
+    ['BSN',       d.bsn],
+    ['Geslacht',  d.geslacht],
+    ['Geboren',   [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
     ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
-    ['Adres', adresO],
-  ]);
-
-  pushSection('Opbaren & locatie', [
-    ['Ophalen / thuis opbaren', d.opbaring_type === 'thuis' ? 'Thuis opbaren' : (d.opbaring_type === 'ophalen' ? 'Ophalen' : (d.opbaring_type === 'beide' ? 'Ophalen + Thuis opbaren' : ''))],
-    ...((d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') ? [
-      ['Ophaaldatum', [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')],
-      ['Brengen naar', Array.isArray(d.brengen_naar) ? d.brengen_naar.map(_routePlain).filter(Boolean).join(' → ') : ''],
-    ] : []),
-    ...((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') ? [
-      ['Datum & begintijd thuis', [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
-      ['Overbrengingen thuis', Array.isArray(d.thuis_overbrengingen) ? d.thuis_overbrengingen.map(_routePlain).filter(Boolean).join(' → ') : ''],
-      ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
-    ] : []),
-    ['Opbaarlocatie', d.opbaarlocatie_type],
-  ]);
-
-  pushSection('Kist & vervoer', [
-    ['Kist', d.kist_type],
-    ['Rouwauto', d.rouwauto === 'ja' ? 'Ja' : (d.rouwauto === 'nee' ? 'Nee' : d.rouwauto)],
+    ['Adres',     adresO],
+    ['Artsverklaring',      d.artsverklaring_pad ? '✓ geüpload' : ''],
+    ['Overdraagformulier',  d.overdraagformulier_pad ? '✓ geüpload' : ''],
   ]);
 
   pushSection('Bezittingen', [
-    ['Oorbel(en)',  d.bezit_oorbellen  === 'ja' ? (d.bezit_oorbellen_aantal ? d.bezit_oorbellen_aantal + ' stuk(s)' : 'ja') : ''],
-    ['Ring(en)',    d.bezit_ringen     === 'ja' ? (d.bezit_ringen_aantal    ? d.bezit_ringen_aantal    + ' stuk(s)' : 'ja') : ''],
-    ['Armband(en)', d.bezit_armbanden  === 'ja' ? (d.bezit_armbanden_aantal ? d.bezit_armbanden_aantal + ' stuk(s)' : 'ja') : ''],
+    ['Oorbel(en)',  _bezit(d.bezit_oorbellen,  d.bezit_oorbellen_aantal)],
+    ['Ring(en)',    _bezit(d.bezit_ringen,     d.bezit_ringen_aantal)],
+    ['Armband(en)', _bezit(d.bezit_armbanden,  d.bezit_armbanden_aantal)],
+    ['Ketting',     _bezit(d.bezit_ketting,    null)],
+    ['Bril',        _bezit(d.bezit_bril,       null)],
+    ['Horloge',     _bezit(d.bezit_horloge,    null)],
+    ...((Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen : [])
+        .map(b => [b.label || '', b.aantal ? b.aantal + ' stuk(s)' : ''])),
   ]);
 
-  pushSection('Opdrachtgever', [
-    ['Naam', d.opdrachtgever_naam],
-    ['Extra personeel', Array.isArray(d.extra_personeel) ? d.extra_personeel.join(', ') : ''],
+  pushSection('Opbaren & locatie', [
+    ['Opbaringstype',        opbaringLabel],
+    ['Ophaaldatum',          [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')],
+    ['Brengen naar',         routeStr(d.brengen_naar)],
+    ['Thuis opbaren start',  [fmtDate(d.thuis_opbaren_datum), d.thuis_opbaren_tijd && 'om ' + d.thuis_opbaren_tijd].filter(Boolean).join(' ')],
+    ['Thuis opbaren einde',  [fmtDate(d.thuis_opbaren_einddatum), d.thuis_opbaren_eindtijd && 'om ' + d.thuis_opbaren_eindtijd].filter(Boolean).join(' ')],
+    ['Overbrengingen thuis', routeStr(d.thuis_overbrengingen)],
+    ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
+    ['Rouwgoederen-lijst',   (Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length) ? d.rouwgoederen_lijst.join(', ') : ''],
+    ['Opbaarlocatie',        d.opbaarlocatie_type],
   ]);
 
-  if (d.bijzonderheden) {
-    parts.push(emH3('Bijzonderheden'));
-    parts.push(`<p style="white-space:pre-wrap;margin:6px 0 14px;font-size:14px;line-height:1.55;">${esc(d.bijzonderheden)}</p>`);
-  }
+  pushSection('Verzorging', [
+    ['Verzorgd/gekleed datum', fmtDate(d.verzorgd_gekleed_datum)],
+    ['Verzorgd/gekleed waar',  d.verzorgd_gekleed_waar],
+    ['Familie erbij',          _jaNee(d.verzorgd_gekleed_familie)],
+    ['Gekist datum',           fmtDate(d.gekist_datum)],
+    ['Gekist waar',            d.gekist_waar],
+    ['Peacemaker verwijderd',  d.peacemaker_verwijderd ? 'Ja' : ''],
+    ['Peacemaker datum',       fmtDate(d.peacemaker_verwijderd_datum)],
+    ['Thanatopraxie',          d.thanatopraxie ? 'Ja' : ''],
+    ['Thanatopraxie datum',    fmtDate(d.thanatopraxie_datum)],
+    ['Thanatopraxie waar',     d.thanatopraxie_waar],
+    ['Mond gehecht',           d.mond_gehecht ? 'Ja' : ''],
+    ['Buikpunctie',            d.buikpunctie ? 'Ja' : ''],
+    ['Oogkapjes',              d.oogkapjes ? 'Ja' : ''],
+  ]);
+
+  pushSection('Kist & vervoer', [
+    ['Kist',     d.kist_type],
+    ['Rouwauto', _jaNee(d.rouwauto)],
+  ]);
+
+  pushSection('Bijzonderheden', [
+    ['Notities / wensen', d.bijzonderheden],
+  ]);
+
+  pushSection('Dossier-metadata', [
+    ['Dossiernummer',      d.dossier_nummer],
+    ['Status',             (d.status || '').replace('_', ' ')],
+    ['Aangemaakt',         d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : ''],
+    ['Laatst opgeslagen',  d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : ''],
+    ['Bijgewerkt door',    d.bijgewerkt_door],
+  ]);
 
   const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
   parts.push(`<p style="margin:18px 0 0;font-size:13px;color:#6f6a62;">Met vriendelijke groet,<br><strong>${esc(s.app_name || 'Uitvaartleider')}</strong>${s.app_tagline ? '<br>' + esc(s.app_tagline) : ''}</p>`);
