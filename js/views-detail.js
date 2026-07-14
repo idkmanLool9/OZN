@@ -897,8 +897,10 @@ function bindDetailEvents(id) {
             && typeof KistVoorraad !== 'undefined'
             && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
           try {
-            if (oud !== 'geannuleerd' && nieuw === 'geannuleerd') await KistVoorraad.terug1(kistOm);
-            else if (oud === 'geannuleerd' && nieuw !== 'geannuleerd') await KistVoorraad.reserveer1(kistOm);
+            const ctxAn = { reden: 'dossier geannuleerd', dossier_id: id };
+            const ctxHer = { reden: 'annulering ongedaan', dossier_id: id };
+            if (oud !== 'geannuleerd' && nieuw === 'geannuleerd') await KistVoorraad.terug1(kistOm, ctxAn);
+            else if (oud === 'geannuleerd' && nieuw !== 'geannuleerd') await KistVoorraad.reserveer1(kistOm, ctxHer);
           } catch (_) {}
         }
         try { Toast.show('Status: ' + nieuw.replace('_', ' '), 'success'); } catch (_) {}
@@ -1077,7 +1079,7 @@ function bindDetailEvents(id) {
       if (kistOm && !alTeruggegeven
           && typeof KistVoorraad !== 'undefined'
           && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
-        try { await KistVoorraad.terug1(kistOm); } catch (_) {}
+        try { await KistVoorraad.terug1(kistOm, { reden: 'dossier verwijderd', dossier_id: id }); } catch (_) {}
       }
       try { Toast.show('Dossier verwijderd', 'success'); } catch (_) {}
       Router.go('/dossiers');

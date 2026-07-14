@@ -2476,6 +2476,25 @@ function _logZinSchrijf(r, wieNaam) {
       return `${wie} heeft een nieuw ${esc(tabelLabel)}${link} <em>aangemaakt</em>${dossierRef}.`;
     case 'delete':
       return `${wie} heeft ${esc(tabelLabel)}${link} <em>verwijderd</em>${dossierRef}.`;
+    case 'voorraad': {
+      const naam = detail.naam || id || 'kist';
+      const delta = detail.delta;
+      const nu  = (detail.nu != null) ? detail.nu : (detail.was != null && typeof delta === 'number' ? detail.was + delta : null);
+      const was = detail.was;
+      const dossierLink = detail.dossier_id
+        ? ` (dossier <a href="#/dossiers/${esc(detail.dossier_id)}">#${esc(detail.dossier_id)}</a>)`
+        : '';
+      const reden = detail.reden ? ` — <span class="muted small">${esc(detail.reden)}</span>` : '';
+      if (typeof delta === 'number' && delta !== 0) {
+        const sign = delta > 0 ? '+' : '';
+        const stukTxt = (was != null && nu != null) ? ` (${was} → ${nu})` : '';
+        return `${wie} — <em>voorraad</em> <strong>${esc(naam)}</strong> <strong>${sign}${delta}</strong>${stukTxt}${dossierLink}${reden}.`;
+      }
+      // Handmatige upsert: was/nu-objecten, toon aantal en min_aantal
+      const wasA = (was && typeof was === 'object') ? was.aantal : was;
+      const nuA  = (nu  && typeof nu  === 'object') ? nu.aantal  : nu;
+      return `${wie} heeft voorraad van <strong>${esc(naam)}</strong> bijgewerkt${(wasA != null && nuA != null) ? ` (${wasA} → ${nuA})` : ''}${reden}.`;
+    }
     case 'update': {
       // Toon de daadwerkelijk gewijzigde velden
       const oud = detail.oud || {};
@@ -2534,12 +2553,13 @@ function _fmtWaarde(v) {
 }
 function logActieKleur(a) {
   switch (a) {
-    case 'insert': return 'green';
-    case 'update': return 'amber';
-    case 'delete': return 'red';
-    case 'login':  return 'blue';
-    case 'logout': return 'grey';
-    case 'profiel':return 'blue';
-    default:       return 'grey';
+    case 'insert':   return 'green';
+    case 'update':   return 'amber';
+    case 'delete':   return 'red';
+    case 'login':    return 'blue';
+    case 'logout':   return 'grey';
+    case 'profiel':  return 'blue';
+    case 'voorraad': return 'amber';
+    default:         return 'grey';
   }
 }

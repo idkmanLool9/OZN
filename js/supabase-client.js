@@ -541,16 +541,24 @@ const KistVoorraad = {
     const arr = Cloud.cache.kist_voorraad;
     const i = arr.findIndex(x => x.naam === naam);
     if (i >= 0) arr[i] = data; else arr.push(data);
+    // Log de handmatige mutatie (aantal / min_aantal wijzigingen)
+    try {
+      const was = bestaand ? { aantal: bestaand.aantal, min_aantal: bestaand.min_aantal } : null;
+      const nu  = { aantal: data.aantal, min_aantal: data.min_aantal };
+      AuditLog.log('voorraad', 'kist_voorraad', naam, {
+        naam, was, nu, delta: was ? (data.aantal - was.aantal) : data.aantal, reden: 'handmatig',
+      });
+    } catch (_) {}
     return data;
   },
   // Reserveer 1 stuk (bij dossier-koppeling). Fout is niet-fataal.
-  async reserveer1(naam) { return KistVoorraad._delta(naam, -1); },
+  async reserveer1(naam, ctx) { return KistVoorraad._delta(naam, -1, ctx || { reden: 'dossier-koppeling' }); },
   // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
   // verwijderd wordt, geeft de oude voorraad +1 terug.
-  async terug1(naam) { return KistVoorraad._delta(naam, +1); },
+  async terug1(naam, ctx) { return KistVoorraad._delta(naam, +1, ctx || { reden: 'dossier-ontkoppeling' }); },
   // Atomaire delta via RPC — voorkomt race tussen twee gelijktijdige
   // reserveringen die anders beide dezelfde 'was'-waarde zouden lezen.
-  async _delta(naam, delta) {
+  async _delta(naam, delta, ctx) {
     if (!naam) return;
     const cur = KistVoorraad.byNaam(naam);
     if (!cur) return; // nog geen voorraadregel = niet bijhouden
@@ -561,6 +569,16 @@ const KistVoorraad = {
       const arr = Cloud.cache.kist_voorraad;
       const i = arr.findIndex(r => r.naam === naam);
       if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: nieuw });
+      // Auditlog: 'voorraad' actie met naam, delta en context (welk dossier).
+      try {
+        AuditLog.log('voorraad', 'kist_voorraad', naam, {
+          naam, delta,
+          was: cur.aantal,
+          nu: nieuw,
+          reden: (ctx && ctx.reden) || (delta < 0 ? 'reservering' : 'teruggave'),
+          dossier_id: ctx && ctx.dossier_id != null ? String(ctx.dossier_id) : null,
+        });
+      } catch (_) {}
     } catch (_) {}
   },
 };

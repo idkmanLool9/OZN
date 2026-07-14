@@ -1967,7 +1967,7 @@ function renderDossierForm(params) {
         // medewerker sowieso — dan gewoon overslaan).
         if (data.kist_type && typeof KistVoorraad !== 'undefined'
             && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
-          try { await KistVoorraad.reserveer1(data.kist_type); } catch (_) {}
+          try { await KistVoorraad.reserveer1(data.kist_type, { reden: 'nieuw dossier', dossier_id: created.id }); } catch (_) {}
         }
         // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
         // Medewerkers mogen kosten toevoegen; prijzen zijn NULL en beheerder
@@ -1998,8 +1998,8 @@ function renderDossierForm(params) {
             && typeof KistVoorraad !== 'undefined'
             && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
           try {
-            if (oudeKist)   await KistVoorraad.terug1(oudeKist);
-            if (nieuweKist) await KistVoorraad.reserveer1(nieuweKist);
+            if (oudeKist)   await KistVoorraad.terug1(oudeKist, { reden: 'kist-wissel (oud terug)', dossier_id: dossier.id });
+            if (nieuweKist) await KistVoorraad.reserveer1(nieuweKist, { reden: 'kist-wissel (nieuw gereserveerd)', dossier_id: dossier.id });
           } catch (_) {}
         }
         localStorage.removeItem(draftKey);
