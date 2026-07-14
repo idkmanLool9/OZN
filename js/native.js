@@ -357,14 +357,16 @@ Native.syncLiveActivity = async function (dossiers, now) {
 };
 
 // Statusbalk: app edge-to-edge tot achter de statusbalk, met donkere
-// tekst (LIGHT-stijl = donkere klok/batterij voor onze lichte balk).
+// tekst. In Capacitor: 'Style.Dark' = donkere klok/batterij (voor onze
+// lichte crème topbar). 'Style.Light' zou witte iconen geven = onzichtbaar
+// op lichte achtergrond. Vroeger stond dit fout op LIGHT.
 Native.initStatusBar = function () {
   if (!Native.isApp()) return;
   try {
     const SB = Native._plugin('StatusBar');
     if (!SB) return;
     if (SB.setOverlaysWebView) SB.setOverlaysWebView({ overlay: true }).catch(() => {});
-    if (SB.setStyle) SB.setStyle({ style: 'LIGHT' }).catch(() => {});
+    if (SB.setStyle) SB.setStyle({ style: 'DARK' }).catch(() => {});
   } catch (_) {}
 };
 

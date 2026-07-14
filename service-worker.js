@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-268';
+const CACHE_VERSION = 'sok-uitvaart-build-269';
 const SHELL = [
   './',
   './index.html',
@@ -146,12 +146,14 @@ self.addEventListener('fetch', e => {
 
 async function networkFirst(req) {
   try {
-    // 'no-cache' = altijd revalideren bij server (ETag/If-Modified-Since).
-    // Zo krijgen we nooit een oude HTTP-cache-versie terwijl er een
-    // nieuwere file klaarstaat op de server.
     const freshReq = new Request(req, { cache: 'no-cache' });
     const resp = await fetch(freshReq);
-    if (resp && resp.ok && resp.type === 'basic') {
+    // Alleen volledige 200-responses cachen. 206 Partial Content (Range)
+    // en cache-buster URLs (?_check=/_v=) zouden anders elk een unieke
+    // cache-entry maken die nooit meer gematched wordt — oneindige groei.
+    const url = new URL(req.url);
+    const isCacheBuster = url.searchParams.has('_check') || url.searchParams.has('_v') || url.searchParams.has('_reset');
+    if (resp && resp.status === 200 && resp.type === 'basic' && !isCacheBuster) {
       const c = await caches.open(CACHE_VERSION);
       c.put(req, resp.clone());
     }
@@ -185,13 +187,18 @@ self.addEventListener('push', event => {
     try { payload = Object.assign(payload, event.data.json()); }
     catch (_) { payload.body = event.data.text(); }
   }
+  // Guard: sommige senders zetten expliciet title:null of body:null in de
+  // JSON — Object.assign overschrijft dan onze defaults. showNotification(null)
+  // crasht op sommige Android WebViews.
+  const title = (payload && typeof payload.title === 'string' && payload.title) || 'OZN';
+  const body  = (payload && typeof payload.body  === 'string' && payload.body)  || 'Je hebt een nieuwe melding.';
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: './icon.svg',
-      badge: './icon.svg',
-      data: { url: payload.url || '/' },
-      tag: payload.tag || 'sok-default',
+    self.registration.showNotification(title, {
+      body,
+      icon: './icon.png',
+      badge: './icon.png',
+      data: { url: (payload && payload.url) || '/' },
+      tag: (payload && payload.tag) || 'sok-default',
     })
   );
 });

@@ -240,7 +240,8 @@ function renderDossierList(params, path) {
   // + status naar de URL, zodat delen/back blijft werken.
   const zoekInput = $('#filter-form input[type="search"]');
   const rijen = $$('#view tbody tr[data-id]');
-  const mijnNaam = ((typeof Auth !== 'undefined' && Auth.current()) || {}).naam || '';
+  const _me = (typeof Auth !== 'undefined' && Auth.current()) || {};
+  const mijnNaam = (_me.fullName || _me.email || '').trim();
   const filterPaneel = $('#dossiers-filter-paneel');
 
   function pasFiltersToe() {
@@ -1154,7 +1155,9 @@ EMAIL_FROM_NAME = OZN</pre>
       }
       if (!navigator.onLine) return Modal.show({ type: 'offline', title: 'Geen internet', message: 'Logo uploaden kan alleen met een actieve internetverbinding.' });
       const lbl = e.target.closest('label');
-      if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
+      // NIET textContent zetten — dat vernietigt de nested <input type="file">.
+      // Alleen opacity aanpassen als visuele feedback, of via een span-child.
+      if (lbl) lbl.style.opacity = .55;
       try {
         pendingLogo = await BrandingFotos.uploadLogo(file);
         const prev = $('#logo-preview');
@@ -1162,24 +1165,22 @@ EMAIL_FROM_NAME = OZN</pre>
       } catch (err) {
         Modal.show({ type: 'error', title: 'Upload mislukt', message: err.message || String(err) });
       } finally {
-        if (lbl) { lbl.style.opacity = 1; }
+        if (lbl) lbl.style.opacity = 1;
       }
     });
 
     const removeBtn = $('#btn-remove-logo');
     if (removeBtn) {
-      removeBtn.addEventListener('click', async () => {
+      removeBtn.addEventListener('click', () => {
+        // Alleen pending-state zetten; storage-delete gebeurt pas bij Opslaan
+        // zodat Annuleren / weg-navigeren geen data-verlies veroorzaakt.
         pendingLogo = '';
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = '<span>OZN</span>';
-        // Bestand uit storage verwijderen (best-effort). Demo-account raakt de
-        // gedeelde storage niet aan.
-        const demo = (typeof Demo !== 'undefined' && Demo.isActive());
-        if (!demo && navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
       });
     }
 
-    brandForm.addEventListener('submit', e => {
+    brandForm.addEventListener('submit', async e => {
       e.preventDefault();
       const f = e.target;
       const patch = {
@@ -1188,11 +1189,20 @@ EMAIL_FROM_NAME = OZN</pre>
         primary_color: f.primary_color.value || Settings.defaults.primary_color,
         accent_color: f.accent_color.value || Settings.defaults.accent_color,
       };
+      const oudLogo = Settings.get('logo_data_url') || '';
       if (pendingLogo !== null) patch.logo_data_url = pendingLogo;
       try {
         Settings.set(patch);
       } catch (err) {
         return renderAccount({ error: 'Opslaan mislukt — logo is mogelijk te groot voor lokale opslag.' });
+      }
+      // Storage-delete PAS als Settings-write is gelukt EN de user 'verwijderen'
+      // koos (pendingLogo === '' en er was een oud logo).
+      if (pendingLogo === '' && oudLogo) {
+        const demo = (typeof Demo !== 'undefined' && Demo.isActive());
+        if (!demo && navigator.onLine) {
+          await BrandingFotos.removeLogo().catch(() => {});
+        }
       }
       Branding.apply();
       renderAccount({ success: 'Branding opgeslagen.' });
@@ -1673,16 +1683,23 @@ EMAIL_FROM_NAME = OZN</pre>
       const huidigLijst = Settings.get('profielen') || [];
       const profielen = [];
       const gebruikteIds = new Set();
-      rows.forEach((r, idx) => {
+      // Map: lowercased naam -> bestaand id, zodat een rij die dezelfde
+      // naam heeft z'n oude id houdt (i.p.v. de id van dezelfde INDEX
+      // — die shiftt bij verwijderen/insert en veroorzaakte data-corruptie
+      // in dossier-auteur-referenties).
+      const idByNaam = new Map();
+      huidigLijst.forEach(p => {
+        if (p && p.id && p.name) idByNaam.set(p.name.trim().toLowerCase(), p.id);
+      });
+      rows.forEach(r => {
         const naam = r.querySelector('.profielen-naam').value.trim();
         if (!naam) return;
         const kleur = r.querySelector('.profielen-kleur').value || '#6b1e2a';
         const rolSel = r.querySelector('.profielen-rol');
         const rol = rolSel && rolSel.value === 'beheerder' ? 'beheerder' : 'medewerker';
-        // Behoud het oude id als de naam overeenkomt; anders genereer een nieuwe
-        let id = huidigLijst[idx]?.id;
+        let id = idByNaam.get(naam.toLowerCase());
         if (!id || gebruikteIds.has(id)) {
-          let base = slugify(naam);
+          const base = slugify(naam);
           id = base;
           let n = 2;
           while (gebruikteIds.has(id)) id = base + '_' + (n++);

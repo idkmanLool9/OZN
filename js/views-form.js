@@ -1870,6 +1870,19 @@ function renderDossierForm(params) {
 
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
+    // Submit-guard: dubbelklik-bescherming DIRECT bij binnenkomst — anders
+    // konden 2 kliks parallel door de Modal.confirm-check heen en werden
+    // er 2 dossiers aangemaakt + 2 auto-mails + dubbele kist-delta.
+    const _submitBtn = e.target.querySelector('button[type=submit]');
+    if (_submitBtn) {
+      if (_submitBtn.dataset.submitting === '1') return;
+      _submitBtn.dataset.submitting = '1';
+      _submitBtn.disabled = true;
+    }
+    const _releaseGuard = () => {
+      if (_submitBtn) { _submitBtn.dataset.submitting = ''; _submitBtn.disabled = false; }
+    };
+
     const data = {};
     DOSSIER_VELDEN.forEach(f => {
       const inp = e.target.elements[f];
@@ -1907,7 +1920,7 @@ function renderDossierForm(params) {
         confirmText: 'Toch opslaan',
         cancelText: 'Corrigeer eerst',
       });
-      if (!doorgaan) return;
+      if (!doorgaan) { _releaseGuard(); return; }
     }
 
     // Extra personeel: aangevinkte accountnamen → JSONB-array
@@ -1950,12 +1963,12 @@ function renderDossierForm(params) {
         confirmText: 'Toch opslaan',
         cancelText: 'Annuleren',
       });
-      if (!tochOpslaan) return;
+      if (!tochOpslaan) { _releaseGuard(); return; }
     }
 
-    const btn = e.target.querySelector('button[type=submit]');
-    btn.disabled = true; const oldText = btn.textContent;
-    btn.textContent = 'Bezig met opslaan...';
+    const btn = _submitBtn || e.target.querySelector('button[type=submit]');
+    const oldText = btn ? btn.textContent : '';
+    if (btn) btn.textContent = 'Bezig met opslaan...';
 
     try {
       let savedDossier;
@@ -2029,7 +2042,8 @@ function renderDossierForm(params) {
 
       Router.go('/dossiers/' + (isNew ? savedDossier.id : dossier.id));
     } catch (err) {
-      btn.disabled = false; btn.textContent = oldText;
+      if (btn) btn.textContent = oldText;
+      _releaseGuard();
     }
   });
 }

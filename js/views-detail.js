@@ -874,6 +874,10 @@ function bloemRowValue(bloemNaam) {
 
 function bindDetailEvents(id) {
   const dRow = DB.byId(KEYS.DOSSIERS, id);
+  // magPrijzen zit alleen als const binnen renderDossierDetail; opnieuw
+  // ophalen zodat handlers in dit scope (add-kosten, preset-tegels) niet
+  // op een ReferenceError klappen.
+  const magPrijzen = (typeof Auth !== 'undefined' && typeof Auth.magPrijzenZien === 'function') ? Auth.magPrijzenZien() : true;
 
   // ── Status-select: bind ALS EERSTE zodat een fout verderop 'm niet
   // meesleurt, en gebruik VERSE data uit de cache i.p.v. de closure.
