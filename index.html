@@ -26,21 +26,21 @@
   <link rel="stylesheet" href="print.css" media="print" />
 </head>
 <body>
-  <!-- Welkomscherm / splash -->
-  <section id="splash" class="splash" role="dialog" aria-label="Welkom">
-    <div class="splash-card">
-      <div class="brand-mark big">OZN</div>
-      <h1 id="splash-title">Welkom</h1>
-      <p class="splash-sub">Overledenenzorg Nederland</p>
+  <!-- Welkomscherm / splash — minimalistisch, alleen OZN-mark en tagline -->
+  <section id="splash" class="splash splash-minimal" role="dialog" aria-label="Welkom">
+    <div class="splash-inner">
+      <div class="splash-mark">
+        <img src="icon.svg" alt="OZN" width="88" height="88">
+      </div>
+      <div class="splash-wordmark">OZN</div>
 
       <div id="splash-online" class="splash-state" hidden>
         <div class="splash-spinner" aria-hidden="true"></div>
-        <p class="splash-msg">Even verbinden met de server...</p>
       </div>
 
       <div id="splash-offline" class="splash-state splash-state-offline" hidden>
         <div class="splash-icon-offline" aria-hidden="true">
-          <svg viewBox="0 0 64 64" width="56" height="56">
+          <svg viewBox="0 0 64 64" width="40" height="40">
             <path d="M32 50 L36 54 L32 58 L28 54 Z" fill="currentColor"/>
             <path d="M22 40 Q32 32 42 40" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round"/>
             <path d="M14 32 Q32 18 50 32" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" opacity=".75"/>
@@ -49,12 +49,16 @@
           </svg>
         </div>
         <p class="splash-msg"><strong>Geen internetverbinding</strong></p>
-        <p class="splash-msg-sub">Je werkt nu in <em>leesmodus</em>. Bestaande dossiers blijven zichtbaar; nieuwe wijzigingen kun je opslaan zodra je weer online bent.</p>
+        <p class="splash-msg-sub">Je werkt nu in <em>leesmodus</em>.</p>
       </div>
 
       <button type="button" id="splash-continue" class="btn btn-primary" hidden>Verder</button>
       <p class="splash-hint muted small" id="splash-hint" hidden>Tik om verder te gaan</p>
-      <p class="splash-version muted" id="splash-version"></p>
+    </div>
+
+    <div class="splash-foot">
+      <div class="splash-foot-tagline">OVERLEDENEN ZORG NEDERLAND B.V.</div>
+      <div class="splash-foot-version muted small" id="splash-version"></div>
     </div>
   </section>
 

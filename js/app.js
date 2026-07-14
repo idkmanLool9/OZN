@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 255;
-const APP_VERSION    = '5.86.3';
+const APP_BUILD      = 256;
+const APP_VERSION    = '5.87.0';
 const APP_BUILD_DATE = '2026-07-13';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -567,17 +567,20 @@ const Splash = {
     const cont = document.getElementById('splash-continue');
     const hint = document.getElementById('splash-hint');
 
+    // Minimalistisch splash: geen aparte titel/subtitel meer — de OZN-mark
+    // en wordmark spreken voor zich. Als de oude elementen nog bestaan
+    // (bv. voor een custom-splash-variant), respecteren we de settings.
     if (subEl) subEl.textContent = s.splash_subtitle;
 
     onlineEl.hidden = state !== 'online';
     offlineEl.hidden = state !== 'offline';
     if (state === 'offline') {
-      titleEl.textContent = s.splash_offline_title;
+      if (titleEl) titleEl.textContent = s.splash_offline_title;
       cont.hidden = false;
       cont.textContent = 'Verder in leesmodus';
       hint.hidden = true;
     } else {
-      titleEl.textContent = s.splash_title;
+      if (titleEl) titleEl.textContent = s.splash_title;
       cont.hidden = true;
       hint.hidden = false;
     }
