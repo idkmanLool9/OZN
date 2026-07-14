@@ -1096,30 +1096,46 @@ function bindDetailEvents(id) {
   if (_addKostenForm) _addKostenForm.addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
-    const omsch = f.omschrijving.value.trim(); if (!omsch) return;
+    const btn = f.querySelector('button[type=submit]');
+    if (btn && btn.dataset.submitting === '1') return;
+    if (btn) { btn.dataset.submitting = '1'; btn.disabled = true; }
+    const omsch = f.omschrijving.value.trim();
+    if (!omsch) { if (btn) { btn.dataset.submitting = ''; btn.disabled = false; } return; }
     const aantal = parseInt(f.aantal.value, 10);
-    if (!isFinite(aantal) || aantal < 1) { Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' }); return; }
+    if (!isFinite(aantal) || aantal < 1) {
+      Modal.show({ type: 'warning', title: 'Ongeldig aantal', message: 'Vul een aantal in van 1 of hoger.' });
+      if (btn) { btn.dataset.submitting = ''; btn.disabled = false; }
+      return;
+    }
     const stuk = (f.bedrag ? parseEUR(f.bedrag.value) : 0);
-    const bedrag = magPrijzen ? +(stuk * aantal).toFixed(2) : null;
+    // Medewerker mag geen bedrag zetten → null. Als beheerder wél een bedrag
+    // invulde (>0) rekenen we door; bij lege prijs blijft de kolom NULL,
+    // niet stiekem €0,00.
+    let bedrag = null;
+    if (magPrijzen) bedrag = stuk > 0 ? +(stuk * aantal).toFixed(2) : null;
     try {
       await DB.insert(KEYS.KOSTEN, { dossier_id: id, omschrijving: omsch, categorie: f.categorie.value || null, bedrag, aantal, betaald: f.betaald.checked });
       await DB.touchDossier(id);
       renderDossierDetail({ id });
-    } catch (_) {}
+    } catch (_) {
+      if (btn) { btn.dataset.submitting = ''; btn.disabled = false; }
+    }
   });
 
-  // Aantal aanpassen → bedrag herberekenen op basis van stukprijs en opslaan
-  let _aantalSaveTimer = null;
+  // Aantal aanpassen → bedrag herberekenen op basis van stukprijs.
+  // Als stukprijs 0 is (bedrag was NULL, bv. door medewerker toegevoegd),
+  // blijft bedrag NULL — anders wordt 'prijs onbekend' stiekem €0,00.
   $$('input.kc-aantal-input').forEach(inp => {
     inp.addEventListener('change', async () => {
       const tid = parseInt(inp.dataset.id, 10);
       const stuk = Number(inp.dataset.stuk) || 0;
-      let nieuw = Math.max(0, parseInt(inp.value, 10) || 0);
+      const nieuw = Math.max(0, parseInt(inp.value, 10) || 0);
       inp.value = String(nieuw);
       const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
-      const newBedrag = +(stuk * nieuw).toFixed(2);
+      const patch = { aantal: nieuw };
+      if (k.bedrag != null && stuk > 0) patch.bedrag = +(stuk * nieuw).toFixed(2);
       try {
-        await DB.update(KEYS.KOSTEN, tid, { aantal: nieuw, bedrag: newBedrag });
+        await DB.update(KEYS.KOSTEN, tid, patch);
         await DB.touchDossier(id);
         renderDossierDetail({ id });
       } catch (_) {}
@@ -1129,7 +1145,12 @@ function bindDetailEvents(id) {
   const _addNotitieForm = $('#add-notitie');
   if (_addNotitieForm) _addNotitieForm.addEventListener('submit', async e => {
     e.preventDefault();
-    const tekst = e.target.tekst.value.trim(); if (!tekst) return;
+    const f = e.target;
+    const btn = f.querySelector('button[type=submit]');
+    if (btn && btn.dataset.submitting === '1') return;
+    if (btn) { btn.dataset.submitting = '1'; btn.disabled = true; }
+    const tekst = f.tekst.value.trim();
+    if (!tekst) { if (btn) { btn.dataset.submitting = ''; btn.disabled = false; } return; }
     const profiel = ActiveProfile.current();
     const u = Auth.current();
     const auteur = profiel ? profiel.name : (u ? (u.fullName || u.email) : 'Onbekend');
@@ -1137,7 +1158,9 @@ function bindDetailEvents(id) {
       await DB.insert(KEYS.NOTITIES, { dossier_id: id, tekst, auteur });
       await DB.touchDossier(id);
       renderDossierDetail({ id });
-    } catch (_) {}
+    } catch (_) {
+      if (btn) { btn.dataset.submitting = ''; btn.disabled = false; }
+    }
   });
 
   $('#view').onclick = async e => {

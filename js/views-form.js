@@ -142,8 +142,9 @@ function applyDossierDraft(formEl, data) {
       if (cb.checked !== v) { cb.checked = v; changed++; }
     });
   }
-  // Brengen-naar rijen terugzetten
-  if (Array.isArray(data.__brengen_naar) && data.__brengen_naar.length) {
+  // Brengen-naar rijen terugzetten (ook lege array = user heeft alles
+  // verwijderd, dan moet de lijst ook echt leeg blijven).
+  if (Array.isArray(data.__brengen_naar)) {
     const lijst = formEl.querySelector('#brengen-naar-lijst');
     if (lijst) {
       lijst.innerHTML = data.__brengen_naar.map((item, i) => {
@@ -159,8 +160,8 @@ function applyDossierDraft(formEl, data) {
       changed++;
     }
   }
-  // Thuis-overbrengingen rijen terugzetten
-  if (Array.isArray(data.__thuis_overbrengingen) && data.__thuis_overbrengingen.length) {
+  // Thuis-overbrengingen rijen terugzetten (idem lege array behouden)
+  if (Array.isArray(data.__thuis_overbrengingen)) {
     const lijst = formEl.querySelector('#thuis-overbr-lijst');
     if (lijst) {
       lijst.innerHTML = data.__thuis_overbrengingen.map((item, i) => {
@@ -176,8 +177,8 @@ function applyDossierDraft(formEl, data) {
       changed++;
     }
   }
-  // Extra bezittingen rijen terugzetten
-  if (Array.isArray(data.__extra_bezittingen) && data.__extra_bezittingen.length) {
+  // Extra bezittingen rijen terugzetten (lege array = alles verwijderd)
+  if (Array.isArray(data.__extra_bezittingen)) {
     const lijst = formEl.querySelector('#extra-bezit-lijst');
     if (lijst) {
       lijst.innerHTML = data.__extra_bezittingen.map(b => `
@@ -866,6 +867,9 @@ function renderDossierForm(params) {
         row.querySelectorAll('input').forEach(i => i.value = '');
       }
       hernummer();
+      // Autosave triggeren zodat de deletion snapshot krijgt — anders
+      // schrijft de setTimeout in scheduleSave pas na de volgende typ-actie.
+      lijstEl.dispatchEvent(new Event('input', { bubbles: true }));
     });
     hernummer();
   }
@@ -972,7 +976,10 @@ function renderDossierForm(params) {
     });
     lijst.addEventListener('click', (e) => {
       const del = e.target.closest('.extra-bezit-del');
-      if (del) del.closest('.extra-bezit-row').remove();
+      if (!del) return;
+      del.closest('.extra-bezit-row').remove();
+      // Autosave triggeren zodat een verwijderde rij ook in de draft komt.
+      lijst.dispatchEvent(new Event('input', { bubbles: true }));
     });
   })();
 
@@ -2010,10 +2017,8 @@ function renderDossierForm(params) {
         if (oudeKist !== nieuweKist
             && typeof KistVoorraad !== 'undefined'
             && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
-          try {
-            if (oudeKist)   await KistVoorraad.terug1(oudeKist, { reden: 'kist-wissel (oud terug)', dossier_id: dossier.id });
-            if (nieuweKist) await KistVoorraad.reserveer1(nieuweKist, { reden: 'kist-wissel (nieuw gereserveerd)', dossier_id: dossier.id });
-          } catch (_) {}
+          // Atomair — voorkomt drift als reserveer1 faalt nadat terug1 slaagde.
+          try { await KistVoorraad.wissel(oudeKist, nieuweKist, { dossier_id: dossier.id }); } catch (_) {}
         }
         localStorage.removeItem(draftKey);
         try { localStorage.removeItem(stepKey); localStorage.removeItem(maxKey); } catch (_) {}

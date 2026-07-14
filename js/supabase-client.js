@@ -556,6 +556,32 @@ const KistVoorraad = {
   // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
   // verwijderd wordt, geeft de oude voorraad +1 terug.
   async terug1(naam, ctx) { return KistVoorraad._delta(naam, +1, ctx || { reden: 'dossier-ontkoppeling' }); },
+  // Atomair: 1 RPC-call, oud terug + nieuw gereserveerd binnen één transactie.
+  // Voorkomt drift als reserveer1 faalt nadat terug1 al slaagde.
+  async wissel(oud, nieuw, ctx) {
+    const oudN = (oud || '').trim();
+    const nwN  = (nieuw || '').trim();
+    if (oudN === nwN) return;
+    try {
+      const { data, error } = await sb.rpc('kist_voorraad_wissel', { p_oud: oudN || null, p_nieuw: nwN || null });
+      if (error) throw error;
+      const arr = Cloud.cache.kist_voorraad;
+      if (data && data.oud_nieuw != null && oudN) {
+        const i = arr.findIndex(r => r.naam === oudN);
+        if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: data.oud_nieuw });
+      }
+      if (data && data.nieuw_nieuw != null && nwN) {
+        const i = arr.findIndex(r => r.naam === nwN);
+        if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: data.nieuw_nieuw });
+      }
+      // Audit-entries voor beide zijden
+      try {
+        const dossierId = ctx && ctx.dossier_id != null ? String(ctx.dossier_id) : null;
+        if (oudN) AuditLog.log('voorraad', 'kist_voorraad', oudN, { naam: oudN, delta: 1, nu: data?.oud_nieuw, reden: 'kist-wissel (oud terug)', dossier_id: dossierId });
+        if (nwN)  AuditLog.log('voorraad', 'kist_voorraad', nwN,  { naam: nwN,  delta: -1, nu: data?.nieuw_nieuw, reden: 'kist-wissel (nieuw gereserveerd)', dossier_id: dossierId });
+      } catch (_) {}
+    } catch (_) {}
+  },
   // Atomaire delta via RPC — voorkomt race tussen twee gelijktijdige
   // reserveringen die anders beide dezelfde 'was'-waarde zouden lezen.
   async _delta(naam, delta, ctx) {
