@@ -509,7 +509,6 @@ function dossierSpec(d, kosten) {
     ] },
     { heading: 'Overledene', rows: [
       ['Naam',           _or(fullName(d))],
-      ['BSN',            _or(d.bsn)],
       ['Geslacht',       _or(d.geslacht)],
       ['Geboren',        geboren],
       ['Overleden',      overleden],
@@ -615,7 +614,6 @@ function buildDossierEmail(d, kosten) {
 
   pushSection('Overledene', [
     ['Naam',      fullName(d)],
-    ['BSN',       d.bsn],
     ['Geslacht',  d.geslacht],
     ['Geboren',   [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
     ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
