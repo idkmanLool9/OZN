@@ -1376,9 +1376,13 @@ button.kist-card-img-btn:focus { outline: 2px solid var(--primary); outline-offs
 .splash-minimal {
   background:
     radial-gradient(1200px 900px at 50% 40%, rgba(30,114,133,.08), transparent 65%),
-    #17181c;
+    #000;
   color: #f5f2ea;
 }
+/* Zorg dat body/html ook zwart zijn terwijl de splash actief is, anders
+   ontstaat er een naadje bij de iOS safe-area padding-bottom. */
+body:has(#splash:not([hidden])) { background: #000; }
+html:has(#splash:not([hidden])) { background: #000; }
 .splash-minimal .splash-stack {
   display: flex; flex-direction: column; align-items: center;
   gap: .4rem;
