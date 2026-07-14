@@ -463,18 +463,8 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 body.profile-active { background: #0b132b !important; overflow: hidden; padding: 0 !important; margin: 0 !important; min-height: 100dvh; }
 body.login-active   { background: var(--bg) !important; overflow: hidden; padding-bottom: 0 !important; }
 /* Zorg dat ook <html> donker is (safe-area onder de home-indicator laat
-   anders een streepje van --bg / --primary door). Werkt in Safari 16+. */
+   anders een streepje van --bg door). Werkt in Safari 16+. */
 html:has(body.profile-active) { background: #0b132b !important; }
-/* Als :has() niet ondersteund wordt: safety-net via een absolute pseudo op
-   .profile-screen die de safe-area onderin met dezelfde kleur opvult. */
-.profile-screen::after {
-  content: '';
-  position: fixed; left: 0; right: 0; bottom: 0;
-  height: calc(env(safe-area-inset-bottom) + 24px);
-  background: #0b132b;
-  z-index: 1;
-  pointer-events: none;
-}
 
 /* Drijvende achtergrond-orbs voor sfeer */
 .profile-bg-orb {
