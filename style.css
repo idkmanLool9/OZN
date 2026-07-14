@@ -460,11 +460,28 @@ body.density-extraruim .form label, body.density-extraruim fieldset.card label {
 /* Class wordt door core.js op de body gezet wanneer de profielkiezer actief
    is — zo blijft de body-achtergrond óók donker in de safe-area-strook
    onderaan, zonder :has() (werkt niet in oudere Safari). */
-body.profile-active { background: #0b132b !important; overflow: hidden; padding: 0 !important; margin: 0 !important; min-height: 100dvh; }
-body.login-active   { background: var(--bg) !important; overflow: hidden; padding-bottom: 0 !important; }
-/* Zorg dat ook <html> donker is (safe-area onder de home-indicator laat
-   anders een streepje van --bg door). Werkt in Safari 16+. */
-html:has(body.profile-active) { background: #0b132b !important; }
+body.profile-active {
+  background: #0b132b !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  overscroll-behavior: none;
+}
+body.login-active { background: var(--bg) !important; overflow: hidden; padding-bottom: 0 !important; }
+/* Zorg dat ook <html> donker is EN geen safe-area overhoudt tijdens
+   de profielkiezer — anders zie je bij een tweede aanroep vanuit de app
+   nog een balkje. */
+html:has(body.profile-active),
+html:has(#splash:not([hidden])) {
+  background: #0b132b !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
 
 /* Drijvende achtergrond-orbs voor sfeer */
 .profile-bg-orb {
