@@ -1537,23 +1537,24 @@ const MailComposer = {
           📎 <strong>Bijlage:</strong> ${esc(bijlNaam)} — zit als PDF bij deze e-mail.
         </div>` + body;
 
-        if (cc.length) {
-          bodyHtml += `<p style="margin-top:14px;font-size:12px;color:#8a847b;">Deze e-mail is ook gestuurd naar: ${esc(cc.join(', '))}.</p>`;
-        }
+        // CC-adressen NIET meer in body zetten (ze staan al in BCC — niemand
+        // mag elkaars adres zien; anders is 't alsnog een lek).
 
         // 3) Versturen — PDF gaat als échte attachment mee (paperclip in inbox).
+        // 'to' zijn de zichtbare ontvangers, 'cc' gaat als BCC zodat mensen
+        // elkaars adres niet zien (AVG). PDF-bijlage via Brevo.
         sendBtn.textContent = 'Verzenden...';
         status.className = 'mail-status mail-status-info';
         status.textContent = `Versturen naar ${to.length + cc.length} ontvanger(s)...`;
 
-        const alle = [...to, ...cc];
         if (EmailService.isConfigured() && navigator.onLine) {
           try {
-            await EmailService.send(alle, subj, bodyHtml, {
+            await EmailService.send(to, subj, bodyHtml, {
+              bcc: cc,
               attachments: [{ name: bijlNaam, contentBase64: pdfBase64 }],
             });
             status.className = 'mail-status mail-status-success';
-            status.textContent = `✓ Verstuurd naar ${alle.length} ontvanger(s).`;
+            status.textContent = `✓ Verstuurd naar ${to.length + cc.length} ontvanger(s).`;
           } catch (e) {
             status.className = 'mail-status mail-status-error';
             status.textContent = (e && e.message) || String(e);
@@ -1580,7 +1581,7 @@ const MailComposer = {
         }
 
         // 3) Adresboek bijwerken in Supabase (alleen nieuwe adressen)
-        await MailComposer.saveToAddrBook(d, alle);
+        await MailComposer.saveToAddrBook(d, [...to, ...cc]);
 
         // 4) Korte vertraging, dan sluiten
         setTimeout(close, 1500);

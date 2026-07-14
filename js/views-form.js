@@ -2026,18 +2026,45 @@ function renderDossierForm(params) {
       }
 
       // ─── Auto-mail dossier bij eerste aanmaak (best-effort) ──
-      // Inclusief kostenoverzicht — net opgeslagen kostenposten staan al
-      // in de cloud-cache via de DB.insert hierboven.
+      // Inclusief kostenoverzicht + PDF-bijlage (paperclip). Alleen als
+      // het opgeslagen adres een geldig e-mailadres is; anders skippen
+      // met een toast zodat een typo niet stilzwijgend het complete
+      // dossier naar een verkeerde ontvanger stuurt.
       const klooster = (Settings.get('auto_send_dossier_email') || '').trim();
-      if (isNew && klooster && EmailService.isConfigured() && navigator.onLine && savedDossier) {
-        try {
-          const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === savedDossier.id);
-          const subj = `Uitvaartdossier ${savedDossier.dossier_nummer || ''} — ${fullName(savedDossier) || ''}`.trim();
-          const body = buildDossierEmail(savedDossier, kostenLijst);
-          await EmailService.send(klooster, subj, body);
-        } catch (mailErr) {
-          // Niet blokkerend — gewoon loggen en doorgaan
-          console.warn('Auto-mail naar klooster mislukt:', mailErr);
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (isNew && klooster && savedDossier) {
+        if (!emailRe.test(klooster)) {
+          try { Toast.show(`Auto-mail overgeslagen — '${klooster}' is geen geldig e-mailadres.`, 'error'); } catch (_) {}
+        } else if (EmailService.isConfigured() && navigator.onLine) {
+          try {
+            const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === savedDossier.id);
+            const subj = `Uitvaartdossier ${savedDossier.dossier_nummer || ''} — ${fullName(savedDossier) || ''}`.trim();
+            const body = buildDossierEmail(savedDossier, kostenLijst);
+            // PDF genereren + base64 zodat de auto-mail dezelfde bijlage
+            // krijgt als de handmatige verzendknop.
+            let attachments;
+            try {
+              const pdfBlob = await PdfGen.blobFromSpec(dossierSpec(savedDossier, kostenLijst));
+              const pdfBase64 = await new Promise((resolve, reject) => {
+                const r = new FileReader();
+                r.onerror = () => reject(new Error('PDF-inlezen mislukt'));
+                r.onload = () => {
+                  const s = String(r.result || '');
+                  const idx = s.indexOf(',');
+                  resolve(idx >= 0 ? s.slice(idx + 1) : s);
+                };
+                r.readAsDataURL(pdfBlob);
+              });
+              if (pdfBase64 && pdfBase64.length > 50) {
+                attachments = [{ name: `Dossier ${savedDossier.dossier_nummer || savedDossier.id}.pdf`, contentBase64: pdfBase64 }];
+              }
+            } catch (_) { /* PDF-fout mag de mail niet blokkeren */ }
+            await EmailService.send(klooster, subj, body, attachments ? { attachments } : undefined);
+            try { Toast.show(`Auto-mail verstuurd naar ${klooster}.`, 'success'); } catch (_) {}
+          } catch (mailErr) {
+            try { Toast.show('Auto-mail mislukt: ' + (mailErr.message || String(mailErr)), 'error'); } catch (_) {}
+            console.warn('Auto-mail naar klooster mislukt:', mailErr);
+          }
         }
       }
 

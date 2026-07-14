@@ -75,9 +75,12 @@ Deno.serve(async (req) => {
     catch { return jsonResp({ error: 'invalid_json' }, 400); }
 
     const to      = Array.isArray(body?.to) ? body.to : (body?.to ? [body.to] : []);
+    const bccArr  = Array.isArray(body?.bcc) ? body.bcc : (body?.bcc ? [body.bcc] : []);
     const subject = String(body?.subject || '').trim();
     const html    = String(body?.html || '').trim();
-    const replyTo = String(body?.replyTo || userEmail || '').trim();
+    // Reply-to defaultt naar EMAIL_FROM (het OZN-adres) i.p.v. het persoonlijke
+    // login-adres van de medewerker — anders belanden replies in privé-inbox.
+    const replyTo = String(body?.replyTo || EMAIL_FROM || '').trim();
     // Bijlagen: array van { name, contentBase64 } — worden 1-op-1 als
     // attachment in Brevo doorgegeven zodat ze in de mailbox als
     // paperclip-attachment verschijnen.
@@ -100,6 +103,11 @@ Deno.serve(async (req) => {
     for (const adr of to) {
       if (typeof adr !== 'string' || !emailRe.test(adr)) {
         return jsonResp({ error: 'invalid_recipient', adr }, 400);
+      }
+    }
+    for (const adr of bccArr) {
+      if (typeof adr !== 'string' || !emailRe.test(adr)) {
+        return jsonResp({ error: 'invalid_bcc', adr }, 400);
       }
     }
 
@@ -126,6 +134,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         sender:  { name: EMAIL_FROM_NAME, email: EMAIL_FROM },
         to:      to.map((email: string) => ({ email })),
+        bcc:     bccArr.length ? bccArr.map((email: string) => ({ email })) : undefined,
         subject,
         htmlContent: html,
         textContent: htmlToPlain(html),
