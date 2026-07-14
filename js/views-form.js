@@ -334,8 +334,8 @@ function renderDossierForm(params) {
         <fieldset class="card" data-step="1">
           <legend>${dLabelSpan("sect_overledene", "Gegevens overledene")}</legend>
           <div class="grid-3">
-            <label><span>Achternaam</span><input type="text" name="achternaam" value="${v('achternaam')}"></label>
-            <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}"></label>
+            <label><span>Achternaam</span><input type="text" name="achternaam" value="${v('achternaam')}" autocomplete="off"></label>
+            <label><span>Voornaam</span><input type="text" name="voornaam" value="${v('voornaam')}" autocomplete="off"></label>
             <label><span>Geslacht</span>
               <select name="geslacht">
                 <option value="">—</option>
@@ -1884,6 +1884,31 @@ function renderDossierForm(params) {
       }
     });
     if (!data.status) data.status = 'nieuw';
+
+    // Sanity-check: naam-velden die verdacht dubbel lijken (bv. 'Van DuistVan Duist'
+    // door een browser-autofill-glitch of dubbele paste). Signaleer 't voordat
+    // het in de DB belandt zodat de gebruiker 't kan corrigeren.
+    const isDubbelPatroon = (v) => {
+      const s = String(v || '').trim();
+      if (s.length < 6) return false;
+      const half = s.length / 2;
+      if (Number.isInteger(half) && s.slice(0, half) === s.slice(half)) return true;
+      // Verdachte gevallen zonder spatie: 'AaAa', of woord dat 2x direct achter zichzelf staat
+      return /^(.{3,})\1$/.test(s.replace(/\s+/g, ''));
+    };
+    const verdacht = [];
+    if (isDubbelPatroon(data.voornaam))   verdacht.push('voornaam');
+    if (isDubbelPatroon(data.achternaam)) verdacht.push('achternaam');
+    if (verdacht.length) {
+      const doorgaan = await Modal.confirm({
+        type: 'warning',
+        title: 'Naam staat dubbel',
+        message: `De ${verdacht.join(' en ')} lijkt dubbel te staan (${verdacht.map(f => `"${data[f]}"`).join(', ')}). Toch opslaan?`,
+        confirmText: 'Toch opslaan',
+        cancelText: 'Corrigeer eerst',
+      });
+      if (!doorgaan) return;
+    }
 
     // Extra personeel: aangevinkte accountnamen → JSONB-array
     data.extra_personeel = [...document.querySelectorAll('#dossier-form .extra-personeel-cb')]
