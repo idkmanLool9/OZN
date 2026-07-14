@@ -78,7 +78,6 @@ function renderDossierDetail(params) {
           ${dlRow('Dossiernummer', d.dossier_nummer)}
           ${dlRow('Opdrachtgever', d.opdrachtgever_naam)}
           ${(Array.isArray(d.extra_personeel) && d.extra_personeel.length) ? dlRow('Extra personeel', d.extra_personeel.join(', ')) : ''}
-          ${dlRow('Naam', fullName(d))}
           ${dlRow('Geslacht', d.geslacht)}
           ${dlRow('Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' '))}
           ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' '))}
