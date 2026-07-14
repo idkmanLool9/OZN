@@ -18,11 +18,23 @@ const SnelStart = {
   },
 
   async _call(payload) {
+    // Stuur de user-JWT (sessie) mee, niet de anon-key. De Edge Function
+    // verifieert dat het een ingelogde beheerder is — anders was 't een
+    // open proxy voor iedereen op internet.
+    let jwt = null;
+    try {
+      if (typeof sb !== 'undefined' && sb.auth) {
+        const { data } = await sb.auth.getSession();
+        jwt = data?.session?.access_token || null;
+      }
+    } catch (_) {}
+    if (!jwt) return { error: 'not_authenticated', msg: 'Niet ingelogd — kan SnelStart niet aanroepen.' };
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/snelstart`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${jwt}`,
+        'apikey': SUPABASE_ANON_KEY,
       },
       body: JSON.stringify(payload),
     });

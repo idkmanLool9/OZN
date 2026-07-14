@@ -11,14 +11,24 @@ const VAPID_PUBLIC = Deno.env.get('VAPID_PUBLIC_KEY') || '';
 const VAPID_PRIVATE = Deno.env.get('VAPID_PRIVATE_KEY') || '';
 const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:info@morephrem.com';
 
+const CRON_SECRET = Deno.env.get('CRON_SECRET') || '';
+
 Deno.serve(async (req) => {
   try {
+    // ── 0. AUTH: alleen aanroepbaar door pg_cron / interne triggers met
+    //     x-cron-secret header. Anders open info-leak (namen overledenen).
+    if (CRON_SECRET) {
+      const supplied = req.headers.get('x-cron-secret') || '';
+      if (supplied !== CRON_SECRET) return jsonResp({ error: 'unauthorized' }, 401);
+    }
+
     // ── 1. ENV CHECK ──────────────────────────────────────────────
     const missing: string[] = [];
     if (!SUPABASE_URL) missing.push('SUPABASE_URL');
     if (!SUPABASE_SERVICE_ROLE) missing.push('SUPABASE_SERVICE_ROLE_KEY');
     if (!VAPID_PUBLIC) missing.push('VAPID_PUBLIC_KEY');
     if (!VAPID_PRIVATE) missing.push('VAPID_PRIVATE_KEY');
+    if (!CRON_SECRET)   missing.push('CRON_SECRET');
     if (missing.length) {
       return jsonResp({
         error: 'missing_secrets',

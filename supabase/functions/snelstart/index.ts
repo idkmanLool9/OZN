@@ -22,9 +22,42 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Supabase-client alleen voor JWT-verificatie (leest de Auth-headers).
+// URL + SERVICE_ROLE zijn nodig om de user achter een JWT te resolven.
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+async function requireBeheerder(req: Request): Promise<{ userId: string } | Response> {
+  const authHeader = req.headers.get('authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return json({ error: 'no_auth' }, 401);
+  }
+  const jwt = authHeader.slice(7);
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+    return json({ error: 'missing_supabase_env' }, 500);
+  }
+  try {
+    const { createClient } = await import('jsr:@supabase/supabase-js@2');
+    const svc = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+    const { data: userData, error: userErr } = await svc.auth.getUser(jwt);
+    if (userErr || !userData?.user) return json({ error: 'invalid_auth' }, 401);
+    // Alleen beheerders mogen de SnelStart-proxy aanroepen.
+    const { data: prof } = await svc.from('profiles').select('rol').eq('id', userData.user.id).maybeSingle();
+    if (!prof || prof.rol !== 'beheerder') return json({ error: 'forbidden', msg: 'Alleen beheerders mogen de SnelStart-koppeling gebruiken.' }, 403);
+    return { userId: userData.user.id };
+  } catch (e: any) {
+    return json({ error: 'auth_check_failed', detail: e?.message || String(e) }, 500);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
+    // Auth-check VOOR we ook maar iets naar SnelStart doen — anders is deze
+    // functie een open proxy voor iedereen op internet.
+    const auth = await requireBeheerder(req);
+    if (auth instanceof Response) return auth;
+
     const { action, subscriptionKey, clientKey, method, path, body } = await req.json();
 
     if (!subscriptionKey || !clientKey) {
