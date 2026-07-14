@@ -299,6 +299,10 @@ const DB = {
       try { Toast.show('Offline — wijziging niet opgeslagen. Concept blijft in de wizard bewaard.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
+    if (_offlineAuth) {
+      try { Toast.show('Leesmodus — log opnieuw in om te kunnen opslaan.', 'error'); } catch (_) {}
+      throw new Error('offline_auth');
+    }
     const u = Auth.current();
     const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
       ? ActiveProfile.current().name : null;
@@ -327,6 +331,10 @@ const DB = {
       try { Toast.show('Offline — wijziging niet opgeslagen. Concept blijft in de wizard bewaard.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
+    if (_offlineAuth) {
+      try { Toast.show('Leesmodus — log opnieuw in om te kunnen opslaan.', 'error'); } catch (_) {}
+      throw new Error('offline_auth');
+    }
     const p = Object.assign({}, patch);
     const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
       ? ActiveProfile.current().name : null;
@@ -348,6 +356,10 @@ const DB = {
     if (!navigator.onLine) {
       try { Toast.show('Offline — verwijderen kan niet zolang je geen internet hebt.', 'error'); } catch (_) {}
       throw new Error('offline');
+    }
+    if (_offlineAuth) {
+      try { Toast.show('Leesmodus — log opnieuw in om te kunnen verwijderen.', 'error'); } catch (_) {}
+      throw new Error('offline_auth');
     }
     const oud = (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id));
     const { error } = await sb.from(tbl).delete().eq('id', id);

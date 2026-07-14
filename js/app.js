@@ -12,9 +12,9 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 272;
-const APP_VERSION    = '5.94.0';
-const APP_BUILD_DATE = '2026-07-13';
+const APP_BUILD      = 273;
+const APP_VERSION    = '5.94.1';
+const APP_BUILD_DATE = '2026-07-14';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -998,9 +998,17 @@ const ApkUpdater = {
 
 function updateOfflineUI() {
   const offline = !navigator.onLine || !!Cloud.offline;
+  const leesmodus = typeof Auth !== 'undefined' && Auth.isOfflineAuth && Auth.isOfflineAuth();
   const badge = document.getElementById('offline-badge');
-  if (badge) badge.hidden = !offline;
+  if (badge) {
+    badge.hidden = !(offline || leesmodus);
+    badge.textContent = leesmodus ? 'leesmodus' : 'offline';
+    badge.title = leesmodus
+      ? 'Offline-sessie — schrijf-acties worden geblokkeerd tot je weer online bent'
+      : 'Geen internet — leesmodus';
+  }
   document.body.classList.toggle('is-offline', offline);
+  document.body.classList.toggle('is-leesmodus', leesmodus);
 }
 window.addEventListener('online', () => {
   updateOfflineUI();

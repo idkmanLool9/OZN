@@ -570,9 +570,22 @@ const Postcode = {
       pickResult(results[parseInt(item.dataset.idx, 10)]);
     });
 
-    // Sluit dropdown bij klik buiten
+    // Sluit-bij-klik-buiten: één globale listener voor de héle app i.p.v.
+    // per veld (leakte anders bij elke form-render een extra listener op
+    // document — na 20 dossiers open/dicht 100+ handlers actief).
+    Postcode._installGlobalOutsideClick();
+  },
+
+  _outsideInstalled: false,
+  _installGlobalOutsideClick() {
+    if (Postcode._outsideInstalled) return;
+    Postcode._outsideInstalled = true;
     document.addEventListener('click', e => {
-      if (!wrap.contains(e.target)) ddown.hidden = true;
+      document.querySelectorAll('.addr-autocomplete').forEach(wrap => {
+        if (wrap.contains(e.target)) return;
+        const list = wrap.querySelector('.addr-autocomplete-list');
+        if (list) list.hidden = true;
+      });
     });
   },
 };

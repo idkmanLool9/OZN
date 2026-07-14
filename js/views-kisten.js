@@ -618,20 +618,26 @@ function renderKistenBestellijst(msg) {
     if (backLink) { e.preventDefault(); Router.go('/kisten'); return; }
     const mBtn = e.target.closest('button[data-mark-besteld]');
     if (mBtn) {
+      // Guard tegen dubbelklik-race: als de knop al bezig is stoppen we hier.
+      // Zonder deze guard dispatchen twee klikken twee upserts en verdubbelt
+      // de voorraad-optelling.
+      if (mBtn.dataset.busy === '1') return;
       const naam = mBtn.getAttribute('data-mark-besteld');
       const aInp = $(`input[data-bestel-aantal="${CSS.escape(naam)}"]`);
       const aantal = aInp ? parseInt(aInp.value, 10) : null;
       if (!aantal || aantal < 1) return;
+      mBtn.dataset.busy = '1';
+      mBtn.disabled = true;
       try {
         await KistVoorraad.upsert(naam, {
           laatst_besteld: new Date().toISOString().slice(0, 10),
           besteld_aantal: aantal,
-          // Direct de voorraad ophogen zodat de kist van de lijst verdwijnt;
-          // de beheerder kan bij levering nog verfijnen.
           aantal: ((KistVoorraad.byNaam(naam) || {}).aantal || 0) + aantal,
         });
         renderKistenBestellijst({ success: `${naam}: ${aantal} besteld — voorraad bijgewerkt.` });
       } catch (err) {
+        mBtn.dataset.busy = '';
+        mBtn.disabled = false;
         renderKistenBestellijst({ error: 'Opslaan mislukt: ' + (err.message || err) });
       }
     }
