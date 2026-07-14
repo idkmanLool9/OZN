@@ -17,6 +17,31 @@ const KEYS = {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 let _session = null;
 let _rol = null;   // 'beheerder' | 'medewerker' — uit public.profiles
+let _offlineAuth = false;  // draai je op een offline-fallback-sessie?
+
+const AUTH_SNAP_KEY = 'sok_auth_snapshot';
+
+function _saveAuthSnapshot() {
+  try {
+    if (!_session || !_session.user) return;
+    const u = _session.user;
+    localStorage.setItem(AUTH_SNAP_KEY, JSON.stringify({
+      userId:   u.id,
+      email:    u.email,
+      fullName: (u.user_metadata && u.user_metadata.full_name) || u.email,
+      role:     _rol || 'medewerker',
+      savedAt:  Date.now(),
+    }));
+  } catch (_) {}
+}
+
+function _restoreAuthSnapshot() {
+  try {
+    const raw = localStorage.getItem(AUTH_SNAP_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_) { return null; }
+}
 
 const Auth = {
   async init() {
@@ -25,11 +50,41 @@ const Auth = {
     sb.auth.onAuthStateChange((_evt, sess) => {
       _session = sess || null;
       _rol = null;
-      if (_session) Auth.loadRol();
+      _offlineAuth = false;
+      if (_session) {
+        Auth.loadRol().then(_saveAuthSnapshot);
+      } else if (_evt === 'SIGNED_OUT') {
+        // Alleen bij expliciete uitloggen de snapshot wissen.
+        try { localStorage.removeItem(AUTH_SNAP_KEY); } catch (_) {}
+      }
     });
-    if (_session) await Auth.loadRol();
+    if (_session) {
+      await Auth.loadRol();
+      _saveAuthSnapshot();
+    } else if (!navigator.onLine) {
+      // Offline: fallback op de opgeslagen snapshot zodat de gebruiker
+      // gewoon door de app kan bladeren (leesmodus). Als 'ie weer online
+      // is, herstelt Supabase de echte sessie en overschrijft deze.
+      const snap = _restoreAuthSnapshot();
+      if (snap && snap.userId) {
+        _session = {
+          user: {
+            id: snap.userId,
+            email: snap.email,
+            user_metadata: { full_name: snap.fullName },
+          },
+          access_token: '',
+          refresh_token: '',
+        };
+        _rol = snap.role || 'medewerker';
+        _offlineAuth = true;
+      }
+    }
     return _session;
   },
+  // Ben je nu op een offline-fallback-sessie? Views kunnen dit gebruiken om
+  // schrijf-acties te blokkeren of een 'leesmodus'-badge te tonen.
+  isOfflineAuth() { return _offlineAuth; },
   // Haal de rol van de ingelogde gebruiker op uit profiles (RLS: eigen rij).
   async loadRol() {
     try {

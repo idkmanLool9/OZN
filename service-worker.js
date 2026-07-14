@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-260';
+const CACHE_VERSION = 'sok-uitvaart-build-261';
 const SHELL = [
   './',
   './index.html',
@@ -74,14 +74,26 @@ self.addEventListener('fetch', e => {
 
   const url = new URL(req.url);
 
-  // Supabase publieke storage-objecten (logo + kistfoto's + bloemen +
-  // eten/drinken-foto's): stale-while-revalidate zodat ze offline werken
+  // Supabase storage-objecten (publiek + signed URL's): stale-while-revalidate
+  // zodat kist-foto's, artsverklaringen, overdraagformulieren, foto-overledene,
+  // logo enz. ook offline zichtbaar blijven na eerste keer laden.
   if ((url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) &&
-      url.pathname.startsWith('/storage/v1/object/public/')) {
+      (url.pathname.startsWith('/storage/v1/object/public/') ||
+       url.pathname.startsWith('/storage/v1/object/sign/') ||
+       url.pathname.startsWith('/storage/v1/object/authenticated/'))) {
     e.respondWith(staleWhileRevalidate(req));
     return;
   }
-  // Overige Supabase API (REST, auth, signed URLs, realtime): nooit cachen
+  // Supabase REST GET-calls (dossiers, kosten, notities, kist_voorraad, ...):
+  // network-first met cache-fallback zodat je bij netwerkverlies nog de
+  // laatst-gelezen versie te zien krijgt. Alle schrijf-acties (POST/PATCH/DELETE)
+  // + auth/realtime blijven ongemoeid — die filter method !== 'GET' er al uit.
+  if ((url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) &&
+      url.pathname.startsWith('/rest/v1/')) {
+    e.respondWith(networkFirst(req));
+    return;
+  }
+  // Overige Supabase API (auth, realtime, functions): nooit cachen.
   if (url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) {
     return;
   }
