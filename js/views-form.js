@@ -454,7 +454,7 @@ function renderDossierForm(params) {
             </label>
             <label class="span-2"><span>Ophaallocatie</span>
               <input type="text" name="opbaarlocatie_type" id="opbaarlocatie-input" list="locatie-suggesties" value="${v('opbaarlocatie_type')}" autocomplete="off" placeholder="bv. uitvaartcentrum, thuis, ziekenhuis…">
-              <span class="muted small" style="display:block; margin-top:.2rem; font-size:.78rem;">Aula Vale ? <span style="opacity:.7;">— typ 'aula' voor de extra velden.</span></span>
+              <span class="muted small" style="display:block; margin-top:.2rem; font-size:.78rem;">Aula Vale ? <span style="opacity:.7;">— typ 'aula vale' voor de extra velden.</span></span>
             </label>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
@@ -466,7 +466,7 @@ function renderDossierForm(params) {
                we vullen hem programmatisch op basis van "bevat 'aula'" bij het
                opslaan. In de UI is er geen aparte checkbox meer. -->
           <input type="hidden" name="aula_gebruikt" id="aula-gebruikt-hidden" value="${dossier.aula_gebruikt ? 'ja' : ''}">
-          <div class="grid-3" id="aula-extra-velden" style="margin-top:.6rem; ${/aula/i.test(dossier.opbaarlocatie_type || '') ? '' : 'display:none;'}">
+          <div class="grid-3" id="aula-extra-velden" style="margin-top:.6rem; ${/aula\s+vale/i.test(dossier.opbaarlocatie_type || '') ? '' : 'display:none;'}">
             <label><span>Centrale koeling vanaf</span>
               <input type="date" name="centrale_koeling_vanaf" value="${v('centrale_koeling_vanaf')}">
             </label>
@@ -834,7 +834,7 @@ function renderDossierForm(params) {
   const aulaHidden = document.getElementById('aula-gebruikt-hidden');
   if (opbaarInp && aulaExtra) {
     const syncAula = () => {
-      const heeftAula = /aula/i.test(opbaarInp.value || '');
+      const heeftAula = /aula\s+vale/i.test(opbaarInp.value || '');
       aulaExtra.style.display = heeftAula ? '' : 'none';
       if (aulaHidden) aulaHidden.value = heeftAula ? 'ja' : '';
       // Datum-velden legen wanneer 'aula' er weer uit gaat — anders blijven
