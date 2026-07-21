@@ -974,6 +974,8 @@ const Router = {
     }
 
     if (!Auth.current()) { showLogin(); return; }
+    // Dev-user: sla de profielkiezer over en zet 'm meteen op Dev-profiel.
+    ActiveProfile.autoActivateForDev();
     if (Settings.get('profielkiezer_actief') && !ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();
 
@@ -1354,6 +1356,17 @@ function showApp() {
 }
 
 // ─── Actief profiel — beheerd in Settings.profielen, onthouden in localStorage ───
+// Speciaal Dev-profiel voor het maker-account (dev@ozn.nl). Zit niet in
+// de gedeelde Settings.profielen-lijst; wordt hardcoded terugegeven door
+// byId('dev') zodat het onzichtbaar blijft voor het team.
+const DEV_PROFILE_EMAIL = 'dev@ozn.nl';
+const DEV_PROFILE_ID = 'dev';
+const DEV_PROFILE = {
+  id: DEV_PROFILE_ID,
+  name: 'Dev',
+  color: '#111111',
+  rol: 'beheerder',
+};
 const ActiveProfile = {
   STORAGE_KEY: 'sok_active_profile',
   list() {
@@ -1362,6 +1375,7 @@ const ActiveProfile = {
     return arr.filter(p => p && p.id && p.name);
   },
   byId(id) {
+    if (id === DEV_PROFILE_ID) return DEV_PROFILE;
     return ActiveProfile.list().find(p => p.id === id) || null;
   },
   current() {
@@ -1369,6 +1383,18 @@ const ActiveProfile = {
       const id = localStorage.getItem(ActiveProfile.STORAGE_KEY);
       return id ? ActiveProfile.byId(id) : null;
     } catch (_) { return null; }
+  },
+  // Auto-activatie: log de dev-user (dev@ozn.nl) direct in op het Dev-profiel
+  // zodat de picker niet verschijnt. Andere accounts blijven ongemoeid.
+  autoActivateForDev() {
+    try {
+      if (typeof Auth === 'undefined') return false;
+      const u = Auth.current();
+      if (!u || (u.email || '').toLowerCase() !== DEV_PROFILE_EMAIL) return false;
+      if (localStorage.getItem(ActiveProfile.STORAGE_KEY) === DEV_PROFILE_ID) return true;
+      localStorage.setItem(ActiveProfile.STORAGE_KEY, DEV_PROFILE_ID);
+      return true;
+    } catch (_) { return false; }
   },
   set(id) {
     const p = ActiveProfile.byId(id);
@@ -1384,7 +1410,8 @@ const ActiveProfile = {
     if (!chip) return;
     const uit = (typeof Settings !== 'undefined') && !Settings.get('profielkiezer_actief');
     const p = ActiveProfile.current();
-    if (uit || !p) { chip.hidden = true; return; }
+    // Dev-profiel: geen chip in de topbar (blijft laag-profiel).
+    if (uit || !p || p.id === DEV_PROFILE_ID) { chip.hidden = true; return; }
     chip.hidden = false;
     $('#active-profile-name').textContent = p.name;
     $('#active-profile-dot').style.background = p.color || '#6b1e2a';
