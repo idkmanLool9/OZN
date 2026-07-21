@@ -641,25 +641,24 @@ const R2Migratie = {
     return werk;
   },
 
-  // Eén bestand migreren:
-  //  1) download van Supabase Storage via signed URL
-  //  2) upload naar R2 (met dezelfde prefix zodat de key logisch blijft)
-  //  3) update de dossier-rij zodat het pad naar r2:-versie wijst
-  //  4) verwijder het originele bestand van Supabase Storage
+  // Eén bestand migreren via de r2-migrate-one Edge Function:
+  //  1) Edge Function downloadt uit Supabase Storage (service-role) en zet
+  //     het bestand op R2 met dezelfde key. Voorkomt browser-CORS + SW-issues.
+  //  2) Client werkt de dossier-rij bij (pad → 'r2:<key>')
+  //  3) Client verwijdert het origineel uit Supabase Storage
   async migreer1(item) {
     const { dossierId, veld, pad, extraIdx } = item;
-    // 1) download
-    const { data: sign, error: sErr } = await sb.storage.from('documenten').createSignedUrl(pad, 600);
-    if (sErr || !sign) throw new Error(`kon geen download-URL krijgen voor ${pad}: ${sErr && sErr.message}`);
-    const resp = await fetch(sign.signedUrl);
-    if (!resp.ok) throw new Error(`download faalde (${resp.status}) voor ${pad}`);
-    const blob = await resp.blob();
-    // 2) upload naar R2 — key = originele pad (behoudt structuur artsverklaring/... etc)
-    const filename = pad.split('/').pop() || 'bestand';
-    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
-    const prefix = pad.includes('/') ? (pad.split('/')[0] + '/') : 'artsverklaring/';
-    const nieuwPad = await R2.upload(file, prefix);
-    // 3) DB bijwerken
+    // 1) migreer via Edge Function
+    const { data, error } = await sb.functions.invoke('r2-migrate-one', {
+      body: { key: pad },
+    });
+    if (error) throw new Error('edge-function faalde: ' + (error.message || String(error)));
+    if (!data || !data.ok) {
+      const det = data && (data.detail || data.error) || 'onbekend';
+      throw new Error(det);
+    }
+    const nieuwPad = R2.tag(data.newKey);
+    // 2) DB bijwerken
     if (veld === '__extra__') {
       const d = DB.byId(KEYS.DOSSIERS, dossierId);
       if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
@@ -669,9 +668,9 @@ const R2Migratie = {
     } else {
       await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
     }
-    // 4) origineel weghalen (best-effort; als 't faalt hebben we alleen dubbele opslag)
+    // 3) origineel weghalen uit Supabase Storage (best-effort)
     await sb.storage.from('documenten').remove([pad]).catch(() => {});
-    return { pad, nieuwPad, bytes: blob.size };
+    return { pad, nieuwPad, bytes: data.bytes || 0 };
   },
 
   // Batch-migratie. onProgress({ done, totaal, huidig, resultaat, error }).
