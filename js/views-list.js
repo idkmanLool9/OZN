@@ -888,6 +888,15 @@ EMAIL_FROM_NAME = OZN</pre>
       </section>` : ''}
 
       ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="cloud-storage">
+        <h2>Cloudflare R2 (dossier-opslag)</h2>
+        <p class="muted small">10 GB opslag voor dossier-PDF's, foto's en scans op Cloudflare R2 (EU-jurisdictie). Klik op Testen om te controleren of de credentials correct in Supabase staan.</p>
+        <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+          <span id="r2-test-status" class="muted small">Nog niet getest.</span>
+          <button type="button" class="btn" id="btn-r2-test">🔌 Test R2-verbinding</button>
+        </div>
+      </section>
+
       <section class="card narrow" id="archief">
         <h2>Archief</h2>
         <p class="muted small">Dossiers kunnen handmatig gearchiveerd worden vanuit het detailscherm. Wil je dat afgehandelde dossiers (rouwauto geweest + alle datums voorbij) automatisch naar het archief gaan? Zet 't hieronder aan. Medewerkers zien het archief niet — tenzij je dat toestaat (server-side afgedwongen).</p>
@@ -1829,6 +1838,62 @@ EMAIL_FROM_NAME = OZN</pre>
         medewerker_ziet_archief: e.target.medewerker_ziet_archief.checked,
       });
       renderAccount({ success: 'Archief-instellingen opgeslagen.' });
+    });
+  }
+
+  // R2 smoke-test — controleert of de Cloudflare R2 credentials werken
+  const r2Btn = $('#btn-r2-test');
+  const r2Status = $('#r2-test-status');
+  if (r2Btn) {
+    r2Btn.addEventListener('click', async () => {
+      r2Btn.disabled = true;
+      r2Status.textContent = 'Bezig…';
+      r2Status.style.color = '';
+      try {
+        const { data, error } = await sb.functions.invoke('r2-smoke-test');
+        r2Btn.disabled = false;
+        if (error) {
+          r2Status.textContent = 'Fout';
+          r2Status.style.color = '#b32020';
+          Modal.show({
+            type: 'error',
+            title: 'R2-test mislukt',
+            message: (error.message || String(error)) +
+              '\n\nZorg dat R2_ACCOUNT_ID, R2_ACCESS_KEY_ID en R2_SECRET_ACCESS_KEY in Supabase Edge Function Secrets staan.',
+          });
+          return;
+        }
+        if (data && data.ok) {
+          r2Status.textContent = '✓ Verbinding OK — ' + (data.bucket || '');
+          r2Status.style.color = '#2ea862';
+          const stepsTxt = (data.steps || []).map(s =>
+            `• ${s.step}${s.status ? ' (' + s.status + ')' : ''} → ${s.ok === false ? '❌' : s.match === false ? '❌ content-mismatch' : '✓'}`
+          ).join('\n');
+          Modal.show({
+            type: 'success',
+            title: 'R2-verbinding OK',
+            message: `Endpoint: ${data.endpoint}\nBucket: ${data.bucket}\nContent-match: ${data.contentMatched ? 'ja' : 'nee'}\n\nStappen:\n${stepsTxt}`,
+          });
+        } else {
+          r2Status.textContent = 'Fout: ' + ((data && data.step) || '?');
+          r2Status.style.color = '#b32020';
+          const stepsTxt = (data && data.steps || []).map(s =>
+            `• ${s.step}${s.status ? ' (' + s.status + ')' : ''}${s.error ? ' — ' + s.error : ''}`
+          ).join('\n');
+          const missing = (data && data.missing) ? '\n\nOntbrekende secrets: ' + data.missing.join(', ') : '';
+          const err = (data && data.error) ? '\n\nDetail: ' + String(data.error).slice(0, 400) : '';
+          Modal.show({
+            type: 'error',
+            title: 'R2-test mislukt in stap: ' + ((data && data.step) || 'onbekend'),
+            message: `Endpoint: ${data && data.endpoint || 'n.v.t.'}\nBucket: ${data && data.bucket || 'n.v.t.'}${missing}${err}\n\nStappen:\n${stepsTxt || '(geen)'}`,
+          });
+        }
+      } catch (e) {
+        r2Btn.disabled = false;
+        r2Status.textContent = 'Fout';
+        r2Status.style.color = '#b32020';
+        Modal.show({ type: 'error', title: 'R2-test crashte', message: e.message || String(e) });
+      }
     });
   }
 
