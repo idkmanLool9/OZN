@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 279;
-const APP_VERSION    = '5.95.5';
+const APP_BUILD      = 280;
+const APP_VERSION    = '5.96.0';
 const APP_BUILD_DATE = '2026-07-21';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1216,8 +1216,23 @@ Router.add('/logboek', () => renderLogboek());
     const id = btn.getAttribute('data-profile');
     const prof = ActiveProfile.byId(id);
     if (prof && prof.rol === 'beheerder' && prof.pincode) {
-      const ok = await PincodePrompt.open(prof);
-      if (!ok) return;
+      const res = await PincodePrompt.open(prof);
+      if (!res) return;
+      // Startpincode '0000' (of allemaal nullen) → gebruiker dwingen een
+      // eigen pincode te kiezen vóór het profiel actief mag worden.
+      if (res === 'setup') {
+        const nieuw = await PincodePrompt.setup(prof);
+        if (!nieuw) return;
+        try {
+          const lijst = (Settings.get('profielen') || []).map(p =>
+            p.id === prof.id ? Object.assign({}, p, { pincode: nieuw }) : p);
+          Settings.set({ profielen: lijst });
+          Toast.show('Nieuwe pincode ingesteld — voortaan hiermee inloggen.', 'success');
+        } catch (err) {
+          Toast.show('Pincode-opslag mislukt: ' + (err.message || err), 'error');
+          return;
+        }
+      }
     }
     ActiveProfile.set(id);
     Router.handle();

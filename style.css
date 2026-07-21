@@ -194,6 +194,13 @@ fieldset.card legend {
   .grid-3 { grid-template-columns: 1fr; }
   .topbar-inner { flex-wrap: wrap; }
   .topnav { order: 3; width: 100%; overflow-x: auto; }
+  /* Op 1-koloms grid moeten span-2/span-3 óók weer 1 kolom pakken;
+     anders schuiven labels/inputs bovenop elkaar (glitch op telefoon). */
+  .grid-3 .span-2, .grid-3 .span-3 { grid-column: span 1; }
+}
+@media (max-width: 800px) {
+  /* Op 2-koloms grid moet span-3 terug naar 2 kolommen. */
+  .grid-3 .span-3 { grid-column: span 2; }
 }
 .span-2 { grid-column: span 2; }
 .span-3 { grid-column: span 3; }

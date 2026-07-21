@@ -1394,6 +1394,10 @@ const ActiveProfile = {
 // ─── PincodePrompt: eigen UI voor beheerder-pincode ───────────────────────
 // Vervangt window.prompt() — toont het profiel groot in beeld, een numeriek
 // toetsenbord en dot-indicators voor de ingetikte cijfers.
+//
+// Resultaten:
+//   open() → true (correcte pincode) / false (annuleer) / 'setup' (default 0000)
+//   setup() → nieuw-pincode-string (opgeslagen) / null (annuleer)
 const PincodePrompt = {
   open(profile) {
     return new Promise(resolve => {
@@ -1441,7 +1445,10 @@ const PincodePrompt = {
       const check = () => {
         if (entered === String(profile.pincode)) {
           card.classList.add('pincode-success');
-          setTimeout(() => close(true), 180);
+          // Default-pincode "0000" (of alleen nullen) betekent: nog nooit
+          // ingesteld → gebruiker eerst dwingen een eigen pincode te kiezen.
+          const isDefault = /^0+$/.test(entered);
+          setTimeout(() => close(isDefault ? 'setup' : true), 180);
         } else {
           err.hidden = false;
           card.classList.add('pincode-shake');
@@ -1472,6 +1479,115 @@ const PincodePrompt = {
 
       const onKey = e => {
         if (e.key === 'Escape')    return close(false);
+        if (e.key === 'Backspace') { entered = entered.slice(0, -1); return refresh(); }
+        if (/^[0-9]$/.test(e.key)) feed(e.key);
+      };
+      document.addEventListener('keydown', onKey);
+    });
+  },
+
+  // Nieuwe pincode instellen — 2 stappen: nieuw + herhaling. targetLen=4.
+  // Returnt de gekozen pincode (string) of null bij annuleren.
+  setup(profile) {
+    const targetLen = 4;
+    return new Promise(resolve => {
+      const letter = (profile.name || '?').trim().charAt(0).toUpperCase() || '?';
+      const c = profile.color || '#6b1e2a';
+      const overlay = document.createElement('div');
+      overlay.className = 'pincode-overlay';
+      overlay.innerHTML = `
+        <div class="pincode-backdrop"></div>
+        <div class="pincode-card" role="dialog" aria-modal="true" aria-labelledby="pincode-setup-title">
+          <div class="pincode-avatar-wrap">
+            <span class="profile-avatar-ring" style="--ring-color:${esc(c)};"></span>
+            <span class="profile-avatar" style="background:${esc(c)};">${esc(letter)}</span>
+          </div>
+          <div class="pincode-title" id="pincode-setup-title">${esc(profile.name)}</div>
+          <div class="pincode-sub pincode-setup-sub">Kies een nieuwe pincode van 4 cijfers</div>
+          <div class="pincode-dots" aria-hidden="true">
+            ${Array.from({ length: targetLen }, () => '<span class="pincode-dot"></span>').join('')}
+          </div>
+          <div class="pincode-error" hidden></div>
+          <div class="pincode-keys">
+            ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pincode-key" data-digit="${n}">${n}</button>`).join('')}
+            <button type="button" class="pincode-key pincode-key-cancel" data-action="cancel">Annuleer</button>
+            <button type="button" class="pincode-key" data-digit="0">0</button>
+            <button type="button" class="pincode-key pincode-key-back" data-action="back" aria-label="Wis laatste cijfer">⌫</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      let stage = 1;              // 1 = kies, 2 = herhaal
+      let firstPin = '';
+      let entered  = '';
+      const dots  = [...overlay.querySelectorAll('.pincode-dot')];
+      const err   = overlay.querySelector('.pincode-error');
+      const card  = overlay.querySelector('.pincode-card');
+      const sub   = overlay.querySelector('.pincode-setup-sub');
+
+      const refresh = () => {
+        dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
+        err.hidden = true;
+      };
+      const close = (result) => {
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        resolve(result);
+      };
+      const advance = () => {
+        if (stage === 1) {
+          // Blokkeer triviale pincodes: alleen nullen (0000) of 1234 e.d.
+          if (/^0+$/.test(entered)) {
+            err.hidden = false;
+            err.textContent = 'Pincode 0000 is niet toegestaan';
+            card.classList.add('pincode-shake');
+            setTimeout(() => {
+              card.classList.remove('pincode-shake');
+              entered = ''; refresh();
+            }, 500);
+            return;
+          }
+          firstPin = entered;
+          entered = '';
+          stage = 2;
+          sub.textContent = 'Vul dezelfde pincode nog een keer in';
+          refresh();
+        } else {
+          if (entered === firstPin) {
+            card.classList.add('pincode-success');
+            setTimeout(() => close(firstPin), 200);
+          } else {
+            err.hidden = false;
+            err.textContent = 'Pincodes komen niet overeen — begin opnieuw';
+            card.classList.add('pincode-shake');
+            try { navigator.vibrate && navigator.vibrate(80); } catch (_) {}
+            setTimeout(() => {
+              card.classList.remove('pincode-shake');
+              stage = 1; firstPin = ''; entered = '';
+              sub.textContent = 'Kies een nieuwe pincode van 4 cijfers';
+              refresh();
+            }, 700);
+          }
+        }
+      };
+      const feed = (digit) => {
+        if (entered.length >= targetLen) return;
+        entered += digit;
+        refresh();
+        if (entered.length === targetLen) setTimeout(advance, 140);
+      };
+
+      overlay.addEventListener('click', e => {
+        if (e.target.classList.contains('pincode-backdrop')) return close(null);
+        const btn = e.target.closest('.pincode-key');
+        if (!btn) return;
+        const a = btn.dataset.action;
+        if (a === 'cancel') return close(null);
+        if (a === 'back')   { entered = entered.slice(0, -1); return refresh(); }
+        if (btn.dataset.digit) feed(btn.dataset.digit);
+      });
+      const onKey = e => {
+        if (e.key === 'Escape')    return close(null);
         if (e.key === 'Backspace') { entered = entered.slice(0, -1); return refresh(); }
         if (/^[0-9]$/.test(e.key)) feed(e.key);
       };
