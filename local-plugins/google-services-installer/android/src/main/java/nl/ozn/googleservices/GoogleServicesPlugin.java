@@ -61,11 +61,15 @@ public class GoogleServicesPlugin extends Plugin {
         ModuleInstallClient client = ModuleInstall.getClient(getContext());
 
         // Progress-updates naar de JS-kant sturen zodat de UI 'bezig' kan tonen.
+        // Nieuwere Play Services API zet download-progress op de geneste
+        // ProgressInfo (kan null zijn bij bv. status-only updates).
         InstallStatusListener listener = update -> {
             JSObject ev = new JSObject();
             ev.put("state", update.getInstallState());
-            ev.put("bytesDownloaded", update.getBytesDownloaded());
-            ev.put("totalBytesToDownload", update.getTotalBytesToDownload());
+            com.google.android.gms.common.moduleinstall.ModuleInstallStatusUpdate.ProgressInfo pi
+                = update.getProgressInfo();
+            ev.put("bytesDownloaded",     pi != null ? pi.getBytesDownloaded()     : 0L);
+            ev.put("totalBytesToDownload", pi != null ? pi.getTotalBytesToDownload() : 0L);
             ev.put("errorCode", update.getErrorCode());
             notifyListeners("moduleProgress", ev);
         };
@@ -80,7 +84,9 @@ public class GoogleServicesPlugin extends Plugin {
             .addOnSuccessListener((ModuleInstallResponse resp) -> {
                 JSObject o = new JSObject();
                 o.put("alreadyInstalled", resp.areModulesAlreadyInstalled());
-                o.put("sessionId", resp.getSessionId() == null ? 0 : resp.getSessionId());
+                // getSessionId() is een primitieve int in nieuwere Play
+                // Services SDKs — geen null-check nodig (en niet mogelijk).
+                o.put("sessionId", resp.getSessionId());
                 JSArray reqs = new JSArray();
                 for (com.google.android.gms.common.api.OptionalModuleApi a : apis) {
                     reqs.put(a.getClass().getName());
