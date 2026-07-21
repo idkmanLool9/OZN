@@ -804,20 +804,34 @@ EMAIL_FROM_NAME = OZN</pre>
           const lijst = (Settings.get('profielen') || []);
           return `
           <form id="profielen-form" class="form" autocomplete="off">
-            <p class="muted small" style="margin:0 0 .5rem;">Beheerder-profielen kunnen een 4- of 6-cijferige pincode krijgen. De pincode wordt gevraagd zodra iemand op het profiel tikt bij "Wie werkt vandaag?".</p>
+            <p class="muted small" style="margin:0 0 .5rem;">Beheerder-profielen kunnen een 4- of 6-cijferige pincode krijgen. De pincode wordt gevraagd zodra iemand op het profiel tikt bij "Wie werkt vandaag?". Elke beheerder kan alleen z'n eigen pincode wijzigen — de andere pincodes staan op slot.</p>
             <div id="profielen-rows" class="profielen-rows">
-              ${lijst.map((p, i) => `
-                <div class="profielen-row" data-idx="${i}">
+              ${(() => {
+                const actiefId = (ActiveProfile.current() || {}).id;
+                return lijst.map((p, i) => {
+                  const isEigen = actiefId && p.id === actiefId;
+                  const heeftPin = !!(p.pincode);
+                  // Zichtbare waarde: alleen bij eigen profiel de echte pincode
+                  // tonen; bij andermans profielen tonen we asterisken (of leeg)
+                  // en staat het veld op read-only zodat je hem niet kunt wissen.
+                  const shownPin = isEigen ? (p.pincode || '') : (heeftPin ? '••••' : '');
+                  const pinAttrs = isEigen
+                    ? ''
+                    : 'readonly tabindex="-1" title="Alleen de eigenaar van dit profiel kan de pincode wijzigen"';
+                  return `
+                <div class="profielen-row" data-idx="${i}" data-profiel-id="${esc(p.id)}">
                   <span class="profielen-avatar" style="background:${esc(p.color || '#6b1e2a')};">${esc((p.name || '?').charAt(0).toUpperCase())}</span>
                   <input type="text" class="profielen-naam" value="${esc(p.name || '')}" placeholder="Naam" maxlength="40">
                   <select class="profielen-rol" title="Rol van dit profiel">
                     <option value="medewerker" ${p.rol !== 'beheerder' ? 'selected' : ''}>Medewerker</option>
                     <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
                   </select>
-                  <input type="text" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" value="${esc(p.pincode || '')}" placeholder="pincode" title="4–6 cijfers (alleen beheerder)" style="width:6rem;${p.rol === 'beheerder' ? '' : 'visibility:hidden;'}">
+                  <input type="text" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" value="${esc(shownPin)}" placeholder="pincode" ${pinAttrs} style="width:6rem;${p.rol === 'beheerder' ? '' : 'visibility:hidden;'}${isEigen ? '' : 'background:#f0ede4;color:var(--muted);cursor:not-allowed;'}">
                   <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
                   <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
-                </div>`).join('')}
+                </div>`;
+                }).join('');
+              })()}
             </div>
             <div class="form-actions" style="justify-content:space-between;">
               <button type="button" class="btn btn-ghost" id="btn-add-profiel">+ Profiel toevoegen</button>
@@ -1707,6 +1721,14 @@ EMAIL_FROM_NAME = OZN</pre>
       huidigLijst.forEach(p => {
         if (p && p.id && p.name) idByNaam.set(p.name.trim().toLowerCase(), p.id);
       });
+      const actiefId = (ActiveProfile.current() || {}).id;
+      // Bestaande pincodes indexeren op profiel-id (niet op naam!), zodat we
+      // andermans pincodes NOOIT verliezen bij het opslaan — ook niet als de
+      // beheerder z'n eigen naam of een van de anderen aanpast.
+      const pincodeById = new Map();
+      huidigLijst.forEach(p => {
+        if (p && p.id && p.pincode) pincodeById.set(p.id, p.pincode);
+      });
       rows.forEach(r => {
         const naam = r.querySelector('.profielen-naam').value.trim();
         if (!naam) return;
@@ -1714,7 +1736,20 @@ EMAIL_FROM_NAME = OZN</pre>
         const rolSel = r.querySelector('.profielen-rol');
         const rol = rolSel && rolSel.value === 'beheerder' ? 'beheerder' : 'medewerker';
         const pinInp = r.querySelector('.profielen-pincode');
-        const pincode = (rol === 'beheerder' && pinInp) ? pinInp.value.replace(/\D/g, '').slice(0, 6) : '';
+        // Wie een read-only pincode-veld ziet (andermans profiel) mag de
+        // waarde niet overschrijven — we pakken de opgeslagen pincode terug.
+        // Alleen de eigenaar van het actieve profiel mag z'n eigen pincode
+        // wijzigen of wissen. Medewerker-profielen krijgen geen pincode.
+        const rowProfielId = r.dataset.profielId || null;
+        const isEigen = actiefId && rowProfielId === actiefId;
+        let pincode = '';
+        if (rol === 'beheerder') {
+          if (isEigen && pinInp) {
+            pincode = pinInp.value.replace(/\D/g, '').slice(0, 6);
+          } else if (rowProfielId) {
+            pincode = pincodeById.get(rowProfielId) || '';
+          }
+        }
         let id = idByNaam.get(naam.toLowerCase());
         if (!id || gebruikteIds.has(id)) {
           const base = slugify(naam);
