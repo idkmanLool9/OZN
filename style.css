@@ -588,6 +588,107 @@ html:has(#splash:not([hidden])) {
 
 .profile-empty { text-align: center; padding: 2rem 1rem; }
 
+/* ─── Pincode-prompt (custom UI voor beheerder-profielen) ─── */
+.pincode-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+}
+.pincode-backdrop {
+  position: absolute; inset: 0;
+  background-color: #0b132b;
+  background-image:
+    radial-gradient(at 20% 30%, rgba(107, 30, 42, .35) 0%, transparent 45%),
+    radial-gradient(at 80% 70%, rgba(42, 93, 107, .30) 0%, transparent 50%),
+    linear-gradient(135deg, #1c2541, #0b132b);
+  animation: pincode-fade .18s ease-out;
+}
+@keyframes pincode-fade { from { opacity: 0; } to { opacity: 1; } }
+.pincode-card {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 380px;
+  padding: 2rem 1.75rem 1.5rem;
+  background: var(--surface, #fff);
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(0,0,0,.35);
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+  animation: pincode-pop .22s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes pincode-pop {
+  from { transform: translateY(12px) scale(.96); opacity: 0; }
+  to   { transform: translateY(0) scale(1);      opacity: 1; }
+}
+.pincode-avatar-wrap {
+  position: relative;
+  width: 84px; height: 84px;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-bottom: .75rem;
+}
+.pincode-avatar-wrap .profile-avatar {
+  width: 76px; height: 76px; font-size: 2.2rem;
+}
+.pincode-title {
+  font-size: 1.35rem; font-weight: 700;
+  color: var(--text); letter-spacing: -0.3px;
+  margin: 0 0 .15rem;
+}
+.pincode-sub {
+  font-size: .92rem; color: var(--muted);
+  margin: 0 0 1.15rem;
+}
+.pincode-dots {
+  display: flex; gap: .7rem;
+  margin: 0 0 1.15rem;
+}
+.pincode-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--border, #d4cec0);
+  transition: background .15s ease, transform .15s ease, border-color .15s ease;
+}
+.pincode-dot.filled {
+  background: var(--primary, #1e7285);
+  border-color: var(--primary, #1e7285);
+  transform: scale(1.15);
+}
+.pincode-error {
+  color: #b32020;
+  font-size: .88rem;
+  margin: -.75rem 0 .75rem;
+  min-height: 1.1em;
+}
+.pincode-keys {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: .55rem;
+  width: 100%;
+}
+.pincode-key {
+  min-height: 58px;
+  border: 1px solid var(--border, #e5e0d6);
+  border-radius: 14px;
+  background: var(--card-bg, #fff);
+  color: var(--text);
+  font-size: 1.5rem; font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform .08s ease, background .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.pincode-key:hover  { background: var(--surface); }
+.pincode-key:active { transform: scale(.96); background: rgba(30,114,133,.08); }
+.pincode-key-cancel { font-size: .95rem; color: var(--muted); font-weight: 500; }
+.pincode-key-back   { font-size: 1.6rem; }
+.pincode-shake { animation: pincode-shake .45s ease-in-out; }
+@keyframes pincode-shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-10px); }
+  40%     { transform: translateX(10px); }
+  60%     { transform: translateX(-6px); }
+  80%     { transform: translateX(6px); }
+}
+.pincode-success .pincode-dot.filled { background: #2ea862; border-color: #2ea862; }
+
 /* Profielen-beheer in Account */
 .profielen-rows { display: flex; flex-direction: column; gap: .5rem; margin-bottom: .85rem; }
 .profielen-row {

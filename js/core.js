@@ -1390,3 +1390,92 @@ const ActiveProfile = {
     $('#active-profile-dot').style.background = p.color || '#6b1e2a';
   },
 };
+
+// ─── PincodePrompt: eigen UI voor beheerder-pincode ───────────────────────
+// Vervangt window.prompt() — toont het profiel groot in beeld, een numeriek
+// toetsenbord en dot-indicators voor de ingetikte cijfers.
+const PincodePrompt = {
+  open(profile) {
+    return new Promise(resolve => {
+      const letter = (profile.name || '?').trim().charAt(0).toUpperCase() || '?';
+      const c = profile.color || '#6b1e2a';
+      const targetLen = String(profile.pincode || '').length || 4;
+      const overlay = document.createElement('div');
+      overlay.className = 'pincode-overlay';
+      overlay.innerHTML = `
+        <div class="pincode-backdrop"></div>
+        <div class="pincode-card" role="dialog" aria-modal="true" aria-labelledby="pincode-title">
+          <div class="pincode-avatar-wrap">
+            <span class="profile-avatar-ring" style="--ring-color:${esc(c)};"></span>
+            <span class="profile-avatar" style="background:${esc(c)};">${esc(letter)}</span>
+          </div>
+          <div class="pincode-title" id="pincode-title">${esc(profile.name)}</div>
+          <div class="pincode-sub">Vul je pincode in</div>
+          <div class="pincode-dots" aria-hidden="true">
+            ${Array.from({ length: targetLen }, () => '<span class="pincode-dot"></span>').join('')}
+          </div>
+          <div class="pincode-error" hidden>Pincode klopt niet</div>
+          <div class="pincode-keys">
+            ${[1,2,3,4,5,6,7,8,9].map(n => `<button type="button" class="pincode-key" data-digit="${n}">${n}</button>`).join('')}
+            <button type="button" class="pincode-key pincode-key-cancel" data-action="cancel">Annuleer</button>
+            <button type="button" class="pincode-key" data-digit="0">0</button>
+            <button type="button" class="pincode-key pincode-key-back" data-action="back" aria-label="Wis laatste cijfer">⌫</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      let entered = '';
+      const dots  = [...overlay.querySelectorAll('.pincode-dot')];
+      const err   = overlay.querySelector('.pincode-error');
+      const card  = overlay.querySelector('.pincode-card');
+
+      const refresh = () => {
+        dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
+        err.hidden = true;
+      };
+      const close = (result) => {
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        resolve(result);
+      };
+      const check = () => {
+        if (entered === String(profile.pincode)) {
+          card.classList.add('pincode-success');
+          setTimeout(() => close(true), 180);
+        } else {
+          err.hidden = false;
+          card.classList.add('pincode-shake');
+          try { navigator.vibrate && navigator.vibrate(80); } catch (_) {}
+          setTimeout(() => {
+            card.classList.remove('pincode-shake');
+            entered = '';
+            refresh();
+          }, 500);
+        }
+      };
+      const feed = (digit) => {
+        if (entered.length >= targetLen) return;
+        entered += digit;
+        refresh();
+        if (entered.length === targetLen) setTimeout(check, 140);
+      };
+
+      overlay.addEventListener('click', e => {
+        if (e.target.classList.contains('pincode-backdrop')) return close(false);
+        const btn = e.target.closest('.pincode-key');
+        if (!btn) return;
+        const a = btn.dataset.action;
+        if (a === 'cancel') return close(false);
+        if (a === 'back')   { entered = entered.slice(0, -1); return refresh(); }
+        if (btn.dataset.digit) feed(btn.dataset.digit);
+      });
+
+      const onKey = e => {
+        if (e.key === 'Escape')    return close(false);
+        if (e.key === 'Backspace') { entered = entered.slice(0, -1); return refresh(); }
+        if (/^[0-9]$/.test(e.key)) feed(e.key);
+      };
+      document.addEventListener('keydown', onKey);
+    });
+  },
+};

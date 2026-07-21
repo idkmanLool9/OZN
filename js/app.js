@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 274;
-const APP_VERSION    = '5.95.0';
+const APP_BUILD      = 275;
+const APP_VERSION    = '5.95.1';
 const APP_BUILD_DATE = '2026-07-21';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1210,19 +1210,14 @@ Router.add('/logboek', () => renderLogboek());
   }
 
   // Event delegation — profielknoppen worden dynamisch gerenderd per opening
-  document.getElementById('profile-screen').addEventListener('click', e => {
+  document.getElementById('profile-screen').addEventListener('click', async e => {
     const btn = e.target.closest('.profile-option[data-profile]');
     if (!btn) return;
     const id = btn.getAttribute('data-profile');
     const prof = ActiveProfile.byId(id);
-    // Beheerder-profiel met pincode? Eerst pincode vragen.
     if (prof && prof.rol === 'beheerder' && prof.pincode) {
-      const invoer = window.prompt('Pincode voor ' + prof.name + ':', '');
-      if (invoer == null) return;
-      if (String(invoer).replace(/\D/g, '') !== String(prof.pincode)) {
-        Toast.show('Pincode klopt niet — profiel niet geactiveerd.', 'error');
-        return;
-      }
+      const ok = await PincodePrompt.open(prof);
+      if (!ok) return;
     }
     ActiveProfile.set(id);
     Router.handle();
