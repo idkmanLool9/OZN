@@ -1768,7 +1768,6 @@ EMAIL_FROM_NAME = OZN</pre>
       }
       Settings.set({ profielen });
       // Als het actieve profiel niet meer bestaat: wissen
-      const actiefId = (ActiveProfile.current() || {}).id;
       if (actiefId && !profielen.some(p => p.id === actiefId)) ActiveProfile.clear();
       renderAccount({ success: 'Profielen opgeslagen.' });
     });
