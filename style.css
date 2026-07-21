@@ -32,8 +32,18 @@
 * { box-sizing: border-box; }
 /* overscroll-behavior: none = geen iOS "rubber-band" bounce in de
    TestFlight/native app als de inhoud kort is; scrollen bij lange
-   inhoud (formulieren, lijsten) blijft gewoon werken. */
-html, body { margin: 0; padding: 0; overscroll-behavior: none; }
+   inhoud (formulieren, lijsten) blijft gewoon werken.
+   touch-action: manipulation = geen dubbele-tik-zoom (die niets doet
+   in native apps maar in de web-view onze eigen dubbelklik-guards
+   omhoog zoomt). Pinch-zoom blijft gewoon werken voor toegankelijkheid. */
+html, body { margin: 0; padding: 0; overscroll-behavior: none; touch-action: manipulation; }
+/* Alle interactieve elementen expliciet ook, zodat een `touch-action:auto`
+   ergens onderaan de boom (bv. van een derde-partij plugin) de
+   double-tap-zoom niet stilletjes terugzet. */
+button, a, input, select, textarea, label, [role="button"], .btn,
+.opbaar-chip, .profile-option, .pincode-key {
+  touch-action: manipulation;
+}
 html { height: 100%; }
 body {
   font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
