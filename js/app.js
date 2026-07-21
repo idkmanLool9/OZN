@@ -12,9 +12,9 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 273;
-const APP_VERSION    = '5.94.1';
-const APP_BUILD_DATE = '2026-07-14';
+const APP_BUILD      = 274;
+const APP_VERSION    = '5.95.0';
+const APP_BUILD_DATE = '2026-07-21';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -1214,9 +1214,18 @@ Router.add('/logboek', () => renderLogboek());
     const btn = e.target.closest('.profile-option[data-profile]');
     if (!btn) return;
     const id = btn.getAttribute('data-profile');
+    const prof = ActiveProfile.byId(id);
+    // Beheerder-profiel met pincode? Eerst pincode vragen.
+    if (prof && prof.rol === 'beheerder' && prof.pincode) {
+      const invoer = window.prompt('Pincode voor ' + prof.name + ':', '');
+      if (invoer == null) return;
+      if (String(invoer).replace(/\D/g, '') !== String(prof.pincode)) {
+        Toast.show('Pincode klopt niet — profiel niet geactiveerd.', 'error');
+        return;
+      }
+    }
     ActiveProfile.set(id);
     Router.handle();
-    // Bevestiging in beeld: 'Ingelogd als: <naam>' na profielkeuze
     try {
       const p = ActiveProfile.current();
       if (p && p.name) setTimeout(() => Toast.show('Ingelogd als: ' + p.name, 'success'), 60);

@@ -252,7 +252,7 @@ function dossierMissendeBelangrijkeVelden(d) {
 }
 
 const DOSSIER_VELDEN = [
-  'dossier_nummer',
+  'dossier_nummer','registratienummer_uitvaartleider',
   'opdrachtgever_naam',
   'bsn',
   'voornaam','achternaam','geslacht','geboortedatum','geboorteplaats',
@@ -266,11 +266,11 @@ const DOSSIER_VELDEN = [
   'bezit_horloge','bezit_horloge_aantal','bezit_horloge_foto',
   'artsverklaring_pad','overdraagformulier_pad',
   'opbaring_type',
-  'opbaring_bed','opbaring_kist',
+  'opbaring_bed','opbaring_kist','aula_gebruikt',
   'ophalen_datum','ophalen_tijd',
   'thuis_opbaren_datum','thuis_opbaren_tijd',
   'thuis_opbaren_einddatum','thuis_opbaren_eindtijd','benodigde_rouwgoederen',
-  'opbaarlocatie_type',
+  'opbaarlocatie_type','centrale_koeling_vanaf','familiekamer_vanaf',
   'verzorgd_gekleed_datum','verzorgd_gekleed_waar','verzorgd_gekleed_familie',
   'gekist_datum','gekist_waar',
   'mond_gehecht','oogkapjes',

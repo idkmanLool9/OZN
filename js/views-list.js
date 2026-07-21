@@ -190,10 +190,10 @@ function renderDossierList(params, path) {
               </tr></thead>
               <tbody>
                 ${dossiers.map(d => {
-                  const missend = dossierMissendeBelangrijkeVelden(d);
-                  const warn = missend.length
-                    ? `<span class="dossier-warn-badge" title="Nog niet ingevuld: ${esc(missend.join(', '))}">⚠ ${missend.length}</span>`
-                    : '';
+                  // 'Niet ingevuld'-melding is verwijderd op verzoek: de badge
+                  // gaf te vaak alarm terwijl velden bewust leeg werden gelaten.
+                  const missend = [];
+                  const warn = '';
                   // Kostenposten voor deze dossier — voor 'openkosten'-filter
                   const kostenD = DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id) || [];
                   const heeftOpenKosten = kostenD.some(k => !k.betaald && Number(k.bedrag) > 0);
@@ -804,6 +804,7 @@ EMAIL_FROM_NAME = OZN</pre>
           const lijst = (Settings.get('profielen') || []);
           return `
           <form id="profielen-form" class="form" autocomplete="off">
+            <p class="muted small" style="margin:0 0 .5rem;">Beheerder-profielen kunnen een 4- of 6-cijferige pincode krijgen. De pincode wordt gevraagd zodra iemand op het profiel tikt bij "Wie werkt vandaag?".</p>
             <div id="profielen-rows" class="profielen-rows">
               ${lijst.map((p, i) => `
                 <div class="profielen-row" data-idx="${i}">
@@ -813,6 +814,7 @@ EMAIL_FROM_NAME = OZN</pre>
                     <option value="medewerker" ${p.rol !== 'beheerder' ? 'selected' : ''}>Medewerker</option>
                     <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
                   </select>
+                  <input type="text" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" value="${esc(p.pincode || '')}" placeholder="pincode" title="4–6 cijfers (alleen beheerder)" style="width:6rem;${p.rol === 'beheerder' ? '' : 'visibility:hidden;'}">
                   <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
                   <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
                 </div>`).join('')}
@@ -1643,6 +1645,7 @@ EMAIL_FROM_NAME = OZN</pre>
           <option value="medewerker" selected>Medewerker</option>
           <option value="beheerder">Beheerder</option>
         </select>
+        <input type="text" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" placeholder="pincode" title="4–6 cijfers (alleen beheerder)" style="width:6rem;visibility:hidden;">
         <input type="color" class="profielen-kleur" value="${esc(kleur)}" title="Kleur van de avatar">
         <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${idx}" title="Verwijderen">×</button>`;
       rows.appendChild(div);
@@ -1652,6 +1655,8 @@ EMAIL_FROM_NAME = OZN</pre>
       const naamInp = row.querySelector('.profielen-naam');
       const kleurInp = row.querySelector('.profielen-kleur');
       const avatar = row.querySelector('.profielen-avatar');
+      const rolSel = row.querySelector('.profielen-rol');
+      const pinInp = row.querySelector('.profielen-pincode');
       naamInp.addEventListener('input', () => {
         const c = (naamInp.value || '?').trim().charAt(0).toUpperCase() || '?';
         avatar.textContent = c;
@@ -1659,6 +1664,17 @@ EMAIL_FROM_NAME = OZN</pre>
       kleurInp.addEventListener('input', () => {
         avatar.style.background = kleurInp.value;
       });
+      if (rolSel && pinInp) {
+        const syncPin = () => {
+          const beh = rolSel.value === 'beheerder';
+          pinInp.style.visibility = beh ? 'visible' : 'hidden';
+          if (!beh) pinInp.value = '';
+        };
+        rolSel.addEventListener('change', syncPin);
+        pinInp.addEventListener('input', () => {
+          pinInp.value = pinInp.value.replace(/\D/g, '').slice(0, 6);
+        });
+      }
     }
     profielenForm.querySelectorAll('.profielen-row').forEach(bindRowEvents);
 
@@ -1697,6 +1713,8 @@ EMAIL_FROM_NAME = OZN</pre>
         const kleur = r.querySelector('.profielen-kleur').value || '#6b1e2a';
         const rolSel = r.querySelector('.profielen-rol');
         const rol = rolSel && rolSel.value === 'beheerder' ? 'beheerder' : 'medewerker';
+        const pinInp = r.querySelector('.profielen-pincode');
+        const pincode = (rol === 'beheerder' && pinInp) ? pinInp.value.replace(/\D/g, '').slice(0, 6) : '';
         let id = idByNaam.get(naam.toLowerCase());
         if (!id || gebruikteIds.has(id)) {
           const base = slugify(naam);
@@ -1705,7 +1723,9 @@ EMAIL_FROM_NAME = OZN</pre>
           while (gebruikteIds.has(id)) id = base + '_' + (n++);
         }
         gebruikteIds.add(id);
-        profielen.push({ id, name: naam, color: kleur, rol });
+        const item = { id, name: naam, color: kleur, rol };
+        if (pincode) item.pincode = pincode;
+        profielen.push(item);
       });
       if (profielen.length === 0) {
         Modal.show({ type: 'warning', title: 'Geen profielen', message: 'Voeg minstens één profiel toe.' });

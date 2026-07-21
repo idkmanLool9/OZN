@@ -56,15 +56,7 @@ function renderDossierDetail(params) {
         <a href="#/dossiers/${d.id}#notities">Notities (${notities.length})</a>
       </nav>
 
-      ${(() => {
-        const missend = dossierMissendeBelangrijkeVelden(d);
-        if (!missend.length) return '';
-        const dagen = d.created_at ? Math.floor((Date.now() - new Date(d.created_at).getTime()) / 86400000) : 0;
-        return `<div class="alert alert-warn dossier-missend-banner">
-          <strong>⚠ Nog niet ingevuld:</strong> ${missend.map(esc).join(', ')}.
-          ${dagen >= 2 ? `<span class="muted small">Dossier is ${dagen} dagen oud — vul aan waar mogelijk.</span>` : ''}
-        </div>`;
-      })()}
+      ${/* 'Niet ingevuld'-banner op verzoek verwijderd. */ ''}
 
       <section id="overzicht" class="card">
         <div class="print-header">
@@ -138,10 +130,8 @@ function renderDossierDetail(params) {
             [d.mond_gehecht, 'Mond gehecht', 'Ja'],
             [d.oogkapjes, 'Oogkapjes', 'Ja'],
             [d.buikpunctie, 'Buikpunctie', 'Ja'],
-            [d.peacemaker_verwijderd, 'Peacemaker verwijderd',
-              [d.peacemaker_verwijderd_datum && 'op ' + fmtDate(d.peacemaker_verwijderd_datum)].filter(Boolean).join(' ') || 'Ja'],
-            [d.thanatopraxie, 'Thanatopraxie',
-              [d.thanatopraxie_datum && 'op ' + fmtDate(d.thanatopraxie_datum), d.thanatopraxie_waar && 'te ' + d.thanatopraxie_waar].filter(Boolean).join(' ') || 'Ja'],
+            [d.peacemaker_verwijderd, 'Pacemaker verwijderd', 'Ja'],
+            [d.thanatopraxie, 'Thanatopraxie', 'Ja'],
           ].filter(([has]) => has);
           if (!items.length) return '';
           return `<h3>Verzorging</h3><dl class="dl">${items.map(([, label, val]) => dlRow(label, val)).join('')}</dl>`;
@@ -510,8 +500,8 @@ function dossierSpec(d, kosten) {
     { heading: 'Overledene', rows: [
       ['Naam',           _or(fullName(d))],
       ['Geslacht',       _or(d.geslacht)],
-      ['Geboren',        geboren],
-      ['Overleden',      overleden],
+      ['Geboortedatum',  _dateOr(d.geboortedatum)],
+      ['Overlijdenslocatie', _or(d.overlijdensplaats)],
       ['Adres',          _or(adresO)],
       ['Artsverklaring', d.artsverklaring_pad     ? '✓ geüpload' : LEEG],
       ['Overdraagformulier', d.overdraagformulier_pad ? '✓ geüpload' : LEEG],
@@ -535,7 +525,10 @@ function dossierSpec(d, kosten) {
       ['Overbrengingen thuis', routeStr(d.thuis_overbrengingen)],
       ['Benodigde rouwgoederen', _or(d.benodigde_rouwgoederen)],
       ['Rouwgoederen-lijst',  (Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length) ? d.rouwgoederen_lijst.join(', ') : LEEG],
-      ['Opbaarlocatie',       _or(d.opbaarlocatie_type)],
+      ['Ophaallocatie',       _or(d.opbaarlocatie_type)],
+      ['Aula',                d.aula_gebruikt ? 'Ja' : LEEG],
+      ['Centrale koeling vanaf', _dateOr(d.centrale_koeling_vanaf)],
+      ['Familiekamer vanaf',  _dateOr(d.familiekamer_vanaf)],
     ] },
     { heading: 'Verzorging', rows: [
       ['Verzorgd/gekleed datum', _dateOr(d.verzorgd_gekleed_datum)],
@@ -543,11 +536,8 @@ function dossierSpec(d, kosten) {
       ['Familie erbij',          _jaNee(d.verzorgd_gekleed_familie)],
       ['Gekist datum',           _dateOr(d.gekist_datum)],
       ['Gekist waar',            _or(d.gekist_waar)],
-      ['Peacemaker verwijderd',  d.peacemaker_verwijderd ? 'Ja' : LEEG],
-      ['Peacemaker datum',       _dateOr(d.peacemaker_verwijderd_datum)],
+      ['Pacemaker verwijderd',   d.peacemaker_verwijderd ? 'Ja' : LEEG],
       ['Thanatopraxie',          d.thanatopraxie ? 'Ja' : LEEG],
-      ['Thanatopraxie datum',    _dateOr(d.thanatopraxie_datum)],
-      ['Thanatopraxie waar',     _or(d.thanatopraxie_waar)],
       ['Mond gehecht',           d.mond_gehecht ? 'Ja' : LEEG],
       ['Buikpunctie',            d.buikpunctie ? 'Ja' : LEEG],
       ['Oogkapjes',              d.oogkapjes ? 'Ja' : LEEG],
@@ -561,6 +551,7 @@ function dossierSpec(d, kosten) {
     ] },
     { heading: 'Dossier-metadata', rows: [
       ['Dossiernummer', _or(d.dossier_nummer)],
+      ['Registratienummer uitvaartleider', _or(d.registratienummer_uitvaartleider)],
       ['Status',        _or((d.status || '').replace('_', ' '))],
       ['Aangemaakt',    d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : LEEG],
       ['Laatst opgeslagen', d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : LEEG],
@@ -615,8 +606,8 @@ function buildDossierEmail(d, kosten) {
   pushSection('Overledene', [
     ['Naam',      fullName(d)],
     ['Geslacht',  d.geslacht],
-    ['Geboren',   [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' ')],
-    ['Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' ')],
+    ['Geboortedatum', fmtDate(d.geboortedatum)],
+    ['Overlijdenslocatie', d.overlijdensplaats],
     ['Adres',     adresO],
     ['Artsverklaring',      d.artsverklaring_pad ? '✓ geüpload' : ''],
     ['Overdraagformulier',  d.overdraagformulier_pad ? '✓ geüpload' : ''],
@@ -642,7 +633,10 @@ function buildDossierEmail(d, kosten) {
     ['Overbrengingen thuis', routeStr(d.thuis_overbrengingen)],
     ['Benodigde rouwgoederen', d.benodigde_rouwgoederen],
     ['Rouwgoederen-lijst',   (Array.isArray(d.rouwgoederen_lijst) && d.rouwgoederen_lijst.length) ? d.rouwgoederen_lijst.join(', ') : ''],
-    ['Opbaarlocatie',        d.opbaarlocatie_type],
+    ['Ophaallocatie',        d.opbaarlocatie_type],
+    ['Aula',                 d.aula_gebruikt ? 'Ja' : ''],
+    ['Centrale koeling vanaf', fmtDate(d.centrale_koeling_vanaf)],
+    ['Familiekamer vanaf',   fmtDate(d.familiekamer_vanaf)],
   ]);
 
   pushSection('Verzorging', [
@@ -651,11 +645,8 @@ function buildDossierEmail(d, kosten) {
     ['Familie erbij',          _jaNee(d.verzorgd_gekleed_familie)],
     ['Gekist datum',           fmtDate(d.gekist_datum)],
     ['Gekist waar',            d.gekist_waar],
-    ['Peacemaker verwijderd',  d.peacemaker_verwijderd ? 'Ja' : ''],
-    ['Peacemaker datum',       fmtDate(d.peacemaker_verwijderd_datum)],
+    ['Pacemaker verwijderd',   d.peacemaker_verwijderd ? 'Ja' : ''],
     ['Thanatopraxie',          d.thanatopraxie ? 'Ja' : ''],
-    ['Thanatopraxie datum',    fmtDate(d.thanatopraxie_datum)],
-    ['Thanatopraxie waar',     d.thanatopraxie_waar],
     ['Mond gehecht',           d.mond_gehecht ? 'Ja' : ''],
     ['Buikpunctie',            d.buikpunctie ? 'Ja' : ''],
     ['Oogkapjes',              d.oogkapjes ? 'Ja' : ''],
@@ -672,6 +663,7 @@ function buildDossierEmail(d, kosten) {
 
   pushSection('Dossier-metadata', [
     ['Dossiernummer',      d.dossier_nummer],
+    ['Registratienummer uitvaartleider', d.registratienummer_uitvaartleider],
     ['Status',             (d.status || '').replace('_', ' ')],
     ['Aangemaakt',         d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : ''],
     ['Laatst opgeslagen',  d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : ''],
