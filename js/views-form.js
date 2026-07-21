@@ -1614,7 +1614,7 @@ function renderDossierForm(params) {
     }
     odStatus.textContent = 'Bezig met uploaden...';
     try {
-      const path = await ArtsVerklaring.upload(file);
+      const path = await ArtsVerklaring.upload(file, 'overdraagformulier/');
       const old = odHidden.value;
       if (old && old !== path) ArtsVerklaring.remove(old);
       odHidden.value = path;

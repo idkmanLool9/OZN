@@ -890,11 +890,26 @@ EMAIL_FROM_NAME = OZN</pre>
       ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
       <section class="card narrow" id="cloud-storage">
         <h2>Cloudflare R2 (dossier-opslag)</h2>
-        <p class="muted small">10 GB opslag voor dossier-PDF's, foto's en scans op Cloudflare R2 (EU-jurisdictie). Klik op Testen om te controleren of de credentials correct in Supabase staan.</p>
+        <p class="muted small">10 GB opslag voor dossier-PDF's, foto's en scans op Cloudflare R2 (EU-jurisdictie). Nieuwe uploads gaan automatisch naar R2. Bestaande bestanden staan nog op Supabase Storage tot je ze migreert.</p>
         <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
-          <span id="r2-test-status" class="muted small">Nog niet getest.</span>
-          <button type="button" class="btn" id="btn-r2-test">🔌 Test R2-verbinding</button>
+          <span id="r2-test-status" class="muted small">Klik Testen om de verbinding te checken.</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-r2-test">🔌 Test R2-verbinding</button>
         </div>
+        <hr style="margin:.85rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
+        ${(() => {
+          const werk = (typeof R2Migratie !== 'undefined') ? R2Migratie.verzamel().length : 0;
+          return `
+            <p class="small" style="margin:0 0 .5rem;">
+              <strong>Migratie Supabase Storage → R2</strong><br>
+              <span class="muted">Verplaatst alle bestaande dossier-bestanden (artsverklaringen, overdraagformulieren, bezittingen-foto's) naar R2 en verwijdert ze uit Supabase Storage. Bestanden blijven toegankelijk via dezelfde app-knoppen.</span>
+            </p>
+            <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+              <span id="r2-migratie-status" class="muted small">${werk === 0 ? '✓ Alles staat al op R2 (of geen bestanden).' : `${werk} bestand${werk === 1 ? '' : 'en'} nog op Supabase Storage.`}</span>
+              <button type="button" class="btn ${werk === 0 ? 'btn-ghost' : ''}" id="btn-r2-migreer" ${werk === 0 ? 'disabled' : ''}>${werk === 0 ? 'Niks te migreren' : `🚀 Migreer ${werk} naar R2`}</button>
+            </div>
+            <div id="r2-migratie-log" class="muted small" style="margin-top:.5rem; max-height:200px; overflow-y:auto; font-family:monospace; font-size:.72rem; white-space:pre-wrap;"></div>
+          `;
+        })()}
       </section>
 
       <section class="card narrow" id="archief">
@@ -1897,6 +1912,52 @@ EMAIL_FROM_NAME = OZN</pre>
     });
   }
 
+  // R2-migratie: alle bestaande Supabase-Storage bestanden naar R2 verhuizen
+  const migBtn = $('#btn-r2-migreer');
+  const migStatus = $('#r2-migratie-status');
+  const migLog = $('#r2-migratie-log');
+  if (migBtn && typeof R2Migratie !== 'undefined') {
+    migBtn.addEventListener('click', async () => {
+      const werk = R2Migratie.verzamel();
+      if (!werk.length) {
+        Modal.show({ type: 'info', title: 'Niks te migreren', message: 'Alle dossier-bestanden staan al op R2.' });
+        return;
+      }
+      const ok = await Modal.confirm({
+        type: 'info',
+        title: `${werk.length} bestand${werk.length === 1 ? '' : 'en'} migreren?`,
+        message: `De bestanden worden gedownload van Supabase Storage, geüpload naar Cloudflare R2, en vervolgens uit Supabase verwijderd. Dit kan een paar minuten duren.\n\nBij een fout blijft het originele bestand op Supabase staan; de app blijft dan gewoon werken.`,
+        confirmText: `Ja, migreer ${werk.length}`,
+      });
+      if (!ok) return;
+      migBtn.disabled = true;
+      migLog.textContent = '';
+      const t0 = Date.now();
+      try {
+        const r = await R2Migratie.migreerAlles(({ done, totaal, huidig, resultaat, error }) => {
+          migStatus.textContent = `${done}/${totaal} — bezig met ${huidig}`;
+          if (resultaat) migLog.textContent += `✓ ${resultaat.pad} → ${resultaat.nieuwPad}\n`;
+          if (error)     migLog.textContent += `✗ ${huidig}: ${error}\n`;
+          migLog.scrollTop = migLog.scrollHeight;
+        });
+        const secs = Math.round((Date.now() - t0) / 1000);
+        const mb = (r.bytesTotaal / 1048576).toFixed(2);
+        Modal.show({
+          type: r.errors.length ? 'warning' : 'success',
+          title: `Migratie klaar${r.errors.length ? ' met fouten' : ''}`,
+          message:
+            `${r.done}/${r.totaal} bestanden gemigreerd (${mb} MB) in ${secs}s.\n` +
+            (r.errors.length ? `\n${r.errors.length} fout(en):\n` + r.errors.map(e => `• ${e.pad}: ${e.error}`).join('\n') : ''),
+        });
+        // Ververs de UI zodat de teller klopt
+        renderAccount({ success: `Migratie afgerond: ${r.done}/${r.totaal} bestanden.` });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Migratie crashte', message: e.message || String(e) });
+        migBtn.disabled = false;
+      }
+    });
+  }
+
   // Bulk-compressie van alle bestaande archief-foto's
   const compBtn = $('#btn-comprimeer-archief');
   const compStatus = $('#archief-compressie-status');
@@ -2389,19 +2450,37 @@ EMAIL_FROM_NAME = OZN</pre>
           <div style="height:9px;border-radius:6px;background:var(--border,#e5e0d6);overflow:hidden;margin:.2rem 0 .1rem;">
             <div style="height:100%;width:${pct.toFixed(1)}%;background:${pct >= 90 ? '#c0392b' : pct >= 70 ? '#d68910' : kleur};"></div>
           </div>`;
+        // R2-teller: aantal R2-paden in de cache (indicatief; bytes weten we
+        // niet direct — daarvoor zou een aparte edge function moeten pollen).
+        let r2Count = 0;
+        try {
+          (Cloud.cache.dossiers || []).forEach(d => {
+            ['artsverklaring_pad','overdraagformulier_pad',
+             'bezit_oorbellen_foto','bezit_ringen_foto','bezit_armbanden_foto',
+             'bezit_ketting_foto','bezit_bril_foto','bezit_horloge_foto']
+              .forEach(k => { if (d[k] && typeof R2 !== 'undefined' && R2.isR2(d[k])) r2Count++; });
+            if (Array.isArray(d.extra_bezittingen)) {
+              d.extra_bezittingen.forEach(b => { if (b && b.foto_pad && typeof R2 !== 'undefined' && R2.isR2(b.foto_pad)) r2Count++; });
+            }
+          });
+        } catch (_) {}
         opslagBox.innerHTML = `
-          <h3 style="margin:.25rem 0 .5rem;font-size:.95rem;">Opslaggebruik · Supabase Free-plan</h3>
+          <h3 style="margin:.25rem 0 .5rem;font-size:.95rem;">Opslaggebruik</h3>
           <div class="muted small" style="display:flex;justify-content:space-between;">
-            <span>Database (tekstgegevens)</span><span>${fmtBytes(data.db_bytes)} / 500 MB</span>
+            <span>Database · Supabase (tekstgegevens)</span><span>${fmtBytes(data.db_bytes)} / 500 MB</span>
           </div>
           ${bar(dbPct, 'var(--primary,#2563eb)')}
           <div class="muted small" style="display:flex;justify-content:space-between;margin-top:.5rem;">
-            <span>Bestandsopslag (scans &amp; foto's · ${data.files} bestand${data.files === 1 ? '' : 'en'})</span><span>${fmtBytes(data.storage_bytes)} / 1 GB</span>
+            <span>Bestanden · Supabase Storage (${data.files} bestand${data.files === 1 ? '' : 'en'})</span><span>${fmtBytes(data.storage_bytes)} / 1 GB</span>
           </div>
           ${bar(stPct, 'var(--accent,#c9a24a)')}
+          <div class="muted small" style="display:flex;justify-content:space-between;margin-top:.5rem;">
+            <span>Bestanden · Cloudflare R2 (${r2Count} bestand${r2Count === 1 ? '' : 'en'})</span><span>ruimte: 10 GB</span>
+          </div>
+          ${bar(Math.min(100, r2Count > 0 ? 1 : 0), '#f38020')}
           <p class="muted small" style="margin:.5rem 0 0;">
             ${data.dossiers} dossier${data.dossiers === 1 ? '' : 's'} in gebruik${perDossier > 0 ? ` · gemiddeld ± ${fmtBytes(perDossier)} aan scans/foto's per dossier` : ' · nog geen scans geüpload'}.
-            De tekstgegevens van een dossier zijn maar enkele KB's; vooral scans en foto's tellen mee voor de opslag.
+            Nieuwe uploads gaan naar Cloudflare R2 (10 GB, EU-jurisdictie). Bestanden op Supabase Storage kun je via de knop hieronder migreren.
           </p>`;
       } catch (e) {
         opslagBox.innerHTML = `<p class="muted small">Opslaggebruik kon niet worden geladen${e && e.message ? ' (' + esc(e.message) + ')' : ''}.</p>`;

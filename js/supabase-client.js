@@ -417,26 +417,93 @@ async function handleStaleCache() {
   });
 }
 
-// ─── Artsverklaring (privé, bucket 'documenten') ────────────────────────────
-// Scan/foto van de artsverklaring (overlijdensverklaring). Privé opgeslagen;
-// bekijken via tijdelijke signed URL.
+// ─── R2 (Cloudflare, bucket 'ozn-dossiers') ────────────────────────────────
+// Nieuwe uploads gaan hierheen. Paden krijgen prefix 'r2:' zodat we ze in de
+// database kunnen onderscheiden van de oude Supabase Storage-paden. Het
+// systeem valt terug op Supabase Storage voor paden zonder prefix, zodat
+// bestaande dossiers blijven werken tot ze zijn gemigreerd.
+const R2_PREFIX_TAG = 'r2:';
+const R2 = {
+  isR2(path) { return typeof path === 'string' && path.startsWith(R2_PREFIX_TAG); },
+  key(path) { return R2.isR2(path) ? path.slice(R2_PREFIX_TAG.length) : path; },
+  tag(key)  { return R2_PREFIX_TAG + key; },
+
+  async _sign(op, key, opts = {}) {
+    const { data, error } = await sb.functions.invoke('r2-sign', {
+      body: { op, key, contentType: opts.contentType, expires: opts.expires },
+    });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error + (data.detail ? ': ' + data.detail : ''));
+    return data;
+  },
+
+  // Bestand uploaden. keyPrefix = bv. 'artsverklaring/' of 'bezittingen/'.
+  // De uiteindelijke key is <prefix><timestamp>-<random>-<safeName>.
+  async upload(file, keyPrefix) {
+    if (!keyPrefix || !/\/$/.test(keyPrefix)) throw new Error('keyPrefix must end with /');
+    const rawName = (file && file.name) || 'bestand';
+    const safe = String(rawName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+    const rand = Math.random().toString(36).slice(2, 8);
+    const key = `${keyPrefix}${Date.now()}-${rand}-${safe}`;
+    const { url, method } = await R2._sign('put', key, { contentType: file.type || 'application/octet-stream' });
+    const resp = await fetch(url, {
+      method,
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream' },
+    });
+    if (!resp.ok) {
+      const txt = await resp.text().catch(() => '');
+      throw new Error(`R2 upload faalde (${resp.status}): ${txt.slice(0, 200)}`);
+    }
+    return R2.tag(key);
+  },
+
+  // Presigned GET URL — te gebruiken als <img src>, downloadlink of fetch().
+  async signedUrl(pathOrKey, seconds = 900) {
+    const key = R2.key(pathOrKey);
+    const { url } = await R2._sign('get', key, { expires: seconds });
+    return url;
+  },
+
+  async remove(pathOrKey) {
+    try {
+      const key = R2.key(pathOrKey);
+      const { url, method } = await R2._sign('delete', key);
+      await fetch(url, { method }).catch(() => {});
+    } catch (_) { /* stil */ }
+  },
+};
+
+// ─── Artsverklaring (nieuw → R2, oud → Supabase 'documenten') ───────────────
+// Scan/foto van de artsverklaring of overdraagformulier. Privé opgeslagen;
+// bekijken via tijdelijke signed URL. Bestaande paden zonder 'r2:'-prefix
+// blijven werken via de oude Supabase Storage.
 const ArtsVerklaring = {
-  async upload(file) {
+  async upload(file, keyPrefix = 'artsverklaring/') {
     const compressed = await compressImage(file, 2200, 0.9);
-    const safe = (compressed.name || 'artsverklaring').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `artsverklaring/${Date.now()}-${safe}`;
-    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-    if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
-    return path;
+    try {
+      return await R2.upload(compressed, keyPrefix);
+    } catch (e) {
+      // Val terug op Supabase Storage als R2 niet bereikbaar is (bv.
+      // credentials ontbreken of Edge Function niet gedeployed).
+      console.warn('R2-upload faalde, fallback naar Supabase Storage:', e && e.message);
+      const safe = (compressed.name || 'artsverklaring').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${keyPrefix}${Date.now()}-${safe}`;
+      const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
+      if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
+      return path;
+    }
   },
   async signedUrl(path, seconds = 300) {
     if (!path) return null;
+    if (R2.isR2(path)) return R2.signedUrl(path, Math.max(60, seconds));
     const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
     if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
     return data.signedUrl;
   },
   async remove(path) {
     if (!path) return;
+    if (R2.isR2(path)) return R2.remove(path);
     await sb.storage.from('documenten').remove([path]).catch(() => {});
   },
 };
@@ -465,9 +532,12 @@ const ArchiefCompressie = {
   },
 
   // Één foto comprimeren: download, hercomprimeer, upload (upsert=true) op
-  // hetzelfde pad. Retourneer besparing in bytes (of 0).
+  // hetzelfde pad. Retourneer besparing in bytes (of 0). Alleen voor
+  // Supabase Storage-paden; R2-uploads worden al bij het uploaden agressief
+  // gecomprimeerd door compressImage(), dus daar is een tweede ronde onnodig.
   async comprimeer1(pad) {
     if (!pad) return 0;
+    if (R2.isR2(pad)) return 0;
     try {
       const { data: sign, error: sErr } = await sb.storage.from('documenten').createSignedUrl(pad, 300);
       if (sErr || !sign) return 0;
@@ -510,20 +580,120 @@ const BezittingenFotos = {
   async upload(file, tag = 'item') {
     const compressed = await compressImage(file, 1600, 0.85);
     const safe = (tag || 'item').replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `bezittingen/${Date.now()}-${safe}.jpg`;
-    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-    if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
-    return path;
+    // Bestandsnaam-hint voor R2 (compressImage geeft geen name terug)
+    const named = new File([compressed], `${safe}.jpg`, { type: 'image/jpeg' });
+    try {
+      return await R2.upload(named, 'bezittingen/');
+    } catch (e) {
+      console.warn('R2-upload faalde, fallback naar Supabase Storage:', e && e.message);
+      const path = `bezittingen/${Date.now()}-${safe}.jpg`;
+      const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
+      if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
+      return path;
+    }
   },
   async signedUrl(path, seconds = 300) {
     if (!path) return null;
+    if (R2.isR2(path)) return R2.signedUrl(path, Math.max(60, seconds));
     const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
     if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
     return data.signedUrl;
   },
   async remove(path) {
     if (!path) return;
+    if (R2.isR2(path)) return R2.remove(path);
     await sb.storage.from('documenten').remove([path]).catch(() => {});
+  },
+};
+
+// ─── R2-migratie: Supabase Storage → R2 voor bestaande dossier-bestanden ───
+// Loopt door alle dossiers, pakt de _pad-kolommen die nog op Supabase staan
+// (geen r2:-prefix), kopieert het bestand naar R2 en werkt het pad in de DB
+// bij. Idempotent: bestaat het bestand al in R2 (r2:-prefix), skip.
+// Retourneert per iteratie een progress-callback zodat de UI live kan updaten.
+const R2Migratie = {
+  // Alle _pad-kolommen die we ondersteunen. Bezittingen-foto's (bezit_X_foto)
+  // en extra_bezittingen zitten in aparte structuren.
+  DOSSIER_PAD_COLUMNS: [
+    'artsverklaring_pad', 'overdraagformulier_pad',
+    'bezit_oorbellen_foto', 'bezit_ringen_foto', 'bezit_armbanden_foto',
+    'bezit_ketting_foto',   'bezit_bril_foto',   'bezit_horloge_foto',
+  ],
+
+  // Verzamel alles wat nog op Supabase staat. Retourneert:
+  //   [{ dossierId, veld, pad, extraIdx? }]
+  verzamel() {
+    const werk = [];
+    (Cloud.cache.dossiers || []).forEach(d => {
+      R2Migratie.DOSSIER_PAD_COLUMNS.forEach(veld => {
+        const p = d[veld];
+        if (p && !R2.isR2(p)) werk.push({ dossierId: d.id, veld, pad: p });
+      });
+      // extra_bezittingen: array met foto_pad-velden
+      if (Array.isArray(d.extra_bezittingen)) {
+        d.extra_bezittingen.forEach((b, i) => {
+          if (b && b.foto_pad && !R2.isR2(b.foto_pad)) {
+            werk.push({ dossierId: d.id, veld: '__extra__', pad: b.foto_pad, extraIdx: i });
+          }
+        });
+      }
+    });
+    return werk;
+  },
+
+  // Eén bestand migreren:
+  //  1) download van Supabase Storage via signed URL
+  //  2) upload naar R2 (met dezelfde prefix zodat de key logisch blijft)
+  //  3) update de dossier-rij zodat het pad naar r2:-versie wijst
+  //  4) verwijder het originele bestand van Supabase Storage
+  async migreer1(item) {
+    const { dossierId, veld, pad, extraIdx } = item;
+    // 1) download
+    const { data: sign, error: sErr } = await sb.storage.from('documenten').createSignedUrl(pad, 600);
+    if (sErr || !sign) throw new Error(`kon geen download-URL krijgen voor ${pad}: ${sErr && sErr.message}`);
+    const resp = await fetch(sign.signedUrl);
+    if (!resp.ok) throw new Error(`download faalde (${resp.status}) voor ${pad}`);
+    const blob = await resp.blob();
+    // 2) upload naar R2 — key = originele pad (behoudt structuur artsverklaring/... etc)
+    const filename = pad.split('/').pop() || 'bestand';
+    const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+    const prefix = pad.includes('/') ? (pad.split('/')[0] + '/') : 'artsverklaring/';
+    const nieuwPad = await R2.upload(file, prefix);
+    // 3) DB bijwerken
+    if (veld === '__extra__') {
+      const d = DB.byId(KEYS.DOSSIERS, dossierId);
+      if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
+      const arr = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.map(x => ({ ...x })) : [];
+      if (arr[extraIdx]) arr[extraIdx].foto_pad = nieuwPad;
+      await DB.update(KEYS.DOSSIERS, dossierId, { extra_bezittingen: arr });
+    } else {
+      await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
+    }
+    // 4) origineel weghalen (best-effort; als 't faalt hebben we alleen dubbele opslag)
+    await sb.storage.from('documenten').remove([pad]).catch(() => {});
+    return { pad, nieuwPad, bytes: blob.size };
+  },
+
+  // Batch-migratie. onProgress({ done, totaal, huidig, resultaat, error }).
+  async migreerAlles(onProgress) {
+    const werk = R2Migratie.verzamel();
+    const totaal = werk.length;
+    let done = 0;
+    let bytesTotaal = 0;
+    const errors = [];
+    for (const item of werk) {
+      onProgress && onProgress({ done, totaal, huidig: item.pad });
+      try {
+        const r = await R2Migratie.migreer1(item);
+        bytesTotaal += r.bytes || 0;
+        done++;
+        onProgress && onProgress({ done, totaal, huidig: item.pad, resultaat: r });
+      } catch (e) {
+        errors.push({ pad: item.pad, error: e.message || String(e) });
+        onProgress && onProgress({ done, totaal, huidig: item.pad, error: e.message || String(e) });
+      }
+    }
+    return { totaal, done, errors, bytesTotaal };
   },
 };
 
