@@ -453,18 +453,20 @@ function renderDossierForm(params) {
               </select>
             </label>
             <label class="span-2"><span>Ophaallocatie</span>
-              <input type="text" name="opbaarlocatie_type" list="locatie-suggesties" value="${v('opbaarlocatie_type')}" autocomplete="off" placeholder="bv. uitvaartcentrum, thuis, ziekenhuis…">
+              <input type="text" name="opbaarlocatie_type" id="opbaarlocatie-input" list="locatie-suggesties" value="${v('opbaarlocatie_type')}" autocomplete="off" placeholder="bv. uitvaartcentrum, thuis, ziekenhuis…">
+              <span class="muted small" style="display:block; margin-top:.2rem; font-size:.78rem;">Aula Vale ? <span style="opacity:.7;">— typ 'aula' voor de extra velden.</span></span>
             </label>
           </div>
           <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
             <label class="opbaar-chip">
               <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
             </label>
-            <label class="opbaar-chip">
-              <input type="checkbox" name="aula_gebruikt" value="ja" ${dossier.aula_gebruikt ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Aula</span>
-            </label>
           </div>
-          <div class="grid-3" style="margin-top:.6rem;">
+          <!-- Vinkje aula_gebruikt bestaat nog in de DB (backwards compat) —
+               we vullen hem programmatisch op basis van "bevat 'aula'" bij het
+               opslaan. In de UI is er geen aparte checkbox meer. -->
+          <input type="hidden" name="aula_gebruikt" id="aula-gebruikt-hidden" value="${dossier.aula_gebruikt ? 'ja' : ''}">
+          <div class="grid-3" id="aula-extra-velden" style="margin-top:.6rem; ${/aula/i.test(dossier.opbaarlocatie_type || '') ? '' : 'display:none;'}">
             <label><span>Centrale koeling vanaf</span>
               <input type="date" name="centrale_koeling_vanaf" value="${v('centrale_koeling_vanaf')}">
             </label>
@@ -823,6 +825,29 @@ function renderDossierForm(params) {
 
   // Pacemaker + Thanatopraxie zijn nu simpele checkboxes (geen datum/waar
   // meer), dus geen klap-effect nodig.
+
+  // Ophaallocatie: bevat de tekst 'aula' (case-insensitive) → toon de
+  // extra velden 'Centrale koeling vanaf' + 'Familiekamer vanaf', en zet
+  // het verborgen 'aula_gebruikt'-veld op 'ja' zodat het in de DB staat.
+  const opbaarInp = document.getElementById('opbaarlocatie-input');
+  const aulaExtra = document.getElementById('aula-extra-velden');
+  const aulaHidden = document.getElementById('aula-gebruikt-hidden');
+  if (opbaarInp && aulaExtra) {
+    const syncAula = () => {
+      const heeftAula = /aula/i.test(opbaarInp.value || '');
+      aulaExtra.style.display = heeftAula ? '' : 'none';
+      if (aulaHidden) aulaHidden.value = heeftAula ? 'ja' : '';
+      // Datum-velden legen wanneer 'aula' er weer uit gaat — anders blijven
+      // ze onzichtbaar bewaard, wat verwarring geeft in de PDF/e-mail.
+      if (!heeftAula) {
+        aulaExtra.querySelectorAll('input[type="date"]').forEach(d => {
+          if (d.value) { d.value = ''; d.dispatchEvent(new Event('input', { bubbles: true })); }
+        });
+      }
+    };
+    opbaarInp.addEventListener('input',  syncAula);
+    opbaarInp.addEventListener('change', syncAula);
+  }
 
   // Auto-tijd: wanneer een datum-input gekoppeld is aan een tijd-veld en die
   // tijd nog leeg is, vul dan de huidige tijd in zodra de datum wordt gekozen.
