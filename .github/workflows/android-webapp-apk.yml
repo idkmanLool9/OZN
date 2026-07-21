@@ -20,6 +20,8 @@ on:
       - 'manifest.webmanifest'
       - 'capacitor.config.json'
       - 'scripts/**'
+      - 'local-plugins/**'
+      - 'package.json'
       - '.github/workflows/android-webapp-apk.yml'
   workflow_dispatch:
 
