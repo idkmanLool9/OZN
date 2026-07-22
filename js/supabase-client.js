@@ -437,14 +437,29 @@ const R2 = {
     return data;
   },
 
+  // Sanitize een naam voor gebruik als map-naam op R2 (alleen a-z0-9._-)
+  folderName(dossier) {
+    if (!dossier) return null;
+    const clean = (s) => String(s || '').trim().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+    const naam = clean([dossier.achternaam, dossier.voornaam].filter(Boolean).join(' '));
+    const nummer = clean(dossier.dossier_nummer || (dossier.id ? 'D' + dossier.id : ''));
+    const parts = [naam, nummer].filter(Boolean);
+    if (!parts.length) return null;
+    return parts.join('_');
+  },
+
   // Bestand uploaden. keyPrefix = bv. 'artsverklaring/' of 'bezittingen/'.
-  // De uiteindelijke key is <prefix><timestamp>-<random>-<safeName>.
-  async upload(file, keyPrefix) {
+  // Optioneel: dossier-context, dan wordt de key
+  //   <prefix><dossier-naam-nummer>/<timestamp>-<random>-<safeName>
+  // zodat je in het R2 dashboard per dossier een map ziet.
+  async upload(file, keyPrefix, dossier) {
     if (!keyPrefix || !/\/$/.test(keyPrefix)) throw new Error('keyPrefix must end with /');
     const rawName = (file && file.name) || 'bestand';
     const safe = String(rawName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
     const rand = Math.random().toString(36).slice(2, 8);
-    const key = `${keyPrefix}${Date.now()}-${rand}-${safe}`;
+    const sub = R2.folderName(dossier);
+    const subPart = sub ? sub + '/' : '';
+    const key = `${keyPrefix}${subPart}${Date.now()}-${rand}-${safe}`;
     const { url, method } = await R2._sign('put', key, { contentType: file.type || 'application/octet-stream' });
     const resp = await fetch(url, {
       method,
@@ -479,10 +494,10 @@ const R2 = {
 // bekijken via tijdelijke signed URL. Bestaande paden zonder 'r2:'-prefix
 // blijven werken via de oude Supabase Storage.
 const ArtsVerklaring = {
-  async upload(file, keyPrefix = 'artsverklaring/') {
+  async upload(file, keyPrefix = 'artsverklaring/', dossier = null) {
     const compressed = await compressImage(file, 2200, 0.9);
     try {
-      return await R2.upload(compressed, keyPrefix);
+      return await R2.upload(compressed, keyPrefix, dossier);
     } catch (e) {
       Modal.show({
         type: 'error',
@@ -575,13 +590,13 @@ const ArchiefCompressie = {
 // om te bekijken; RLS op documenten (documenten_zicht) beperkt tot zichtbare
 // dossiers.
 const BezittingenFotos = {
-  async upload(file, tag = 'item') {
+  async upload(file, tag = 'item', dossier = null) {
     const compressed = await compressImage(file, 1600, 0.85);
     const safe = (tag || 'item').replace(/[^a-zA-Z0-9._-]/g, '_');
     // Bestandsnaam-hint voor R2 (compressImage geeft geen name terug)
     const named = new File([compressed], `${safe}.jpg`, { type: 'image/jpeg' });
     try {
-      return await R2.upload(named, 'bezittingen/');
+      return await R2.upload(named, 'bezittingen/', dossier);
     } catch (e) {
       Modal.show({
         type: 'error',
@@ -641,15 +656,24 @@ const R2Migratie = {
   },
 
   // Eén bestand migreren via de r2-migrate-one Edge Function:
-  //  1) Edge Function downloadt uit Supabase Storage (service-role) en zet
-  //     het bestand op R2 met dezelfde key. Voorkomt browser-CORS + SW-issues.
-  //  2) Client werkt de dossier-rij bij (pad → 'r2:<key>')
-  //  3) Client verwijdert het origineel uit Supabase Storage
+  //  1) bereken de nieuwe R2-key mét dossier-submap zodat de mappenstructuur
+  //     op R2 direct netjes is (artsverklaring/Achternaam_Dnummer/xxx.jpg)
+  //  2) EF haalt file uit Supabase Storage en zet 'm op de nieuwe R2-key
+  //  3) client update de DB en verwijdert het origineel uit Supabase Storage
   async migreer1(item) {
     const { dossierId, veld, pad, extraIdx } = item;
+    const dossier = DB.byId(KEYS.DOSSIERS, dossierId);
+    const sub = dossier ? R2.folderName(dossier) : null;
+    // pad = 'artsverklaring/1234-x.jpg' → prefix = 'artsverklaring/', rest = '1234-x.jpg'
+    const firstSlash = pad.indexOf('/');
+    const prefix = firstSlash >= 0 ? pad.slice(0, firstSlash + 1) : '';
+    const restRaw = firstSlash >= 0 ? pad.slice(firstSlash + 1) : pad;
+    // Als het bestaande pad al een submap heeft, pak alleen het laatste segment
+    const filename = restRaw.split('/').pop();
+    const destKey = sub ? `${prefix}${sub}/${filename}` : pad;
     // 1) migreer via Edge Function
     const { data, error } = await sb.functions.invoke('r2-migrate-one', {
-      body: { key: pad },
+      body: { key: pad, destKey },
     });
     if (error) throw new Error('edge-function faalde: ' + (error.message || String(error)));
     if (!data || !data.ok) {
