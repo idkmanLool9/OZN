@@ -484,14 +484,12 @@ const ArtsVerklaring = {
     try {
       return await R2.upload(compressed, keyPrefix);
     } catch (e) {
-      // Val terug op Supabase Storage als R2 niet bereikbaar is (bv.
-      // credentials ontbreken of Edge Function niet gedeployed).
-      console.warn('R2-upload faalde, fallback naar Supabase Storage:', e && e.message);
-      const safe = (compressed.name || 'artsverklaring').replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `${keyPrefix}${Date.now()}-${safe}`;
-      const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-      if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
-      return path;
+      Modal.show({
+        type: 'error',
+        title: 'Upload naar R2 mislukt',
+        message: (e && e.message) + '\n\nHet bestand is NIET opgeslagen. Controleer de internetverbinding en probeer opnieuw. Als dit blijft: check R2-credentials in Account → Cloudflare R2.',
+      });
+      throw e;
     }
   },
   async signedUrl(path, seconds = 300) {
@@ -585,11 +583,12 @@ const BezittingenFotos = {
     try {
       return await R2.upload(named, 'bezittingen/');
     } catch (e) {
-      console.warn('R2-upload faalde, fallback naar Supabase Storage:', e && e.message);
-      const path = `bezittingen/${Date.now()}-${safe}.jpg`;
-      const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-      if (error) { Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message }); throw error; }
-      return path;
+      Modal.show({
+        type: 'error',
+        title: 'Foto niet opgeslagen',
+        message: (e && e.message) + '\n\nR2 niet bereikbaar. Probeer opnieuw als de verbinding er weer is.',
+      });
+      throw e;
     }
   },
   async signedUrl(path, seconds = 300) {
