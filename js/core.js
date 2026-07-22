@@ -1384,6 +1384,14 @@ const ActiveProfile = {
       return id ? ActiveProfile.byId(id) : null;
     } catch (_) { return null; }
   },
+  // Is het huidige profiel het maker-account? Wordt gebruikt om 'Dev' niet
+  // in bijgewerkt_door te schrijven, zodat het team dat niet bij elk dossier
+  // ziet staan.
+  isDev() {
+    try {
+      return localStorage.getItem(ActiveProfile.STORAGE_KEY) === DEV_PROFILE_ID;
+    } catch (_) { return false; }
+  },
   // Auto-activatie: log de dev-user (dev@ozn.nl) direct in op het Dev-profiel
   // zodat de picker niet verschijnt. Andere accounts blijven ongemoeid.
   autoActivateForDev() {

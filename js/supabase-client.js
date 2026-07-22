@@ -304,7 +304,11 @@ const DB = {
       throw new Error('offline_auth');
     }
     const u = Auth.current();
-    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+    // Dev-profiel wordt NIET meegeschreven in bijgewerkt_door of auteur —
+    // anders ziet het team 'Dev' als laatst gewijzigd op elk dossier waar
+    // de maker een test op heeft gedaan.
+    const isDev = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current() && !isDev)
       ? ActiveProfile.current().name : null;
     const row = Object.assign({}, payload);
     if (tbl === 'dossiers' && u) row.created_by = u.id;
@@ -336,7 +340,8 @@ const DB = {
       throw new Error('offline_auth');
     }
     const p = Object.assign({}, patch);
-    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+    const isDev = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current() && !isDev)
       ? ActiveProfile.current().name : null;
     if (TRACK_TABLES.has(tbl) && profielNaam && p.bijgewerkt_door === undefined) {
       p.bijgewerkt_door = profielNaam;
