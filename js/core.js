@@ -995,13 +995,13 @@ const Router = {
     if (Settings.get('profielkiezer_actief') && !ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();
 
-    // Onthou laatst-bezochte dossier-detail zodat 'Dossiers' in de topbar
-    // je terugbrengt bij het dossier waar je mee bezig was (i.p.v. de lijst).
+    // Onthou laatst-bezochte dossier-route (detail, bewerken, concept nieuw,
+    // factuur…) zodat 'Dossiers' in de topbar je terugbrengt bij het dossier
+    // waar je mee bezig was — óók bij een nog-niet-opgeslagen concept
+    // (#/dossiers/nieuw).
     try {
-      if (/^\/dossiers\/\d+/.test(path)) {
+      if (/^\/dossiers\/.+/.test(path)) {
         sessionStorage.setItem('sok_last_dossier_route', '#' + fullHash);
-      } else if (path === '/dossiers' || path.startsWith('/kisten') || path.startsWith('/account')) {
-        // Op de lijst zelf of op een andere tab: laatste-bezocht behouden, niet wissen.
       }
     } catch (_) {}
 
