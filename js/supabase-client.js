@@ -875,6 +875,18 @@ async function autoSyncNaarR2() {
     if (mig.length || reorg.length || snapCount) {
       console.log(`R2 auto-sync: ${mig.length} gemigreerd, ${reorg.length} geordend, ${snapCount} snapshots.`);
     }
+    // Als alle reorg klaar is (geen items meer over), verwijder dan de
+    // legacy top-level prefixes (artsverklaring/, overdraagformulier/,
+    // bezittingen/, ...). Alle geldige bestanden zitten dan onder
+    // dossiers/. De EF weigert als er nog DB-verwijzingen zijn.
+    if (R2Reorg.verzamel().length === 0 && R2Migratie.verzamel().length === 0) {
+      try {
+        const { data } = await sb.functions.invoke('r2-cleanup-orphans');
+        if (data && data.ok && data.deletedCount > 0) {
+          console.log(`R2 cleanup: ${data.deletedCount} legacy-orphan(s) verwijderd.`);
+        }
+      } catch (e) { console.warn('R2 cleanup-orphans faalde:', e && e.message); }
+    }
   } finally {
     _r2AutoSyncBusy = false;
   }

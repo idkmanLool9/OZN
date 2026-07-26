@@ -29,7 +29,13 @@ function renderDossierDetail(params) {
             ${d.gezinsnummer ? ' · gezinsnr. ' + esc(d.gezinsnummer) : ''}
           </p>
           <p class="muted small dossier-timestamps">
-            Aangemaakt: <strong title="${esc(d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.created_at) || '—')}</strong>
+            Aangemaakt: <strong title="${esc(d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.created_at) || '—')}</strong>${(() => {
+              // Zoek naam van maker uit profiles-cache; val terug op e-mail (of niets)
+              if (!d.created_by) return '';
+              const p = (Cloud.cache.profiles || []).find(x => x.id === d.created_by);
+              const nm = (p && (p.naam || p.email)) || null;
+              return nm ? ' door <strong>' + esc(nm) + '</strong>' : '';
+            })()}
             · Laatst opgeslagen: <strong title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at) || '—')}</strong>${d.bijgewerkt_door ? ' door <strong>' + esc(d.bijgewerkt_door) + '</strong>' : ''}
           </p>
         </div>
