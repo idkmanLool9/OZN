@@ -33,7 +33,9 @@ function renderDossierList(params, path) {
     dossiers = dossiers.filter(d => !d.gearchiveerd);   // archief standaard verborgen
     if (status) dossiers = dossiers.filter(d => d.status === status);
   }
-  dossiers.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+  // Sorteer op aanmaak-datum (nieuwste bovenaan) — niet op laatst gewijzigd,
+  // anders schieten oude dossiers naar boven zodra iemand ze even aanraakt.
+  dossiers.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
   $('#view').innerHTML = `
     <div class="page">
