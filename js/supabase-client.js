@@ -837,7 +837,7 @@ let _r2AutoSyncBusy = false;
 async function autoSyncNaarR2() {
   if (_r2AutoSyncBusy) return;
   if (!navigator.onLine) return;
-  if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return; // alleen beheerders mogen r2-migrate-one aanroepen
+  if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return;
   _r2AutoSyncBusy = true;
   try {
     // Migratie SB Storage → R2 (max 20 tegelijk om lange kliks te voorkomen)
@@ -846,14 +846,34 @@ async function autoSyncNaarR2() {
       try { await R2Migratie.migreer1(item); }
       catch (e) { console.warn('R2 auto-migratie faalde voor', item.pad, e && e.message); }
     }
-    // Reorder R2 → submap per dossier (max 40)
+    // Reorder R2 → dossier-first submap (max 40)
     const reorg = R2Reorg.verzamel().slice(0, 40);
     for (const item of reorg) {
       try { await R2Reorg.verplaats1(item); }
       catch (e) { console.warn('R2 auto-reorder faalde voor', item.sourceKey, e && e.message); }
     }
-    if (mig.length || reorg.length) {
-      console.log(`R2 auto-sync: ${mig.length} gemigreerd, ${reorg.length} geordend.`);
+    // Snapshot-backfill: voor elk dossier dat nog geen recente snapshot
+    // in localStorage staat (of ouder dan de dossier.updated_at) maken we
+    // er één. Max 5 per app-start om niet te veel PDF-werk in één keer te
+    // doen. Zo krijgen bestaande dossiers automatisch hun snapshot zodra
+    // je de app een paar keer opent.
+    let snapCount = 0;
+    for (const d of (Cloud.cache.dossiers || [])) {
+      if (snapCount >= 5) break;
+      if (!d || !d.id) continue;
+      const key = 'sok_snap_' + d.id;
+      let last = null;
+      try { last = localStorage.getItem(key); } catch (_) {}
+      const dossierStamp = d.updated_at || d.created_at || '';
+      if (last && last === dossierStamp) continue; // al gedaan voor deze versie
+      try {
+        await uploadDossierPdfNaarR2(d);
+        try { localStorage.setItem(key, dossierStamp); } catch (_) {}
+        snapCount++;
+      } catch (e) { console.warn('R2 snapshot-backfill faalde voor dossier', d.id, e && e.message); }
+    }
+    if (mig.length || reorg.length || snapCount) {
+      console.log(`R2 auto-sync: ${mig.length} gemigreerd, ${reorg.length} geordend, ${snapCount} snapshots.`);
     }
   } finally {
     _r2AutoSyncBusy = false;
@@ -875,22 +895,46 @@ async function autoSyncDossierNaarR2(dossierId) {
   } catch (e) { console.warn('autoSyncDossierNaarR2:', e && e.message); }
 }
 
-// ─── Dossier-PDF automatisch naar R2 (na elke save) ────────────────────────
-// Genereert een PDF van het dossier via de bestaande PdfGen + dossierSpec en
-// zet 'm neer als dossiers/<folder>/dossier-<yyyy-mm-dd-hhmm>.pdf op R2.
-// Wordt asynchroon aangeroepen na een succesvolle save; faalt stil (niet
-// blokkerend voor de gebruiker) maar logt naar console.
+// ─── Dossier-snapshot naar R2 (na elke save én background-backfill) ────────
+// Zet TWEE bestanden neer per snapshot:
+//  1) dossier-<yyyy-mm-dd-hhmm>.pdf  — gelayoute PDF (menselijk leesbaar)
+//  2) dossier-<yyyy-mm-dd-hhmm>.json — raw data (elk veld met waarde,
+//     kosten-regels en notities inclusief) voor archivering/leesbaarheid
 async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
   try {
     if (!dossier || !dossier.id) return;
-    if (typeof PdfGen === 'undefined' || typeof dossierSpec === 'undefined') return;
-    const blob = await PdfGen.blobFromSpec(dossierSpec(dossier, kostenLijst || []));
-    if (!blob) return;
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    const named = new File([blob], `dossier-${stamp}.pdf`, { type: 'application/pdf' });
-    await R2.upload(named, 'dossiers/', dossier);
+    const kosten = kostenLijst || DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id) || [];
+    const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === dossier.id) || [];
+
+    // 1) PDF (bevat alle intake-velden via dossierSpec)
+    if (typeof PdfGen !== 'undefined' && typeof dossierSpec !== 'undefined') {
+      try {
+        const blob = await PdfGen.blobFromSpec(dossierSpec(dossier, kosten));
+        if (blob) {
+          const named = new File([blob], `dossier-${stamp}.pdf`, { type: 'application/pdf' });
+          await R2.upload(named, 'dossiers/', dossier);
+        }
+      } catch (e) { console.warn('Dossier-PDF-upload faalde:', e && e.message); }
+    }
+
+    // 2) JSON snapshot — alle rauwe velden. Slaat gevoelige onderliggende
+    // opslag-paden ook op zodat je later kunt terugvinden welk bestand bij
+    // welke versie hoorde.
+    try {
+      const snapshot = {
+        exported_at: new Date().toISOString(),
+        exported_by: (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().email : null,
+        dossier: dossier,
+        kosten: kosten,
+        notities: notities,
+      };
+      const jsonBlob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const jsonFile = new File([jsonBlob], `dossier-${stamp}.json`, { type: 'application/json' });
+      await R2.upload(jsonFile, 'dossiers/', dossier);
+    } catch (e) { console.warn('Dossier-JSON-upload faalde:', e && e.message); }
   } catch (e) {
-    console.warn('Dossier-PDF-upload naar R2 faalde:', e && e.message);
+    console.warn('Dossier-snapshot faalde:', e && e.message);
   }
 }
 
