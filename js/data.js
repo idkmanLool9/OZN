@@ -280,5 +280,5 @@ const DOSSIER_VELDEN = [
   'kist_type','rouwauto',
   'aanbetaling_bedrag','aanbetaling_datum',
   'eindafrekening_bedrag','eindafrekening_status',
-  'bijzonderheden','status'
+  'bijzonderheden','status','aangemaakt_door'
 ];

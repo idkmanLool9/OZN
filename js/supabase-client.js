@@ -314,6 +314,13 @@ const DB = {
     if (tbl === 'dossiers' && u) row.created_by = u.id;
     if (tbl === 'notities' && u) row.auteur_id = u.id;
     if (tbl === 'documenten' && u) row.geupload_door = u.id;
+    // Aangemaakt door = actieve profielnaam op het moment van INSERT.
+    // Blijft ongewijzigd bij latere updates — zo weet je wie de eerste
+    // versie van het dossier heeft aangemaakt (ook nadat een collega 'm
+    // later bijwerkt). Skip voor dev-profiel (isDev = true → geen naam).
+    if (tbl === 'dossiers' && profielNaam && row.aangemaakt_door == null) {
+      row.aangemaakt_door = profielNaam;
+    }
     // Auto-track: welk profiel (Rume / Robert) deed de wijziging?
     if (TRACK_TABLES.has(tbl) && profielNaam && row.bijgewerkt_door == null) {
       row.bijgewerkt_door = profielNaam;
