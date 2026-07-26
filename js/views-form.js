@@ -2071,6 +2071,18 @@ function renderDossierForm(params) {
         try { sessionStorage.removeItem('sok_actief_' + draftKey); } catch (_) {}
       }
 
+      // ─── Dossier-PDF asynchroon naar R2 (achtergrond, faalt stil) ──
+      // Zorgt dat elke opgeslagen versie van het dossier ook als PDF onder
+      // dossiers/<Achternaam_Dnummer>/ in R2 staat, zodat je daar altijd
+      // een compleet overzicht kunt terugvinden zonder de app open te hoeven.
+      if (savedDossier && navigator.onLine) {
+        try {
+          const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === savedDossier.id) || [];
+          // Niet awaiten — mag rustig op de achtergrond draaien.
+          uploadDossierPdfNaarR2(savedDossier, kostenLijst);
+        } catch (_) {}
+      }
+
       // ─── Auto-mail dossier bij eerste aanmaak (best-effort) ──
       // Inclusief kostenoverzicht + PDF-bijlage (paperclip). Alleen als
       // het opgeslagen adres een geldig e-mailadres is; anders skippen

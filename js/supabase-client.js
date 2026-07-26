@@ -724,6 +724,114 @@ const R2Migratie = {
   },
 };
 
+// ─── R2Reorg: bestaande R2-bestanden herordenen in dossier-submappen ───────
+// Loopt door alle dossiers, kijkt naar de r2:-paden, en verplaatst bestanden
+// die nog in de root van hun type-map staan naar een submap met de
+// dossier-naam (bv. artsverklaring/1234.jpg → artsverklaring/Achternaam_D42/1234.jpg).
+// Verplaatsing gebeurt server-side via r2-move (COPY + DELETE) — geen client-
+// bandbreedte.
+const R2Reorg = {
+  DOSSIER_PAD_COLUMNS: [
+    'artsverklaring_pad', 'overdraagformulier_pad',
+    'bezit_oorbellen_foto', 'bezit_ringen_foto', 'bezit_armbanden_foto',
+    'bezit_ketting_foto',   'bezit_bril_foto',   'bezit_horloge_foto',
+  ],
+
+  verzamel() {
+    const werk = [];
+    (Cloud.cache.dossiers || []).forEach(d => {
+      const sub = R2.folderName(d);
+      if (!sub) return; // dossier zonder naam/nummer: submap kunnen we niet bepalen
+      R2Reorg.DOSSIER_PAD_COLUMNS.forEach(veld => {
+        const p = d[veld];
+        if (!p || !R2.isR2(p)) return;
+        const key = R2.key(p);
+        const parts = key.split('/');
+        // Verwacht: <prefix>/<sub>/<file>. Als parts.length < 3, zit er geen submap in.
+        // Als de bestaande submap != gewenste sub, verplaatsen we ook.
+        if (parts.length === 2 || parts[1] !== sub) {
+          const prefix = parts[0] + '/';
+          const filename = parts[parts.length - 1];
+          const destKey = `${prefix}${sub}/${filename}`;
+          werk.push({ dossierId: d.id, veld, oldPath: p, sourceKey: key, destKey });
+        }
+      });
+      if (Array.isArray(d.extra_bezittingen)) {
+        d.extra_bezittingen.forEach((b, i) => {
+          if (!b || !b.foto_pad || !R2.isR2(b.foto_pad)) return;
+          const key = R2.key(b.foto_pad);
+          const parts = key.split('/');
+          if (parts.length === 2 || parts[1] !== sub) {
+            const prefix = parts[0] + '/';
+            const filename = parts[parts.length - 1];
+            const destKey = `${prefix}${sub}/${filename}`;
+            werk.push({ dossierId: d.id, veld: '__extra__', extraIdx: i, oldPath: b.foto_pad, sourceKey: key, destKey });
+          }
+        });
+      }
+    });
+    return werk;
+  },
+
+  async verplaats1(item) {
+    const { dossierId, veld, extraIdx, sourceKey, destKey } = item;
+    const { data, error } = await sb.functions.invoke('r2-move', {
+      body: { sourceKey, destKey },
+    });
+    if (error) throw new Error('edge-function faalde: ' + (error.message || String(error)));
+    if (!data || !data.ok) throw new Error((data && (data.detail || data.error)) || 'onbekend');
+    const nieuwPad = R2.tag(destKey);
+    if (veld === '__extra__') {
+      const d = DB.byId(KEYS.DOSSIERS, dossierId);
+      if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
+      const arr = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.map(x => ({ ...x })) : [];
+      if (arr[extraIdx]) arr[extraIdx].foto_pad = nieuwPad;
+      await DB.update(KEYS.DOSSIERS, dossierId, { extra_bezittingen: arr });
+    } else {
+      await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
+    }
+    return { sourceKey, destKey };
+  },
+
+  async reorganiseerAlles(onProgress) {
+    const werk = R2Reorg.verzamel();
+    const totaal = werk.length;
+    let done = 0;
+    const errors = [];
+    for (const item of werk) {
+      onProgress && onProgress({ done, totaal, huidig: item.sourceKey });
+      try {
+        await R2Reorg.verplaats1(item);
+        done++;
+        onProgress && onProgress({ done, totaal, huidig: item.sourceKey, resultaat: { destKey: item.destKey } });
+      } catch (e) {
+        errors.push({ key: item.sourceKey, error: e.message || String(e) });
+        onProgress && onProgress({ done, totaal, huidig: item.sourceKey, error: e.message || String(e) });
+      }
+    }
+    return { totaal, done, errors };
+  },
+};
+
+// ─── Dossier-PDF automatisch naar R2 (na elke save) ────────────────────────
+// Genereert een PDF van het dossier via de bestaande PdfGen + dossierSpec en
+// zet 'm neer als dossiers/<folder>/dossier-<yyyy-mm-dd-hhmm>.pdf op R2.
+// Wordt asynchroon aangeroepen na een succesvolle save; faalt stil (niet
+// blokkerend voor de gebruiker) maar logt naar console.
+async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
+  try {
+    if (!dossier || !dossier.id) return;
+    if (typeof PdfGen === 'undefined' || typeof dossierSpec === 'undefined') return;
+    const blob = await PdfGen.blobFromSpec(dossierSpec(dossier, kostenLijst || []));
+    if (!blob) return;
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const named = new File([blob], `dossier-${stamp}.pdf`, { type: 'application/pdf' });
+    await R2.upload(named, 'dossiers/', dossier);
+  } catch (e) {
+    console.warn('Dossier-PDF-upload naar R2 faalde:', e && e.message);
+  }
+}
+
 // ─── Kist-voorraad (beheerder-only) ─────────────────────────────────────────
 const KistVoorraad = {
   // Alles synchroon uit de cache: welke rij hoort bij deze kist-naam?

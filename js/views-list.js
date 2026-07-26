@@ -846,16 +846,27 @@ EMAIL_FROM_NAME = OZN</pre>
         <hr style="margin:.85rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
         ${(() => {
           const werk = (typeof R2Migratie !== 'undefined') ? R2Migratie.verzamel().length : 0;
+          const rework = (typeof R2Reorg !== 'undefined') ? R2Reorg.verzamel().length : 0;
           return `
             <p class="small" style="margin:0 0 .5rem;">
               <strong>Migratie Supabase Storage → R2</strong><br>
-              <span class="muted">Verplaatst alle bestaande dossier-bestanden (artsverklaringen, overdraagformulieren, bezittingen-foto's) naar R2 en verwijdert ze uit Supabase Storage. Bestanden blijven toegankelijk via dezelfde app-knoppen.</span>
+              <span class="muted">Verplaatst alle bestaande dossier-bestanden (artsverklaringen, overdraagformulieren, bezittingen-foto's) naar R2 en verwijdert ze uit Supabase Storage.</span>
             </p>
             <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
-              <span id="r2-migratie-status" class="muted small">${werk === 0 ? '✓ Alles staat al op R2 (of geen bestanden).' : `${werk} bestand${werk === 1 ? '' : 'en'} nog op Supabase Storage.`}</span>
+              <span id="r2-migratie-status" class="muted small">${werk === 0 ? '✓ Alles staat al op R2.' : `${werk} bestand${werk === 1 ? '' : 'en'} nog op Supabase Storage.`}</span>
               <button type="button" class="btn ${werk === 0 ? 'btn-ghost' : ''}" id="btn-r2-migreer" ${werk === 0 ? 'disabled' : ''}>${werk === 0 ? 'Niks te migreren' : `🚀 Migreer ${werk} naar R2`}</button>
             </div>
             <div id="r2-migratie-log" class="muted small" style="margin-top:.5rem; max-height:200px; overflow-y:auto; font-family:monospace; font-size:.72rem; white-space:pre-wrap;"></div>
+            <hr style="margin:.85rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
+            <p class="small" style="margin:0 0 .5rem;">
+              <strong>Opnieuw ordenen op dossier</strong><br>
+              <span class="muted">Verplaatst losse R2-bestanden naar submap per dossier (bv. artsverklaring/Achternaam_D42/). Server-side kopie, snel.</span>
+            </p>
+            <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+              <span id="r2-reorg-status" class="muted small">${rework === 0 ? '✓ Alles staat al in de juiste submap.' : `${rework} bestand${rework === 1 ? '' : 'en'} nog los.`}</span>
+              <button type="button" class="btn ${rework === 0 ? 'btn-ghost' : ''}" id="btn-r2-reorg" ${rework === 0 ? 'disabled' : ''}>${rework === 0 ? 'Niks te ordenen' : `📁 Order ${rework} in submappen`}</button>
+            </div>
+            <div id="r2-reorg-log" class="muted small" style="margin-top:.5rem; max-height:200px; overflow-y:auto; font-family:monospace; font-size:.72rem; white-space:pre-wrap;"></div>
           `;
         })()}
       </section>
@@ -1902,6 +1913,50 @@ EMAIL_FROM_NAME = OZN</pre>
       } catch (e) {
         Modal.show({ type: 'error', title: 'Migratie crashte', message: e.message || String(e) });
         migBtn.disabled = false;
+      }
+    });
+  }
+
+  // R2-reorganize: losse R2-bestanden in dossier-submap plaatsen
+  const reorgBtn = $('#btn-r2-reorg');
+  const reorgStatus = $('#r2-reorg-status');
+  const reorgLog = $('#r2-reorg-log');
+  if (reorgBtn && typeof R2Reorg !== 'undefined') {
+    reorgBtn.addEventListener('click', async () => {
+      const werk = R2Reorg.verzamel();
+      if (!werk.length) {
+        Modal.show({ type: 'info', title: 'Niks te doen', message: 'Alle R2-bestanden staan al in de juiste submap.' });
+        return;
+      }
+      const ok = await Modal.confirm({
+        type: 'info',
+        title: `${werk.length} bestand${werk.length === 1 ? '' : 'en'} herordenen?`,
+        message: `Elk bestand wordt server-side gekopieerd naar de dossier-submap (bv. artsverklaring/Achternaam_Dnummer/) en het origineel wordt verwijderd. Geen data-transfer via jouw browser.`,
+        confirmText: `Ja, order ${werk.length}`,
+      });
+      if (!ok) return;
+      reorgBtn.disabled = true;
+      reorgLog.textContent = '';
+      const t0 = Date.now();
+      try {
+        const r = await R2Reorg.reorganiseerAlles(({ done, totaal, huidig, resultaat, error }) => {
+          reorgStatus.textContent = `${done}/${totaal} — bezig met ${huidig}`;
+          if (resultaat) reorgLog.textContent += `✓ ${huidig} → ${resultaat.destKey}\n`;
+          if (error)     reorgLog.textContent += `✗ ${huidig}: ${error}\n`;
+          reorgLog.scrollTop = reorgLog.scrollHeight;
+        });
+        const secs = Math.round((Date.now() - t0) / 1000);
+        Modal.show({
+          type: r.errors.length ? 'warning' : 'success',
+          title: `Ordenen klaar${r.errors.length ? ' met fouten' : ''}`,
+          message:
+            `${r.done}/${r.totaal} bestanden verplaatst in ${secs}s.\n` +
+            (r.errors.length ? `\n${r.errors.length} fout(en):\n` + r.errors.map(e => `• ${e.key}: ${e.error}`).join('\n') : ''),
+        });
+        renderAccount({ success: `Ordenen afgerond: ${r.done}/${r.totaal} bestanden.` });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Ordenen crashte', message: e.message || String(e) });
+        reorgBtn.disabled = false;
       }
     });
   }
