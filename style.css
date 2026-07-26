@@ -493,9 +493,13 @@ body.login-active { background: var(--bg) !important; overflow: hidden; padding-
 /* Zorg dat ook <html> donker is EN geen safe-area overhoudt tijdens
    de profielkiezer — anders zie je bij een tweede aanroep vanuit de app
    nog een balkje. */
-html:has(body.profile-active),
-html:has(#splash:not([hidden])) {
+html:has(body.profile-active) {
   background: #0b132b !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+html:has(#splash:not([hidden])) {
+  background: #f6f4ef !important;
   height: 100dvh !important;
   overflow: hidden !important;
 }
@@ -1523,17 +1527,19 @@ button.kist-card-img-btn:focus { outline: 2px solid var(--primary); outline-offs
 }
 .splash.fading { pointer-events: none; }
 
-/* ─── Minimalistisch splash — dark, groot icoon gecentreerd + naam eronder. */
+/* ─── Minimalistisch splash — lichte app-tint zodat 't naadloos in de
+   dossierlijst overgaat (geen zwart flits meer bij openen). */
 .splash-minimal {
   background:
-    radial-gradient(1200px 900px at 50% 40%, rgba(30,114,133,.08), transparent 65%),
-    #000;
-  color: #f5f2ea;
+    radial-gradient(1200px 900px at 30% 20%, rgba(107,30,42,.06), transparent 60%),
+    radial-gradient(900px 600px at 80% 90%, rgba(201,162,74,.08), transparent 60%),
+    linear-gradient(135deg, #f6f4ef, #ede5d8);
+  color: var(--text);
 }
-/* Zorg dat body/html ook zwart zijn terwijl de splash actief is, anders
-   ontstaat er een naadje bij de iOS safe-area padding-bottom. */
-body:has(#splash:not([hidden])) { background: #000; }
-html:has(#splash:not([hidden])) { background: #000; }
+/* Zorg dat body/html óók de lichte splash-tint volgen tijdens de laad —
+   zo geen naadje bij iOS safe-area en geen zwart in beeld. */
+body:has(#splash:not([hidden])) { background: #f6f4ef; }
+html:has(#splash:not([hidden])) { background: #f6f4ef; }
 .splash-minimal .splash-stack {
   display: flex; flex-direction: column; align-items: center;
   gap: .4rem;
@@ -1556,17 +1562,17 @@ html:has(#splash:not([hidden])) { background: #000; }
 .splash-minimal .splash-wordmark {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 2.75rem; font-weight: 700; letter-spacing: -1px;
-  color: #4ea8bd;
+  color: #1e7285;
   line-height: 1;
   margin-top: .25rem;
 }
 .splash-minimal .splash-tagline {
   font-size: .85rem;
   letter-spacing: .04em;
-  color: rgba(245,242,234,.62);
+  color: rgba(42,39,36,.62);
   margin-top: .1rem;
 }
-.splash-minimal .splash-state { margin-top: 1.5rem; text-align: center; color: rgba(245,242,234,.55); }
+.splash-minimal .splash-state { margin-top: 1.5rem; text-align: center; color: rgba(42,39,36,.55); }
 .splash-minimal .splash-state .splash-spinner {
   width: 20px; height: 20px;
   border: 2px solid rgba(255,255,255,.14);
@@ -1578,17 +1584,17 @@ html:has(#splash:not([hidden])) { background: #000; }
 @keyframes splashSpin { to { transform: rotate(360deg); } }
 .splash-minimal .splash-hint {
   margin-top: 1rem; letter-spacing: .04em; text-transform: uppercase;
-  font-size: .7rem; color: rgba(245,242,234,.45);
+  font-size: .7rem; color: rgba(42,39,36,.45);
 }
-.splash-minimal .splash-msg { color: rgba(245,242,234,.75); }
-.splash-minimal .splash-msg-sub { color: rgba(245,242,234,.5); }
-.splash-minimal .splash-icon-offline { color: rgba(245,242,234,.5); }
+.splash-minimal .splash-msg { color: rgba(42,39,36,.75); }
+.splash-minimal .splash-msg-sub { color: rgba(42,39,36,.55); }
+.splash-minimal .splash-icon-offline { color: rgba(42,39,36,.55); }
 
 /* Versie klein rechtsonder in de hoek — geen 'BY X'-blok centraal. */
 .splash-minimal .splash-version-corner {
   position: absolute; right: 1rem; bottom: 1rem;
   font-size: .65rem;
-  color: rgba(245,242,234,.28);
+  color: rgba(42,39,36,.35);
   letter-spacing: .05em;
 }
 .splash-minimal .splash-card { display: none; }
