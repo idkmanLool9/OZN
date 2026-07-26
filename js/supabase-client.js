@@ -453,18 +453,23 @@ const R2 = {
     return parts.join('_');
   },
 
-  // Bestand uploaden. keyPrefix = bv. 'artsverklaring/' of 'bezittingen/'.
-  // Optioneel: dossier-context, dan wordt de key
-  //   <prefix><dossier-naam-nummer>/<timestamp>-<random>-<safeName>
-  // zodat je in het R2 dashboard per dossier een map ziet.
+  // Bestand uploaden. keyPrefix = type ('artsverklaring/', 'bezittingen/'…).
+  // Nieuwe structuur (dossier-first):
+  //   dossiers/<Achternaam_Dnummer>/<type>/<timestamp>-<random>-<safeName>
+  // Voor dossier-snapshots (keyPrefix = 'dossiers/' of leeg) komt het
+  // bestand direct in de dossier-map: dossiers/<sub>/<filename>.
+  // Zonder dossier-context gebruiken we tijdelijke map _nieuw_<timestamp>;
+  // de auto-reorder verplaatst 'm zodra het dossier een naam/ID heeft.
   async upload(file, keyPrefix, dossier) {
-    if (!keyPrefix || !/\/$/.test(keyPrefix)) throw new Error('keyPrefix must end with /');
     const rawName = (file && file.name) || 'bestand';
     const safe = String(rawName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
     const rand = Math.random().toString(36).slice(2, 8);
-    const sub = R2.folderName(dossier);
-    const subPart = sub ? sub + '/' : '';
-    const key = `${keyPrefix}${subPart}${Date.now()}-${rand}-${safe}`;
+    const sub = R2.folderName(dossier) || `_nieuw_${Date.now()}_${rand}`;
+    const type = String(keyPrefix || '').replace(/\/$/, '');
+    const filename = `${Date.now()}-${rand}-${safe}`;
+    const key = (!type || type === 'dossiers')
+      ? `dossiers/${sub}/${filename}`
+      : `dossiers/${sub}/${type}/${filename}`;
     const { url, method } = await R2._sign('put', key, { contentType: file.type || 'application/octet-stream' });
     const resp = await fetch(url, {
       method,
@@ -724,18 +729,32 @@ const R2Migratie = {
   },
 };
 
-// ─── R2Reorg: bestaande R2-bestanden herordenen in dossier-submappen ───────
-// Loopt door alle dossiers, kijkt naar de r2:-paden, en verplaatst bestanden
-// die nog in de root van hun type-map staan naar een submap met de
-// dossier-naam (bv. artsverklaring/1234.jpg → artsverklaring/Achternaam_D42/1234.jpg).
-// Verplaatsing gebeurt server-side via r2-move (COPY + DELETE) — geen client-
-// bandbreedte.
+// ─── R2Reorg: bestaande R2-bestanden verplaatsen naar dossier-first schema
+// Nieuw pad: dossiers/<Achternaam_Dnummer>/<type>/<filename>
+// Oud patroon (nog aanwezig na eerdere migraties):
+//   <type>/<filename>              — plat
+//   <type>/<sub>/<filename>        — type-first
+// Beide worden geïdentificeerd en server-side (r2-move) verplaatst.
 const R2Reorg = {
   DOSSIER_PAD_COLUMNS: [
     'artsverklaring_pad', 'overdraagformulier_pad',
     'bezit_oorbellen_foto', 'bezit_ringen_foto', 'bezit_armbanden_foto',
     'bezit_ketting_foto',   'bezit_bril_foto',   'bezit_horloge_foto',
   ],
+
+  _typeVoorVeld(veld) {
+    if (veld === 'artsverklaring_pad')     return 'artsverklaring';
+    if (veld === 'overdraagformulier_pad') return 'overdraagformulier';
+    if (veld === '__extra__')              return 'bezittingen';
+    if (veld && veld.indexOf('bezit_') === 0) return 'bezittingen';
+    return 'overig';
+  },
+
+  _computeDest(sub, type, sourceKey) {
+    const parts = sourceKey.split('/');
+    const filename = parts[parts.length - 1];
+    return `dossiers/${sub}/${type}/${filename}`;
+  },
 
   verzamel() {
     const werk = [];
@@ -745,28 +764,22 @@ const R2Reorg = {
       R2Reorg.DOSSIER_PAD_COLUMNS.forEach(veld => {
         const p = d[veld];
         if (!p || !R2.isR2(p)) return;
-        const key = R2.key(p);
-        const parts = key.split('/');
-        // Verwacht: <prefix>/<sub>/<file>. Als parts.length < 3, zit er geen submap in.
-        // Als de bestaande submap != gewenste sub, verplaatsen we ook.
-        if (parts.length === 2 || parts[1] !== sub) {
-          const prefix = parts[0] + '/';
-          const filename = parts[parts.length - 1];
-          const destKey = `${prefix}${sub}/${filename}`;
-          werk.push({ dossierId: d.id, veld, oldPath: p, sourceKey: key, destKey });
-        }
+        const sourceKey = R2.key(p);
+        const type = R2Reorg._typeVoorVeld(veld);
+        const expectedPrefix = `dossiers/${sub}/${type}/`;
+        if (sourceKey.startsWith(expectedPrefix)) return; // al goed
+        const destKey = R2Reorg._computeDest(sub, type, sourceKey);
+        werk.push({ dossierId: d.id, veld, oldPath: p, sourceKey, destKey });
       });
       if (Array.isArray(d.extra_bezittingen)) {
         d.extra_bezittingen.forEach((b, i) => {
           if (!b || !b.foto_pad || !R2.isR2(b.foto_pad)) return;
-          const key = R2.key(b.foto_pad);
-          const parts = key.split('/');
-          if (parts.length === 2 || parts[1] !== sub) {
-            const prefix = parts[0] + '/';
-            const filename = parts[parts.length - 1];
-            const destKey = `${prefix}${sub}/${filename}`;
-            werk.push({ dossierId: d.id, veld: '__extra__', extraIdx: i, oldPath: b.foto_pad, sourceKey: key, destKey });
-          }
+          const sourceKey = R2.key(b.foto_pad);
+          const type = 'bezittingen';
+          const expectedPrefix = `dossiers/${sub}/${type}/`;
+          if (sourceKey.startsWith(expectedPrefix)) return;
+          const destKey = R2Reorg._computeDest(sub, type, sourceKey);
+          werk.push({ dossierId: d.id, veld: '__extra__', extraIdx: i, oldPath: b.foto_pad, sourceKey, destKey });
         });
       }
     });
