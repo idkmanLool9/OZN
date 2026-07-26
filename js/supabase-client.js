@@ -813,6 +813,55 @@ const R2Reorg = {
   },
 };
 
+// ─── Autonome R2-sync: draait stil op de achtergrond ───────────────────────
+// 1) Migreer alles wat nog op Supabase Storage staat → R2
+// 2) Order alle R2-bestanden in dossier-submappen
+// Faalt stil (niet blokkerend voor de gebruiker); alleen console-log.
+// Wordt aangeroepen:
+//   - eenmalig per sessie, ~5 sec na login (voor beheerders)
+//   - na elke dossier-save, alleen voor dat ene dossier (fijn na intake)
+let _r2AutoSyncBusy = false;
+async function autoSyncNaarR2() {
+  if (_r2AutoSyncBusy) return;
+  if (!navigator.onLine) return;
+  if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return; // alleen beheerders mogen r2-migrate-one aanroepen
+  _r2AutoSyncBusy = true;
+  try {
+    // Migratie SB Storage → R2 (max 20 tegelijk om lange kliks te voorkomen)
+    const mig = R2Migratie.verzamel().slice(0, 20);
+    for (const item of mig) {
+      try { await R2Migratie.migreer1(item); }
+      catch (e) { console.warn('R2 auto-migratie faalde voor', item.pad, e && e.message); }
+    }
+    // Reorder R2 → submap per dossier (max 40)
+    const reorg = R2Reorg.verzamel().slice(0, 40);
+    for (const item of reorg) {
+      try { await R2Reorg.verplaats1(item); }
+      catch (e) { console.warn('R2 auto-reorder faalde voor', item.sourceKey, e && e.message); }
+    }
+    if (mig.length || reorg.length) {
+      console.log(`R2 auto-sync: ${mig.length} gemigreerd, ${reorg.length} geordend.`);
+    }
+  } finally {
+    _r2AutoSyncBusy = false;
+  }
+}
+
+// Reorder alleen bestanden die bij één specifiek dossier horen. Handig na
+// een dossier-save: nieuwe uploads onder 'Achternaam/xxx' krijgen dan meteen
+// hun D-nummer erbij ('Achternaam_D42/xxx').
+async function autoSyncDossierNaarR2(dossierId) {
+  if (!navigator.onLine) return;
+  if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return;
+  try {
+    const werk = R2Reorg.verzamel().filter(i => i.dossierId === dossierId);
+    for (const item of werk) {
+      try { await R2Reorg.verplaats1(item); }
+      catch (e) { console.warn('R2 dossier-reorder faalde voor', item.sourceKey, e && e.message); }
+    }
+  } catch (e) { console.warn('autoSyncDossierNaarR2:', e && e.message); }
+}
+
 // ─── Dossier-PDF automatisch naar R2 (na elke save) ────────────────────────
 // Genereert een PDF van het dossier via de bestaande PdfGen + dossierSpec en
 // zet 'm neer als dossiers/<folder>/dossier-<yyyy-mm-dd-hhmm>.pdf op R2.

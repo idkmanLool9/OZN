@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 290;
-const APP_VERSION    = '5.98.0';
+const APP_BUILD      = 291;
+const APP_VERSION    = '5.98.1';
 const APP_BUILD_DATE = '2026-07-21';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1111,6 +1111,13 @@ Router.add('/logboek', () => renderLogboek());
   // Offline: blijft staan tot de gebruiker op "Verder" klikt.
   if (splashOn && navigator.onLine && !Cloud.offline) {
     Splash.autoDismiss();
+  }
+
+  // R2 auto-sync op de achtergrond (beheerder-only). Migreert losse
+  // Supabase-Storage-bestanden naar R2 en zet R2-bestanden in dossier-
+  // submappen zonder dat de beheerder ergens op hoeft te klikken.
+  if (sess && navigator.onLine && typeof autoSyncNaarR2 === 'function') {
+    setTimeout(() => { try { autoSyncNaarR2(); } catch (_) {} }, 5000);
   }
 
   const clearBtn = document.getElementById('login-clear');

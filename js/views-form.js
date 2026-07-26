@@ -2071,14 +2071,17 @@ function renderDossierForm(params) {
         try { sessionStorage.removeItem('sok_actief_' + draftKey); } catch (_) {}
       }
 
-      // ─── Dossier-PDF asynchroon naar R2 (achtergrond, faalt stil) ──
-      // Zorgt dat elke opgeslagen versie van het dossier ook als PDF onder
-      // dossiers/<Achternaam_Dnummer>/ in R2 staat, zodat je daar altijd
-      // een compleet overzicht kunt terugvinden zonder de app open te hoeven.
+      // ─── Alles automatisch naar R2 (achtergrond, faalt stil) ──
+      //  1) Reorder losse bestanden van dit dossier naar de juiste submap
+      //     (belangrijk: bij nieuwe dossiers heeft de eerste upload nog geen
+      //      dossier-nummer, dus krijgt 'ie na save z'n D-nummer erbij)
+      //  2) Volledige dossier-PDF als snapshot naar dossiers/<naam>/
       if (savedDossier && navigator.onLine) {
         try {
+          if (typeof autoSyncDossierNaarR2 === 'function') autoSyncDossierNaarR2(savedDossier.id);
+        } catch (_) {}
+        try {
           const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === savedDossier.id) || [];
-          // Niet awaiten — mag rustig op de achtergrond draaien.
           uploadDossierPdfNaarR2(savedDossier, kostenLijst);
         } catch (_) {}
       }
