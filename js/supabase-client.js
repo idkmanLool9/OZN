@@ -326,6 +326,7 @@ const DB = {
     const norm = normalize(tbl, data);
     Cloud.cache[tbl].push(norm);
     AuditLog.log('insert', tbl, norm && norm.id, { row: sanitizeForAudit(row) });
+    _triggerDossierR2Sync(tbl, norm);
     return norm;
   },
 
@@ -353,6 +354,7 @@ const DB = {
     const i = Cloud.cache[tbl].findIndex(x => _idEq(x.id, id));
     if (i >= 0) Cloud.cache[tbl][i] = norm;
     AuditLog.log('update', tbl, id, { patch: sanitizeForAudit(p), oud: oud ? diffKeys(oud, norm) : null });
+    _triggerDossierR2Sync(tbl, norm);
     return norm;
   },
 
@@ -374,6 +376,7 @@ const DB = {
     }
     Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => !_idEq(x.id, id));
     AuditLog.log('delete', tbl, id, { was: oud ? sanitizeForAudit(oud) : null });
+    _triggerDossierR2Sync(tbl, oud);
   },
 
   async removeWhere(tbl, fn) {
@@ -890,6 +893,41 @@ async function autoSyncNaarR2() {
   } finally {
     _r2AutoSyncBusy = false;
   }
+}
+
+// Debounced trigger: elke DB-mutatie op dossiers / kosten / notities zet
+// een R2-snapshot voor het bijhorende dossier op de rol. Meerdere snelle
+// wijzigingen tellen mee tot één upload (5 sec na de laatste).
+const _r2SyncDebounce = new Map();
+function _triggerDossierR2Sync(tbl, row) {
+  try {
+    if (!row) return;
+    if (!navigator.onLine) return;
+    let dossierId = null;
+    if (tbl === 'dossiers') dossierId = row.id;
+    else if (tbl === 'kosten' || tbl === 'notities') dossierId = row.dossier_id;
+    if (!dossierId) return;
+    const existing = _r2SyncDebounce.get(dossierId);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(async () => {
+      _r2SyncDebounce.delete(dossierId);
+      try {
+        const d = DB.byId(KEYS.DOSSIERS, dossierId);
+        if (!d) return;
+        // 1) losse R2-bestanden van dit dossier in de juiste submap zetten
+        if (typeof autoSyncDossierNaarR2 === 'function') {
+          try { await autoSyncDossierNaarR2(dossierId); } catch (_) {}
+        }
+        // 2) volledige PDF + JSON snapshot uploaden
+        const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === dossierId) || [];
+        await uploadDossierPdfNaarR2(d, kostenLijst);
+        // 3) markeer als 'snapshot up-to-date' zodat de startup-backfill
+        //    'm overslaat totdat er weer iets wijzigt.
+        try { localStorage.setItem('sok_snap_' + dossierId, d.updated_at || d.created_at || ''); } catch (_) {}
+      } catch (e) { console.warn('Auto-R2 snapshot faalde voor dossier', dossierId, e && e.message); }
+    }, 5000);
+    _r2SyncDebounce.set(dossierId, t);
+  } catch (_) {}
 }
 
 // Reorder alleen bestanden die bij één specifiek dossier horen. Handig na
