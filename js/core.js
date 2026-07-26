@@ -997,11 +997,14 @@ const Router = {
 
     // Onthou laatst-bezochte dossier-route (detail, bewerken, concept nieuw,
     // factuur…) zodat 'Dossiers' in de topbar je terugbrengt bij het dossier
-    // waar je mee bezig was — óók bij een nog-niet-opgeslagen concept
-    // (#/dossiers/nieuw).
+    // waar je mee bezig was. Op de lijst zelf wissen we het geheugen, zodat
+    // een volgende keer 'Kisten → Dossiers' je NIET terugstuurt naar een
+    // oud dossier waar je allang klaar mee bent.
     try {
       if (/^\/dossiers\/.+/.test(path)) {
         sessionStorage.setItem('sok_last_dossier_route', '#' + fullHash);
+      } else if (path === '/dossiers') {
+        sessionStorage.removeItem('sok_last_dossier_route');
       }
     } catch (_) {}
 
