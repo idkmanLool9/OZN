@@ -951,6 +951,22 @@ const Router = {
   go(path) { location.hash = '#' + path; },
   start() {
     window.addEventListener('hashchange', Router.handle);
+    // Slim gedrag voor 'Dossiers' in de topbar: als je vanuit Kisten of
+    // Account terugklikt en er is een laatst-bezocht dossier, spring dan
+    // direct daar naartoe i.p.v. de lijst. Ben je al binnen /dossiers,
+    // dan blijft klikken naar de lijst gaan (huidige gedrag).
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[data-route="/dossiers"][href="#/dossiers"]');
+      if (!a) return;
+      const currentPath = (location.hash || '#/').slice(1).split('?')[0].split('#')[0];
+      if (currentPath.startsWith('/dossiers')) return; // laat lijst-gedrag
+      let last = null;
+      try { last = sessionStorage.getItem('sok_last_dossier_route'); } catch (_) {}
+      if (last && last.startsWith('#/dossiers/')) {
+        e.preventDefault();
+        location.hash = last.slice(1);
+      }
+    }, true);
     Router.handle();
   },
   handle() {
@@ -978,6 +994,16 @@ const Router = {
     ActiveProfile.autoActivateForDev();
     if (Settings.get('profielkiezer_actief') && !ActiveProfile.current()) { showProfilePicker(); return; }
     showApp();
+
+    // Onthou laatst-bezochte dossier-detail zodat 'Dossiers' in de topbar
+    // je terugbrengt bij het dossier waar je mee bezig was (i.p.v. de lijst).
+    try {
+      if (/^\/dossiers\/\d+/.test(path)) {
+        sessionStorage.setItem('sok_last_dossier_route', '#' + fullHash);
+      } else if (path === '/dossiers' || path.startsWith('/kisten') || path.startsWith('/account')) {
+        // Op de lijst zelf of op een andere tab: laatste-bezocht behouden, niet wissen.
+      }
+    } catch (_) {}
 
     for (const r of Router.routes) {
       const m = path.match(r.regex);

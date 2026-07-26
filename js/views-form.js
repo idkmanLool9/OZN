@@ -169,7 +169,7 @@ function applyDossierDraft(formEl, data) {
         return `
         <div class="brengen-naar-row route-row">
           <span class="route-dot" aria-hidden="true">${i + 1}</span>
-          <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+          <input type="text" class="brengen-naar-input" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
           <input type="date" class="brengen-naar-datum" value="${esc(it.datum || '')}" title="Datum">
           <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
         </div>`;
@@ -186,7 +186,7 @@ function applyDossierDraft(formEl, data) {
         return `
         <div class="thuis-overbr-row route-row">
           <span class="route-dot" aria-hidden="true">${i + 1}</span>
-          <input type="text" class="thuis-overbr-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+          <input type="text" class="thuis-overbr-input" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
           <input type="date" class="thuis-overbr-datum" value="${esc(it.datum || '')}" title="Datum">
           <button type="button" class="btn btn-sm btn-ghost thuis-overbr-del" title="Verwijder">×</button>
         </div>`;
@@ -373,7 +373,7 @@ function renderDossierForm(params) {
             <input type="hidden" name="geboorteplaats"   value="${v('geboorteplaats')}">
             <input type="hidden" name="overlijdensdatum" value="${v('overlijdensdatum')}">
             <label class="span-2"><span>Overlijdenslocatie</span>
-              <input type="text" name="overlijdensplaats" list="locatie-suggesties" value="${v('overlijdensplaats')}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
+              <input type="text" name="overlijdensplaats" value="${v('overlijdensplaats')}" autocomplete="off" placeholder="bv. ziekenhuis, thuis…">
             </label>
             <label class="span-2"><span>Adres overledene</span><input type="text" name="adres_overledene" value="${v('adres_overledene')}" placeholder="Typ straat + huisnummer — kies uit lijst" autocomplete="off"></label>
             <label><span>Postcode</span><input type="text" name="postcode_overledene" value="${v('postcode_overledene')}"></label>
@@ -470,18 +470,13 @@ function renderDossierForm(params) {
               </select>
             </label>
             <label class="span-2"><span>Ophaallocatie</span>
-              <input type="text" name="opbaarlocatie_type" id="opbaarlocatie-input" list="locatie-suggesties" value="${v('opbaarlocatie_type')}" autocomplete="off" placeholder="bv. uitvaartcentrum, thuis, ziekenhuis…">
+              <input type="text" name="opbaarlocatie_type" id="opbaarlocatie-input" value="${v('opbaarlocatie_type')}" autocomplete="off" placeholder="bv. uitvaartcentrum, thuis, ziekenhuis…">
               <span class="muted small" style="display:block; margin-top:.2rem; font-size:.78rem;">Aula Vale ? <span style="opacity:.7;">— typ 'aula vale' voor de extra velden.</span></span>
             </label>
           </div>
-          <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem;">
-            <label class="opbaar-chip">
-              <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
-            </label>
-          </div>
           <!-- Vinkje aula_gebruikt bestaat nog in de DB (backwards compat) —
-               we vullen hem programmatisch op basis van "bevat 'aula'" bij het
-               opslaan. In de UI is er geen aparte checkbox meer. -->
+               we vullen hem programmatisch op basis van "bevat 'aula vale'"
+               bij het opslaan. In de UI is er geen aparte checkbox meer. -->
           <input type="hidden" name="aula_gebruikt" id="aula-gebruikt-hidden" value="${dossier.aula_gebruikt ? 'ja' : ''}">
           <div class="grid-3" id="aula-extra-velden" style="margin-top:.6rem; ${/aula\s+vale/i.test(dossier.opbaarlocatie_type || '') ? '' : 'display:none;'}">
             <label><span>Centrale koeling vanaf</span>
@@ -491,18 +486,11 @@ function renderDossierForm(params) {
               <input type="date" name="familiekamer_vanaf" value="${v('familiekamer_vanaf')}">
             </label>
           </div>
-          <datalist id="locatie-suggesties">
-            ${(() => {
-              const s = new Set();
-              DB.list(KEYS.DOSSIERS).forEach(d => {
-                if (d.opbaarlocatie_type) s.add(d.opbaarlocatie_type);
-                if (d.overlijdensplaats) s.add(d.overlijdensplaats);
-                if (Array.isArray(d.brengen_naar)) d.brengen_naar.forEach(x => { const it = _normRouteItem(x); if (it.locatie) s.add(it.locatie); });
-                if (Array.isArray(d.thuis_overbrengingen)) d.thuis_overbrengingen.forEach(x => { const it = _normRouteItem(x); if (it.locatie) s.add(it.locatie); });
-              });
-              return [...s].sort().map(x => `<option value="${esc(x)}"></option>`).join('');
-            })()}
-          </datalist>
+          <div style="display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.6rem;">
+            <label class="opbaar-chip">
+              <input type="checkbox" name="opbaring_kist" value="ja" ${dossier.opbaring_kist ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:var(--primary,#2563eb);"> <span>Kist-opbaring</span>
+            </label>
+          </div>
         </fieldset>
 
         <!-- ── OPHALEN / OVERBRENGEN ─────────────────────────────────────── -->
@@ -526,7 +514,7 @@ function renderDossierForm(params) {
                   return `
                   <div class="brengen-naar-row route-row">
                     <span class="route-dot" aria-hidden="true">${i + 1}</span>
-                    <input type="text" class="brengen-naar-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+                    <input type="text" class="brengen-naar-input" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
                     <input type="date" class="brengen-naar-datum" value="${esc(it.datum || '')}" title="Datum">
                     <button type="button" class="btn btn-sm btn-ghost brengen-naar-del" title="Verwijder">×</button>
                   </div>`;
@@ -569,7 +557,7 @@ function renderDossierForm(params) {
                   return `
                   <div class="thuis-overbr-row route-row">
                     <span class="route-dot" aria-hidden="true">${i + 1}</span>
-                    <input type="text" class="thuis-overbr-input" list="locatie-suggesties" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
+                    <input type="text" class="thuis-overbr-input" autocomplete="off" value="${esc(it.locatie || '')}" placeholder="Locatie ${i + 1}">
                     <input type="date" class="thuis-overbr-datum" value="${esc(it.datum || '')}" title="Datum">
                     <button type="button" class="btn btn-sm btn-ghost thuis-overbr-del" title="Verwijder">×</button>
                   </div>`;
@@ -601,7 +589,7 @@ function renderDossierForm(params) {
               <strong>Verzorgd / Gekleed</strong>
               <div class="grid-3" style="margin-top:.35rem;">
                 <label><span>Datum</span><input type="date" name="verzorgd_gekleed_datum" value="${v('verzorgd_gekleed_datum')}"></label>
-                <label><span>Waar</span><input type="text" name="verzorgd_gekleed_waar" list="locatie-suggesties" value="${v('verzorgd_gekleed_waar')}"></label>
+                <label><span>Waar</span><input type="text" name="verzorgd_gekleed_waar" value="${v('verzorgd_gekleed_waar')}" autocomplete="off"></label>
                 <label><span>Met/zonder familie</span>
                   <select name="verzorgd_gekleed_familie">
                     <option value="">—</option>
@@ -616,7 +604,7 @@ function renderDossierForm(params) {
               <strong>Gekist</strong>
               <div class="grid-3" style="margin-top:.35rem;">
                 <label><span>Datum</span><input type="date" name="gekist_datum" value="${v('gekist_datum')}"></label>
-                <label class="span-2"><span>Waar</span><input type="text" name="gekist_waar" list="locatie-suggesties" value="${v('gekist_waar')}"></label>
+                <label class="span-2"><span>Waar</span><input type="text" name="gekist_waar" value="${v('gekist_waar')}" autocomplete="off"></label>
               </div>
             </div>
 
@@ -905,7 +893,7 @@ function renderDossierForm(params) {
       div.className = rowClass + ' route-row';
       div.innerHTML = `
         <span class="route-dot" aria-hidden="true">•</span>
-        <input type="text" class="${inputClass}" list="locatie-suggesties" autocomplete="off" value="${esc(loc)}" placeholder="Locatie">
+        <input type="text" class="${inputClass}" autocomplete="off" value="${esc(loc)}" placeholder="Locatie">
         <input type="date" class="${datumClass}" value="${esc(datum)}" title="Datum">
         <button type="button" class="btn btn-sm btn-ghost ${delClass}" title="Verwijder">×</button>`;
       return div;
