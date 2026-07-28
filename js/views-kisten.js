@@ -602,7 +602,7 @@ function renderKistenBestellijst(msg) {
             </div>
             <div style="display:flex; align-items:center; gap:.5rem;">
               <label class="muted small" style="margin:0;">Aantal</label>
-              <input type="number" min="1" step="1" value="${r.teBestellen}" data-bestel-aantal="${esc(r.naam)}" style="width:70px; text-align:right; padding:.4rem .5rem;">
+              <input type="number" min="1" step="1" value="" placeholder="${r.teBestellen}" data-bestel-aantal="${esc(r.naam)}" style="width:70px; text-align:right; padding:.4rem .5rem;">
               <button type="button" class="btn btn-sm btn-primary" data-mark-besteld="${esc(r.naam)}" title="Voorraad ophogen met dit aantal + datum vandaag als laatst bijgevuld">+ Bijvullen</button>
             </div>
           </li>`).join('')}
