@@ -12,9 +12,9 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 301;
-const APP_VERSION    = '6.0.0';
-const APP_BUILD_DATE = '2026-07-21';
+const APP_BUILD      = 302;
+const APP_VERSION    = '6.0.1';
+const APP_BUILD_DATE = '2026-07-28';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -938,24 +938,41 @@ const ApkUpdater = {
       if (Date.now() - last < ApkUpdater.CHECK_INTERVAL_MS) return null;
     }
     try {
-      const r = await fetch(ApkUpdater.RELEASE_API, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
-      if (!r.ok) return null;
-      const j = await r.json();
+      // Haal APP_BUILD uit de release-source (js/app.js op de default-branch)
+      // en vergelijk met het lokale APP_BUILD-nummer. Een nieuwe release
+      // heeft altijd een hoger build-nummer; dat is dus een betrouwbare
+      // vergelijking. Het oude script vergeleek asset.updated_at — dat gaf
+      // false positives omdat élke rebuild een nieuwe timestamp geeft.
+      const rSrc = await fetch(
+        'https://raw.githubusercontent.com/idkmanLool9/OZN/claude/app-scan-analysis-huhgss/js/app.js?_ts=' + Date.now(),
+        { cache: 'no-store' }
+      );
+      if (!rSrc.ok) return null;
+      const text = (await rSrc.text()).slice(0, 1500);
+      const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
+      const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
+      const remoteBuild = mb ? parseInt(mb[1], 10) : null;
+      const remoteVersion = mv ? mv[1] : null;
       localStorage.setItem(ApkUpdater.LAST_CHECK_KEY, String(Date.now()));
-      const asset = (j.assets || []).find(a => a && a.name && a.name.toLowerCase().endsWith('.apk'));
-      if (!asset) return null;
-      // Vergelijk asset.updated_at met APP_BUILD_DATE. Als de asset op zijn
-      // laatst UPDATED is nádat de app werd gebouwd, is er iets nieuws.
-      const remoteTs = new Date(asset.updated_at || asset.created_at || 0).getTime();
-      const localTs  = new Date(APP_BUILD_DATE + 'T00:00:00Z').getTime();
-      const nieuwer = remoteTs > localTs + 12 * 60 * 60 * 1000; // 12u marge tegen tijdzone-slop
+
+      // Voor de download-URL wél nog even de release-API pakken
+      let downloadUrl = 'https://github.com/idkmanLool9/OZN/releases/latest/download/ozn-app.apk';
+      try {
+        const rApi = await fetch(ApkUpdater.RELEASE_API, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
+        if (rApi.ok) {
+          const j = await rApi.json();
+          const asset = (j.assets || []).find(a => a && a.name && a.name.toLowerCase().endsWith('.apk'));
+          if (asset && asset.browser_download_url) downloadUrl = asset.browser_download_url;
+        }
+      } catch (_) {}
+
+      const nieuwer = !!(remoteBuild && remoteBuild > APP_BUILD);
       const info = {
-        hasUpdate: nieuwer,
-        remoteTs, localTs,
-        downloadUrl: asset.browser_download_url,
-        releaseName: j.name || 'app-latest',
-        commitSha: (j.body || '').match(/commit `([a-f0-9]+)`/i)?.[1] || null,
-        assetUpdated: asset.updated_at,
+        hasUpdate:     nieuwer,
+        localBuild:    APP_BUILD,
+        remoteBuild,
+        remoteVersion,
+        downloadUrl,
       };
       if (nieuwer) ApkUpdater.showBanner(info);
       return info;
@@ -964,14 +981,14 @@ const ApkUpdater = {
 
   showBanner(info) {
     const dismissed = localStorage.getItem(ApkUpdater.DISMISSED_KEY);
-    if (dismissed && dismissed === String(info.remoteTs)) return; // gebruiker heeft déze versie al weggeklikt
+    if (dismissed && dismissed === String(info.remoteBuild)) return; // gebruiker heeft déze versie al weggeklikt
     const el = document.getElementById('apk-update-banner');
     const txt = document.getElementById('apk-update-banner-info');
     const btn = document.getElementById('apk-update-banner-install');
     const dis = document.getElementById('apk-update-banner-dismiss');
     if (!el || !txt || !btn) return;
-    const dagOud = Math.max(0, Math.round((info.remoteTs - info.localTs) / 86400000));
-    txt.textContent = `Nieuwe versie op de release-pagina ${dagOud > 0 ? '(' + dagOud + ' dag' + (dagOud === 1 ? '' : 'en') + ' nieuwer)' : ''}. Installeer om de laatste verbeteringen te krijgen.`;
+    const versieStr = info.remoteVersion ? `v${info.remoteVersion}` : `build ${info.remoteBuild}`;
+    txt.textContent = `Nieuwe versie beschikbaar: ${versieStr} (jij: build ${info.localBuild}). Installeer om de laatste verbeteringen te krijgen.`;
     btn.href = info.downloadUrl;
     btn.setAttribute('target', '_blank');
     btn.setAttribute('rel', 'noopener');
@@ -989,7 +1006,7 @@ const ApkUpdater = {
     el.hidden = false;
     document.body.classList.add('has-apk-banner');
     if (dis) dis.onclick = () => {
-      localStorage.setItem(ApkUpdater.DISMISSED_KEY, String(info.remoteTs));
+      localStorage.setItem(ApkUpdater.DISMISSED_KEY, String(info.remoteBuild));
       el.hidden = true;
       document.body.classList.remove('has-apk-banner');
     };
