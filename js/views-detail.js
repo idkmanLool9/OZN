@@ -30,16 +30,13 @@ function renderDossierDetail(params) {
           </p>
           <p class="muted small dossier-timestamps">
             Aangemaakt: <strong title="${esc(d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.created_at) || '—')}</strong>${(() => {
-              // 1e voorkeur: aangemaakt_door (profielnaam zoals Kevin/Van Duist)
-              // Vangt daarna terug op profiles.naam voor oude dossiers zonder
-              // die kolom, en als laatste redmiddel op niks (geen 'door'-tekst).
-              if (d.aangemaakt_door) return ' door <strong>' + esc(d.aangemaakt_door) + '</strong>';
-              if (d.created_by) {
-                const p = (Cloud.cache.profiles || []).find(x => x.id === d.created_by);
-                const nm = p && p.naam;
-                if (nm) return ' door <strong>' + esc(nm) + '</strong>';
-              }
-              return '';
+              // Volgorde:
+              //  1) aangemaakt_door (profielnaam bij insert bewaard)
+              //  2) bijgewerkt_door (profielnaam bij laatste update — vaak nog
+              //     dezelfde als de maker voor recent aangemaakte dossiers)
+              //  3) niks tonen (liever geen naam dan een verwarrende e-mail)
+              const nm = d.aangemaakt_door || d.bijgewerkt_door || '';
+              return nm ? ' door <strong>' + esc(nm) + '</strong>' : '';
             })()}
             · Laatst opgeslagen: <strong title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at) || '—')}</strong>${d.bijgewerkt_door ? ' door <strong>' + esc(d.bijgewerkt_door) + '</strong>' : ''}
           </p>
