@@ -75,7 +75,34 @@ jobs:
       - name: Bak Android-icoontjes uit assets/icon.png
         run: npx @capacitor/assets generate --android --iconBackgroundColor '#f6f2e7'
 
-      - name: APK bouwen (debug)
+      - name: Vaste signing-keystore koppelen (voorkomt update-mismatch)
+        run: |
+          # De keystore in ../android-signing/ozn.keystore is gecommit in het
+          # repo. Alle builds signeren voortaan met dezelfde key, zodat een
+          # update over een oudere APK niet meer geblokkeerd wordt met
+          # "conflicteert met bestaand pakket" (signature mismatch).
+          mkdir -p android/app
+          cp android-signing/ozn.keystore android/app/ozn.keystore
+          cat >> android/app/build.gradle <<'GRADLE'
+
+          android {
+              signingConfigs {
+                  debug {
+                      storeFile file('ozn.keystore')
+                      storePassword 'ozn2026debug'
+                      keyAlias 'ozn'
+                      keyPassword 'ozn2026debug'
+                  }
+              }
+              buildTypes {
+                  debug {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          GRADLE
+
+      - name: APK bouwen (debug, gesigneerd met vaste keystore)
         working-directory: android
         run: |
           chmod +x gradlew
@@ -104,6 +131,11 @@ jobs:
             1. Open deze pagina op de tablet en tik op `ozn-app.apk`.
             2. Sta 'installeren van onbekende bronnen' toe voor je browser (eenmalig).
             3. Open de app.
+
+            > ⚠️ **Alleen bij deze update éénmaal**: als je een OZN-app van vóór
+            > 28 jul 2026 hebt geïnstalleerd, deïnstalleer die eerst (signing
+            > key is gewijzigd naar een vaste). Toekomstige updates gaan
+            > gewoon normaal over de bestaande installatie.
           files: ozn-app.apk
           prerelease: false
           make_latest: 'false'
