@@ -249,7 +249,7 @@ function renderKistenBeheer(msg) {
           </div>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
             <a href="#/kisten/voorraad" class="btn btn-sm">📦 Voorraadbeheer</a>
-            ${heeftLaag ? '<a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>' : ''}
+            ${heeftLaag ? '<a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bijvul-lijst</a>' : ''}
           </div>
         </div>`;
       })() : ''}
@@ -580,33 +580,35 @@ function renderKistenBestellijst(msg) {
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head">
-        <div><a href="#/kisten" class="back-link">← Terug naar kisten</a><h1>Bestellijst — Unigra</h1>
-          <p class="muted">Alle kisten waarvan de voorraad onder het minimum staat.</p></div>
+        <div><a href="#/kisten" class="back-link">← Terug naar kisten</a><h1>Bijvullen</h1>
+          <p class="muted">Kisten waarvan de voorraad onder het minimum staat.</p></div>
       </div>
 
       ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
 
       ${berekend.length === 0 ? `
-        <div class="card"><p class="muted">🎉 Alle voorraden zijn op peil — niets te bestellen.</p></div>
+        <div class="card"><p class="muted">🎉 Alle voorraden zijn op peil — niets bij te vullen.</p></div>
       ` : `
       <section class="card">
-        <table class="table">
-          <thead><tr><th>Kist</th><th class="num">Voorraad</th><th class="num">Min.</th><th class="num">Levertijd</th><th class="num">Te bestellen</th><th>Laatst besteld</th><th></th></tr></thead>
-          <tbody>
-            ${berekend.map(r => `<tr class="${(r.aantal||0) === 0 ? 'row-leeg' : ''}">
-              <td><strong>${esc(r.naam)}</strong></td>
-              <td class="num">${r.aantal || 0}</td>
-              <td class="num">${r.min_aantal || 0}</td>
-              <td class="num muted small">${r.levertijd_dagen ? r.levertijd_dagen + ' dgn' : '—'}</td>
-              <td class="num"><input type="number" min="1" step="1" value="${r.teBestellen}" data-bestel-aantal="${esc(r.naam)}" style="width:70px;text-align:right;"></td>
-              <td class="muted small">${r.laatst_besteld ? esc(fmtDate(r.laatst_besteld)) + (r.besteld_aantal ? ' · ' + r.besteld_aantal + '×' : '') : '—'}</td>
-              <td><button type="button" class="btn btn-sm" data-mark-besteld="${esc(r.naam)}" title="Markeer als besteld (dan komt hij niet meer op deze lijst voor vandaag)">✓ Besteld</button></td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-        <div class="form-actions" style="justify-content:flex-end;">
-          <span class="muted small">${berekend.length} kist${berekend.length===1?'':'en'} · totaal ${totaal} stuks te bestellen</span>
+        <ul class="bijvullen-lijst" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.6rem;">
+          ${berekend.map(r => `
+          <li class="${(r.aantal||0) === 0 ? 'row-leeg' : ''}" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; padding:.85rem 1rem; border:1px solid var(--border,#e5e0d6); border-radius:12px; background:${(r.aantal||0) === 0 ? '#fff5f0' : 'var(--card-bg,#fff)'};">
+            <div style="min-width:200px; flex:1;">
+              <div style="font-weight:600; font-size:1.02rem;">${esc(r.naam)}</div>
+              <div class="muted small" style="margin-top:.15rem;">
+                Voorraad <strong style="color:${(r.aantal||0) === 0 ? '#c0392b' : 'var(--text)'};">${r.aantal || 0}</strong> · min <strong>${r.min_aantal || 0}</strong>${r.laatst_besteld ? ' · laatst bijgevuld ' + esc(fmtDate(r.laatst_besteld)) : ''}
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:.5rem;">
+              <label class="muted small" style="margin:0;">Aantal</label>
+              <input type="number" min="1" step="1" value="${r.teBestellen}" data-bestel-aantal="${esc(r.naam)}" style="width:70px; text-align:right; padding:.4rem .5rem;">
+              <button type="button" class="btn btn-sm btn-primary" data-mark-besteld="${esc(r.naam)}" title="Voorraad ophogen met dit aantal + datum vandaag als laatst bijgevuld">+ Bijvullen</button>
+            </div>
+          </li>`).join('')}
+        </ul>
+        <div class="form-actions" style="justify-content:flex-end; margin-top:.75rem;">
+          <span class="muted small">${berekend.length} kist${berekend.length===1?'':'en'} · totaal ${totaal} stuks bij te vullen</span>
         </div>
       </section>
       `}
@@ -634,7 +636,7 @@ function renderKistenBestellijst(msg) {
           besteld_aantal: aantal,
           aantal: ((KistVoorraad.byNaam(naam) || {}).aantal || 0) + aantal,
         });
-        renderKistenBestellijst({ success: `${naam}: ${aantal} besteld — voorraad bijgewerkt.` });
+        renderKistenBestellijst({ success: `${naam}: ${aantal} bijgevuld — voorraad bijgewerkt.` });
       } catch (err) {
         mBtn.dataset.busy = '';
         mBtn.disabled = false;
@@ -688,7 +690,7 @@ function renderKistenVoorraad(msg) {
           <h1>Voorraadbeheer</h1>
           <p class="muted">Wijzigingen worden <strong>automatisch opgeslagen</strong> zodra je uit een veld klikt. Geen opslaan-knop nodig.</p>
         </div>
-        <a href="#/kisten/bestellijst" class="btn">📄 Bestellijst</a>
+        <a href="#/kisten/bestellijst" class="btn">📦 Bijvullen</a>
       </div>
 
       ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
