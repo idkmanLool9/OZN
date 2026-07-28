@@ -900,9 +900,7 @@ function bindDetailEvents(id) {
           const i = Cloud.cache.dossiers.findIndex(x => Number(x.id) === Number(id));
           if (i >= 0) Cloud.cache.dossiers[i] = Object.assign({}, Cloud.cache.dossiers[i], updated);
         }
-        if (kistOm
-            && typeof KistVoorraad !== 'undefined'
-            && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+        if (kistOm && typeof KistVoorraad !== 'undefined') {
           try {
             const ctxAn = { reden: 'dossier geannuleerd', dossier_id: id };
             const ctxHer = { reden: 'annulering ongedaan', dossier_id: id };

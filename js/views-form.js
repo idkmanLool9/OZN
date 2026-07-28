@@ -2029,10 +2029,12 @@ function renderDossierForm(params) {
         const created = await DB.insert(KEYS.DOSSIERS, data);
         savedDossier = created;
         // Voorraad-reservering: als er een kist_type is gekozen én er een
-        // voorraadregel bestaat, 1 afboeken. Alleen beheerder (RLS blokkeert
-        // medewerker sowieso — dan gewoon overslaan).
-        if (data.kist_type && typeof KistVoorraad !== 'undefined'
-            && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+        // voorraadregel bestaat, 1 afboeken. Geen client-side rol-check —
+        // server-side RLS bepaalt of het account mag; de RPC faalt gewoon
+        // stil als het niet mag. Belangrijk: bij een medewerker-profiel
+        // (op een beheerder-account) mag het WÉL, en dan moet 'ie ook
+        // gebeuren. De oude Auth.isBeheerder()-check faalde in dat geval.
+        if (data.kist_type && typeof KistVoorraad !== 'undefined') {
           try { await KistVoorraad.reserveer1(data.kist_type, { reden: 'nieuw dossier', dossier_id: created.id }); } catch (_) {}
         }
         // De in de wizard opgebouwde kostenposten (buffer) nu echt opslaan.
@@ -2060,10 +2062,9 @@ function renderDossierForm(params) {
         const oudeKist   = (dossier.kist_type || '').trim();
         const nieuweKist = (data.kist_type || '').trim();
         savedDossier = await DB.update(KEYS.DOSSIERS, dossier.id, data);
-        if (oudeKist !== nieuweKist
-            && typeof KistVoorraad !== 'undefined'
-            && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+        if (oudeKist !== nieuweKist && typeof KistVoorraad !== 'undefined') {
           // Atomair — voorkomt drift als reserveer1 faalt nadat terug1 slaagde.
+          // Geen client-side rol-check; server-side RLS beslist.
           try { await KistVoorraad.wissel(oudeKist, nieuweKist, { dossier_id: dossier.id }); } catch (_) {}
         }
         localStorage.removeItem(draftKey);
