@@ -79,8 +79,8 @@ function renderDossierDetail(params) {
           ${dlRow('Opdrachtgever', d.opdrachtgever_naam)}
           ${(Array.isArray(d.extra_personeel) && d.extra_personeel.length) ? dlRow('Extra personeel', d.extra_personeel.join(', ')) : ''}
           ${dlRow('Geslacht', d.geslacht)}
-          ${dlRow('Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && 'te ' + d.geboorteplaats].filter(Boolean).join(' '))}
-          ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && 'te ' + d.overlijdensplaats].filter(Boolean).join(' '))}
+          ${dlRow('Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && d.geboorteplaats].filter(Boolean).join(' '))}
+          ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && d.overlijdensplaats].filter(Boolean).join(' '))}
           ${dlRow('Adres', [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', '))}
           ${d.artsverklaring_pad ? `<div><dt>Artsverklaring</dt><dd><button type="button" class="link-btn" id="btn-view-artsverklaring">📄 Bekijk scan</button></dd></div>` : ''}
           ${d.overdraagformulier_pad ? `<div><dt>Overdraagformulier</dt><dd><button type="button" class="link-btn" id="btn-view-overdraag">📄 Bekijk scan</button></dd></div>` : ''}
@@ -131,10 +131,10 @@ function renderDossierDetail(params) {
           const items = [
             [d.verzorgd_gekleed_datum || d.verzorgd_gekleed_waar || d.verzorgd_gekleed_familie,
               'Verzorgd / gekleed',
-              [fmtDate(d.verzorgd_gekleed_datum), d.verzorgd_gekleed_waar && 'te ' + d.verzorgd_gekleed_waar, d.verzorgd_gekleed_familie && '(' + d.verzorgd_gekleed_familie + ' familie)'].filter(Boolean).join(' ')],
+              [fmtDate(d.verzorgd_gekleed_datum), d.verzorgd_gekleed_waar && d.verzorgd_gekleed_waar, d.verzorgd_gekleed_familie && '(' + d.verzorgd_gekleed_familie + ' familie)'].filter(Boolean).join(' ')],
             [d.gekist_datum || d.gekist_waar,
               'Gekist',
-              [fmtDate(d.gekist_datum), d.gekist_waar && 'te ' + d.gekist_waar].filter(Boolean).join(' ')],
+              [fmtDate(d.gekist_datum), d.gekist_waar && d.gekist_waar].filter(Boolean).join(' ')],
             [d.mond_gehecht, 'Mond gehecht', 'Ja'],
             [d.oogkapjes, 'Oogkapjes', 'Ja'],
             [d.buikpunctie, 'Buikpunctie', 'Ja'],
@@ -497,8 +497,8 @@ function dossierSpec(d, kosten) {
   const routeStr = (arr) => (Array.isArray(arr) && arr.length)
     ? arr.map(_routePlain).filter(Boolean).join(' → ') : LEEG;
 
-  const geboren  = [_dateOr(d.geboortedatum),   d.geboorteplaats  ? 'te ' + d.geboorteplaats  : ''].filter(Boolean).join(' ') || LEEG;
-  const overleden = [_dateOr(d.overlijdensdatum), d.overlijdensplaats ? 'te ' + d.overlijdensplaats : ''].filter(Boolean).join(' ') || LEEG;
+  const geboren  = [_dateOr(d.geboortedatum),   d.geboorteplaats  ? d.geboorteplaats  : ''].filter(Boolean).join(' ') || LEEG;
+  const overleden = [_dateOr(d.overlijdensdatum), d.overlijdensplaats ? d.overlijdensplaats : ''].filter(Boolean).join(' ') || LEEG;
 
   const sections = [
     { heading: 'Opdrachtgever', rows: [
