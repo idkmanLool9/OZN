@@ -521,8 +521,10 @@ const Postcode = {
 
       if (abortCtrl) abortCtrl.abort();
       abortCtrl = new AbortController();
+      // Zoek zowel volledige adressen als losse straatnamen — anders krijg
+      // je pas suggesties nadat je én straat én huisnummer hebt getikt.
       const url = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/free?' +
-        'fq=type:adres&fl=weergavenaam,straatnaam,huisnummer,huis_nlt,postcode,woonplaatsnaam&rows=8&q=' +
+        'fq=type:(adres OR weg)&fl=weergavenaam,straatnaam,huisnummer,huis_nlt,postcode,woonplaatsnaam,type&rows=10&q=' +
         encodeURIComponent(q);
       try {
         const r = await fetch(url, { signal: abortCtrl.signal });
@@ -539,7 +541,7 @@ const Postcode = {
     const scheduleFetch = () => {
       if (suppressFetch) return;   // net een adres gekozen → niet opnieuw zoeken
       clearTimeout(debounceT);
-      debounceT = setTimeout(fetchSuggestions, 300);
+      debounceT = setTimeout(fetchSuggestions, 180);
     };
 
     // Input-events op beide velden (straat én huisnummer indien apart)
