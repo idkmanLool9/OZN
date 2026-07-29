@@ -109,8 +109,15 @@ function snapshotDossierForm(formEl) {
   DOSSIER_VELDEN.forEach(f => {
     const inp = formEl.elements[f];
     if (!inp) return;
-    if (inp.type === 'checkbox') {
-      data[f] = BOOL_VELDEN.has(f) ? inp.checked : (inp.checked ? 'ja' : 'nee');
+    if (BOOL_VELDEN.has(f)) {
+      // Boolean-veld: checkbox = .checked, hidden/text = value truthy ('ja'/'1'/'true')
+      if (inp.type === 'checkbox') data[f] = inp.checked;
+      else {
+        const v = (inp.value || '').trim().toLowerCase();
+        data[f] = v === 'ja' || v === '1' || v === 'true';
+      }
+    } else if (inp.type === 'checkbox') {
+      data[f] = inp.checked ? 'ja' : 'nee';
     } else data[f] = inp.value;
   });
   // Extra personeel (checkboxes zonder name, buiten DOSSIER_VELDEN) meenemen
@@ -1940,8 +1947,15 @@ function renderDossierForm(params) {
     DOSSIER_VELDEN.forEach(f => {
       const inp = e.target.elements[f];
       if (!inp) return;
-      if (inp.type === 'checkbox') {
-        data[f] = BOOL_VELDEN.has(f) ? inp.checked : (inp.checked ? 'ja' : 'nee');
+      if (BOOL_VELDEN.has(f)) {
+        // Boolean-veld: checkbox = .checked, hidden/text = value truthy
+        if (inp.type === 'checkbox') data[f] = inp.checked;
+        else {
+          const v = (inp.value || '').trim().toLowerCase();
+          data[f] = v === 'ja' || v === '1' || v === 'true';
+        }
+      } else if (inp.type === 'checkbox') {
+        data[f] = inp.checked ? 'ja' : 'nee';
       } else {
         const val = (inp.value || '').trim();
         // Lege datum-inputs mogen null zijn (postgres accepteert '' niet voor date)
