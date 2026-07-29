@@ -76,9 +76,11 @@ function renderDossierDetail(params) {
         <h3>Overledene</h3>
         <dl class="dl">
           ${dlRow('Dossiernummer', d.dossier_nummer)}
+          ${d.registratienummer_uitvaartleider ? dlRow('Reg.nr uitvaartleider', d.registratienummer_uitvaartleider) : ''}
           ${dlRow('Opdrachtgever', d.opdrachtgever_naam)}
           ${(Array.isArray(d.extra_personeel) && d.extra_personeel.length) ? dlRow('Extra personeel', d.extra_personeel.join(', ')) : ''}
           ${dlRow('Geslacht', d.geslacht)}
+          ${d.bsn ? dlRow('BSN', d.bsn) : ''}
           ${dlRow('Geboren', [fmtDate(d.geboortedatum), d.geboorteplaats && d.geboorteplaats].filter(Boolean).join(' '))}
           ${dlRow('Overleden', [fmtDate(d.overlijdensdatum), d.overlijdensplaats && d.overlijdensplaats].filter(Boolean).join(' '))}
           ${dlRow('Adres', [d.adres_overledene, d.postcode_overledene, d.woonplaats_overledene].filter(Boolean).join(', '))}
@@ -90,6 +92,9 @@ function renderDossierDetail(params) {
             ['Oorbel(en)',  d.bezit_oorbellen, d.bezit_oorbellen_aantal, d.bezit_oorbellen_foto],
             ['Ring(en)',    d.bezit_ringen,    d.bezit_ringen_aantal,    d.bezit_ringen_foto],
             ['Armband(en)', d.bezit_armbanden, d.bezit_armbanden_aantal, d.bezit_armbanden_foto],
+            ['Ketting',     d.bezit_ketting,   d.bezit_ketting_aantal,   d.bezit_ketting_foto],
+            ['Bril',        d.bezit_bril,      d.bezit_bril_aantal,      d.bezit_bril_foto],
+            ['Horloge',     d.bezit_horloge,   d.bezit_horloge_aantal,   d.bezit_horloge_foto],
           ].filter(([, heeft]) => heeft === 'ja');
           const extras = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.filter(x => x && x.label) : [];
           if (!items.length && !extras.length) return '';
@@ -122,6 +127,9 @@ function renderDossierDetail(params) {
           ${((d.opbaring_type === 'thuis' || d.opbaring_type === 'beide') && d.benodigde_rouwgoederen)
             ? `<div><dt>Extra (vrije tekst)</dt><dd class="prewrap">${esc(d.benodigde_rouwgoederen)}</dd></div>` : ''}
           ${dlRow('Opbaarlocatie', d.opbaarlocatie_type)}
+          ${d.aula_gebruikt ? dlRow('Aula', 'Ja') : ''}
+          ${d.centrale_koeling_vanaf ? dlRow('Centrale koeling vanaf', fmtDate(d.centrale_koeling_vanaf)) : ''}
+          ${d.familiekamer_vanaf ? dlRow('Familiekamer vanaf', fmtDate(d.familiekamer_vanaf)) : ''}
           ${(d.opbaring_type === 'ophalen' || d.opbaring_type === 'beide') ? dlRow('Ophaaldatum', [fmtDate(d.ophalen_datum), d.ophalen_tijd && 'om ' + d.ophalen_tijd].filter(Boolean).join(' ')) : ''}
           ${d.opbaring_bed ? dlRow('Bed-opbaring', 'Ja') : ''}
           ${d.opbaring_kist ? dlRow('Kist-opbaring', 'Ja') : ''}
@@ -1078,9 +1086,10 @@ function bindDetailEvents(id) {
       await DB.remove(KEYS.DOSSIERS, id); // cascade verwijdert kosten/notities in DB
       ['kosten','notities'].forEach(t =>
         Cloud.cache[t] = Cloud.cache[t].filter(x => x.dossier_id !== id));
-      if (kistOm && !alTeruggegeven
-          && typeof KistVoorraad !== 'undefined'
-          && typeof Auth !== 'undefined' && Auth.isBeheerder()) {
+      // Server-side RLS is de autoriteit op voorraadmutaties; client-side
+      // isBeheerder() blokkeerde per ongeluk medewerker-profielen (voorraad
+      // dreef weg). Alleen guard: kist bekend + nog niet teruggegeven.
+      if (kistOm && !alTeruggegeven && typeof KistVoorraad !== 'undefined') {
         try { await KistVoorraad.terug1(kistOm, { reden: 'dossier verwijderd', dossier_id: id }); } catch (_) {}
       }
       try { Toast.show('Dossier verwijderd', 'success'); } catch (_) {}
@@ -1151,7 +1160,9 @@ function bindDetailEvents(id) {
     if (!tekst) { if (btn) { btn.dataset.submitting = ''; btn.disabled = false; } return; }
     const profiel = ActiveProfile.current();
     const u = Auth.current();
-    const auteur = profiel ? profiel.name : (u ? (u.fullName || u.email) : 'Onbekend');
+    // Dev-profiel mag geen sporen achterlaten: notitie krijgt anonieme auteur.
+    const isDev = ActiveProfile.isDev && ActiveProfile.isDev();
+    const auteur = isDev ? 'Onbekend' : (profiel ? profiel.name : (u ? (u.fullName || u.email) : 'Onbekend'));
     try {
       await DB.insert(KEYS.NOTITIES, { dossier_id: id, tekst, auteur });
       await DB.touchDossier(id);

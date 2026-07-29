@@ -104,6 +104,21 @@ const BOOL_VELDEN = new Set([
   'mond_gehecht', 'oogkapjes', 'buikpunctie',
   'peacemaker_verwijderd', 'thanatopraxie',
 ]);
+// DATE-kolommen. Postgres accepteert geen '' voor date; lege waarde → null.
+// Nodig omdat sommige date-velden als <input type="hidden"> in het form staan
+// (bv. overlijdensdatum, geboortedatum) — die vallen buiten de inp.type==='date' guard.
+const DATE_VELDEN = new Set([
+  'geboortedatum', 'overlijdensdatum',
+  'ophalen_datum', 'thuis_opbaren_datum', 'thuis_opbaren_einddatum',
+  'centrale_koeling_vanaf', 'familiekamer_vanaf',
+  'verzorgd_gekleed_datum', 'gekist_datum',
+  'peacemaker_verwijderd_datum', 'thanatopraxie_datum',
+  'aanbetaling_datum',
+]);
+function _valueOrNullDate(v) {
+  const s = (v || '').trim();
+  return s ? s : null;
+}
 function snapshotDossierForm(formEl) {
   const data = {};
   DOSSIER_VELDEN.forEach(f => {
@@ -116,6 +131,8 @@ function snapshotDossierForm(formEl) {
         const v = (inp.value || '').trim().toLowerCase();
         data[f] = v === 'ja' || v === '1' || v === 'true';
       }
+    } else if (DATE_VELDEN.has(f)) {
+      data[f] = _valueOrNullDate(inp.value);
     } else if (inp.type === 'checkbox') {
       data[f] = inp.checked ? 'ja' : 'nee';
     } else data[f] = inp.value;
@@ -1954,6 +1971,8 @@ function renderDossierForm(params) {
           const v = (inp.value || '').trim().toLowerCase();
           data[f] = v === 'ja' || v === '1' || v === 'true';
         }
+      } else if (DATE_VELDEN.has(f)) {
+        data[f] = _valueOrNullDate(inp.value);
       } else if (inp.type === 'checkbox') {
         data[f] = inp.checked ? 'ja' : 'nee';
       } else {
@@ -2075,8 +2094,16 @@ function renderDossierForm(params) {
         // medewerker sowieso.
         const oudeKist   = (dossier.kist_type || '').trim();
         const nieuweKist = (data.kist_type || '').trim();
+        // Als het dossier al 'geannuleerd' was, is de OUDE kist al eerder
+        // teruggegeven aan de voorraad (status-select flow in views-detail).
+        // Een wissel-mutatie zou dan een extra +1 doen op oude kist en -1 op
+        // nieuwe, wat de voorraad kapotmaakt. Wissel dus alleen als het
+        // dossier ook nu 'actief' is (niet-geannuleerd) en de kist wisselt.
+        const wasGeannuleerd = dossier.status === 'geannuleerd';
+        const wordtGeannuleerd = (data.status || dossier.status) === 'geannuleerd';
         savedDossier = await DB.update(KEYS.DOSSIERS, dossier.id, data);
-        if (oudeKist !== nieuweKist && typeof KistVoorraad !== 'undefined') {
+        if (oudeKist !== nieuweKist && typeof KistVoorraad !== 'undefined'
+            && !wasGeannuleerd && !wordtGeannuleerd) {
           // Atomair — voorkomt drift als reserveer1 faalt nadat terug1 slaagde.
           // Geen client-side rol-check; server-side RLS beslist.
           try { await KistVoorraad.wissel(oudeKist, nieuweKist, { dossier_id: dossier.id }); } catch (_) {}
@@ -2086,20 +2113,11 @@ function renderDossierForm(params) {
         try { sessionStorage.removeItem('sok_actief_' + draftKey); } catch (_) {}
       }
 
-      // ─── Alles automatisch naar R2 (achtergrond, faalt stil) ──
-      //  1) Reorder losse bestanden van dit dossier naar de juiste submap
-      //     (belangrijk: bij nieuwe dossiers heeft de eerste upload nog geen
-      //      dossier-nummer, dus krijgt 'ie na save z'n D-nummer erbij)
-      //  2) Volledige dossier-PDF als snapshot naar dossiers/<naam>/
-      if (savedDossier && navigator.onLine) {
-        try {
-          if (typeof autoSyncDossierNaarR2 === 'function') autoSyncDossierNaarR2(savedDossier.id);
-        } catch (_) {}
-        try {
-          const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === savedDossier.id) || [];
-          uploadDossierPdfNaarR2(savedDossier, kostenLijst);
-        } catch (_) {}
-      }
+      // ─── Alles automatisch naar R2 ──
+      // DB.insert/update triggeren al een debounced R2-snapshot (zie
+      // _triggerDossierR2Sync in supabase-client.js) die ook de reorg doet.
+      // De expliciete calls hier veroorzaakten 2 snapshots per save
+      // (één direct + één 5s later). We laten de debounce dat regelen.
 
       // ─── Auto-mail dossier bij eerste aanmaak (best-effort) ──
       // Inclusief kostenoverzicht + PDF-bijlage (paperclip). Alleen als

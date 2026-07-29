@@ -776,7 +776,7 @@ EMAIL_FROM_NAME = OZN</pre>
                     <option value="medewerker" ${p.rol !== 'beheerder' ? 'selected' : ''}>Medewerker</option>
                     <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
                   </select>
-                  <input type="text" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" value="${esc(shownPin)}" placeholder="pincode" ${pinAttrs} style="width:6rem;${p.rol === 'beheerder' ? '' : 'visibility:hidden;'}${isEigen ? '' : 'background:#f0ede4;color:var(--muted);cursor:not-allowed;'}">
+                  <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" value="${esc(shownPin)}" placeholder="pincode" ${pinAttrs} style="width:6rem;${p.rol === 'beheerder' ? '' : 'visibility:hidden;'}${isEigen ? '' : 'background:#f0ede4;color:var(--muted);cursor:not-allowed;'}">
                   <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
                   <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
                 </div>`;

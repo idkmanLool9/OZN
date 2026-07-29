@@ -631,11 +631,7 @@ function renderKistenBestellijst(msg) {
       mBtn.dataset.busy = '1';
       mBtn.disabled = true;
       try {
-        await KistVoorraad.upsert(naam, {
-          laatst_besteld: new Date().toISOString().slice(0, 10),
-          besteld_aantal: aantal,
-          aantal: ((KistVoorraad.byNaam(naam) || {}).aantal || 0) + aantal,
-        });
+        await KistVoorraad.bijvul(naam, aantal);
         renderKistenBestellijst({ success: `${naam}: ${aantal} bijgevuld — voorraad bijgewerkt.` });
       } catch (err) {
         mBtn.dataset.busy = '';

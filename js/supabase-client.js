@@ -54,8 +54,13 @@ const Auth = {
       if (_session) {
         Auth.loadRol().then(_saveAuthSnapshot);
       } else if (_evt === 'SIGNED_OUT') {
-        // Alleen bij expliciete uitloggen de snapshot wissen.
+        // Bij uitloggen ook de data-mirror wissen — anders blijven alle
+        // dossiers/kosten/notities/profielen incl. pincodes zichtbaar voor
+        // een volgende gebruiker die de app opent op hetzelfde toestel.
         try { localStorage.removeItem(AUTH_SNAP_KEY); } catch (_) {}
+        try { localStorage.removeItem('sok_mirror'); } catch (_) {}
+        try { Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_voorraad: [] }; } catch (_) {}
+        try { if (typeof location !== 'undefined') location.reload(); } catch (_) {}
       }
     });
     if (_session) {
@@ -804,14 +809,21 @@ const R2Reorg = {
     if (error) throw new Error('edge-function faalde: ' + (error.message || String(error)));
     if (!data || !data.ok) throw new Error((data && (data.detail || data.error)) || 'onbekend');
     const nieuwPad = R2.tag(destKey);
-    if (veld === '__extra__') {
-      const d = DB.byId(KEYS.DOSSIERS, dossierId);
-      if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
-      const arr = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.map(x => ({ ...x })) : [];
-      if (arr[extraIdx]) arr[extraIdx].foto_pad = nieuwPad;
-      await DB.update(KEYS.DOSSIERS, dossierId, { extra_bezittingen: arr });
-    } else {
-      await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
+    // Markeer dat we bezig zijn met reorg-updates op dit dossier — voorkomt
+    // dat _triggerDossierR2Sync een verse snapshot inplant voor élke padwissel.
+    _r2ReorgInProgress.add(dossierId);
+    try {
+      if (veld === '__extra__') {
+        const d = DB.byId(KEYS.DOSSIERS, dossierId);
+        if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
+        const arr = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.map(x => ({ ...x })) : [];
+        if (arr[extraIdx]) arr[extraIdx].foto_pad = nieuwPad;
+        await DB.update(KEYS.DOSSIERS, dossierId, { extra_bezittingen: arr });
+      } else {
+        await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
+      }
+    } finally {
+      _r2ReorgInProgress.delete(dossierId);
     }
     return { sourceKey, destKey };
   },
@@ -847,7 +859,10 @@ let _r2AutoSyncBusy = false;
 async function autoSyncNaarR2() {
   if (_r2AutoSyncBusy) return;
   if (!navigator.onLine) return;
-  if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return;
+  // Server-side RLS bepaalt of upload/reorg mag; client-side isBeheerder()
+  // blokkeerde per ongeluk beheerder-accounts met een medewerker-profiel actief.
+  // Server-side RLS bepaalt uploads/mutaties; skip alleen als er geen sessie is.
+  if (typeof Auth === 'undefined' || Auth.isOfflineAuth()) return;
   _r2AutoSyncBusy = true;
   try {
     // Migratie SB Storage → R2 (max 20 tegelijk om lange kliks te voorkomen)
@@ -877,9 +892,11 @@ async function autoSyncNaarR2() {
       const dossierStamp = d.updated_at || d.created_at || '';
       if (last && last === dossierStamp) continue; // al gedaan voor deze versie
       try {
-        await uploadDossierPdfNaarR2(d);
-        try { localStorage.setItem(key, dossierStamp); } catch (_) {}
-        snapCount++;
+        const res = await uploadDossierPdfNaarR2(d);
+        if (res && res.jsonOk) {
+          try { localStorage.setItem(key, dossierStamp); } catch (_) {}
+          snapCount++;
+        }
       } catch (e) { console.warn('R2 snapshot-backfill faalde voor dossier', d.id, e && e.message); }
     }
     if (mig.length || reorg.length || snapCount) {
@@ -906,6 +923,12 @@ async function autoSyncNaarR2() {
 // een R2-snapshot voor het bijhorende dossier op de rol. Meerdere snelle
 // wijzigingen tellen mee tot één upload (5 sec na de laatste).
 const _r2SyncDebounce = new Map();
+// Dossiers waar op dit moment een R2Reorg actief is. DB.update binnen die
+// reorg zou anders opnieuw een snapshot triggeren → oneindige lus van 3-4
+// snapshots per save. Reorg zet de id vóór DB.update in de set en haalt
+// 'm er na afloop weer uit; _triggerDossierR2Sync slaat over zolang de id
+// erin staat.
+const _r2ReorgInProgress = new Set();
 function _triggerDossierR2Sync(tbl, row) {
   try {
     if (!row) return;
@@ -914,6 +937,7 @@ function _triggerDossierR2Sync(tbl, row) {
     if (tbl === 'dossiers') dossierId = row.id;
     else if (tbl === 'kosten' || tbl === 'notities') dossierId = row.dossier_id;
     if (!dossierId) return;
+    if (_r2ReorgInProgress.has(dossierId)) return; // reorg loopt — snapshot komt straks vanzelf
     const existing = _r2SyncDebounce.get(dossierId);
     if (existing) clearTimeout(existing);
     const t = setTimeout(async () => {
@@ -927,10 +951,14 @@ function _triggerDossierR2Sync(tbl, row) {
         }
         // 2) volledige PDF + JSON snapshot uploaden
         const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === dossierId) || [];
-        await uploadDossierPdfNaarR2(d, kostenLijst);
-        // 3) markeer als 'snapshot up-to-date' zodat de startup-backfill
-        //    'm overslaat totdat er weer iets wijzigt.
-        try { localStorage.setItem('sok_snap_' + dossierId, d.updated_at || d.created_at || ''); } catch (_) {}
+        const res = await uploadDossierPdfNaarR2(d, kostenLijst);
+        // 3) alleen markeren als 'snapshot up-to-date' als de JSON écht is
+        //    geüpload (die is essentieel — de PDF is nice-to-have). Bij PDF-
+        //    fail probeert de startup-backfill 'm later opnieuw ipv stil te
+        //    denken dat het gelukt is.
+        if (res && res.jsonOk) {
+          try { localStorage.setItem('sok_snap_' + dossierId, d.updated_at || d.created_at || ''); } catch (_) {}
+        }
       } catch (e) { console.warn('Auto-R2 snapshot faalde voor dossier', dossierId, e && e.message); }
     }, 5000);
     _r2SyncDebounce.set(dossierId, t);
@@ -942,7 +970,8 @@ function _triggerDossierR2Sync(tbl, row) {
 // hun D-nummer erbij ('Achternaam_D42/xxx').
 async function autoSyncDossierNaarR2(dossierId) {
   if (!navigator.onLine) return;
-  if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return;
+  // Server-side RLS bepaalt uploads/mutaties; skip alleen als er geen sessie is.
+  if (typeof Auth === 'undefined' || Auth.isOfflineAuth()) return;
   try {
     const werk = R2Reorg.verzamel().filter(i => i.dossierId === dossierId);
     for (const item of werk) {
@@ -958,8 +987,9 @@ async function autoSyncDossierNaarR2(dossierId) {
 //  2) dossier-<yyyy-mm-dd-hhmm>.json — raw data (elk veld met waarde,
 //     kosten-regels en notities inclusief) voor archivering/leesbaarheid
 async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
+  const result = { pdfOk: false, jsonOk: false };
   try {
-    if (!dossier || !dossier.id) return;
+    if (!dossier || !dossier.id) return result;
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
     const kosten = kostenLijst || DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id) || [];
     const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === dossier.id) || [];
@@ -971,6 +1001,7 @@ async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
         if (blob) {
           const named = new File([blob], `dossier-${stamp}.pdf`, { type: 'application/pdf' });
           await R2.upload(named, 'dossiers/', dossier);
+          result.pdfOk = true;
         }
       } catch (e) { console.warn('Dossier-PDF-upload faalde:', e && e.message); }
     }
@@ -979,9 +1010,14 @@ async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
     // opslag-paden ook op zodat je later kunt terugvinden welk bestand bij
     // welke versie hoorde.
     try {
+      const _isDevExport = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+      const _profielNaamExport = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+        ? ActiveProfile.current().name : null;
       const snapshot = {
         exported_at: new Date().toISOString(),
-        exported_by: (typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().email : null,
+        // Dev-profiel mag geen sporen achterlaten in R2-archief.
+        exported_by: _isDevExport ? null : (_profielNaamExport
+          || ((typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().email : null)),
         dossier: dossier,
         kosten: kosten,
         notities: notities,
@@ -989,10 +1025,12 @@ async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
       const jsonBlob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
       const jsonFile = new File([jsonBlob], `dossier-${stamp}.json`, { type: 'application/json' });
       await R2.upload(jsonFile, 'dossiers/', dossier);
+      result.jsonOk = true;
     } catch (e) { console.warn('Dossier-JSON-upload faalde:', e && e.message); }
   } catch (e) {
     console.warn('Dossier-snapshot faalde:', e && e.message);
   }
+  return result;
 }
 
 // ─── Kist-voorraad (beheerder-only) ─────────────────────────────────────────
@@ -1009,11 +1047,17 @@ const KistVoorraad = {
     if (!navigator.onLine) throw new Error('offline');
     const bestaand = KistVoorraad.byNaam(naam);
     const row = Object.assign({ naam }, bestaand || {}, patch);
-    // Wie wijzigde: actief profiel of e-mail
-    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
-      ? ActiveProfile.current().name : null;
-    const u = Auth.current();
-    row.bijgewerkt_door = profielNaam || (u ? (u.fullName || u.email) : null);
+    // Wie wijzigde: actief profiel of e-mail. Dev-profiel laat geen sporen na
+    // (eis van eigenaar): zowel de naam als de fallback-email worden weggelaten.
+    const isDev = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+    if (isDev) {
+      row.bijgewerkt_door = null;
+    } else {
+      const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+        ? ActiveProfile.current().name : null;
+      const u = Auth.current();
+      row.bijgewerkt_door = profielNaam || (u ? (u.fullName || u.email) : null);
+    }
     const { data, error } = await sb.from('kist_voorraad')
       .upsert(row, { onConflict: 'naam' }).select().single();
     if (error) throw error;
@@ -1036,6 +1080,26 @@ const KistVoorraad = {
   // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
   // verwijderd wordt, geeft de oude voorraad +1 terug.
   async terug1(naam, ctx) { return KistVoorraad._delta(naam, +1, ctx || { reden: 'dossier-ontkoppeling' }); },
+  // Bijvullen: atomair +N via RPC (geen read-modify-write race met parallelle
+  // reserveringen) + partial UPDATE voor de metadata (alléén laatst_besteld /
+  // besteld_aantal — dus NIET aantal, wat de RPC net server-side heeft
+  // aangepast en anders overschreven zou worden met een stale cache-waarde).
+  async bijvul(naam, aantal) {
+    const n = Math.max(1, parseInt(aantal, 10) || 0);
+    if (!n) return;
+    // 1) Atomaire delta op aantal (server-side)
+    await KistVoorraad._delta(naam, +n, { reden: 'bijvullen' });
+    // 2) Metadata: partial update alleen op deze 2 kolommen
+    try {
+      const { data, error } = await sb.from('kist_voorraad')
+        .update({ laatst_besteld: new Date().toISOString().slice(0, 10), besteld_aantal: n })
+        .eq('naam', naam).select().single();
+      if (error) throw error;
+      const arr = Cloud.cache.kist_voorraad;
+      const i = arr.findIndex(x => x.naam === naam);
+      if (i >= 0) arr[i] = data;
+    } catch (e) { console.warn('bijvul-metadata faalde:', e && e.message); }
+  },
   // Atomair: 1 RPC-call, oud terug + nieuw gereserveerd binnen één transactie.
   // Voorkomt drift als reserveer1 faalt nadat terug1 al slaagde.
   async wissel(oud, nieuw, ctx) {
@@ -1060,7 +1124,14 @@ const KistVoorraad = {
         if (oudN) AuditLog.log('voorraad', 'kist_voorraad', oudN, { naam: oudN, delta: 1, nu: data?.oud_nieuw, reden: 'kist-wissel (oud terug)', dossier_id: dossierId });
         if (nwN)  AuditLog.log('voorraad', 'kist_voorraad', nwN,  { naam: nwN,  delta: -1, nu: data?.nieuw_nieuw, reden: 'kist-wissel (nieuw gereserveerd)', dossier_id: dossierId });
       } catch (_) {}
-    } catch (_) {}
+    } catch (e) {
+      // Voorheen silent — nu een duidelijke waarschuwing zodat de beheerder
+      // de voorraad handmatig kan corrigeren i.p.v. onopgemerkte drift.
+      console.warn('KistVoorraad.wissel faalde:', e && e.message);
+      try {
+        Toast.show(`Kist-wissel voorraad kon niet bijgewerkt worden${e && e.message ? ': ' + e.message : ''}. Controleer voorraad handmatig.`, 'error');
+      } catch (_) {}
+    }
   },
   // Atomaire delta via RPC — voorkomt race tussen twee gelijktijdige
   // reserveringen die anders beide dezelfde 'was'-waarde zouden lezen.
@@ -1085,7 +1156,13 @@ const KistVoorraad = {
           dossier_id: ctx && ctx.dossier_id != null ? String(ctx.dossier_id) : null,
         });
       } catch (_) {}
-    } catch (_) {}
+    } catch (e) {
+      console.warn('KistVoorraad._delta faalde:', e && e.message);
+      try {
+        const richting = delta < 0 ? 'reserveren' : 'teruggeven';
+        Toast.show(`Voorraad ${richting} mislukt (${naam})${e && e.message ? ': ' + e.message : ''}. Controleer voorraad handmatig.`, 'error');
+      } catch (_) {}
+    }
   },
 };
 
@@ -1122,6 +1199,8 @@ const AuditLog = {
   async log(actie, tabel, recordId, detail) {
     try {
       if (!navigator.onLine) return; // stil overslaan als offline; niet blokkerend
+      // Dev-profiel mag geen audit-spoor achterlaten (eis van eigenaar).
+      if (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev()) return;
       const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
         ? ActiveProfile.current().name : null;
       const rid = recordId != null ? String(recordId) : null;

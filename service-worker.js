@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-310';
+const CACHE_VERSION = 'sok-uitvaart-build-311';
 const SHELL = [
   './',
   './index.html',
@@ -151,9 +151,12 @@ async function networkFirst(req) {
     // Alleen volledige 200-responses cachen. 206 Partial Content (Range)
     // en cache-buster URLs (?_check=/_v=) zouden anders elk een unieke
     // cache-entry maken die nooit meer gematched wordt — oneindige groei.
+    // 'basic' = eigen origin; 'cors' = Supabase REST (die stuurt CORS-headers).
+    // Beide moeten mogen cachen anders is de offline-fallback dood voor REST.
     const url = new URL(req.url);
     const isCacheBuster = url.searchParams.has('_check') || url.searchParams.has('_v') || url.searchParams.has('_reset');
-    if (resp && resp.status === 200 && resp.type === 'basic' && !isCacheBuster) {
+    const okType = resp && (resp.type === 'basic' || resp.type === 'cors');
+    if (resp && resp.status === 200 && okType && !isCacheBuster) {
       const c = await caches.open(CACHE_VERSION);
       c.put(req, resp.clone());
     }

@@ -489,6 +489,9 @@ const Postcode = {
       // heropent het gedispatchte 'input'-event de lijst na ~300ms.
       suppressFetch = true;
       clearTimeout(debounceT);
+      // Any in-flight fetch afbreken zodat de dropdown niet 200ms later
+      // opnieuw opengaat met een verouderde lijst.
+      if (abortCtrl) { try { abortCtrl.abort(); } catch (_) {} abortCtrl = null; }
       // Adres-/straat-veld invullen
       if (huisnummerEl) {
         straatEl.value = r.straatnaam || '';
@@ -498,8 +501,11 @@ const Postcode = {
         const huis = r.huis_nlt || r.huisnummer || '';
         straatEl.value = ((r.straatnaam || '') + (huis ? ' ' + huis : '')).trim();
       }
-      if (postcodeEl)   postcodeEl.value   = formatPostcode(r.postcode || '');
-      if (woonplaatsEl) woonplaatsEl.value = r.woonplaatsnaam || '';
+      // Alleen postcode/woonplaats overschrijven als de suggestie ze zélf heeft
+      // (weg-suggesties bevatten geen postcode/plaats — die zouden anders de
+      // eerder ingevulde waarden wissen).
+      if (postcodeEl   && r.postcode)       postcodeEl.value   = formatPostcode(r.postcode);
+      if (woonplaatsEl && r.woonplaatsnaam) woonplaatsEl.value = r.woonplaatsnaam;
       // Trigger change events zodat dependent listeners (autosave, validatie) actief blijven
       [straatEl, postcodeEl, woonplaatsEl].filter(Boolean).forEach(el => {
         el.dispatchEvent(new Event('input',  { bubbles: true }));
@@ -530,6 +536,9 @@ const Postcode = {
         const r = await fetch(url, { signal: abortCtrl.signal });
         if (!r.ok) return;
         const j = await r.json();
+        // Als er inmiddels een adres gekozen is (suppressFetch=true), NIET meer
+        // de dropdown updaten — anders knippert 'ie na een klik nog terug.
+        if (suppressFetch) return;
         results = (j.response && j.response.docs) || [];
         activeIdx = -1;
         renderList();
@@ -1499,6 +1508,33 @@ const PincodePrompt = {
       const err   = overlay.querySelector('.pincode-error');
       const card  = overlay.querySelector('.pincode-card');
 
+      // Brute-force bescherming: after 5 foute pogingen 30 seconden lockout,
+      // na 10 pogingen 5 minuten, na 15 pogingen 30 minuten. State per profiel
+      // in localStorage zodat lockout een reload overleeft.
+      const BF_KEY = 'sok_pin_bf_' + (profile.id || profile.name || 'x');
+      const getBF = () => {
+        try { return JSON.parse(localStorage.getItem(BF_KEY) || '{}'); }
+        catch (_) { return {}; }
+      };
+      const setBF = (v) => { try { localStorage.setItem(BF_KEY, JSON.stringify(v)); } catch (_) {} };
+      const lockoutMs = (n) => (n >= 15 ? 30 * 60_000 : n >= 10 ? 5 * 60_000 : n >= 5 ? 30_000 : 0);
+      const checkLockout = () => {
+        const bf = getBF();
+        const wait = (bf.until || 0) - Date.now();
+        if (wait > 0) {
+          const secs = Math.ceil(wait / 1000);
+          const mins = Math.ceil(secs / 60);
+          err.hidden = false;
+          err.textContent = wait > 60_000
+            ? `Te vaak fout — probeer over ${mins} min opnieuw`
+            : `Te vaak fout — probeer over ${secs} sec opnieuw`;
+          card.classList.add('pincode-shake');
+          setTimeout(() => card.classList.remove('pincode-shake'), 500);
+          return true;
+        }
+        return false;
+      };
+
       const refresh = () => {
         dots.forEach((d, i) => d.classList.toggle('filled', i < entered.length));
         err.hidden = true;
@@ -1511,22 +1547,32 @@ const PincodePrompt = {
       const check = () => {
         if (entered === String(profile.pincode)) {
           card.classList.add('pincode-success');
+          setBF({}); // Reset teller bij succes
           // Default-pincode "0000" (of alleen nullen) betekent: nog nooit
           // ingesteld → gebruiker eerst dwingen een eigen pincode te kiezen.
           const isDefault = /^0+$/.test(entered);
           setTimeout(() => close(isDefault ? 'setup' : true), 180);
         } else {
+          const bf = getBF();
+          const fails = (bf.fails || 0) + 1;
+          const lock = lockoutMs(fails);
+          setBF({ fails, until: lock ? Date.now() + lock : 0 });
           err.hidden = false;
+          err.textContent = lock
+            ? `${fails} foute pogingen — ${lock >= 60_000 ? Math.ceil(lock/60000) + ' min' : Math.ceil(lock/1000) + ' sec'} wachten`
+            : 'Onjuiste pincode';
           card.classList.add('pincode-shake');
           try { navigator.vibrate && navigator.vibrate(80); } catch (_) {}
           setTimeout(() => {
             card.classList.remove('pincode-shake');
             entered = '';
             refresh();
+            err.hidden = false; // laat lockout-melding staan
           }, 500);
         }
       };
       const feed = (digit) => {
+        if (checkLockout()) return;
         if (entered.length >= targetLen) return;
         entered += digit;
         refresh();
@@ -1602,10 +1648,22 @@ const PincodePrompt = {
       };
       const advance = () => {
         if (stage === 1) {
-          // Blokkeer triviale pincodes: alleen nullen (0000) of 1234 e.d.
-          if (/^0+$/.test(entered)) {
+          // Blokkeer triviale pincodes. Als alle cijfers gelijk zijn (0000,
+          // 1111, 9999, ...) of het is een oplopende/aflopende reeks
+          // (1234, 2345, 4321, 9876 e.d.), weigeren met een korte melding.
+          const isZelfde = /^(\d)\1+$/.test(entered);
+          const isSeq = (s) => {
+            if (s.length < 2) return false;
+            const dir = Math.sign(+s[1] - +s[0]);
+            if (dir === 0) return false;
+            for (let i = 1; i < s.length; i++) {
+              if (+s[i] - +s[i - 1] !== dir) return false;
+            }
+            return true;
+          };
+          if (isZelfde || isSeq(entered)) {
             err.hidden = false;
-            err.textContent = 'Pincode 0000 is niet toegestaan';
+            err.textContent = 'Kies een minder voor de hand liggende pincode';
             card.classList.add('pincode-shake');
             setTimeout(() => {
               card.classList.remove('pincode-shake');
