@@ -117,6 +117,84 @@ function _kistFiltersActief() {
   return !!(_kistFilter || _kistMateriaal || _kistKleur || _kistPrijs);
 }
 
+// Modal om een eigen kist toe te voegen of te bewerken. Doorgeef-parameter
+// bestaandeNaam = 'Naam' → bewerk-modus (voorvullen uit kisten_eigen).
+async function _promptNieuweKist(bestaandeNaam) {
+  const eigen = Settings.get('kisten_eigen') || [];
+  const bestaand = bestaandeNaam ? eigen.find(x => x && x.naam === bestaandeNaam) : null;
+  const materialen = [...new Set(KISTEN_CATALOGUS.map(k => k.materiaal))].sort();
+  const html = `
+    <div class="pincode-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;">
+      <div class="card" style="max-width:480px;width:100%;background:var(--surface);padding:1.5rem;border-radius:.75rem;">
+        <h2 style="margin-top:0;">${bestaand ? 'Kist bewerken' : 'Nieuwe kist toevoegen'}</h2>
+        <form id="frm-nieuwe-kist">
+          <label style="display:block;margin:.75rem 0;">
+            <span>Naam <span style="color:#b00;">*</span></span>
+            <input type="text" name="naam" required maxlength="80" value="${esc(bestaand?.naam || '')}" style="width:100%;padding:.5rem;">
+          </label>
+          <label style="display:block;margin:.75rem 0;">
+            <span>Materiaal / omschrijving</span>
+            <input type="text" name="materiaal" list="mat-suggesties" maxlength="120" value="${esc(bestaand?.materiaal || '')}" style="width:100%;padding:.5rem;" placeholder="bv. Massief eiken, rustiek">
+            <datalist id="mat-suggesties">
+              ${materialen.map(m => `<option value="${esc(m)}">`).join('')}
+            </datalist>
+          </label>
+          <label style="display:block;margin:.75rem 0;">
+            <span>Adviesprijs (€)</span>
+            <input type="text" name="bedrag" inputmode="decimal" value="${bestaand?.bedrag ? String(bestaand.bedrag).replace('.', ',') : ''}" style="width:100%;padding:.5rem;" placeholder="bv. 1234,56">
+          </label>
+          <label style="display:block;margin:.75rem 0;">
+            <span>Kleur (optioneel)</span>
+            <input type="text" name="kleur" maxlength="60" value="${esc(bestaand?.kleur || '')}" style="width:100%;padding:.5rem;" placeholder="bv. Naturel, Blank hout">
+          </label>
+          <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;">
+            <button type="button" class="btn btn-ghost" id="btn-kist-annuleer">Annuleren</button>
+            <button type="submit" class="btn btn-primary">${bestaand ? 'Opslaan' : 'Toevoegen'}</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  const overlay = wrap.firstElementChild;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.id === 'btn-kist-annuleer') close();
+  });
+  return new Promise(resolve => {
+    overlay.querySelector('#frm-nieuwe-kist').addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const naam = (f.naam.value || '').trim();
+      if (!naam) return;
+      const materiaal = (f.materiaal.value || '').trim();
+      const kleur = (f.kleur.value || '').trim();
+      const bedragRaw = (f.bedrag.value || '').trim().replace(/\./g, '').replace(',', '.');
+      const bedrag = parseFloat(bedragRaw) || 0;
+      const alleEigen = (Settings.get('kisten_eigen') || []).slice();
+      const dubbelInEigen = alleEigen.findIndex(x => x && x.naam === naam);
+      const dubbelInBasis = KISTEN_CATALOGUS.some(k => k.naam === naam);
+      if (!bestaand && (dubbelInBasis || dubbelInEigen >= 0)) {
+        Modal.show({ type: 'warning', title: 'Naam bestaat al', message: 'Er is al een kist met deze naam. Kies een andere naam of bewerk de bestaande.' });
+        return;
+      }
+      const entry = { naam, materiaal, bedrag, kleur };
+      if (bestaand) {
+        const oudIdx = alleEigen.findIndex(x => x && x.naam === bestaandeNaam);
+        if (oudIdx >= 0) alleEigen[oudIdx] = entry;
+        else alleEigen.push(entry);
+      } else {
+        alleEigen.push(entry);
+      }
+      Settings.set({ kisten_eigen: alleEigen });
+      close();
+      renderKistenBeheer({ success: bestaand ? `Kist "${naam}" bijgewerkt.` : `Kist "${naam}" toegevoegd.` });
+      resolve(true);
+    });
+  });
+}
+
 function renderKistenBeheer(msg) {
   const adminMode = !!Settings.get('catalog_admin_mode');
   const drafts = _activeDossierDrafts();
@@ -209,6 +287,7 @@ function renderKistenBeheer(msg) {
                 <input type="file" accept="image/*" data-upload="${esc(k.naam)}" hidden>
               </label>
               ${url ? `<button type="button" class="btn btn-sm btn-ghost" data-remove-foto="${esc(k.naam)}">Foto weg</button>` : ''}
+              ${k._eigen ? `<span class="badge badge-amber" title="Eigen toegevoegde kist">Eigen</span>` : ''}
             </div>
             <div class="kist-card-actions catalog-edit-row">
               <label class="catalog-price-edit">
@@ -217,9 +296,12 @@ function renderKistenBeheer(msg) {
               </label>
               <button type="button" class="btn btn-sm" data-save-price="${esc(k.naam)}">Opslaan</button>
               ${k._customBedrag ? `<button type="button" class="btn btn-sm btn-ghost" data-reset-price="${esc(k.naam)}" title="Terug naar standaardprijs">↺ Reset</button>` : ''}
-              ${hidden
-                ? `<button type="button" class="btn btn-sm btn-ghost" data-show-kist="${esc(k.naam)}">↺ Herstel kist</button>`
-                : `<button type="button" class="btn btn-sm btn-ghost btn-danger" data-hide-kist="${esc(k.naam)}">🗑 Verwijder kist</button>`}
+              ${k._eigen
+                ? `<button type="button" class="btn btn-sm btn-ghost" data-eigen-edit="${esc(k.naam)}">✏️ Bewerk</button>
+                   <button type="button" class="btn btn-sm btn-ghost btn-danger" data-eigen-del="${esc(k.naam)}">🗑 Verwijder</button>`
+                : (hidden
+                    ? `<button type="button" class="btn btn-sm btn-ghost" data-show-kist="${esc(k.naam)}">↺ Herstel kist</button>`
+                    : `<button type="button" class="btn btn-sm btn-ghost btn-danger" data-hide-kist="${esc(k.naam)}">🗑 Verwijder kist</button>`)}
             </div>` : ''}
         </div>
       </div>`;
@@ -234,6 +316,15 @@ function renderKistenBeheer(msg) {
         </div>
         ${adminMode ? '<span class="badge badge-amber">Beheermodus aan</span>' : ''}
       </div>
+
+      ${adminMode ? `
+        <div class="alert alert-info" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <div>
+            <strong>➕ Eigen kist toevoegen</strong>
+            <span class="muted small">Voeg kisten toe die niet in de Unigra-catalogus staan (naam, materiaal, prijs, optionele kleur).</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-kist-nieuw">+ Nieuwe kist</button>
+        </div>` : ''}
 
       ${isBeheerder ? (() => {
         if (typeof KistVoorraad === 'undefined') return '';
@@ -411,6 +502,34 @@ function renderKistenBeheer(msg) {
       renderKistenBeheer();
       const top = $('#view .catalog-zoekbalk');
       if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    // ── Beheermodus: nieuwe eigen kist toevoegen ──
+    const nieuwBtn = e.target.closest('#btn-kist-nieuw');
+    if (nieuwBtn) {
+      await _promptNieuweKist();
+      return;
+    }
+    // ── Beheermodus: eigen kist bewerken / verwijderen ──
+    const editEigen = e.target.closest('button[data-eigen-edit]');
+    if (editEigen) {
+      await _promptNieuweKist(editEigen.getAttribute('data-eigen-edit'));
+      return;
+    }
+    const delEigen = e.target.closest('button[data-eigen-del]');
+    if (delEigen) {
+      const naam = delEigen.getAttribute('data-eigen-del');
+      const ok = await Modal.confirm({
+        type: 'warning',
+        title: 'Eigen kist verwijderen?',
+        message: `"${naam}" wordt uit je eigen catalogus verwijderd. Bestaande dossiers die deze kist gebruiken blijven werken, maar de kist is niet meer kiesbaar.`,
+        confirmText: 'Verwijderen',
+        cancelText: 'Annuleren',
+      });
+      if (!ok) return;
+      const lijst = (Settings.get('kisten_eigen') || []).filter(x => x && x.naam !== naam);
+      Settings.set({ kisten_eigen: lijst });
+      renderKistenBeheer({ success: `Eigen kist "${naam}" verwijderd.` });
       return;
     }
     // ── Beheermodus: prijs / verwijder / herstel / reset ──

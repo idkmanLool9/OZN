@@ -79,7 +79,17 @@ function effectieveKostenPresets({ includeHidden = false } = {}) {
 }
 function effectieveKistenCatalogus({ includeHidden = false } = {}) {
   const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};
-  return KISTEN_CATALOGUS
+  const eigen = ((typeof Settings !== 'undefined' && Settings.get('kisten_eigen')) || [])
+    .filter(x => x && x.naam)
+    .map(x => ({
+      naam: String(x.naam),
+      materiaal: String(x.materiaal || ''),
+      bedrag: Number(x.bedrag) || 0,
+      kleur: String(x.kleur || ''),
+      _eigen: true,
+    }));
+  const basis = KISTEN_CATALOGUS.concat(eigen);
+  return basis
     .filter(k => includeHidden || !(ov[k.naam] && ov[k.naam].hidden))
     .map(k => {
       const o = ov[k.naam];
@@ -94,7 +104,10 @@ function vindKist(naam) {
   // Lookup-by-naam met override toegepast (ook voor verborgen kisten —
   // zodat oude dossiers nog correct hun kist-prijs vertonen).
   const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};
-  const k = KISTEN_CATALOGUS.find(x => x.naam === naam);
+  const eigen = ((typeof Settings !== 'undefined' && Settings.get('kisten_eigen')) || [])
+    .filter(x => x && x.naam);
+  const k = KISTEN_CATALOGUS.find(x => x.naam === naam)
+    || eigen.find(x => x.naam === naam);
   if (!k) return null;
   const o = ov[naam];
   if (!o || o.bedrag == null) return k;

@@ -12,9 +12,9 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 311;
-const APP_VERSION    = '6.1.0';
-const APP_BUILD_DATE = '2026-07-29';
+const APP_BUILD      = 312;
+const APP_VERSION    = '6.1.1';
+const APP_BUILD_DATE = '2026-08-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
@@ -76,6 +76,10 @@ const Settings = {
     // Per-naam overrides voor de Unigra-kistencatalogus (alleen wijzigbaar
     // in beheermodus): { 'Naam kist': { bedrag?: number, hidden?: bool } }
     kisten_overrides: {},
+    // Zelf-toegevoegde kisten (buiten Unigra-catalogus). Vorm:
+    // [{ naam, materiaal, bedrag, kleur? }, …]. Beheer via Account of via
+    // de + knop in de Kisten-catalogus (alleen in beheermodus).
+    kisten_eigen: [],
     // Idem voor de standaard-kostenpresets (Snel toevoegen uit lijst).
     // Sleutels = omschrijving (uitgezonderd nav-tegels Kist/Bloemen/Extra).
     kosten_overrides: {},

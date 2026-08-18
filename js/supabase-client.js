@@ -475,6 +475,13 @@ const R2 = {
   // bestand direct in de dossier-map: dossiers/<sub>/<filename>.
   // Zonder dossier-context gebruiken we tijdelijke map _nieuw_<timestamp>;
   // de auto-reorder verplaatst 'm zodra het dossier een naam/ID heeft.
+  //
+  // Twee-stappen strategie:
+  //  1) Probeer presigned URL (snel, geen server-bandwidth). Faalt vaak
+  //     met "Failed to fetch" wanneer R2-bucket geen CORS-config heeft
+  //     voor de app-origin — vooral in Capacitor WebViews.
+  //  2) Bij netwerkfout: fallback naar edge function `r2-upload` die de
+  //     bytes server-side naar R2 pusht (geen browser-CORS in het spel).
   async upload(file, keyPrefix, dossier) {
     const rawName = (file && file.name) || 'bestand';
     const safe = String(rawName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
@@ -485,17 +492,54 @@ const R2 = {
     const key = (!type || type === 'dossiers')
       ? `dossiers/${sub}/${filename}`
       : `dossiers/${sub}/${type}/${filename}`;
-    const { url, method } = await R2._sign('put', key, { contentType: file.type || 'application/octet-stream' });
-    const resp = await fetch(url, {
-      method,
-      body: file,
-      headers: { 'content-type': file.type || 'application/octet-stream' },
-    });
-    if (!resp.ok) {
-      const txt = await resp.text().catch(() => '');
-      throw new Error(`R2 upload faalde (${resp.status}): ${txt.slice(0, 200)}`);
+    const contentType = file.type || 'application/octet-stream';
+
+    // Stap 1: presigned URL — snelste pad
+    try {
+      const { url, method } = await R2._sign('put', key, { contentType });
+      const resp = await fetch(url, {
+        method,
+        body: file,
+        headers: { 'content-type': contentType },
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        // 400/403 = signature/permission fout → NIET terugvallen (dan
+        // zit het probleem in de credentials, niet in CORS).
+        throw new Error(`R2 upload faalde (${resp.status}): ${txt.slice(0, 200)}`);
+      }
+      return R2.tag(key);
+    } catch (e) {
+      // "Failed to fetch" = netwerk of CORS. Alleen dan retry via EF.
+      const msg = String(e && e.message || e);
+      const isNetOrCors = /failed to fetch|network|cors|typeerror/i.test(msg);
+      if (!isNetOrCors) throw e;
+      console.warn('R2 direct upload faalde, probeer EF-proxy…', msg);
     }
-    return R2.tag(key);
+
+    // Stap 2: EF-proxy fallback
+    try {
+      const fd = new FormData();
+      fd.append('key', key);
+      fd.append('file', file, safe);
+      const { data, error } = await sb.functions.invoke('r2-upload', { body: fd });
+      if (error) throw new Error(error.message || String(error));
+      if (data && data.error) throw new Error(data.error + (data.detail ? ': ' + data.detail : ''));
+      if (!data || !data.ok) throw new Error('r2-upload EF gaf onverwacht antwoord');
+      return R2.tag(key);
+    } catch (e) {
+      const msg = String(e && e.message || e);
+      // Als de EF niet bestaat (404 / not-found) → verwijs naar CORS.
+      if (/not.found|404|invocation/i.test(msg)) {
+        throw new Error(
+          'Upload lukt niet (browser blokkeert directe R2-verbinding). ' +
+          'Vraag de beheerder om óf de R2-bucket CORS-config toe te voegen, ' +
+          'óf de nieuwe edge function `r2-upload` te deployen ' +
+          '(supabase functions deploy r2-upload).'
+        );
+      }
+      throw e;
+    }
   },
 
   // Presigned GET URL — te gebruiken als <img src>, downloadlink of fetch().
@@ -527,7 +571,16 @@ const ArtsVerklaring = {
       Modal.show({
         type: 'error',
         title: 'Upload naar R2 mislukt',
-        message: (e && e.message) + '\n\nHet bestand is NIET opgeslagen. Controleer de internetverbinding en probeer opnieuw. Als dit blijft: check R2-credentials in Account → Cloudflare R2.',
+        message: (e && e.message)
+          + '\n\nMogelijke oorzaken:'
+          + '\n1) R2-bucket heeft geen CORS-config voor de app-origin'
+          + '\n   (fix: Cloudflare dashboard → R2 → bucket → Settings → CORS Policy,'
+          + '   voeg regel toe met AllowedOrigins:["*"], AllowedMethods:["PUT","GET","DELETE"],'
+          + '   AllowedHeaders:["*"]).'
+          + '\n2) Edge function `r2-upload` niet gedeployed'
+          + '\n   (fix: supabase functions deploy r2-upload).'
+          + '\n3) Verkeerde/verlopen R2-credentials in Supabase secrets.'
+          + '\n\nHet bestand is NIET opgeslagen.',
       });
       throw e;
     }
@@ -626,7 +679,11 @@ const BezittingenFotos = {
       Modal.show({
         type: 'error',
         title: 'Foto niet opgeslagen',
-        message: (e && e.message) + '\n\nR2 niet bereikbaar. Probeer opnieuw als de verbinding er weer is.',
+        message: (e && e.message)
+          + '\n\nMogelijke oorzaken:'
+          + '\n1) R2-bucket heeft geen CORS-config (Cloudflare dashboard → R2 → bucket → Settings → CORS Policy).'
+          + '\n2) Edge function `r2-upload` niet gedeployed (supabase functions deploy r2-upload).'
+          + '\n3) Slechte verbinding.',
       });
       throw e;
     }
