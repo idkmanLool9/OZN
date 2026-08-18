@@ -338,30 +338,6 @@ function renderAccount(msg) {
         <a href="#/logboek">Logboek</a>
       </nav>
 
-      <section class="card narrow" id="acc-beheer" style="border:2px solid #e6c46b;background:linear-gradient(180deg,#fffaee 0%,#fdf3d8 100%);">
-        <h2 style="display:flex;align-items:center;gap:.5rem;color:#7a5100;">🛠 Beheerdersmodus</h2>
-        <p class="muted" style="margin:.25rem 0 1rem;">Alleen zichtbaar voor beheerders. Schakel deze modus in om de kistencatalogus of het intake-formulier aan te passen.</p>
-        <form id="frm-beheermodus" style="display:flex;flex-direction:column;gap:.75rem;">
-          <label class="beheer-toggle" style="display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1rem;background:var(--surface);border-radius:.5rem;border:1px solid #e6c46b;cursor:pointer;">
-            <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''} style="margin-top:.2rem;width:1.2rem;height:1.2rem;flex:none;">
-            <div>
-              <strong style="display:block;margin-bottom:.15rem;">📦 Kistencatalogus beheren</strong>
-              <span class="muted small">Voeg nieuwe kisten toe, wijzig prijzen, upload foto's of verberg kisten die je niet meer gebruikt. Toont een "+ Kist toevoegen" knop en bewerk-icoontjes op elke kist-kaart.</span>
-            </div>
-          </label>
-          <label class="beheer-toggle" style="display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1rem;background:var(--surface);border-radius:.5rem;border:1px solid #e6c46b;cursor:pointer;">
-            <input type="checkbox" name="dossier_admin_mode" ${s.dossier_admin_mode ? 'checked' : ''} style="margin-top:.2rem;width:1.2rem;height:1.2rem;flex:none;">
-            <div>
-              <strong style="display:block;margin-bottom:.15rem;">📝 Formulier-labels aanpassen</strong>
-              <span class="muted small">Klik op titels, knop-teksten en veld-labels in het intake-formulier om ze te hernoemen. Handig als je bepaalde termen anders wilt noemen.</span>
-            </div>
-          </label>
-          <div class="form-actions" style="justify-content:flex-end;">
-            <button type="submit" class="btn btn-primary">Opslaan</button>
-          </div>
-        </form>
-      </section>
-
       <section class="card narrow" id="acc-versie">
         <h2>App-versie &amp; updates</h2>
         <dl class="dl">
@@ -394,6 +370,23 @@ function renderAccount(msg) {
           <strong>Check op updates</strong> haalt de laatste versie binnen.<br>
           <strong>Reset volledig</strong> gebruik je alleen als de app vast blijft hangen op een oude versie — dossiers blijven veilig staan, alleen de offline-kopie wordt gewist.
         </p>
+      </section>
+
+      <section class="card narrow" id="acc-beheer" style="border:2px solid #e6c46b;background:linear-gradient(180deg,#fffaee 0%,#fdf3d8 100%);">
+        <h2 style="display:flex;align-items:center;gap:.5rem;color:#7a5100;">🛠 Beheerdersmodus</h2>
+        <p class="muted" style="margin:.25rem 0 1rem;">Alleen zichtbaar voor beheerders. Schakel deze modus in om de kistencatalogus aan te passen.</p>
+        <form id="frm-beheermodus" style="display:flex;flex-direction:column;gap:.75rem;">
+          <label class="beheer-toggle" style="display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1rem;background:var(--surface);border-radius:.5rem;border:1px solid #e6c46b;cursor:pointer;">
+            <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''} style="margin-top:.2rem;width:1.2rem;height:1.2rem;flex:none;">
+            <div>
+              <strong style="display:block;margin-bottom:.15rem;">📦 Kistencatalogus beheren</strong>
+              <span class="muted small">Voeg nieuwe kisten toe, wijzig prijzen, upload foto's of verberg kisten die je niet meer gebruikt. Toont een "+ Kist toevoegen" knop en bewerk-icoontjes op elke kist-kaart.</span>
+            </div>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
       </section>
 
       <section class="card narrow" id="acc-gegevens">
@@ -1310,23 +1303,18 @@ EMAIL_FROM_NAME = OZN</pre>
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
     });
   }
-  // ── Beheermodus (aparte prominent-card bovenaan) ──
+  // ── Beheermodus (aparte prominent-card onder App-versie) ──
   const beheerForm = document.getElementById('frm-beheermodus');
   if (beheerForm) {
     beheerForm.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
-      Settings.set({
-        catalog_admin_mode: f.catalog_admin_mode.checked,
-        dossier_admin_mode: f.dossier_admin_mode.checked,
+      Settings.set({ catalog_admin_mode: f.catalog_admin_mode.checked });
+      renderAccount({
+        success: f.catalog_admin_mode.checked
+          ? 'Beheerdersmodus AAN — je kunt nu de kistencatalogus bewerken.'
+          : 'Beheerdersmodus UIT.',
       });
-      const aan = [];
-      if (f.catalog_admin_mode.checked) aan.push('kistencatalogus');
-      if (f.dossier_admin_mode.checked) aan.push('formulier-labels');
-      const msg = aan.length
-        ? `Beheerdersmodus AAN voor: ${aan.join(' + ')}.`
-        : 'Beheerdersmodus UIT.';
-      renderAccount({ success: msg });
     });
   }
 

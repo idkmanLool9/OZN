@@ -813,33 +813,6 @@ function renderDossierForm(params) {
   document.getElementById('btn-wizard-prev').addEventListener('click', () => showStep(currentStep - 1));
   document.getElementById('btn-wizard-next').addEventListener('click', () => showStep(currentStep + 1));
 
-  // ─── Beheermodus: labels/knop-teksten inline hernoemen ─────────────
-  // Wanneer beheerder + dossier_admin_mode aan staan, hebben titels de
-  // klasse 'dossier-label-edit' + contenteditable. Op blur slaan we de
-  // nieuwe tekst op in Settings.dossier_labels. Enter → einde bewerking.
-  if (typeof Auth !== 'undefined' && Auth.isBeheerder()
-      && typeof Settings !== 'undefined' && Settings.get('dossier_admin_mode')) {
-    document.querySelectorAll('#dossier-form .dossier-label-edit, .wizard-steps .dossier-label-edit, .wizard-actions .dossier-label-edit')
-      .forEach(el => {
-        el.addEventListener('keydown', ev => {
-          if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
-        });
-        el.addEventListener('blur', () => {
-          const key = el.dataset.labelKey;
-          const def = el.dataset.labelDefault || '';
-          const nieuw = (el.textContent || '').trim();
-          const cur = Object.assign({}, Settings.get('dossier_labels') || {});
-          if (!nieuw || nieuw === def) delete cur[key];
-          else cur[key] = nieuw;
-          Settings.set({ dossier_labels: cur });
-          Toast.show('Label opgeslagen', 'success');
-        });
-        // Ook een klik op de wizard-step-knop moet het label kunnen bewerken
-        // zonder de step-navigatie te triggeren.
-        el.addEventListener('click', ev => ev.stopPropagation());
-      });
-  }
-
   // Ophalen / Thuis opbaren / Beide → toont het bijhorende fieldset.
   function updateOpbaring() {
     const sel = document.getElementById('opbaring-type-select');
