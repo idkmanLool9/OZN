@@ -143,6 +143,41 @@ Native.openUrl = async function (url) {
   try { window.open(url, '_blank'); return true; } catch (_) { return false; }
 };
 
+// Open een URL EXTERN (systeem-browser), NIET in de in-app Chrome Custom Tab.
+// Cruciaal voor APK-downloads: alleen de systeem-browser triggert Android's
+// DownloadManager + de "onbekende bronnen"-install-prompt. Chrome Custom Tab
+// download 'm silent zonder installatie-prompt.
+//
+// Werkwijze:
+//  - Android: intent://... URI die door de OS naar de default-browser wordt
+//    gerouteerd. WebView geeft 'm door met setDownloadListener.
+//  - iOS: gewoon Browser.open (SFSafariViewController — die downloadt APKs
+//    sowieso niet, iOS heeft geen APKs).
+//  - Web: window.open in nieuw tab.
+Native.openExternalUrl = async function (url) {
+  if (!url) return false;
+  const plat = Native.platform();
+  if (plat === 'android') {
+    // Bouw intent:// URI. Extractie scheme + rest zodat we het correct
+    // wrappen (intent:URL#Intent;end).
+    const m = String(url).match(/^(https?):\/\/(.+)$/i);
+    if (m) {
+      const scheme = m[1];
+      const rest = m[2];
+      const intentUrl = `intent://${rest}#Intent;scheme=${scheme};action=android.intent.action.VIEW;end`;
+      try {
+        // location.href triggert de intent — Android routeert naar default browser.
+        window.location.href = intentUrl;
+        return true;
+      } catch (_) {}
+    }
+    // Fallback: gewoon href — Android WebView download-listener pakt 't op
+    try { window.location.href = url; return true; } catch (_) {}
+  }
+  // iOS + web fallback
+  return Native.openUrl(url);
+};
+
 // data-URL (base64) → File
 Native._dataUrlToFile = async function (dataUrl, naam) {
   const resp = await fetch(dataUrl);

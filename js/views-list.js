@@ -1463,7 +1463,36 @@ EMAIL_FROM_NAME = OZN</pre>
         if (typeof ApkUpdater !== 'undefined' && ApkUpdater.isApp()) {
           const info = await ApkUpdater.check({ force: true });
           if (info && info.hasUpdate) {
-            result.innerHTML = `<div class="alert alert-info">📦 Nieuwe APK beschikbaar. <a href="${esc(info.downloadUrl)}" target="_blank" rel="noopener" class="btn btn-sm btn-primary" style="margin-left:.5rem;">Installeer</a></div>`;
+            const versieStr = info.remoteVersion ? `v${info.remoteVersion}` : `build ${info.remoteBuild}`;
+            const notReadyNote = info.assetReady ? '' :
+              `<p class="alert alert-warn small" style="margin:.5rem 0 0;padding:.5rem;">
+                ⏳ Build ${info.remoteBuild} is klaar in de code, maar de APK-workflow op GitHub is nog bezig.
+                Wacht 1–2 minuten en probeer opnieuw als "download &amp; installeer" een 404 geeft.
+              </p>`;
+            result.innerHTML = `<div class="alert alert-info">
+              📦 Nieuwe APK beschikbaar: <strong>${esc(versieStr)}</strong> (jij: build ${info.localBuild}).
+              <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-apk-install">📥 Download &amp; installeer</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="btn-apk-copy">🔗 Kopieer download-link</button>
+              </div>
+              ${notReadyNote}
+              <p class="muted small" style="margin:.5rem 0 0;">Als de download niet start: kopieer de link en open 'm in Chrome/Firefox. Bij eerste keer: sta "Onbekende bronnen" toe voor de app die de APK opent.</p>
+            </div>`;
+            const inst = document.getElementById('btn-apk-install');
+            if (inst) inst.onclick = () => {
+              try { Native.openExternalUrl(info.downloadUrl); } catch (_) {
+                try { window.location.href = info.downloadUrl; } catch (__) {}
+              }
+            };
+            const cp = document.getElementById('btn-apk-copy');
+            if (cp) cp.onclick = async () => {
+              try {
+                await navigator.clipboard.writeText(info.downloadUrl);
+                Toast.show('Download-link gekopieerd — plak in Chrome/Firefox', 'success');
+              } catch (_) {
+                Toast.show('Kopiëren mislukt — selecteer de link handmatig', 'error');
+              }
+            };
           } else if (info) {
             result.innerHTML = `<div class="alert alert-success">Je draait al de laatste APK (${esc(APP_VERSION)}, ${esc(APP_BUILD_DATE)}).</div>`;
           } else {

@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 312;
-const APP_VERSION    = '6.1.1';
+const APP_BUILD      = 313;
+const APP_VERSION    = '6.1.2';
 const APP_BUILD_DATE = '2026-08-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -942,33 +942,51 @@ const ApkUpdater = {
       if (Date.now() - last < ApkUpdater.CHECK_INTERVAL_MS) return null;
     }
     try {
-      // Haal APP_BUILD uit de release-source (js/app.js op de default-branch)
-      // en vergelijk met het lokale APP_BUILD-nummer. Een nieuwe release
-      // heeft altijd een hoger build-nummer; dat is dus een betrouwbare
-      // vergelijking. Het oude script vergeleek asset.updated_at — dat gaf
-      // false positives omdat élke rebuild een nieuwe timestamp geeft.
-      const rSrc = await fetch(
-        'https://raw.githubusercontent.com/idkmanLool9/OZN/claude/app-scan-analysis-huhgss/js/app.js?_ts=' + Date.now(),
-        { cache: 'no-store' }
-      );
-      if (!rSrc.ok) return null;
-      const text = (await rSrc.text()).slice(0, 1500);
+      // Haal APP_BUILD uit de release-source. Probeer meerdere branches in
+      // volgorde: eerst de huidige WIP-branch (heeft altijd de nieuwste code),
+      // dan main/master als fallback voor wanneer de WIP-branch merget.
+      // Zo blijft de check werken als het release-proces verandert.
+      const BRANCHES = ['claude/app-scan-analysis-huhgss', 'main', 'master'];
+      let text = '';
+      for (const br of BRANCHES) {
+        try {
+          const r = await fetch(
+            `https://raw.githubusercontent.com/idkmanLool9/OZN/${br}/js/app.js?_ts=` + Date.now(),
+            { cache: 'no-store' }
+          );
+          if (r.ok) { text = (await r.text()).slice(0, 1500); break; }
+        } catch (_) {}
+      }
+      if (!text) return null;
       const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
       const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
       const remoteBuild = mb ? parseInt(mb[1], 10) : null;
       const remoteVersion = mv ? mv[1] : null;
       localStorage.setItem(ApkUpdater.LAST_CHECK_KEY, String(Date.now()));
 
-      // Voor de download-URL wél nog even de release-API pakken
+      // Voor de download-URL de release-API pakken. Probeer eerst 'app-latest'
+      // tag, dan 'latest'-release. Als de asset nog niet is gepubliceerd
+      // (workflow bezig) gebruiken we een default die via redirect vanzelf
+      // naar de juiste tag verwijst.
       let downloadUrl = 'https://github.com/idkmanLool9/OZN/releases/latest/download/ozn-app.apk';
-      try {
-        const rApi = await fetch(ApkUpdater.RELEASE_API, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
-        if (rApi.ok) {
+      let assetReady = false;
+      const RELEASE_TAGS = [
+        ApkUpdater.RELEASE_API,
+        'https://api.github.com/repos/idkmanLool9/OZN/releases/latest',
+      ];
+      for (const apiUrl of RELEASE_TAGS) {
+        try {
+          const rApi = await fetch(apiUrl, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
+          if (!rApi.ok) continue;
           const j = await rApi.json();
           const asset = (j.assets || []).find(a => a && a.name && a.name.toLowerCase().endsWith('.apk'));
-          if (asset && asset.browser_download_url) downloadUrl = asset.browser_download_url;
-        }
-      } catch (_) {}
+          if (asset && asset.browser_download_url) {
+            downloadUrl = asset.browser_download_url;
+            assetReady = true;
+            break;
+          }
+        } catch (_) {}
+      }
 
       const nieuwer = !!(remoteBuild && remoteBuild > APP_BUILD);
       const info = {
@@ -977,6 +995,7 @@ const ApkUpdater = {
         remoteBuild,
         remoteVersion,
         downloadUrl,
+        assetReady, // false = release-workflow nog bezig, download-URL kan 404 geven
       };
       if (nieuwer) ApkUpdater.showBanner(info);
       return info;
@@ -986,6 +1005,9 @@ const ApkUpdater = {
   showBanner(info) {
     const dismissed = localStorage.getItem(ApkUpdater.DISMISSED_KEY);
     if (dismissed && dismissed === String(info.remoteBuild)) return; // gebruiker heeft déze versie al weggeklikt
+    // Als de release-workflow nog bezig is, wachten we — anders krijgt de
+    // gebruiker een banner met een download-URL die 404 geeft.
+    if (info.assetReady === false) return;
     const el = document.getElementById('apk-update-banner');
     const txt = document.getElementById('apk-update-banner-info');
     const btn = document.getElementById('apk-update-banner-install');
@@ -996,14 +1018,15 @@ const ApkUpdater = {
     btn.href = info.downloadUrl;
     btn.setAttribute('target', '_blank');
     btn.setAttribute('rel', 'noopener');
-    // Op Android/iOS met Capacitor: forceer externe browser zodat de APK-
-    // download en installer-prompt triggeren. Anders blijft de webview
-    // hangen op de github.com-pagina.
     btn.onclick = (e) => {
+      // In de APK: gebruik systeem-browser via intent:// zodat de APK-
+      // download door Android's DownloadManager gaat en de installer-prompt
+      // verschijnt. Chrome Custom Tab (Browser.open) download 'm silent
+      // waardoor de gebruiker niets ziet gebeuren.
       try {
         if (typeof Native !== 'undefined' && Native.isApp()) {
           e.preventDefault();
-          Native.openUrl(info.downloadUrl);
+          Native.openExternalUrl(info.downloadUrl);
         }
       } catch (_) {}
     };
