@@ -319,6 +319,7 @@ function renderAccount(msg) {
       <div class="page-head"><h1>Mijn account</h1></div>
 
       <nav class="account-nav" aria-label="Snelnavigatie instellingen">
+        <a href="#/account#acc-beheer" style="background:#fdf3d8;border-color:#e6c46b;color:#7a5100;font-weight:700;">🛠 Beheermodus</a>
         <a href="#/account#acc-versie">App &amp; updates</a>
         <a href="#/account#acc-gegevens">Mijn gegevens</a>
         <a href="#/account#acc-wachtwoord">Wachtwoord</a>
@@ -336,6 +337,30 @@ function renderAccount(msg) {
         <a href="#/account#acc-data">Data &amp; sync</a>
         <a href="#/logboek">Logboek</a>
       </nav>
+
+      <section class="card narrow" id="acc-beheer" style="border:2px solid #e6c46b;background:linear-gradient(180deg,#fffaee 0%,#fdf3d8 100%);">
+        <h2 style="display:flex;align-items:center;gap:.5rem;color:#7a5100;">🛠 Beheerdersmodus</h2>
+        <p class="muted" style="margin:.25rem 0 1rem;">Alleen zichtbaar voor beheerders. Schakel deze modus in om de kistencatalogus of het intake-formulier aan te passen.</p>
+        <form id="frm-beheermodus" style="display:flex;flex-direction:column;gap:.75rem;">
+          <label class="beheer-toggle" style="display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1rem;background:var(--surface);border-radius:.5rem;border:1px solid #e6c46b;cursor:pointer;">
+            <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''} style="margin-top:.2rem;width:1.2rem;height:1.2rem;flex:none;">
+            <div>
+              <strong style="display:block;margin-bottom:.15rem;">📦 Kistencatalogus beheren</strong>
+              <span class="muted small">Voeg nieuwe kisten toe, wijzig prijzen, upload foto's of verberg kisten die je niet meer gebruikt. Toont een "+ Kist toevoegen" knop en bewerk-icoontjes op elke kist-kaart.</span>
+            </div>
+          </label>
+          <label class="beheer-toggle" style="display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1rem;background:var(--surface);border-radius:.5rem;border:1px solid #e6c46b;cursor:pointer;">
+            <input type="checkbox" name="dossier_admin_mode" ${s.dossier_admin_mode ? 'checked' : ''} style="margin-top:.2rem;width:1.2rem;height:1.2rem;flex:none;">
+            <div>
+              <strong style="display:block;margin-bottom:.15rem;">📝 Formulier-labels aanpassen</strong>
+              <span class="muted small">Klik op titels, knop-teksten en veld-labels in het intake-formulier om ze te hernoemen. Handig als je bepaalde termen anders wilt noemen.</span>
+            </div>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
+      </section>
 
       <section class="card narrow" id="acc-versie">
         <h2>App-versie &amp; updates</h2>
@@ -546,14 +571,10 @@ function renderAccount(msg) {
               <input type="checkbox" name="rounded_cards" ${s.rounded_cards ? 'checked' : ''}>
               Afgeronde hoeken (uit = strakke vierkante stijl)
             </label>
-            <label class="checkbox-inline" style="font-size:.95rem;">
-              <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''}>
-              Beheermodus voor de kistencatalogus (toont knoppen om foto's te vervangen en prijzen aan te passen)
-            </label>
-            <label class="checkbox-inline" style="font-size:.95rem;">
-              <input type="checkbox" name="dossier_admin_mode" ${s.dossier_admin_mode ? 'checked' : ''}>
-              Beheermodus voor dossier-labels (klik op titels/knop-teksten in het intake-formulier om ze te hernoemen)
-            </label>
+            <p class="muted small" style="margin:.5rem 0 0;padding:.5rem;background:#fdf3d8;border-radius:.35rem;border:1px solid #e6c46b;">
+              🛠 <strong>Beheerdersmodus</strong> (kistencatalogus / formulier-labels bewerken)
+              staat nu bovenaan deze pagina in een aparte sectie. <a href="#/account#acc-beheer">Ga daarheen →</a>
+            </p>
             <div class="form-actions" style="justify-content:flex-end;">
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
@@ -1284,11 +1305,28 @@ EMAIL_FROM_NAME = OZN</pre>
         rounded_cards: f.rounded_cards.checked,
         font_id: f.font_id.value,
         form_density: f.form_density.value,
-        catalog_admin_mode: f.catalog_admin_mode.checked,
-        dossier_admin_mode: f.dossier_admin_mode.checked,
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
+    });
+  }
+  // ── Beheermodus (aparte prominent-card bovenaan) ──
+  const beheerForm = document.getElementById('frm-beheermodus');
+  if (beheerForm) {
+    beheerForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        catalog_admin_mode: f.catalog_admin_mode.checked,
+        dossier_admin_mode: f.dossier_admin_mode.checked,
+      });
+      const aan = [];
+      if (f.catalog_admin_mode.checked) aan.push('kistencatalogus');
+      if (f.dossier_admin_mode.checked) aan.push('formulier-labels');
+      const msg = aan.length
+        ? `Beheerdersmodus AAN voor: ${aan.join(' + ')}.`
+        : 'Beheerdersmodus UIT.';
+      renderAccount({ success: msg });
     });
   }
 
