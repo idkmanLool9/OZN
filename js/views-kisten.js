@@ -123,9 +123,10 @@ async function _promptNieuweKist(bestaandeNaam) {
   const eigen = Settings.get('kisten_eigen') || [];
   const bestaand = bestaandeNaam ? eigen.find(x => x && x.naam === bestaandeNaam) : null;
   const materialen = [...new Set(KISTEN_CATALOGUS.map(k => k.materiaal))].sort();
+  const heeftAlFoto = bestaand ? !!KistFotos.urlVoor(bestaandeNaam) : false;
   const html = `
     <div class="pincode-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;">
-      <div class="card" style="max-width:480px;width:100%;background:var(--surface);padding:1.5rem;border-radius:.75rem;">
+      <div class="card" style="max-width:520px;width:100%;background:var(--surface);padding:1.5rem;border-radius:.75rem;max-height:92vh;overflow-y:auto;">
         <h2 style="margin-top:0;">${bestaand ? 'Kist bewerken' : 'Nieuwe kist toevoegen'}</h2>
         <form id="frm-nieuwe-kist">
           <label style="display:block;margin:.75rem 0;">
@@ -147,6 +148,32 @@ async function _promptNieuweKist(bestaandeNaam) {
             <span>Kleur (optioneel)</span>
             <input type="text" name="kleur" maxlength="60" value="${esc(bestaand?.kleur || '')}" style="width:100%;padding:.5rem;" placeholder="bv. Naturel, Blank hout">
           </label>
+
+          <fieldset style="margin:1.25rem 0 .5rem;padding:.9rem 1rem;border:1px solid var(--border,#e5e0d5);border-radius:.5rem;">
+            <legend style="padding:0 .35rem;font-weight:600;font-size:.95rem;">📷 Foto van de kist</legend>
+            ${heeftAlFoto ? `<p class="muted small" style="margin:.25rem 0 .5rem;">Er staat al een foto voor deze kist. Kies "Vervangen" om 'm te overschrijven.</p>` : ''}
+            <div style="display:flex;flex-direction:column;gap:.5rem;margin:.5rem 0;">
+              <label style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--surface);border:1px solid var(--border);border-radius:.35rem;cursor:pointer;">
+                <input type="radio" name="foto_keuze" value="ja" ${!bestaand ? '' : (heeftAlFoto ? '' : 'checked')}>
+                <span><strong>${heeftAlFoto ? 'Vervangen' : 'Ja, ik heb een foto'}</strong>${heeftAlFoto ? '' : ' — kies een bestand hieronder'}</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--surface);border:1px solid var(--border);border-radius:.35rem;cursor:pointer;">
+                <input type="radio" name="foto_keuze" value="nee" ${!bestaand && !heeftAlFoto ? 'checked' : ''}>
+                <span><strong>Nee, geen foto</strong> — er komt een "Geen afbeelding"-pictogram op de kaart</span>
+              </label>
+            </div>
+            <div id="foto-input-wrap" style="margin-top:.5rem;display:none;">
+              <input type="file" name="foto" accept="image/*" style="width:100%;">
+              <p class="muted small" style="margin:.4rem 0 0;">Max. 5 MB. JPG/PNG. Wordt automatisch gecomprimeerd tot ~1600 px.</p>
+              <div id="foto-preview" style="margin-top:.5rem;display:none;">
+                <img alt="Voorbeeld" style="max-width:100%;max-height:180px;border-radius:.4rem;border:1px solid var(--border);">
+              </div>
+            </div>
+            <p id="foto-nee-hint" class="muted small" style="margin:.5rem 0 0;padding:.6rem;background:#1e1e1e;color:rgba(255,255,255,.75);border-radius:.35rem;display:none;">
+              ℹ️ Kaart krijgt automatisch de "Geen afbeelding"-placeholder. Je kunt later altijd nog een foto uploaden via het 📷 icoontje op de kist-kaart.
+            </p>
+          </fieldset>
+
           <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;">
             <button type="button" class="btn btn-ghost" id="btn-kist-annuleer">Annuleren</button>
             <button type="submit" class="btn btn-primary">${bestaand ? 'Opslaan' : 'Toevoegen'}</button>
@@ -162,8 +189,35 @@ async function _promptNieuweKist(bestaandeNaam) {
   overlay.addEventListener('click', e => {
     if (e.target === overlay || e.target.id === 'btn-kist-annuleer') close();
   });
+
+  // Foto-keuze radio's togglen de UI
+  const fotoWrap = overlay.querySelector('#foto-input-wrap');
+  const neeHint  = overlay.querySelector('#foto-nee-hint');
+  const preview  = overlay.querySelector('#foto-preview');
+  const previewImg = preview.querySelector('img');
+  const syncFotoUI = () => {
+    const val = (overlay.querySelector('input[name="foto_keuze"]:checked') || {}).value;
+    if (val === 'ja') { fotoWrap.style.display = ''; neeHint.style.display = 'none'; }
+    else if (val === 'nee') { fotoWrap.style.display = 'none'; neeHint.style.display = ''; }
+    else { fotoWrap.style.display = 'none'; neeHint.style.display = 'none'; }
+  };
+  overlay.querySelectorAll('input[name="foto_keuze"]').forEach(r => r.addEventListener('change', syncFotoUI));
+  syncFotoUI();
+
+  // Live preview van geselecteerd bestand
+  const fInp = overlay.querySelector('input[name="foto"]');
+  if (fInp) fInp.addEventListener('change', () => {
+    const f = fInp.files && fInp.files[0];
+    if (!f) { preview.style.display = 'none'; return; }
+    if (!f.type.startsWith('image/')) { Modal.show({ type: 'warning', title: 'Verkeerd bestand', message: 'Alleen afbeeldingen (JPG/PNG).' }); fInp.value = ''; return; }
+    if (f.size > 5 * 1024 * 1024) { Modal.show({ type: 'warning', title: 'Foto te groot', message: 'Max. 5 MB.' }); fInp.value = ''; return; }
+    const url = URL.createObjectURL(f);
+    previewImg.src = url;
+    preview.style.display = '';
+  });
+
   return new Promise(resolve => {
-    overlay.querySelector('#frm-nieuwe-kist').addEventListener('submit', e => {
+    overlay.querySelector('#frm-nieuwe-kist').addEventListener('submit', async e => {
       e.preventDefault();
       const f = e.target;
       const naam = (f.naam.value || '').trim();
@@ -188,8 +242,37 @@ async function _promptNieuweKist(bestaandeNaam) {
         alleEigen.push(entry);
       }
       Settings.set({ kisten_eigen: alleEigen });
+
+      // Foto-upload afhandelen als 'ja' + bestand geselecteerd
+      const fotoKeuze = (f.foto_keuze?.value || '').toLowerCase();
+      const file = f.foto?.files?.[0] || null;
+      const submitBtn = f.querySelector('button[type=submit]');
+      if (fotoKeuze === 'ja' && file) {
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Foto uploaden…'; }
+        try {
+          await KistFotos.upload(naam, file);
+          close();
+          renderKistenBeheer({ success: bestaand ? `Kist "${naam}" bijgewerkt (met nieuwe foto).` : `Kist "${naam}" toegevoegd met foto.` });
+          resolve(true);
+          return;
+        } catch (err) {
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = bestaand ? 'Opslaan' : 'Toevoegen'; }
+          // Kist zelf is al opgeslagen — foto niet. Geef gebruiker de keus.
+          Modal.show({
+            type: 'warning',
+            title: 'Kist opgeslagen, foto mislukt',
+            message: (err && err.message ? err.message + '\n\n' : '') +
+                     'De kist zelf is toegevoegd, maar de foto kon niet worden geüpload. Je kunt hem later opnieuw proberen via het 📷-icoontje op de kaart.',
+          });
+          close();
+          renderKistenBeheer();
+          resolve(true);
+          return;
+        }
+      }
+
       close();
-      renderKistenBeheer({ success: bestaand ? `Kist "${naam}" bijgewerkt.` : `Kist "${naam}" toegevoegd.` });
+      renderKistenBeheer({ success: bestaand ? `Kist "${naam}" bijgewerkt.` : `Kist "${naam}" toegevoegd — er wordt automatisch een "Geen afbeelding"-pictogram getoond tot je een foto uploadt.` });
       resolve(true);
     });
   });
