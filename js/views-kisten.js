@@ -195,6 +195,57 @@ async function _promptNieuweKist(bestaandeNaam) {
   });
 }
 
+// Kort prijs-modal voor niet-eigen (Unigra) kisten. Alleen de prijs kan
+// gewijzigd worden — naam/materiaal zijn onderdeel van de standaard-catalogus
+// en overrides worden opgeslagen in Settings.kisten_overrides.
+async function _promptPrijs(naam) {
+  const kist = KISTEN_CATALOGUS.find(x => x.naam === naam);
+  if (!kist) return false;
+  const ov = (Settings.get('kisten_overrides') || {})[naam] || {};
+  const huidige = ov.bedrag != null ? ov.bedrag : kist.bedrag;
+  const html = `
+    <div class="pincode-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;">
+      <div class="card" style="max-width:400px;width:100%;background:var(--surface);padding:1.5rem;border-radius:.75rem;">
+        <h2 style="margin-top:0;">Prijs aanpassen</h2>
+        <p class="muted" style="margin:.25rem 0 1rem;">${esc(naam)}</p>
+        <form id="frm-prijs">
+          <label style="display:block;margin:.5rem 0;">
+            <span>Adviesprijs (€)</span>
+            <input type="text" name="bedrag" inputmode="decimal" value="${String(huidige).replace('.', ',')}" style="width:100%;padding:.5rem;font-size:1.1rem;" autofocus>
+          </label>
+          <p class="muted small" style="margin:.5rem 0;">Standaardprijs: € ${String(kist.bedrag).replace('.', ',')}</p>
+          <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem;">
+            <button type="button" class="btn btn-ghost" id="btn-prijs-annuleer">Annuleren</button>
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  const overlay = wrap.firstElementChild;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay || e.target.id === 'btn-prijs-annuleer') close();
+  });
+  return new Promise(resolve => {
+    overlay.querySelector('#frm-prijs').addEventListener('submit', e => {
+      e.preventDefault();
+      const raw = (e.target.bedrag.value || '').trim().replace(/\./g, '').replace(',', '.');
+      const bedrag = parseFloat(raw);
+      if (!isFinite(bedrag) || bedrag < 0) {
+        Modal.show({ type: 'warning', title: 'Ongeldige prijs', message: 'Vul een geldig bedrag in (bv. 1234,56).' });
+        return;
+      }
+      _patchKistOverride(naam, { bedrag });
+      close();
+      renderKistenBeheer({ success: `Prijs van "${naam}" opgeslagen: ${fmtEUR(bedrag)}.` });
+      resolve(true);
+    });
+  });
+}
+
 function renderKistenBeheer(msg) {
   const adminMode = !!Settings.get('catalog_admin_mode');
   const drafts = _activeDossierDrafts();
@@ -264,8 +315,16 @@ function renderKistenBeheer(msg) {
           <button type="button" class="kist-card-img kist-card-img-btn" data-action="zoom" data-naam="${esc(k.naam)}" aria-label="Bekijk ${esc(k.naam)}">
             ${url
               ? `<img src="${esc(url)}" alt="${esc(k.naam)}" loading="lazy">`
-              : `<div class="kist-card-svg">${kistSVG(k.materiaal)}</div>
-                 <div class="kist-card-no-img">geen foto</div>`}
+              : `<div class="kist-card-placeholder" role="img" aria-label="Geen afbeelding voor ${esc(k.naam)}">
+                   <svg viewBox="0 0 100 100" width="72" height="72" aria-hidden="true">
+                     <rect x="12" y="18" width="76" height="64" rx="8" ry="8" fill="none" stroke="currentColor" stroke-width="4"/>
+                     <circle cx="35" cy="42" r="6" fill="currentColor"/>
+                     <path d="M 22 74 L 44 52 L 58 66 L 74 50 L 82 58 L 82 74 Z" fill="currentColor"/>
+                     <line x1="20" y1="14" x2="82" y2="86" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+                   </svg>
+                   <div class="kist-placeholder-title">Geen afbeelding</div>
+                   <div class="kist-placeholder-sub">Er is geen afbeelding toegevoegd.</div>
+                 </div>`}
           </button>
           ${isTop ? '<span class="kist-badge-top">★ Meest gekozen</span>' : ''}
           ${hidden ? '<span class="kist-hidden-badge">verwijderd</span>' : ''}
@@ -282,26 +341,24 @@ function renderKistenBeheer(msg) {
             ${hidden ? '' : `<button type="button" class="btn btn-sm btn-primary kist-kies-btn ${magPrijzen ? '' : 'kist-kies-btn-full'}" data-pick-kist="${esc(k.naam)}">Kies deze kist</button>`}
           </div>
           ${adminMode ? `
-            <div class="kist-card-actions">
-              <label class="btn btn-sm">${url ? 'Vervang foto' : 'Foto uploaden'}
-                <input type="file" accept="image/*" data-upload="${esc(k.naam)}" hidden>
-              </label>
-              ${url ? `<button type="button" class="btn btn-sm btn-ghost" data-remove-foto="${esc(k.naam)}">Foto weg</button>` : ''}
-              ${k._eigen ? `<span class="badge badge-amber" title="Eigen toegevoegde kist">Eigen</span>` : ''}
-            </div>
-            <div class="kist-card-actions catalog-edit-row">
-              <label class="catalog-price-edit">
-                <span class="muted small">Prijs €</span>
-                <input type="text" inputmode="decimal" data-edit-price="${esc(k.naam)}" value="${esc((Number(k.bedrag) || 0).toFixed(2).replace('.', ','))}" placeholder="0,00">
-              </label>
-              <button type="button" class="btn btn-sm" data-save-price="${esc(k.naam)}">Opslaan</button>
-              ${k._customBedrag ? `<button type="button" class="btn btn-sm btn-ghost" data-reset-price="${esc(k.naam)}" title="Terug naar standaardprijs">↺ Reset</button>` : ''}
-              ${k._eigen
-                ? `<button type="button" class="btn btn-sm btn-ghost" data-eigen-edit="${esc(k.naam)}">✏️ Bewerk</button>
-                   <button type="button" class="btn btn-sm btn-ghost btn-danger" data-eigen-del="${esc(k.naam)}">🗑 Verwijder</button>`
-                : (hidden
-                    ? `<button type="button" class="btn btn-sm btn-ghost" data-show-kist="${esc(k.naam)}">↺ Herstel kist</button>`
-                    : `<button type="button" class="btn btn-sm btn-ghost btn-danger" data-hide-kist="${esc(k.naam)}">🗑 Verwijder kist</button>`)}
+            <div class="kist-admin-bar" style="display:flex;gap:.4rem;align-items:center;justify-content:space-between;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border,#e5e0d5);">
+              <div style="display:flex;gap:.35rem;">
+                <label class="btn btn-sm btn-ghost kist-admin-icon" title="${url ? 'Vervang foto' : 'Foto uploaden'}" aria-label="Foto">
+                  📷
+                  <input type="file" accept="image/*" data-upload="${esc(k.naam)}" hidden>
+                </label>
+                <button type="button" class="btn btn-sm btn-ghost kist-admin-icon" data-admin-edit="${esc(k.naam)}" title="${k._eigen ? 'Bewerk naam / materiaal / prijs' : 'Bewerk prijs'}" aria-label="Bewerken">✏️</button>
+                ${k._eigen
+                  ? `<button type="button" class="btn btn-sm btn-ghost kist-admin-icon btn-danger-ghost" data-eigen-del="${esc(k.naam)}" title="Verwijder kist" aria-label="Verwijderen">🗑</button>`
+                  : (hidden
+                      ? `<button type="button" class="btn btn-sm btn-ghost kist-admin-icon" data-show-kist="${esc(k.naam)}" title="Kist terugzetten" aria-label="Herstel">↺</button>`
+                      : `<button type="button" class="btn btn-sm btn-ghost kist-admin-icon btn-danger-ghost" data-hide-kist="${esc(k.naam)}" title="Verberg kist uit lijst" aria-label="Verwijderen">🗑</button>`)}
+              </div>
+              <div style="display:flex;gap:.35rem;align-items:center;">
+                ${k._eigen ? '<span class="badge badge-amber" title="Eigen toegevoegde kist">Eigen</span>' : ''}
+                ${k._customBedrag ? `<button type="button" class="btn btn-sm btn-ghost kist-admin-icon" data-reset-price="${esc(k.naam)}" title="Terug naar standaardprijs" aria-label="Reset prijs">↺ €</button>` : ''}
+                ${url ? `<button type="button" class="btn btn-sm btn-ghost kist-admin-icon" data-remove-foto="${esc(k.naam)}" title="Foto weghalen" aria-label="Foto verwijderen">🖼✕</button>` : ''}
+              </div>
             </div>` : ''}
         </div>
       </div>`;
@@ -316,15 +373,6 @@ function renderKistenBeheer(msg) {
         </div>
         ${adminMode ? '<span class="badge badge-amber">Beheermodus aan</span>' : ''}
       </div>
-
-      ${adminMode ? `
-        <div class="alert alert-info" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
-          <div>
-            <strong>➕ Eigen kist toevoegen</strong>
-            <span class="muted small">Voeg kisten toe die niet in de Unigra-catalogus staan (naam, materiaal, prijs, optionele kleur).</span>
-          </div>
-          <button type="button" class="btn btn-sm btn-primary" id="btn-kist-nieuw">+ Nieuwe kist</button>
-        </div>` : ''}
 
       ${isBeheerder ? (() => {
         if (typeof KistVoorraad === 'undefined') return '';
@@ -350,6 +398,7 @@ function renderKistenBeheer(msg) {
           <input type="search" id="kist-filter-q" value="${esc(_kistFilter)}" placeholder="Zoek op naam, materiaal of kenmerk…" autocomplete="off">
         </div>
         <button type="button" class="btn catalog-filters-toggle" id="kist-filters-toggle">⛛ Filters</button>
+        ${adminMode ? '<button type="button" class="btn btn-primary" id="btn-kist-nieuw" style="white-space:nowrap;">+ Kist toevoegen</button>' : ''}
       </div>
 
       <div class="catalog-chips">
@@ -510,7 +559,18 @@ function renderKistenBeheer(msg) {
       await _promptNieuweKist();
       return;
     }
-    // ── Beheermodus: eigen kist bewerken / verwijderen ──
+    // ── Beheermodus: universele bewerk-knop op elke kaart ──
+    // Eigen kist → volledig modal (naam/materiaal/prijs/kleur)
+    // Unigra kist → kort prijs-modal
+    const adminEdit = e.target.closest('button[data-admin-edit]');
+    if (adminEdit) {
+      const naam = adminEdit.getAttribute('data-admin-edit');
+      const isEigen = (Settings.get('kisten_eigen') || []).some(x => x && x.naam === naam);
+      if (isEigen) await _promptNieuweKist(naam);
+      else await _promptPrijs(naam);
+      return;
+    }
+    // ── Beheermodus: eigen kist bewerken / verwijderen (oude route, blijft werken) ──
     const editEigen = e.target.closest('button[data-eigen-edit]');
     if (editEigen) {
       await _promptNieuweKist(editEigen.getAttribute('data-eigen-edit'));
