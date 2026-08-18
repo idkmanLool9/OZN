@@ -1497,12 +1497,24 @@ EMAIL_FROM_NAME = OZN</pre>
               </p>`;
             result.innerHTML = `<div class="alert alert-info">
               📦 Nieuwe APK beschikbaar: <strong>${esc(versieStr)}</strong> (jij: build ${info.localBuild}).
-              <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+              <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap;">
                 <button type="button" class="btn btn-sm btn-primary" id="btn-apk-install">📥 Download &amp; installeer</button>
                 <button type="button" class="btn btn-sm btn-ghost" id="btn-apk-copy">🔗 Kopieer download-link</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="btn-apk-help">❓ Hulp bij installeren</button>
               </div>
               ${notReadyNote}
-              <p class="muted small" style="margin:.5rem 0 0;">Als de download niet start: kopieer de link en open 'm in Chrome/Firefox. Bij eerste keer: sta "Onbekende bronnen" toe voor de app die de APK opent.</p>
+              <details style="margin-top:.75rem;background:var(--surface);border-radius:.4rem;padding:.5rem .75rem;border:1px solid var(--border);">
+                <summary style="cursor:pointer;font-weight:600;">📖 Stappen als de download niet lukt</summary>
+                <ol style="margin:.5rem 0 0 1.25rem;padding:0;line-height:1.55;">
+                  <li>Tik op <strong>🔗 Kopieer download-link</strong> hierboven.</li>
+                  <li>Open <strong>Chrome</strong> of <strong>Firefox</strong> op je toestel.</li>
+                  <li>Plak de link in de <em>adresbalk</em> (lang indrukken → Plakken) en druk Enter.</li>
+                  <li>De download start automatisch. Zie je een notificatie <em>"Download voltooid"</em>? Tik erop.</li>
+                  <li>De eerste keer vraagt Android om <strong>"Onbekende bronnen toestaan"</strong> voor de app die de APK opent (meestal Chrome of Bestanden). Zet de schakelaar aan → terug.</li>
+                  <li>Bevestig <strong>"Installeren"</strong>. De app werkt zichzelf bij zonder dat je iets kwijtraakt.</li>
+                </ol>
+                <p class="muted small" style="margin:.5rem 0 0;">Werkt het nog niet? Zoek de gedownloade APK in <strong>Downloads</strong> (via de Bestanden-app) en tik hem daar aan.</p>
+              </details>
             </div>`;
             const inst = document.getElementById('btn-apk-install');
             if (inst) inst.onclick = () => {
@@ -1514,10 +1526,49 @@ EMAIL_FROM_NAME = OZN</pre>
             if (cp) cp.onclick = async () => {
               try {
                 await navigator.clipboard.writeText(info.downloadUrl);
-                Toast.show('Download-link gekopieerd — plak in Chrome/Firefox', 'success');
+                // Duidelijke pop-up met de exacte stappen na kopiëren
+                Modal.show({
+                  type: 'info',
+                  title: '✅ Link gekopieerd',
+                  message:
+                    'Wat nu doen:\n\n' +
+                    '1️⃣  Open Chrome of Firefox op je telefoon.\n\n' +
+                    '2️⃣  Druk lang in de adresbalk → tik "Plakken".\n\n' +
+                    '3️⃣  Druk Enter — de download start vanzelf.\n\n' +
+                    '4️⃣  Bij notificatie "Download voltooid": tik erop.\n\n' +
+                    '5️⃣  Eerste keer: sta "Onbekende bronnen" toe voor Chrome (of de app die vraagt) → tik "Installeren".\n\n' +
+                    'De app werkt bij zonder dat er iets kwijt raakt.',
+                });
               } catch (_) {
-                Toast.show('Kopiëren mislukt — selecteer de link handmatig', 'error');
+                Modal.show({
+                  type: 'warning',
+                  title: 'Kopiëren mislukt',
+                  message: 'Selecteer en kopieer de link hieronder handmatig:\n\n' + info.downloadUrl,
+                });
               }
+            };
+            const help = document.getElementById('btn-apk-help');
+            if (help) help.onclick = () => {
+              Modal.show({
+                type: 'info',
+                title: '📖 Hoe installeer ik de update?',
+                message:
+                  'MAKKELIJKE MANIER\n' +
+                  '─────────────────\n' +
+                  'Tik op "📥 Download & installeer" — de app opent Chrome, download start vanzelf en Android vraagt om te installeren.\n\n' +
+                  'ALS DAT NIET WERKT\n' +
+                  '─────────────────\n' +
+                  '1. Tik op "🔗 Kopieer download-link"\n' +
+                  '2. Open Chrome of Firefox\n' +
+                  '3. Lang in de adresbalk drukken → Plakken → Enter\n' +
+                  '4. Bij notificatie "Download voltooid": tik erop\n' +
+                  '5. Eerste keer: sta "Onbekende bronnen" toe voor Chrome → tik Installeren\n\n' +
+                  'BELANGRIJK\n' +
+                  '─────────────────\n' +
+                  '· Je gegevens (dossiers, foto\'s, instellingen) blijven staan.\n' +
+                  '· Als je meerdere apps van "OZN" ziet, kies degene met hetzelfde icoon.\n' +
+                  '· Werkt Chrome niet? Probeer Firefox, of open de Bestanden-app en zoek de APK in Downloads.',
+              });
             };
           } else if (info) {
             result.innerHTML = `<div class="alert alert-success">Je draait al de laatste APK (${esc(APP_VERSION)}, ${esc(APP_BUILD_DATE)}).</div>`;

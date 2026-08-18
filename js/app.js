@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 317;
-const APP_VERSION    = '6.1.6';
+const APP_BUILD      = 318;
+const APP_VERSION    = '6.1.7';
 const APP_BUILD_DATE = '2026-08-18';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -1031,6 +1031,27 @@ const ApkUpdater = {
       localStorage.setItem(ApkUpdater.DISMISSED_KEY, String(info.remoteBuild));
       el.hidden = true;
       document.body.classList.remove('has-apk-banner');
+    };
+    const helpBtn = document.getElementById('apk-update-banner-help');
+    if (helpBtn) helpBtn.onclick = (e) => {
+      e.preventDefault();
+      try {
+        Modal.show({
+          type: 'info',
+          title: '📖 Hoe installeer ik de update?',
+          message:
+            'MAKKELIJKE MANIER\n' +
+            '─────────────────\n' +
+            'Tik op "Installeer" — Chrome opent en de download start vanzelf. Bij notificatie "Download voltooid" tik je erop → Installeren.\n\n' +
+            'WERKT DE INSTALLEER-KNOP NIET?\n' +
+            '─────────────────\n' +
+            'Ga naar Account → "Check op updates" → "🔗 Kopieer download-link". Daar staan volledige stappen: link kopiëren, in Chrome plakken, downloaden, installeren.\n\n' +
+            'BELANGRIJK\n' +
+            '─────────────────\n' +
+            '· Je gegevens (dossiers, foto\'s, instellingen) blijven bewaard.\n' +
+            '· Eerste keer: sta "Onbekende bronnen" toe voor Chrome (Android vraagt dat automatisch).',
+        });
+      } catch (_) {}
     };
   },
 };
