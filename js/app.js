@@ -12,9 +12,9 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 318;
-const APP_VERSION    = '6.1.7';
-const APP_BUILD_DATE = '2026-08-18';
+const APP_BUILD      = 319;
+const APP_VERSION    = '6.1.8';
+const APP_BUILD_DATE = '2026-09-04';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {

@@ -1,31 +1,36 @@
 // Kistencatalogus: kaart-galerij met filters, favorieten en dossier-koppeling.
 
-// Detecteer alle actieve dossier-drafts in localStorage zodat we direct
-// een kist kunnen koppelen aan een dossier-in-bewerking.
+// Detecteer alle actieve dossier-drafts zodat we direct een kist kunnen
+// koppelen aan een dossier-in-bewerking.
 //
-// Belangrijk: we tonen ALLEEN drafts waarvoor deze sessie ook echt
-// het intake-formulier is geopend (sessionStorage-vlag). Zonder die
-// vlag is 't een oude, blijven-hangen-concept van een vorige keer
-// die niet als 'ik zit nu in dossier X' geïnterpreteerd mag worden.
+// Autoritatief signaal is de sessionStorage-vlag 'sok_actief_sok_draft_<id>'
+// die view-form zet zodra 'ie opent. De localStorage-draft is optioneel:
+// bij een BESTAAND dossier dat je net hebt geopend maar nog niet gewijzigd,
+// bestaat de localStorage-draft nog niet — dan vallen we terug op de
+// dossier-rij uit Cloud.cache. Zonder deze fallback zag de kisten-pagina
+// je 'actief dossier' niet totdat je iets had getypt (bug).
 function _activeDossierDrafts() {
   const drafts = [];
+  const gezien = new Set();
   try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith('sok_draft_')) continue;
-      // Filter: alleen drafts die deze sessie zijn aangeraakt tellen als
-      // 'actief'. Oude localStorage-drafts blijven bestaan (kan resumen
-      // in het formulier), maar spammen niet meer de kisten-banner.
-      let sessionActive = false;
-      try { sessionActive = sessionStorage.getItem('sok_actief_' + key) === '1'; }
-      catch (_) {}
-      if (!sessionActive) continue;
-
-      let data = null;
-      try { data = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) {}
-      if (!data) continue;
+    // Loop over sessionStorage-vlaggen (autoritatief: 'ik zit nu in dossier X')
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const skey = sessionStorage.key(i);
+      if (!skey || !skey.startsWith('sok_actief_sok_draft_')) continue;
+      if (sessionStorage.getItem(skey) !== '1') continue;
+      const key = skey.slice('sok_actief_'.length); // → sok_draft_<id>
+      if (gezien.has(key)) continue;
+      gezien.add(key);
       const idPart = key.slice('sok_draft_'.length);
       const isNew = idPart === 'new';
+      // Probeer draft-data uit localStorage; anders val terug op DB-cache
+      let data = null;
+      try { data = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) {}
+      if (!data && !isNew && typeof Cloud !== 'undefined' && Cloud.cache) {
+        const rij = (Cloud.cache.dossiers || []).find(x => String(x.id) === String(idPart));
+        if (rij) data = rij;
+      }
+      if (!data) data = {}; // laatste redmiddel: lege data — kaart heet dan 'Nieuw dossier (concept)' / 'Dossier #<id>'
       const naam = [data.voornaam, data.achternaam].filter(Boolean).join(' ').trim()
         || (isNew ? 'Nieuw dossier (concept)' : ('Dossier #' + idPart));
       drafts.push({
