@@ -34,10 +34,16 @@ function parseEUR(s) {
   } else if (hasComma) {
     str = str.replace(',', '.');                              // EU decimaal
   } else if (hasDot) {
-    // Eén of meer punten zonder komma. Als het patroon precies één punt
-    // is gevolgd door 1-2 cijfers tot het eind → punt-decimaal. Anders
-    // (bv. "1.234" of "1.234.567") → duizend-scheiding.
-    if (!/^\d+\.\d{1,2}$/.test(str)) str = str.replace(/\./g, '');
+    // Eén of meer punten zonder komma. Als het patroon een punt is
+    // gevolgd door 1-2 cijfers tot het eind → punt-decimaal (ook
+    // '.50' zonder voorloop-nul). Anders (bv. "1.234" of "1.234.567")
+    // → duizend-scheiding.
+    if (/^\d*\.\d{1,2}$/.test(str)) {
+      // '.50' → '0.50' zodat parseFloat 0.5 geeft i.p.v. 50.
+      if (str.startsWith('.')) str = '0' + str;
+    } else {
+      str = str.replace(/\./g, '');
+    }
   }
   const n = parseFloat(str);
   return isFinite(n) ? n : 0;
@@ -1103,7 +1109,17 @@ const PdfGen = {
     // Emoji/pictogrammen strippen — het standaard jsPDF-lettertype kan ze niet
     // weergeven en verpest anders de regel (garbled tekens + rare spatiëring).
     const EMOJI_RX = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{2300}-\u{23FF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{2022}]/gu;
-    const clean = (t) => String(t == null ? '' : t).replace(EMOJI_RX, '').replace(/[ \t]{2,}/g, ' ').replace(/^[ \t]+/, '');
+    // Vervang zinvolle pictogrammen door ASCII-equivalenten VÓÓR de strip,
+    // anders verdwijnen ze uit route-strings ('Brengen naar A → B' → 'A  B')
+    // en checkmarks ('✓ geüpload' → 'geüpload').
+    const clean = (t) => String(t == null ? '' : t)
+      .replace(/→|➡|▶|➔|➜/g, '->')
+      .replace(/←|◀/g, '<-')
+      .replace(/✓|✔/g, 'V')
+      .replace(/✗|✘|❌/g, 'X')
+      .replace(EMOJI_RX, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/^[ \t]+/, '');
     const txt = (t, x, yy, o) => doc.text(Array.isArray(t) ? t : clean(t), x, yy, o);
     const split = (t, w) => doc.splitTextToSize(clean(t), w);
 

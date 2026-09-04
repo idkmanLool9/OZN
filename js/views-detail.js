@@ -514,21 +514,24 @@ function dossierSpec(d, kosten) {
       ['Extra personeel', (Array.isArray(d.extra_personeel) && d.extra_personeel.length) ? d.extra_personeel.join(', ') : LEEG],
     ] },
     { heading: 'Overledene', rows: [
-      ['Naam',           _or(fullName(d))],
-      ['Geslacht',       _or(d.geslacht)],
-      ['Geboortedatum',  _dateOr(d.geboortedatum)],
+      ['Naam',              _or(fullName(d))],
+      ['Geslacht',          _or(d.geslacht)],
+      ['BSN',               _or(d.bsn)],
+      ['Geboortedatum',     _dateOr(d.geboortedatum)],
+      ['Overlijdensdatum',  _dateOr(d.overlijdensdatum)],
       ['Overlijdenslocatie', _or(d.overlijdensplaats)],
-      ['Adres',          _or(adresO)],
-      ['Artsverklaring', d.artsverklaring_pad     ? '✓ geüpload' : LEEG],
+      ['Adres',             _or(adresO)],
+      ['Reg.nr uitvaartleider', _or(d.registratienummer_uitvaartleider)],
+      ['Artsverklaring',    d.artsverklaring_pad     ? '✓ geüpload' : LEEG],
       ['Overdraagformulier', d.overdraagformulier_pad ? '✓ geüpload' : LEEG],
     ] },
     { heading: 'Bezittingen', rows: [
       ['Oorbel(en)',  _bezit(d.bezit_oorbellen,  d.bezit_oorbellen_aantal)],
       ['Ring(en)',    _bezit(d.bezit_ringen,     d.bezit_ringen_aantal)],
       ['Armband(en)', _bezit(d.bezit_armbanden,  d.bezit_armbanden_aantal)],
-      ['Ketting',     _bezit(d.bezit_ketting,    null)],
-      ['Bril',        _bezit(d.bezit_bril,       null)],
-      ['Horloge',     _bezit(d.bezit_horloge,    null)],
+      ['Ketting',     _bezit(d.bezit_ketting,    d.bezit_ketting_aantal)],
+      ['Bril',        _bezit(d.bezit_bril,       d.bezit_bril_aantal)],
+      ['Horloge',     _bezit(d.bezit_horloge,    d.bezit_horloge_aantal)],
       ...((Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen : [])
           .map(b => [_or(b.label), b.aantal ? b.aantal + ' stuk(s)' : LEEG])),
     ] },
@@ -567,7 +570,6 @@ function dossierSpec(d, kosten) {
     ] },
     { heading: 'Dossier-metadata', rows: [
       ['Dossiernummer', _or(d.dossier_nummer)],
-      ['Registratienummer uitvaartleider', _or(d.registratienummer_uitvaartleider)],
       ['Status',        _or((d.status || '').replace('_', ' '))],
       ['Aangemaakt',    d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : LEEG],
       ['Laatst opgeslagen', d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : LEEG],
@@ -679,7 +681,7 @@ function buildDossierEmail(d, kosten) {
 
   pushSection('Dossier-metadata', [
     ['Dossiernummer',      d.dossier_nummer],
-    ['Registratienummer uitvaartleider', d.registratienummer_uitvaartleider],
+    ['Reg.nr uitvaartleider', d.registratienummer_uitvaartleider],
     ['Status',             (d.status || '').replace('_', ' ')],
     ['Aangemaakt',         d.created_at ? new Date(d.created_at).toLocaleString('nl-NL') : ''],
     ['Laatst opgeslagen',  d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : ''],
@@ -701,7 +703,11 @@ function buildFactuurEmail(d, kosten) {
                  : (verzDek > 0 ? Math.min(verzDek, totaal) : gedektFlag);
   const familie = Math.max(0, totaal - gedekt);
   const aanbet = Number(d.aanbetaling_bedrag) || 0;
-  const teBetalen = familie - aanbet;
+  // 'Nog te voldoen' mag nooit negatief zijn — bij overbetaling toont
+  // het overzicht dan 0 (en het teveel is een aparte terugbetalingsregel
+  // in de administratie, niet in de factuur-mail).
+  const teBetalen = Math.max(0, familie - aanbet);
+  const overbetaald = Math.max(0, aanbet - familie);
   const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
 
   const parts = [];
@@ -793,7 +799,13 @@ async function openMailto(to, subject, body) {
   // Ruwe HTML → platte tekst voor de mail-app (mail apps kunnen geen HTML
   // via mailto:).
   const plat = _mailToPlainText(effectiveBody);
-  let url = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plat)}`;
+  // Meerdere ontvangers scheiden door komma; NIET het hele 'to' encoderen
+  // (dan wordt de komma %2C en werken de meeste mail-apps niet meer met
+  // 'To:' als lijst). Encodeer elk adres apart en join daarna met ','.
+  const toEnc = String(to || '')
+    .split(/[,;]/).map(s => s.trim()).filter(Boolean)
+    .map(encodeURIComponent).join(',');
+  let url = `mailto:${toEnc}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(plat)}`;
   if (url.length > MAX_URL) {
     clipped = true;
     const kort = plat.slice(0, 400) + '\n\n(De volledige tekst is gekopieerd — plak deze in de mail met Cmd+V of houd ingedrukt → Plakken.)';
@@ -1034,7 +1046,7 @@ function bindDetailEvents(id) {
       MailComposer.open({
         dossier: d,
         type: 'dossier',
-        subject: `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim(),
+        subject: `Uitvaartdossier ${d.dossier_nummer} — ${fullName(d) || ''}`.trim().slice(0, 180),
         body: buildDossierEmail(d, kostenLijst),
       });
     });
@@ -1047,7 +1059,7 @@ function bindDetailEvents(id) {
       MailComposer.open({
         dossier: d,
         type: 'factuur',
-        subject: `Factuur uitvaart ${d.dossier_nummer} — ${fullName(d) || ''}`.trim(),
+        subject: `Factuur uitvaart ${d.dossier_nummer} — ${fullName(d) || ''}`.trim().slice(0, 180),
         body: buildFactuurEmail(d, ks),
         kosten: ks,
       });
@@ -1085,7 +1097,22 @@ function bindDetailEvents(id) {
     try {
       await DB.remove(KEYS.DOSSIERS, id); // cascade verwijdert kosten/notities in DB
       ['kosten','notities'].forEach(t =>
-        Cloud.cache[t] = Cloud.cache[t].filter(x => x.dossier_id !== id));
+        Cloud.cache[t] = Cloud.cache[t].filter(x => Number(x.dossier_id) !== Number(id)));
+      // Ruim ook alle lokale draft/wizard-state op voor dit dossier — anders
+      // blijft de kisten-pagina 'dossier #X actief' tonen (zombie) en kan
+      // een orphan-draft bij volgende sessie herleven.
+      try {
+        localStorage.removeItem('sok_draft_' + id);
+        localStorage.removeItem('sok_wizard_step_' + id);
+        localStorage.removeItem('sok_wizard_max_' + id);
+        localStorage.removeItem('sok_kosten_buffer_' + id);
+        localStorage.removeItem('sok_snap_' + id);
+        sessionStorage.removeItem('sok_actief_sok_draft_' + id);
+        // Ook 'last visited dossier' wissen als het deze was
+        if (String(localStorage.getItem('sok_last_dossier_route') || '').endsWith('/' + id)) {
+          localStorage.removeItem('sok_last_dossier_route');
+        }
+      } catch (_) {}
       // Server-side RLS is de autoriteit op voorraadmutaties; client-side
       // isBeheerder() blokkeerde per ongeluk medewerker-profielen (voorraad
       // dreef weg). Alleen guard: kist bekend + nog niet teruggegeven.
@@ -1115,6 +1142,13 @@ function bindDetailEvents(id) {
       return;
     }
     const stuk = (f.bedrag ? parseEUR(f.bedrag.value) : 0);
+    // Negatief bedrag zou stiekem als NULL verdwijnen (typfout van gebruiker
+    // die correctie wil doen). Waarschuw expliciet.
+    if (stuk < 0) {
+      Modal.show({ type: 'warning', title: 'Negatief bedrag', message: 'Bedragen kunnen niet negatief zijn. Gebruik "verwijderen" om een kostenpost weg te halen.' });
+      if (btn) { btn.dataset.submitting = ''; btn.disabled = false; }
+      return;
+    }
     // Medewerker mag geen bedrag zetten → null. Als beheerder wél een bedrag
     // invulde (>0) rekenen we door; bij lege prijs blijft de kolom NULL,
     // niet stiekem €0,00.
@@ -1132,11 +1166,19 @@ function bindDetailEvents(id) {
   // Aantal aanpassen → bedrag herberekenen op basis van stukprijs.
   // Als stukprijs 0 is (bedrag was NULL, bv. door medewerker toegevoegd),
   // blijft bedrag NULL — anders wordt 'prijs onbekend' stiekem €0,00.
+  // Minimum 1 afdwingen: aantal 0 zou stuk=bedrag/aantal onbereikbaar
+  // maken (NaN bij herladen), dus prijs onherstelbaar kwijt.
   $$('input.kc-aantal-input').forEach(inp => {
     inp.addEventListener('change', async () => {
       const tid = parseInt(inp.dataset.id, 10);
       const stuk = Number(inp.dataset.stuk) || 0;
-      const nieuw = Math.max(0, parseInt(inp.value, 10) || 0);
+      let nieuw = parseInt(inp.value, 10) || 0;
+      if (nieuw < 1) {
+        try {
+          Toast.show('Aantal moet minimaal 1 zijn. Gebruik "verwijderen" om deze kostenpost weg te halen.', 'warning');
+        } catch (_) {}
+        nieuw = 1;
+      }
       inp.value = String(nieuw);
       const k = DB.byId(KEYS.KOSTEN, tid); if (!k) return;
       const patch = { aantal: nieuw };
@@ -1188,6 +1230,9 @@ function bindDetailEvents(id) {
           const { error } = await sb.rpc('kosten_zet_betaald_dossier', { p_dossier_id: id, p_betaald: nieuw });
           if (error) throw error;
           kostenList.forEach(k => { const c = DB.byId(KEYS.KOSTEN, k.id); if (c) c.betaald = nieuw; });
+          // Ook hier touchDossier — anders drijft updated_at scheef en zien
+          // andere clients de wijziging niet als 'meest recente activiteit'.
+          try { await DB.touchDossier(id); } catch (_) {}
           renderDossierDetail({ id });
         } else {
           await Promise.all(kostenList.map(k =>
@@ -1322,7 +1367,9 @@ function bindDetailEvents(id) {
 }
 
 const MailComposer = {
-  EMAIL_RX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  // Strenger dan de vorige regex: weigert 'a@..b', 'a@b.', 'a@b..c'.
+  // Formaat: local@sub.tld met domein-labels die minstens 1 non-punt-teken bevatten.
+  EMAIL_RX: /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/,
 
   // Verzamel suggesties voor To/CC: contact + verzekeraar + persoonlijke
   // (Rume/Robert) + opgeslagen adresboek van dit dossier.

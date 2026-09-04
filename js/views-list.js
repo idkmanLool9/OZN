@@ -1377,6 +1377,13 @@ EMAIL_FROM_NAME = OZN</pre>
       const result = $('#email-test-result');
       result.innerHTML = '';
       if (!to) { result.innerHTML = '<div class="alert alert-error">Vul eerst een test-e-mailadres in.</div>'; return; }
+      // Strengere e-mail-validatie: local@domain.tld met tld ≥2 letters,
+      // geen dubbele punten, geen trailing punt in domain.
+      const EMAIL_STRICT = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+      if (!EMAIL_STRICT.test(to)) {
+        result.innerHTML = '<div class="alert alert-error">Ongeldig e-mailadres. Formaat: naam@domein.nl</div>';
+        return;
+      }
       const btn = $('#btn-email-test');
       btn.disabled = true; const orig = btn.textContent;
       btn.textContent = 'Bezig met verzenden...';

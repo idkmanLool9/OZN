@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 319;
-const APP_VERSION    = '6.1.8';
+const APP_BUILD      = 320;
+const APP_VERSION    = '6.2.0';
 const APP_BUILD_DATE = '2026-09-04';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -699,12 +699,19 @@ const PushNotificaties = {
       userVisibleOnly: true,
       applicationServerKey: PushNotificaties._urlBase64ToUint8Array(key),
     });
-    // Sla op in Supabase zodat Edge Function ons kan bereiken
+    // Sla op in Supabase zodat Edge Function ons kan bereiken.
+    // Zonder ingelogde user hoort er GEEN push-abonnement in de tabel te
+    // komen (RLS zou een null-user_id sowieso weigeren, maar we voorkomen
+    // ook lokaal een verwarrende error-toast).
     const u = Auth.current();
+    if (!u || !u.id) {
+      console.warn('PushNotificaties.subscribe: geen ingelogde user, sla over');
+      return null;
+    }
     const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
       ? ActiveProfile.current().name : null;
     const payload = {
-      user_id: u ? u.id : null,
+      user_id: u.id,
       profiel: profielNaam,
       endpoint: sub.endpoint,
       p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))),

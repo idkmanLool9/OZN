@@ -589,8 +589,9 @@ function renderKistenBeheer(msg) {
     try {
       await KistFotos.upload(naam, file);
       renderKistenBeheer({ success: `Foto opgeslagen voor "${naam}".` });
-    } catch (_) {
+    } catch (e) {
       if (card) card.classList.remove('is-uploading');
+      renderKistenBeheer({ error: `Foto uploaden mislukt${e && e.message ? ': ' + e.message : ''}. Controleer verbinding en probeer opnieuw.` });
     }
   };
 
@@ -798,7 +799,9 @@ function renderKistenBeheer(msg) {
     try {
       await KistFotos.remove(naam);
       renderKistenBeheer({ success: 'Foto verwijderd.' });
-    } catch (_) {}
+    } catch (e) {
+      renderKistenBeheer({ error: `Foto verwijderen mislukt${e && e.message ? ': ' + e.message : ''}.` });
+    }
   };
 }
 

@@ -60,6 +60,25 @@ const Auth = {
         try { localStorage.removeItem(AUTH_SNAP_KEY); } catch (_) {}
         try { localStorage.removeItem('sok_mirror'); } catch (_) {}
         try { Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_voorraad: [] }; } catch (_) {}
+        // Push-abonnement afmelden — anders blijven notificaties bedoeld voor
+        // de oude gebruiker binnenkomen op dit toestel (privacy-lek op
+        // gedeelde iPad).
+        try {
+          if (typeof PushNotificaties !== 'undefined' && PushNotificaties.unsubscribe) {
+            PushNotificaties.unsubscribe().catch(() => {});
+          }
+        } catch (_) {}
+        // Ook kosten-buffer keys wissen (bevatten dossier-data)
+        try {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('sok_kosten_buffer_') || k.startsWith('sok_draft_') || k.startsWith('sok_snap_'))) {
+              keys.push(k);
+            }
+          }
+          keys.forEach(k => localStorage.removeItem(k));
+        } catch (_) {}
         try { if (typeof location !== 'undefined') location.reload(); } catch (_) {}
       }
     });

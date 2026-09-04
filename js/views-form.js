@@ -982,7 +982,10 @@ function renderDossierForm(params) {
     // draft-restore werkt de UI dan al bij op basis van hidden-value.
     // Voor de zekerheid: luister op storage-events zoals de rest.
     window.addEventListener('storage', (e) => {
-      if (!e.key || !e.key.startsWith('sok_draft_')) return;
+      // Filter op EXACT onze eigen draft-key — anders kan een kist gekozen
+      // in een ander tabblad voor dossier X ook de kist in dit dossier Y
+      // overschrijven.
+      if (!e.key || e.key !== draftKey) return;
       try {
         const cur = JSON.parse(localStorage.getItem(e.key) || '{}');
         if (cur.kist_type && cur.kist_type !== hidden.value) zetKist(cur.kist_type);
@@ -1849,6 +1852,34 @@ function renderDossierForm(params) {
             cancelText: 'Annuleren',
           });
           if (!ok) return;
+          // R2-uploads die WEL in de draft staan maar NIET in het opgeslagen
+          // dossier zitten, zijn ontstaan door deze concept-sessie en worden
+          // door 'verwerpen' orphan-bestanden op R2. Ruim ze op.
+          try {
+            const draftData = JSON.parse(localStorage.getItem(draftKey) || '{}');
+            const savedData = isNew ? {} : (DB.byId(KEYS.DOSSIERS, dossier.id) || {});
+            const upFields = ['artsverklaring_pad', 'overdraagformulier_pad',
+              'bezit_oorbellen_foto', 'bezit_ringen_foto', 'bezit_armbanden_foto',
+              'bezit_ketting_foto', 'bezit_bril_foto', 'bezit_horloge_foto'];
+            const teVerwijderen = [];
+            upFields.forEach(f => {
+              const draftPad = draftData[f];
+              if (draftPad && draftPad !== savedData[f]) teVerwijderen.push(draftPad);
+            });
+            // Extra bezittingen: draft-foto's die niet in saved staan
+            const savedExtra = Array.isArray(savedData.extra_bezittingen) ? savedData.extra_bezittingen : [];
+            const savedFotos = new Set(savedExtra.map(x => x && x.foto_pad).filter(Boolean));
+            const draftExtra = Array.isArray(draftData.__extra_bezittingen) ? draftData.__extra_bezittingen : [];
+            draftExtra.forEach(x => {
+              if (x && x.foto_pad && !savedFotos.has(x.foto_pad)) teVerwijderen.push(x.foto_pad);
+            });
+            teVerwijderen.forEach(pad => {
+              try {
+                if (R2.isR2(pad)) R2.remove(pad).catch(() => {});
+                else if (typeof BezittingenFotos !== 'undefined') BezittingenFotos.remove(pad).catch(() => {});
+              } catch (_) {}
+            });
+          } catch (_) {}
           localStorage.removeItem(draftKey);
           try {
             localStorage.removeItem(stepKey);
@@ -1920,6 +1951,10 @@ function renderDossierForm(params) {
 
   $('#dossier-form').addEventListener('submit', async e => {
     e.preventDefault();
+    // Cancel pending autosave — anders schrijft de setTimeout hierna
+    // (na ons localStorage.removeItem(draftKey) op ~2061/2086) een orphan-
+    // draft terug die de kisten-pagina zou zien als 'actief dossier'.
+    try { clearTimeout(saveTimer); saveTimer = null; } catch (_) {}
     // Submit-guard: dubbelklik-bescherming DIRECT bij binnenkomst — anders
     // konden 2 kliks parallel door de Modal.confirm-check heen en werden
     // er 2 dossiers aangemaakt + 2 auto-mails + dubbele kist-delta.
@@ -1988,10 +2023,15 @@ function renderDossierForm(params) {
 
     // Brengen naar (bij ophalen): meerdere locaties + datum → JSONB-array
     // van {locatie, datum}. Rijen zonder locatie én zonder datum worden
-    // eruit gefilterd.
+    // eruit gefilterd. Bij switch van opbaring_type worden niet-relevante
+    // routes leeggemaakt zodat de detail-view geen oude "Brengen naar"
+    // toont voor een dossier dat nu 'thuis' is.
     const _form = document.getElementById('dossier-form');
-    data.brengen_naar = _collectRouteRows(_form, '.brengen-naar-row', '.brengen-naar-input', '.brengen-naar-datum');
-    data.thuis_overbrengingen = _collectRouteRows(_form, '.thuis-overbr-row', '.thuis-overbr-input', '.thuis-overbr-datum');
+    const _opb = (data.opbaring_type || '').toLowerCase();
+    const _brengen = _collectRouteRows(_form, '.brengen-naar-row', '.brengen-naar-input', '.brengen-naar-datum');
+    const _thuis   = _collectRouteRows(_form, '.thuis-overbr-row', '.thuis-overbr-input', '.thuis-overbr-datum');
+    data.brengen_naar        = (_opb === 'ophalen' || _opb === 'beide') ? _brengen : [];
+    data.thuis_overbrengingen = (_opb === 'thuis'   || _opb === 'beide') ? _thuis   : [];
 
     // Rouwgoederen (bij thuis opbaren): aangevinkte items → JSONB-array
     data.rouwgoederen_lijst = [...document.querySelectorAll('#dossier-form .rouwgoed-cb')]

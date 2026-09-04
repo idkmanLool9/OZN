@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-319';
+const CACHE_VERSION = 'sok-uitvaart-build-320';
 const SHELL = [
   './',
   './index.html',
@@ -208,17 +208,31 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/';
+  // Beperk de URL uit de push-payload tot ONS domein of een relatieve pad.
+  // Anders kan een gecompromitteerde push-server een cross-origin URL sturen
+  // en de app als open-redirect gebruiken.
+  const rawUrl = (event.notification.data && event.notification.data.url) || '/';
+  let safeUrl = '/';
+  try {
+    const scope = self.registration.scope;
+    const abs = new URL(rawUrl, scope);
+    if (abs.origin === new URL(scope).origin) safeUrl = abs.pathname + abs.search + abs.hash;
+    // Cross-origin URL → val terug op '/'
+  } catch (_) {
+    // Ongeldige URL → val terug op '/'
+  }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
       for (const w of wins) {
         if (w.url.includes(self.registration.scope) && 'focus' in w) {
           w.focus();
-          if ('navigate' in w) w.navigate(url);
+          if ('navigate' in w) {
+            try { w.navigate(safeUrl); } catch (_) {}
+          }
           return;
         }
       }
-      return self.clients.openWindow(url);
+      return self.clients.openWindow(safeUrl);
     })
   );
 });
