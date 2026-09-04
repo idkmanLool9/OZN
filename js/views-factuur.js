@@ -104,7 +104,13 @@ function buildFactuurPdf(d, kosten) {
   const logoUrl = s.factuur_logo_data_url || s.logo_data_url || KOSTENRAMING_LOGO;
   if (logoUrl) {
     try {
-      const fmt = /jpe?g|jpeg/i.test(logoUrl) ? 'JPEG' : (/webp/i.test(logoUrl) ? 'WEBP' : 'PNG');
+      // Formaat-detectie uit de data-URL prefix (bv. 'data:image/png;base64,')
+      // NIET de hele URL — base64-payload kan toevallig 'jpg' bevatten.
+      const mimeMatch = String(logoUrl).match(/^data:image\/([a-z0-9+.-]+);/i);
+      const mime = mimeMatch ? mimeMatch[1].toLowerCase() : '';
+      const fmt = (mime === 'jpeg' || mime === 'jpg') ? 'JPEG'
+                : (mime === 'webp') ? 'WEBP'
+                : 'PNG';
       // Verhouding behouden: schaal binnen een kader van 26x24 mm.
       let lw = 24, lh = 24;
       try {

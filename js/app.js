@@ -12,8 +12,8 @@
 //                    5.5.0 → 5.5.1: knop uit topnav weggehaald
 //                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
 //                    5.6.x → 6.0.0: totaal nieuwe layout
-const APP_BUILD      = 320;
-const APP_VERSION    = '6.2.0';
+const APP_BUILD      = 321;
+const APP_VERSION    = '6.2.1';
 const APP_BUILD_DATE = '2026-09-04';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
@@ -764,10 +764,14 @@ const EmailService = {
   // caller op de mailto-fallback kan vallen.
   isConfigured() {
     try {
-      // sb wordt in supabase-client.js met const gedeclareerd — dat is
-      // globaal binnen de non-module script-scope maar niet als window.sb
-      // te bereiken. Vandaar de directe verwijzing.
-      return !!(typeof sb !== 'undefined' && sb && sb.auth && sb.auth.getSession);
+      // Naast een geldige sb-client moeten we ook echt online zijn EN een
+      // sessie hebben. Anders geeft de call naar de edge function toch een
+      // fout, en is de mailto-fallback beter. Dit voorkomt dat de knop
+      // 'verstuur via server' fantoom-succes toont.
+      if (typeof sb === 'undefined' || !sb || !sb.auth || !sb.auth.getSession) return false;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      if (typeof Auth !== 'undefined' && Auth.current && !Auth.current()) return false;
+      return true;
     } catch (_) { return false; }
   },
 

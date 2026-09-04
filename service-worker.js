@@ -6,7 +6,7 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-320';
+const CACHE_VERSION = 'sok-uitvaart-build-321';
 const SHELL = [
   './',
   './index.html',
@@ -201,7 +201,10 @@ self.addEventListener('push', event => {
       icon: './icon.png',
       badge: './icon.png',
       data: { url: (payload && payload.url) || '/' },
-      tag: (payload && payload.tag) || 'sok-default',
+      // Unieke tag per melding tenzij payload er expliciet één meegeeft —
+      // anders overschrijven opeenvolgende meldingen elkaar stil (Android
+      // dedupt op tag).
+      tag: (payload && payload.tag) || ('sok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)),
     })
   );
 });

@@ -1317,23 +1317,33 @@ function renderDossierForm(params) {
     };
     const presetList = effectieveKostenPresets({ includeHidden: adminMode });
     mount.querySelectorAll('[data-wk-preset]').forEach(b => {
-      b.addEventListener('click', () => {
-        const p = presetList[parseInt(b.dataset.wkPreset, 10)];
-        if (!p) return;
-        // Navigatie-tegels (Kist / Bloemen / Extra) hebben geen vaste prijs;
-        // ze leiden de gebruiker naar een andere pagina of focussen het
-        // 'eigen invoer'-veld.
-        if (p.nav === 'kist')    { Router.go('/kisten');  return; }
-        if (p.nav === 'bloemen') { Router.go('/bloemen'); return; }
-        if (p.nav === 'eten')    { Router.go('/eten');    return; }
-        if (p.nav === 'extra') {
-          const oms = mount.querySelector('#wk-omschrijving');
-          const add = mount.querySelector('.wizard-kosten-add');
-          if (add) add.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          if (oms) setTimeout(() => { try { oms.focus(); } catch (_) {} }, 250);
-          return;
+      b.addEventListener('click', async () => {
+        // Dubbelklik-bescherming — voorheen kon snelle klik 2 identieke
+        // DB.insert-calls triggeren (bv. Koffie/thee 2x, of Bloemen 2x).
+        if (b.dataset.busy === '1') return;
+        b.dataset.busy = '1';
+        b.disabled = true;
+        try {
+          const p = presetList[parseInt(b.dataset.wkPreset, 10)];
+          if (!p) return;
+          // Navigatie-tegels (Kist / Bloemen / Extra) hebben geen vaste prijs;
+          // ze leiden de gebruiker naar een andere pagina of focussen het
+          // 'eigen invoer'-veld.
+          if (p.nav === 'kist')    { Router.go('/kisten');  return; }
+          if (p.nav === 'bloemen') { Router.go('/bloemen'); return; }
+          if (p.nav === 'eten')    { Router.go('/eten');    return; }
+          if (p.nav === 'extra') {
+            const oms = mount.querySelector('#wk-omschrijving');
+            const add = mount.querySelector('.wizard-kosten-add');
+            if (add) add.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (oms) setTimeout(() => { try { oms.focus(); } catch (_) {} }, 250);
+            return;
+          }
+          await addPreset(p);
+        } finally {
+          b.dataset.busy = '';
+          b.disabled = false;
         }
-        addPreset(p);
       });
     });
     // ── Beheermodus: prijs aanpassen, verbergen, weer tonen ──

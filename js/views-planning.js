@@ -19,10 +19,14 @@ let _planningMode = 'agenda';   // 'agenda' | 'week'
 let _planningWeek = 0;          // offset in weken t.o.v. deze week
 let _planningResource = '';     // filter op resource ('' = alle)
 
-// 'YYYY-MM-DDTHH:mm' (lokaal) → ISO-string; leeg → null
-function planningToISO(datum, tijd) {
+// 'YYYY-MM-DDTHH:mm' (lokaal) → ISO-string; leeg → null.
+// allowEmptyTime: bij eindtijd mag lege tijd → null (i.p.v. stille 00:00
+// fallback die 'einde 00:00' zou tonen voor elke ongevulde eindtijd).
+function planningToISO(datum, tijd, allowEmptyTime = false) {
   if (!datum) return null;
-  const t = (tijd && /^\d{2}:\d{2}/.test(tijd)) ? tijd : '00:00';
+  const heeftTijd = tijd && /^\d{2}:\d{2}/.test(tijd);
+  if (!heeftTijd && allowEmptyTime) return null;
+  const t = heeftTijd ? tijd : '00:00';
   const d = new Date(`${datum}T${t}`);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
@@ -251,7 +255,19 @@ function renderPlanning() {
         type: f.type.value || 'taak',
         resource: (f.resource.value || '').trim() || null,
         start_ts: planningToISO(f.datum.value, f.starttijd.value),
-        eind_ts: planningToISO(f.datum.value, f.eindtijd.value),
+        // Eindtijd optioneel; als leeg → null (voorheen stille 00:00).
+        // Als eindtijd < starttijd (midnight-crossing bv. 23:00-01:00),
+        // dan hoort de eindtijd op de volgende dag.
+        eind_ts: (() => {
+          const eind = planningToISO(f.datum.value, f.eindtijd.value, true);
+          const start = planningToISO(f.datum.value, f.starttijd.value);
+          if (eind && start && new Date(eind) <= new Date(start)) {
+            // Voeg 1 dag toe aan eind (midnight-crossing)
+            const d = new Date(eind); d.setDate(d.getDate() + 1);
+            return d.toISOString();
+          }
+          return eind;
+        })(),
         dossier_id: f.dossier_id.value ? parseInt(f.dossier_id.value, 10) : null,
         notitie: (f.notitie.value || '').trim() || null,
         gedaan: false,

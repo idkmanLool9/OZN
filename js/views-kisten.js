@@ -362,7 +362,13 @@ function renderKistenBeheer(msg) {
 
   // Beschikbare materiaal-/kleurgroepen voor de dropdowns
   const materiaalGroepen = [...new Set(bron.map(k => _kistMateriaalGroep(k.materiaal)))].sort();
+  // Als een filter is actief maar de bijbehorende optie bestaat niet meer
+  // (bv. omdat de laatste kist met dat materiaal is verwijderd), reset het
+  // filter — anders krijgt de gebruiker een lege lijst zonder duidelijk
+  // waarom.
+  if (_kistMateriaal && !materiaalGroepen.includes(_kistMateriaal)) _kistMateriaal = '';
   const kleurGroepen = [...new Set(bron.map(k => _kistKleurGroep(k.materiaal)))].sort();
+  if (_kistKleur && !kleurGroepen.includes(_kistKleur)) _kistKleur = '';
 
   // Paginering
   const totPaginas = Math.max(1, Math.ceil(gefilterd.length / KISTEN_PER_PAGINA));
@@ -742,7 +748,10 @@ function renderKistenBeheer(msg) {
     const pickBtn = e.target.closest('button[data-pick-kist]');
     if (pickBtn) {
       const kistNaam = pickBtn.getAttribute('data-pick-kist');
-      if (!hasDraft) {
+      // Check op werkelijke drafts (NIET hasDraft — die is false zodra de
+      // banner is verborgen, waardoor de user "Open eerst een dossier" te
+      // zien kreeg terwijl er wél een actief dossier is).
+      if (!drafts.length) {
         Modal.show({
           type: 'info',
           title: 'Open eerst een dossier',

@@ -1417,7 +1417,7 @@ const MailComposer = {
           </label>
 
           <label class="mail-field">
-            <span>CC <span class="muted small">(elke ontvanger krijgt een aparte mail — geen echte CC-header)</span></span>
+            <span>BCC (blinde kopie) <span class="muted small">— ontvangers zien elkaars adres niet</span></span>
             <div class="mail-tags" data-field="cc">
               <input type="email" class="mail-tag-input" placeholder="Typ een adres en druk Enter">
             </div>
@@ -1587,6 +1587,17 @@ const MailComposer = {
           };
           r.readAsDataURL(pdfBlob);
         });
+        // Grootte-check: mailproviders (Brevo/Resend) weigeren bijlagen >10MB
+        // base64. Geef een duidelijke fout in plaats van cryptisch server-error.
+        const attachBytes = (pdfBase64.length * 3) / 4;
+        if (attachBytes > 9 * 1024 * 1024) {
+          Modal.show({
+            type: 'warning',
+            title: 'PDF te groot voor mail',
+            message: `Deze PDF is ${(attachBytes / 1024 / 1024).toFixed(1)}MB. E-mailproviders weigeren bijlagen boven ~9MB. Probeer minder foto's op te nemen of stuur de PDF via een andere weg (WhatsApp, cloud-link).`,
+          });
+          return;
+        }
 
         // 2) Body: bovenaan een 'PDF-bijlage:'-vermelding, daarna het dossier.
         let bodyHtml = `<div style="margin:0 0 16px;padding:10px 14px;background:#f6f4ef;border-radius:8px;font-size:13px;color:#4a4a4a;">

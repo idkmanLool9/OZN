@@ -1182,13 +1182,19 @@ const PdfGen = {
       txt('Omschrijving', M, y); txt('Categorie', xCat, y); txt('Bedrag', xBedrag, y, { align: 'right' });
       y += 1.5; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 4;
       doc.setFont('helvetica', 'normal');
+      // Categorie-kolom moet ook gesplitst worden op de beschikbare breedte
+      // (van xCat tot xBedrag - 22 voor Bedrag) — anders loopt lange categorie
+      // door in de Bedrag-kolom.
+      const catWidth = (xBedrag - xCat) - 22;
       spec.table.rows.forEach(r => {
         const oms = split(r[0], xCat - M - 3);
-        ensure(oms.length * 4.6 + 1);
+        const cat = split(r[1] || '', Math.max(10, catWidth));
+        const regels = Math.max(oms.length, cat.length);
+        ensure(regels * 4.6 + 1);
         doc.setTextColor(...DARK); txt(oms, M, y);
-        doc.setTextColor(...GRAY); txt(r[1] || '', xCat, y);
+        doc.setTextColor(...GRAY); txt(cat, xCat, y);
         doc.setTextColor(...DARK); txt(r[2] || '', xBedrag, y, { align: 'right' });
-        y += Math.max(5, oms.length * 4.6);
+        y += Math.max(5, regels * 4.6);
       });
       y += 1; doc.setDrawColor(210); doc.line(M, y, W - M, y); y += 5;
     }
