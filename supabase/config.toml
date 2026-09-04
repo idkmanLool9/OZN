@@ -1,0 +1,25 @@
+# Supabase project config voor lokale dev + functions deploy
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "cmcbmcyxdndymxgpxmed"
+
+# Edge Functions — per function settings
+#
+# send-push: openbaar callable zonder Bearer-token zodat de cron-job
+# (pg_net.http_post vanuit Postgres) hem kan aanroepen zonder JWT.
+# De function is intern alsnog veilig: hij gebruikt de service-role
+# key alleen binnen Deno, doet alleen lees-operaties op publieke data,
+# en stuurt alleen naar reeds geregistreerde subscriptions.
+[functions.send-push]
+verify_jwt = false
+
+# snelstart: auth-proxy naar de SnelStart B2B API. Callable met de anon-key
+# (verify_jwt = false zodat de aanroep niet op een verlopen JWT vastloopt).
+# De functie bevat zelf geen sleutels; die komen mee per aanroep.
+[functions.snelstart]
+verify_jwt = false
+
+# snelstart-webhook: ontvangt meldingen van SnelStart. Moet openbaar
+# bereikbaar zijn (SnelStart roept aan zonder Supabase-JWT).
+[functions.snelstart-webhook]
+verify_jwt = false

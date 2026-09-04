@@ -1,9 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" ry="96" fill="#6b1e2a"/>
-  <g fill="#f5e8ea">
-    <rect x="232" y="120" width="48" height="280" rx="6"/>
-    <rect x="160" y="200" width="192" height="48" rx="6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="OZN — Overledenen Zorg Nederland">
+  <defs>
+    <linearGradient id="ozn-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#f6f2e7"/>
+      <stop offset="100%" stop-color="#efe8d6"/>
+    </linearGradient>
+  </defs>
+  <!-- Zachte crème achtergrond die past bij de app-branding. Afgeronde hoeken
+       zodat 't binnen zowel iOS-squircle als Windows-tegel netjes uitkomt. -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#ozn-bg)"/>
+
+  <!-- Kleine gestileerde vogel boven de wordmark (dove/duif). -->
+  <g fill="#1e7285" transform="translate(256 118)">
+    <path d="M 0 0
+             c -14 -14 -32 -18 -46 -8
+             c -6 -10 -18 -14 -28 -8
+             c 10 -6 22 -4 30 4
+             c 4 -12 20 -18 34 -12
+             c 14 -6 30 0 36 12
+             c -6 -2 -14 -2 -22 4
+             c 16 4 24 18 22 30
+             c -8 -12 -22 -18 -34 -14
+             c -4 4 -8 6 -12 6 z" />
+    <circle cx="18" cy="-6" r="2.4"/>
   </g>
-  <circle cx="256" cy="260" r="178" fill="none" stroke="#c9a24a" stroke-width="6" opacity=".55"/>
+
+  <!-- OZN wordmark in de OZN-huisstijl teal. Serif-letters, bold. -->
+  <text x="256" y="308"
+        fill="#1e7285"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-weight="700"
+        font-size="180"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        letter-spacing="-2">OZN</text>
+
+  <!-- Tagline: 'Zorg' krijgt hetzelfde teal (i.p.v. donker), rest donkergrijs. -->
+  <g font-family="Georgia, 'Times New Roman', serif" font-size="34" text-anchor="middle">
+    <text x="256" y="410" fill="#4a4a4a">Overledenen<tspan fill="#1e7285">Zorg</tspan>Nederland</text>
+  </g>
 </svg>

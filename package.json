@@ -7,13 +7,25 @@
     "build": "node scripts/build-www.js",
     "cap:sync": "npm run build && npx cap sync ios",
     "cap:add-ios": "npm run build && npx cap add ios",
-    "cap:open-ios": "npx cap open ios"
+    "cap:open-ios": "npx cap open ios",
+    "cap:assets": "npx @capacitor/assets generate --iconBackgroundColor '#2563eb' --ios"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2"
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/assets": "^3.0.5"
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2"
+    "@capacitor/ios": "^6.1.2",
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/camera": "^6.1.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/local-notifications": "^6.1.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@capawesome/capacitor-badge": "^6.0.0",
+    "capacitor-document-scanner-sok": "file:./local-plugins/document-scanner",
+    "capacitor-document-scanner-mlkit": "file:./local-plugins/document-scanner-mlkit",
+    "capacitor-google-services-installer": "file:./local-plugins/google-services-installer",
+    "capacitor-live-activity-sok": "file:./local-plugins/live-activity"
   }
 }

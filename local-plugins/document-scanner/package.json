@@ -1,0 +1,15 @@
+{
+  "name": "capacitor-document-scanner-sok",
+  "version": "1.0.0",
+  "description": "Apple VisionKit documentscanner voor Capacitor (SOK Uitvaartbeheer)",
+  "license": "MIT",
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "files": [
+    "ios/",
+    "CapacitorDocumentScannerSok.podspec"
+  ]
+}

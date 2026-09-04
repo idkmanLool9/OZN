@@ -1,4 +1,4 @@
-// Service worker voor offline-modus
+// Service worker voor offline-modus (kick 2026-07-09)
 // Cache-strategie:
 //  - App-shell (HTML/CSS/JS/icon/manifest): cache-first, fall back naar netwerk
 //  - Supabase REST/Storage/Auth: network-only (schrijven en authenticatie)
@@ -6,38 +6,49 @@
 
 // Cache-naam bevat het buildnummer (groeit elke release). Bij wijziging
 // wordt de oude cache automatisch opgeruimd in het 'activate'-event.
-const CACHE_VERSION = 'sok-uitvaart-build-54';
+const CACHE_VERSION = 'sok-uitvaart-build-321';
 const SHELL = [
   './',
   './index.html',
+  './privacy.html',
+  './support.html',
   './style.css',
   './print.css',
   './manifest.webmanifest',
   './icon.svg',
   './js/config.js',
   './js/supabase-client.js',
+  './js/snelstart.js',
   './js/data.js',
+  './js/demo.js',
   './js/core.js',
   './js/views-list.js',
+  './js/views-planning.js',
   './js/views-form.js',
   './js/views-detail.js',
   './js/views-kisten.js',
-  './js/views-bloemen.js',
-  './js/views-eten-drinken.js',
   './js/views-factuur.js',
-  './js/views-rouwkaart.js',
-  './js/intake-scan.js',
   './js/app.js',
+  './js/native.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_VERSION)
-      .then(c => c.addAll(SHELL).catch(err => {
-        console.warn('SW: kon shell niet helemaal cachen', err);
-      }))
+      .then(async c => {
+        // Forceer 'reload' zodat we de HTTP-cache van de browser overslaan.
+        // Anders cacht de nieuwe SW stilletjes de oude bestanden en blijft
+        // de gebruiker een versie achterlopen.
+        await Promise.all(SHELL.map(async url => {
+          try {
+            const resp = await fetch(url, { cache: 'reload' });
+            if (resp && resp.ok) await c.put(url, resp);
+          } catch (err) {
+            console.warn('SW shell fetch faalde:', url, err);
+          }
+        }));
+      })
       .then(() => self.skipWaiting())
   );
 });
@@ -63,27 +74,57 @@ self.addEventListener('fetch', e => {
 
   const url = new URL(req.url);
 
-  // Supabase publieke storage-objecten (logo + kistfoto's + bloemen +
-  // eten/drinken-foto's): stale-while-revalidate zodat ze offline werken
+  // Supabase storage-objecten (publiek + signed URL's): stale-while-revalidate
+  // zodat kist-foto's, artsverklaringen, overdraagformulieren, foto-overledene,
+  // logo enz. ook offline zichtbaar blijven na eerste keer laden.
   if ((url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) &&
-      url.pathname.startsWith('/storage/v1/object/public/')) {
+      (url.pathname.startsWith('/storage/v1/object/public/') ||
+       url.pathname.startsWith('/storage/v1/object/sign/') ||
+       url.pathname.startsWith('/storage/v1/object/authenticated/'))) {
     e.respondWith(staleWhileRevalidate(req));
     return;
   }
-  // Overige Supabase API (REST, auth, signed URLs, realtime): nooit cachen
+  // Supabase REST GET-calls (dossiers, kosten, notities, kist_voorraad, ...):
+  // network-first met cache-fallback zodat je bij netwerkverlies nog de
+  // laatst-gelezen versie te zien krijgt. Alle schrijf-acties (POST/PATCH/DELETE)
+  // + auth/realtime blijven ongemoeid — die filter method !== 'GET' er al uit.
+  if ((url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) &&
+      url.pathname.startsWith('/rest/v1/')) {
+    e.respondWith(networkFirst(req));
+    return;
+  }
+  // Overige Supabase API (auth, realtime, functions): nooit cachen.
   if (url.host.endsWith('.supabase.co') || url.host.endsWith('.supabase.in')) {
     return;
   }
 
-  // jsdelivr CDN (Supabase SDK + jscanify) + Google Fonts +
-  // OpenCV.js (docs.opencv.org): stale-while-revalidate
-  // (zo werken lettertype + scan-bibliotheek ook offline na 1e laad)
+  // jsdelivr CDN (Supabase SDK + EmailJS + html2pdf) + Google Fonts:
+  // stale-while-revalidate zodat ze offline werken na 1e laad
   if (url.host === 'cdn.jsdelivr.net' ||
       url.host === 'fonts.googleapis.com' ||
-      url.host === 'fonts.gstatic.com' ||
-      url.host === 'docs.opencv.org') {
+      url.host === 'fonts.gstatic.com') {
     e.respondWith(staleWhileRevalidate(req));
     return;
+  }
+
+  // Losse statische pagina's (support/privacy): altijd de echte pagina serveren,
+  // nooit de app-shell als fallback. Werkt voor /support én /support.html.
+  if (url.origin === location.origin) {
+    const staticMatch = url.pathname.match(/^\/(support|privacy)(?:\.html)?$/);
+    if (staticMatch) {
+      const file = './' + staticMatch[1] + '.html';
+      e.respondWith(
+        fetch(new Request(req, { cache: 'no-cache' }))
+          .then(resp => {
+            if (resp && resp.ok && resp.type === 'basic') {
+              caches.open(CACHE_VERSION).then(c => c.put(file, resp.clone()));
+            }
+            return resp;
+          })
+          .catch(() => caches.match(file))
+      );
+      return;
+    }
   }
 
   // Eigen assets
@@ -105,8 +146,17 @@ self.addEventListener('fetch', e => {
 
 async function networkFirst(req) {
   try {
-    const resp = await fetch(req);
-    if (resp && resp.ok && resp.type === 'basic') {
+    const freshReq = new Request(req, { cache: 'no-cache' });
+    const resp = await fetch(freshReq);
+    // Alleen volledige 200-responses cachen. 206 Partial Content (Range)
+    // en cache-buster URLs (?_check=/_v=) zouden anders elk een unieke
+    // cache-entry maken die nooit meer gematched wordt — oneindige groei.
+    // 'basic' = eigen origin; 'cors' = Supabase REST (die stuurt CORS-headers).
+    // Beide moeten mogen cachen anders is de offline-fallback dood voor REST.
+    const url = new URL(req.url);
+    const isCacheBuster = url.searchParams.has('_check') || url.searchParams.has('_v') || url.searchParams.has('_reset');
+    const okType = resp && (resp.type === 'basic' || resp.type === 'cors');
+    if (resp && resp.status === 200 && okType && !isCacheBuster) {
       const c = await caches.open(CACHE_VERSION);
       c.put(req, resp.clone());
     }
@@ -132,3 +182,60 @@ async function staleWhileRevalidate(req) {
   }).catch(() => cached);
   return cached || fetchPromise;
 }
+
+// ─── Push-notificaties ──────────────────────────────────────────────────────
+self.addEventListener('push', event => {
+  let payload = { title: 'OZN', body: 'Je hebt een nieuwe melding.', url: '/' };
+  if (event.data) {
+    try { payload = Object.assign(payload, event.data.json()); }
+    catch (_) { payload.body = event.data.text(); }
+  }
+  // Guard: sommige senders zetten expliciet title:null of body:null in de
+  // JSON — Object.assign overschrijft dan onze defaults. showNotification(null)
+  // crasht op sommige Android WebViews.
+  const title = (payload && typeof payload.title === 'string' && payload.title) || 'OZN';
+  const body  = (payload && typeof payload.body  === 'string' && payload.body)  || 'Je hebt een nieuwe melding.';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: './icon.png',
+      badge: './icon.png',
+      data: { url: (payload && payload.url) || '/' },
+      // Unieke tag per melding tenzij payload er expliciet één meegeeft —
+      // anders overschrijven opeenvolgende meldingen elkaar stil (Android
+      // dedupt op tag).
+      tag: (payload && payload.tag) || ('sok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)),
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  // Beperk de URL uit de push-payload tot ONS domein of een relatieve pad.
+  // Anders kan een gecompromitteerde push-server een cross-origin URL sturen
+  // en de app als open-redirect gebruiken.
+  const rawUrl = (event.notification.data && event.notification.data.url) || '/';
+  let safeUrl = '/';
+  try {
+    const scope = self.registration.scope;
+    const abs = new URL(rawUrl, scope);
+    if (abs.origin === new URL(scope).origin) safeUrl = abs.pathname + abs.search + abs.hash;
+    // Cross-origin URL → val terug op '/'
+  } catch (_) {
+    // Ongeldige URL → val terug op '/'
+  }
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
+      for (const w of wins) {
+        if (w.url.includes(self.registration.scope) && 'focus' in w) {
+          w.focus();
+          if ('navigate' in w) {
+            try { w.navigate(safeUrl); } catch (_) {}
+          }
+          return;
+        }
+      }
+      return self.clients.openWindow(safeUrl);
+    })
+  );
+});

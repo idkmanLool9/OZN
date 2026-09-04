@@ -7,3 +7,10 @@ www/
 ios/
 android/
 .capacitor/
+
+# Uitzondering: eigen Capacitor-plugins bevatten platformcode (ios/ + android/)
+# die WEL mee moet naar de builder — anders faalt `cap sync` bij de APK-workflow.
+!local-plugins/**/ios/
+!local-plugins/**/ios/**
+!local-plugins/**/android/
+!local-plugins/**/android/**

@@ -1,42 +1,52 @@
 // Init: Supabase auth, route registratie, login form, offline-modus
 
-// Versie-schema (gekoppeld aan buildnummer)
-//  · APP_BUILD   — monotoon groeiend nummer, +1 bij elke release.
-//                  Wordt gebruikt voor service-worker cache-invalidatie
-//                  en als CFBundleVersion in de iOS-app.
-//  · APP_VERSION — semver-weergave (MAJOR.MINOR.PATCH), afgeleid van het
-//                  buildnummer:
-//                    MAJOR = floor(build / 10)
-//                    MINOR = build mod 10
-//                    PATCH = klein fix-cijfer binnen dezelfde build
-//                            (meestal 0; ophogen bij hot-fix zonder nieuw
-//                             buildnummer)
-//                  Voorbeelden:
-//                    build 47 → 4.7.0
-//                    build 48 → 4.8.0
-//                    build 50 → 5.0.0
-//                    build 60 → 6.0.0
-const APP_BUILD      = 54;
-const APP_VERSION    = '5.4.0';
-const APP_BUILD_DATE = '2026-05-28';
+// Versie-schema (semver MAJOR.MINOR.PATCH, gekoppeld aan buildnummer)
+//  · APP_BUILD   — monotoon groeiend nummer, +1 bij ELKE release.
+//                  Wordt gebruikt voor service-worker cache-invalidatie.
+//  · APP_VERSION — semver-weergave:
+//                    PATCH (laatste cijfer) — kleine UI-tweaks, bugfixes,
+//                          knop toevoegen/weghalen
+//                    MINOR (middelste)      — nieuwe features
+//                    MAJOR (eerste)         — grote architectuur-wijziging
+//                  Voorbeeld:
+//                    5.5.0 → 5.5.1: knop uit topnav weggehaald
+//                    5.5.1 → 5.6.0: nieuwe agenda-functie toegevoegd
+//                    5.6.x → 6.0.0: totaal nieuwe layout
+const APP_BUILD      = 321;
+const APP_VERSION    = '6.2.1';
+const APP_BUILD_DATE = '2026-09-04';
 
 // ─── Instellingen (cloud-first, localStorage als offline-spiegel) ──────────
 const Settings = {
-  KEY: 'sok_settings',          // lokale spiegel
+  KEY: 'sok_settings',          // lokale spiegel (gedeelde instellingen)
   TABLE: 'app_instellingen',
-  ROW_ID: 1,                    // single-row model
-  _cache: null,                 // huidige overrides (zonder defaults)
+  ROW_ID: 1,                    // single-row model (gedeeld door hele parochie)
+  _cache: null,                 // huidige gedeelde overrides (zonder defaults)
+  // Gevoelige, PER-ACCOUNT instellingen: API-sleutels e.d. Deze horen NIET in de
+  // gedeelde instellingenrij (dan zou elk ander account ze zien). Ze worden
+  // opgeslagen in de auth-metadata van de ingelogde gebruiker (alleen voor die
+  // gebruiker leesbaar) + een per-account lokale spiegel.
+  SENSITIVE: [
+    'emailjs_public_key', 'emailjs_service_id', 'emailjs_template_id',
+    'snelstart_actief', 'snelstart_subscription_key', 'snelstart_client_key',
+  ],
+  SECRET_KEY_PREFIX: 'sok_secrets_',  // + user-id = per-account lokale spiegel
+  _secretCache: null,                 // per-account gevoelige overrides
+  // Demo-/review-account bewaart zijn keuzes (lettertype, logo, ontwerp) hier,
+  // uitsluitend lokaal op het toestel — nooit naar de cloud. Zo overleven de
+  // instellingen een herstart, zonder de echte gedeelde instellingen te raken.
+  DEMO_KEY: 'sok_settings_demo',
   defaults: {
     splash_enabled: true,
-    splash_duration_ms: 2500,
+    splash_duration_ms: 1600,
     splash_animation: 'glass', // 'glass' | 'fade' | 'scale' | 'slide'
     splash_title: 'Welkom',
-    splash_subtitle: 'Uitvaartbeheer · Syrisch-Orthodoxe Kerk van Antiochië',
+    splash_subtitle: 'OZN · Overledenenzorg Nederland',
     splash_offline_title: 'Welkom terug',
     // Branding
-    app_name: 'Uitvaartbeheer',
-    app_tagline: 'Syrisch-Orthodoxe Kerk van Antiochië',
-    primary_color: '#6b1e2a',
+    app_name: 'OZN',
+    app_tagline: 'Overledenenzorg Nederland',
+    primary_color: '#2563eb',
     accent_color: '#c9a24a',
     logo_data_url: '',
     // UI
@@ -44,9 +54,33 @@ const Settings = {
     rounded_cards: true,
     font_id: 'default',
     form_density: 'normaal', // 'compact' | 'normaal' | 'ruim' | 'extraruim'
+    // Ontwerp-versie: 'v1' = klassieke bovenbalk-layout (standaard),
+    // 'v2' = nieuwe zijbalk-layout.
+    design_version: 'v1',
     // Beheermodus: knoppen 'Vervang foto' / 'Verwijder' tonen op
     // catalogi (kisten, bloemen, eten & drinken)
     catalog_admin_mode: false,
+    // Archief: afgehandelde dossiers automatisch archiveren (rouwauto geweest
+    // + alle datums voorbij). En: mogen medewerkers het archief zien?
+    // (medewerker_ziet_archief wordt server-side afgedwongen via RLS.)
+    auto_archief_actief: false,
+    medewerker_ziet_archief: false,
+    // Mogen gewone medewerkers prijzen/bedragen zien? Standaard niet.
+    // (Server dwingt dit af via de kosten_zicht-view + mag_prijzen_zien().)
+    medewerker_ziet_prijzen: false,
+    // Per-naam overrides voor de Unigra-kistencatalogus (alleen wijzigbaar
+    // in beheermodus): { 'Naam kist': { bedrag?: number, hidden?: bool } }
+    kisten_overrides: {},
+    // Zelf-toegevoegde kisten (buiten Unigra-catalogus). Vorm:
+    // [{ naam, materiaal, bedrag, kleur? }, …]. Beheer via Account of via
+    // de + knop in de Kisten-catalogus (alleen in beheermodus).
+    kisten_eigen: [],
+    // Idem voor de standaard-kostenpresets (Snel toevoegen uit lijst).
+    // Sleutels = omschrijving (uitgezonderd nav-tegels Kist/Bloemen/Extra).
+    kosten_overrides: {},
+    // Extra kostenposten die de beheerder zelf heeft aangemaakt in Account →
+    // Kostenposten beheren. Vorm: [{ omschrijving, categorie, bedrag }, …]
+    kosten_extra: [],
     // Handtekeningen-velden in het intake-formulier
     signature_fields: [
       { id: 'opdrachtgever',   label: 'Handtekening opdrachtgever',   required: true },
@@ -56,107 +90,176 @@ const Settings = {
     emailjs_public_key: '',
     emailjs_service_id: '',
     emailjs_template_id: '',
+    // Push-notificaties (zie PushNotificaties + docs/push-setup.md)
+    push_vapid_public_key: 'BFrHC8o3zxJ4e1qirE93vUm5wPZpEdqWIV9OwczE-Omgf3QkoM_hKFI1ZFK2Lon4f7bvwVNKQVUfOZxkFQ6nUmg',
+    push_remind_days_ahead: 1,   // x dagen voor uitvaart een push sturen
+    // Profielkiezer ("Wie werkt vandaag?") wordt bij ELKE app-start getoond
+    // (zolang er profielen zijn geconfigureerd). Zo houdt de app bij wie
+    // wat heeft gedaan zonder dat iedereen een eigen account nodig heeft.
+    profielkiezer_actief: true,
+    // Profielen — Wie werkt vandaag? Beheer in Account → Profielen.
+    // Leeg default: OZN vult zelf het team in.
+    profielen: [],
+    // Automatisch dossier mailen naar klooster bij opslaan (leeg = uit)
+    auto_send_dossier_email: '',
+    // E-mail-footer (handtekening onderaan elke verzonden mail)
+    email_footer_enabled: true,
+    email_footer_terms_url:     '',
+    email_footer_privacy_url:   '',
+    email_footer_facebook_url:  '',
+    email_footer_instagram_url: '',
+    email_footer_address: '',
+    email_footer_phone:   '',
+    email_footer_email:   '',
+    email_footer_website: '',
     // Login-scherm teksten (split-screen)
     login_brand_title: 'Welkom terug',
     login_brand_subtitle: 'Beheer dossiers, kosten, documenten en facturen — alles op één plek.',
     login_brand_features: [
-      'Dossiers met taken, kosten en documenten',
-      'Automatische ID-kaart-scan met perspectief-correctie',
-      'Digitale handtekeningen + e-mail-verzending',
+      'Dossiers met kosten en notities — altijd up-to-date',
+      'Facturen direct opmaken en als PDF mailen',
+      'Kistassortiment en rouwauto per dossier',
       'Versleutelde sessie · automatische uitlog',
     ],
-    login_brand_foot: '© Syrisch-Orthodoxe parochies',
+    login_brand_foot: '© OZN Vastgoed B.V.',
     login_form_title: 'Inloggen',
-    login_form_subtitle: 'Voer uw e-mailadres en wachtwoord in om door te gaan.',
+    login_form_subtitle: 'Voer je e-mailadres en wachtwoord in om door te gaan.',
     login_secretariaat_text: 'Geen account? Vraag het secretariaat.',
-    // Verzekeringsmaatschappijen (datalist in intake)
-    verzekering_maatschappijen: [
-      'DELA', 'Monuta', 'Yarden', 'Ardanta', 'Nuvema', 'Klooster eigen polis',
+    // OZN-specifieke keuzelijstjes (beheerder-onderhouden).
+    // rouwgoederen_opties: standaard-vinkjes bij thuis-opbaren.
+    // rouwauto_lijst: opties in de rouwauto-dropdown.
+    rouwgoederen_opties: [
+      'Airco', 'Opbaarplank', 'Koelplaat', 'Schermen',
+      'Kaarsen/Kruis', 'Schragen', 'Baarwagen', 'Rok',
+      'Body bag', 'Opbaar mand',
     ],
-    // Pakket-uitvoeringen — per pakket optioneel een standaard-dekkingsbedrag
-    // dat in het dossier-formulier automatisch wordt voorgesteld bij de
-    // dekkingsbedrag-input. Voor DELA-pakketten is er een 'categorieen'-blok
-    // met max-bedragen per kostencategorie; die worden automatisch gedekt
-    // wanneer maatschappij = DELA én dit pakket is gekozen. De rest gaat uit
-    // de Geldverzekering-bucket (geldverzekering_default of polisbedrag).
-    verzekering_pakketten: [
-      {
-        naam: 'DELA UitvaartPlan in Diensten — externe uitvaartleider',
-        verzekeraar: 'DELA',
-        dekking: '3957',
-        geldverzekering_default: 800,
-        categorieen: {
-          aannametarief: { max: 600, gedekt: true  },
-          vervoer:       { max: 500, gedekt: true  },
-          verzorging:    { max: 200, gedekt: true  },
-          kist:          { max: 600, gedekt: true  },
-          aula:          { max: 300, gedekt: true  },
-          kerk:          { max:   0, gedekt: false },  // niet-DELA-locatie
-          begraafplaats: { max: 800, gedekt: true  },  // alleen algemeen graf
-          bloemen:       { max:   0, gedekt: false },  // via Geldverzekering
-          rouwkaarten:   { max: 250, gedekt: true  },
-          catering:      { max:   0, gedekt: false },  // via Geldverzekering
-          schoonmaak:    { max:   0, gedekt: false },
-          administratie: { max:  50, gedekt: true  },
-          overig:        { max: 657, gedekt: true  },
-        },
-        opmerking: 'Vergoeding bij niet-DELA-uitvaartleider: €3.157 dienstendeel + min. €800 Geldverzekering. Familie betaalt het verschil.',
-      },
-      {
-        naam: 'DELA UitvaartPlan in Geld',
-        verzekeraar: 'DELA',
-        dekking: '',
-        opmerking: 'Vrij te besteden bedrag — vul polisbedrag in als dekking.',
-      },
-      {
-        naam: 'DELA UitvaartPlan in Diensten — DELA verzorgt zelf',
-        verzekeraar: 'DELA',
-        dekking: '8800',
-        opmerking: 'Alleen relevant als DELA de uitvaart zelf verzorgt — zelden van toepassing in onze parochie.',
-      },
-      { naam: 'Standaard pakket',  dekking: '' },
-      { naam: 'Uitgebreid pakket', dekking: '' },
-      { naam: 'Vrije keuze',       dekking: '' },
-      { naam: 'Maatwerk',          dekking: '' },
-    ],
-    // Parochies + bijbehorende standaard-priester (Aboona).
-    // Wordt automatisch ingevuld in het intake-formulier wanneer een
-    // parochie wordt gekozen.
-    parochies: [
-      { naam: 'St. Ephrem de Syriër Klooster — Glane/Losser', priester: '' },
-      { naam: 'Mor Ephrem — Glanerbrug',                       priester: '' },
-      { naam: 'Mor Severios — Hengelo',                        priester: '' },
-      { naam: 'Mor Kuryakos — Enschede',                       priester: '' },
-      { naam: 'Mor Aday — Rijssen',                            priester: '' },
-      { naam: 'Sint Maria — Amsterdam',                        priester: '' },
-      { naam: 'Mor Gabriël — Holland',                         priester: '' },
-    ],
-    // Defaults voor het intake-formulier (auto-ingevuld bij nieuw dossier)
-    default_kerk_locatie: 'Maria kathedraal',
-    default_begraafplaats: 'St. Ephrem',
+    rouwauto_lijst: [],
+    // Factuur-bedrijfsgegevens (kop + betaalgegevens op de PDF-factuur)
+    factuur_bedrijfsnaam: 'OZN Vastgoed B.V.',
+    factuur_adres: '',
+    factuur_telefoon: '',
+    factuur_email: '',
+    factuur_iban: '',
+    factuur_btw: '',
+    factuur_kvk: '',
+    factuur_betalingstermijn_dagen: 30,
+    // Oplopend factuurnummer: laatste volgnummer + toegekende nummers per
+    // dossier (zodat een dossier altijd hetzelfde factuurnummer houdt).
+    factuur_volgnr: 0,
+    factuur_nummers: {},
+    // SnelStart-koppeling (boekhouding) — sleutels invullen in Account.
+    snelstart_actief: false,
+    snelstart_subscription_key: '',
+    snelstart_client_key: '',
   },
-  // Synchrone read uit cache + lokale spiegel
+  // Synchrone read uit cache + lokale spiegel (gedeelde instellingen).
+  // Voor het demo-account: uit de aparte, alleen-lokale demo-spiegel.
   _localOverrides() {
     if (Settings._cache) return Settings._cache;
-    try { return JSON.parse(localStorage.getItem(Settings.KEY) || '{}') || {}; } catch (_) { return {}; }
+    const key = (typeof Demo !== 'undefined' && Demo.isActive()) ? Settings.DEMO_KEY : Settings.KEY;
+    try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (_) { return {}; }
   },
-  all() { return Object.assign({}, Settings.defaults, Settings._localOverrides()); },
+  // Per-account gevoelige overrides (uit cache of per-account lokale spiegel)
+  _secretOverrides() {
+    if (Settings._secretCache) return Settings._secretCache;
+    const u = (typeof Auth !== 'undefined' && Auth.current()) || null;
+    if (u && u.id) {
+      try {
+        const raw = localStorage.getItem(Settings.SECRET_KEY_PREFIX + u.id);
+        if (raw) return JSON.parse(raw) || {};
+      } catch (_) {}
+    }
+    return {};
+  },
+  // Gevoelige sleutels uit een object filteren (voor de gedeelde rij)
+  _stripSensitive(obj) {
+    const out = {};
+    for (const k in obj) if (Settings.SENSITIVE.indexOf(k) === -1) out[k] = obj[k];
+    return out;
+  },
+  // Defaults + gedeelde overrides + per-account gevoelige overrides
+  all() {
+    return Object.assign({}, Settings.defaults, Settings._localOverrides(), Settings._secretOverrides());
+  },
   get(key) { return Settings.all()[key]; },
 
-  // Synchroon: update cache + lokale spiegel; cloud-push fire-and-forget
+  // Synchroon: update cache + spiegels; cloud-push fire-and-forget.
+  // Gevoelige sleutels gaan naar de per-account store, de rest naar de
+  // gedeelde instellingenrij.
   set(patch) {
-    const cur = Settings._localOverrides();
-    const next = Object.assign({}, cur, patch);
-    // Defaults eruit halen om de tabel klein te houden
-    const trimmed = {};
-    for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
-    Settings._cache = trimmed;
-    try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {}
-    Settings._pushCloud(trimmed); // niet awaiten
+    // Demo-/review-account: alle keuzes (lettertype, logo, ontwerp, enz.) alleen
+    // lokaal op het toestel bewaren zodat ze een herstart overleven — nooit naar
+    // de cloud en niet in de gedeelde/gevoelige stores.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) {
+      const next = Object.assign({}, Settings._localOverrides(), patch);
+      const trimmed = {};
+      for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+      Settings._cache = trimmed;
+      Settings._secretCache = {};
+      try { localStorage.setItem(Settings.DEMO_KEY, JSON.stringify(trimmed)); } catch (_) {}
+      return;
+    }
+
+    const secretPatch = {}, sharedPatch = {};
+    for (const k in patch) {
+      if (Settings.SENSITIVE.indexOf(k) !== -1) secretPatch[k] = patch[k];
+      else sharedPatch[k] = patch[k];
+    }
+
+    // ── Gedeelde (niet-gevoelige) instellingen ──
+    if (Object.keys(sharedPatch).length) {
+      const next = Object.assign({}, Settings._localOverrides(), sharedPatch);
+      const trimmed = {};
+      for (const k in next) {
+        if (Settings.SENSITIVE.indexOf(k) !== -1) continue;           // nooit gevoelig in de gedeelde rij
+        if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+      }
+      Settings._cache = trimmed;
+      try { localStorage.setItem(Settings.KEY, JSON.stringify(trimmed)); } catch (_) {}
+      Settings._pushCloud(trimmed);
+    }
+
+    // ── Gevoelige (per-account) instellingen ──
+    if (Object.keys(secretPatch).length) {
+      const next = Object.assign({}, Settings._secretOverrides(), secretPatch);
+      const trimmed = {};
+      for (const k in next) if (next[k] !== Settings.defaults[k]) trimmed[k] = next[k];
+      Settings._secretCache = trimmed;
+      Settings._persistSecrets(trimmed);
+      Settings._pushSecrets(trimmed);
+    }
   },
 
-  // Geluidloos pushen naar Supabase
+  // Per-account lokale spiegel van de gevoelige sleutels
+  _persistSecrets(data) {
+    const u = (typeof Auth !== 'undefined' && Auth.current()) || null;
+    if (!u || !u.id) return;
+    try { localStorage.setItem(Settings.SECRET_KEY_PREFIX + u.id, JSON.stringify(data)); } catch (_) {}
+  },
+  // Gevoelige sleutels opslaan in de auth-metadata van deze gebruiker
+  _pushSecrets(data) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return;
+    if (!navigator.onLine) return;
+    if (!Auth.current()) return;
+    sb.auth.updateUser({ data: { sok_secrets: data } })
+      .then(r => { if (r.error) console.warn('Gevoelige instellingen opslaan faalde:', r.error.message); })
+      .catch(err => console.warn('Gevoelige instellingen opslaan-fout:', err));
+  },
+  // Bij login: gevoelige sleutels uit de auth-metadata halen (bron van waarheid),
+  // met de per-account lokale spiegel als terugval.
+  _loadSecretsFromSession() {
+    let secrets = null;
+    try {
+      const meta = (typeof Auth !== 'undefined' && Auth.metadata()) || {};
+      if (meta.sok_secrets && typeof meta.sok_secrets === 'object') secrets = meta.sok_secrets;
+    } catch (_) {}
+    if (secrets) { Settings._secretCache = secrets; Settings._persistSecrets(secrets); }
+    else { Settings._secretCache = Settings._secretOverrides(); }
+  },
+
+  // Geluidloos pushen naar Supabase (gedeelde instellingenrij)
   _pushCloud(data) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return; // demo schrijft nooit gedeelde instellingen
     if (!navigator.onLine) return;
     if (!Auth.current()) return;
     sb.from(Settings.TABLE)
@@ -168,14 +271,29 @@ const Settings = {
   // Bij login / app-start: haal de gedeelde instellingen op
   async loadFromCloud() {
     if (!Auth.current()) return;
+
+    // Demo-/review-account: nooit de echte gedeelde instellingen of gevoelige
+    // sleutels laden. Wél de eigen, alleen-lokale demo-keuzes terughalen zodat
+    // lettertype/logo/ontwerp een herstart overleven. Niets naar de cloud.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) {
+      try { Settings._cache = JSON.parse(localStorage.getItem(Settings.DEMO_KEY) || '{}') || {}; }
+      catch (_) { Settings._cache = {}; }
+      Settings._secretCache = {};
+      return;
+    }
+
+    // 1) Per-account gevoelige sleutels uit de auth-metadata van deze gebruiker
+    Settings._loadSecretsFromSession();
+
+    // 2) Gedeelde instellingen uit de cloud (nooit met gevoelige sleutels erin)
     try {
       const { data, error } = await sb.from(Settings.TABLE)
         .select('data').eq('id', Settings.ROW_ID).maybeSingle();
       if (error) throw error;
       const cloud = (data && data.data) ? data.data : null;
       if (cloud === null || Object.keys(cloud).length === 0) {
-        // Cloud is nog leeg — push de lokale overrides (eerste keer migratie)
-        const local = Settings._localOverrides();
+        // Cloud is nog leeg — push de lokale (niet-gevoelige) overrides
+        const local = Settings._stripSensitive(Settings._localOverrides());
         if (Object.keys(local).length > 0) {
           Settings._pushCloud(local);
           Settings._cache = local;
@@ -183,12 +301,30 @@ const Settings = {
           Settings._cache = {};
         }
       } else {
-        Settings._cache = cloud;
-        try { localStorage.setItem(Settings.KEY, JSON.stringify(cloud)); } catch (_) {}
+        // Eenmalige migratie: vroeger stonden gevoelige sleutels in de gedeelde
+        // rij. Neem ze (eenmalig) over in het eigen account en verwijder ze uit
+        // de gedeelde rij, zodat andere accounts ze niet meer kunnen zien.
+        const leaked = {};
+        for (const k of Settings.SENSITIVE) if (cloud[k] !== undefined) leaked[k] = cloud[k];
+        const cleaned = Settings._stripSensitive(cloud);
+        Settings._cache = cleaned;
+        try { localStorage.setItem(Settings.KEY, JSON.stringify(cleaned)); } catch (_) {}
+        if (Object.keys(leaked).length) {
+          if (Object.keys(Settings._secretOverrides()).length === 0) {
+            const trimmed = {};
+            for (const k in leaked) if (leaked[k] !== Settings.defaults[k]) trimmed[k] = leaked[k];
+            Settings._secretCache = trimmed;
+            Settings._persistSecrets(trimmed);
+            Settings._pushSecrets(trimmed);
+            console.info('[uitvaart] Gevoelige API-sleutels overgezet naar je eigen account.');
+          }
+          Settings._pushCloud(cleaned); // gevoelige sleutels uit de gedeelde rij verwijderen
+        }
       }
     } catch (e) {
-      // Offline of API-fout: gebruik de lokale spiegel
-      try { Settings._cache = JSON.parse(localStorage.getItem(Settings.KEY) || '{}'); } catch (_) { Settings._cache = {}; }
+      // Offline of API-fout: gebruik de lokale spiegel (zonder gevoelige sleutels)
+      try { Settings._cache = Settings._stripSensitive(JSON.parse(localStorage.getItem(Settings.KEY) || '{}')); }
+      catch (_) { Settings._cache = {}; }
     }
   },
 
@@ -259,9 +395,12 @@ const Branding = {
     if (s.primary_color) root.style.setProperty('--primary', s.primary_color);
     if (s.accent_color)  root.style.setProperty('--accent',  s.accent_color);
 
-    // Theme-color voor mobiele statusbalk
+    // Theme-color voor mobiele statusbalk + Windows PWA-titelbalk.
+    // We houden 'm bewust op de crème surface-kleur ('#f6f4ef') zodat de
+    // titelbalk op Windows netjes past bij de topbar; de app-primary blijft
+    // gebruiken voor accenten binnen de app zelf.
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta && s.primary_color) meta.setAttribute('content', s.primary_color);
+    if (meta) meta.setAttribute('content', '#f6f4ef');
 
     // Tekst overal
     document.querySelectorAll('.brand-text strong').forEach(el => el.textContent = s.app_name);
@@ -286,16 +425,23 @@ const Branding = {
       }).join('');
     }
 
-    // Document-titel
-    document.title = `${s.app_name} · ${s.app_tagline}`;
+    // Footer (dynamisch op basis van de branding)
+    setText('footer-brand', `Intern systeem · ${s.app_name}${s.app_tagline ? ' · ' + s.app_tagline : ''} · gegevens veilig opgeslagen in de cloud`);
 
-    // Logo: vervang ✝ door <img> als er een eigen logo is
+    // Document-titel — zo kort mogelijk zodat de fallback-titelbalk (waar
+    // Window Controls Overlay uit staat) alleen 'OZN' toont naast de
+    // venster-knoppen. Wel via een korte lookup: sommige gebruikers hebben
+    // app_name = 'Opdrachtformulier'; toch overrulen naar 'OZN'.
+    document.title = 'OZN';
+
+    // Logo: vervang het merkteken door <img> als er een eigen logo is;
+    // anders een neutraal 'OZN'-monogram (geen kruis).
     document.querySelectorAll('.brand-mark').forEach(el => {
       if (s.logo_data_url) {
         el.innerHTML = `<img src="${s.logo_data_url}" alt="Logo">`;
         el.classList.add('has-custom-logo');
       } else {
-        el.innerHTML = '✝';
+        el.textContent = 'OZN';
         el.classList.remove('has-custom-logo');
       }
     });
@@ -303,6 +449,9 @@ const Branding = {
     // Compact / afgeronde hoeken
     document.body.classList.toggle('ui-compact', !!s.compact_mode);
     document.body.classList.toggle('ui-square', !s.rounded_cards);
+
+    // Ontwerp-versie: v1 = klassieke bovenbalk (standaard), v2 = nieuwe zijbalk
+    document.body.classList.toggle('design-v1', (s.design_version || 'v1') === 'v1');
 
     // Form-dichtheid
     document.body.classList.remove('density-compact','density-normaal','density-ruim','density-extraruim');
@@ -324,16 +473,20 @@ const Branding = {
       if (iconLink)  iconLink.href  = s.logo_data_url;
       if (appleLink) appleLink.href = s.logo_data_url;
 
-      // Dynamische manifest met eigen logo + naam + kleur
+      // Dynamische manifest met eigen logo + kleur. Naam bewust kort ('OZN')
+      // zodat de venster-titelbalk niet vol staat met 'Opdrachtformulier —
+      // Overledenen Zorg Nederland B.V.'.
       if (manifestLink) {
         const manifest = {
-          name: `${s.app_name} — ${s.app_tagline}`,
-          short_name: s.app_name,
+          name: 'OZN',
+          short_name: 'OZN',
+          description: (s.app_name || 'OZN') + ' — ' + (s.app_tagline || ''),
           start_url: './',
           scope: './',
           display: 'standalone',
+          display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
           background_color: '#f6f4ef',
-          theme_color: s.primary_color,
+          theme_color: '#f6f4ef',
           lang: 'nl',
           icons: [
             { src: s.logo_data_url, sizes: 'any', purpose: 'any maskable' }
@@ -389,6 +542,7 @@ const BrandingFotos = {
     const exts = ['png','jpg','jpeg','svg','webp','gif'];
     await sb.storage.from('branding').remove(exts.map(e => `logo.${e}`)).catch(() => {});
   },
+
 };
 
 const Splash = {
@@ -412,17 +566,20 @@ const Splash = {
     const cont = document.getElementById('splash-continue');
     const hint = document.getElementById('splash-hint');
 
+    // Minimalistisch splash: geen aparte titel/subtitel meer — de OZN-mark
+    // en wordmark spreken voor zich. Als de oude elementen nog bestaan
+    // (bv. voor een custom-splash-variant), respecteren we de settings.
     if (subEl) subEl.textContent = s.splash_subtitle;
 
     onlineEl.hidden = state !== 'online';
     offlineEl.hidden = state !== 'offline';
     if (state === 'offline') {
-      titleEl.textContent = s.splash_offline_title;
+      if (titleEl) titleEl.textContent = s.splash_offline_title;
       cont.hidden = false;
       cont.textContent = 'Verder in leesmodus';
       hint.hidden = true;
     } else {
-      titleEl.textContent = s.splash_title;
+      if (titleEl) titleEl.textContent = s.splash_title;
       cont.hidden = true;
       hint.hidden = false;
     }
@@ -474,29 +631,207 @@ const Splash = {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(err =>
-      console.warn('Service worker registratie mislukt:', err));
+    // updateViaCache:'none' zorgt dat de browser de service-worker.js
+    // file zelf NOOIT uit zijn HTTP-cache haalt — anders denkt-ie soms
+    // dagenlang dat er geen nieuwe versie is, ook al staat hij er.
+    navigator.serviceWorker.register('./service-worker.js', { updateViaCache: 'none' })
+      .catch(err => console.warn('Service worker registratie mislukt:', err));
   });
 }
 
-// ─── E-mail-service (EmailJS) ───────────────────────────────────────────────
-const EmailService = {
-  isConfigured() {
-    const s = Settings.all();
-    return !!(s.emailjs_public_key && s.emailjs_service_id && s.emailjs_template_id);
+// ─── Push-notificaties (Web Push API) ───────────────────────────────────────
+// Werkt op alle moderne browsers + iOS Safari 16.4+ (vereist dat de app
+// 'op beginscherm' staat geïnstalleerd voor iOS).
+//
+// Setup-vereisten (in Supabase):
+//   1. VAPID-sleutels genereren (eenmalig)
+//   2. Public key in Settings → push_vapid_public_key zetten
+//   3. Edge Function 'send-push' draaien die elke ochtend de
+//      aankomende uitvaarten checkt en push verstuurt
+// Zie docs/push-setup.md voor de complete handleiding.
+const PushNotificaties = {
+  STORAGE_KEY: 'sok_push_subscription_id',
+
+  get vapidPublicKey() {
+    const s = (typeof Settings !== 'undefined') ? Settings.all() : {};
+    return s.push_vapid_public_key || '';
   },
-  async send(toEmail, subject, message) {
-    if (!EmailService.isConfigured()) throw new Error('E-mail-koppeling niet ingesteld in Account.');
-    if (!window.emailjs) throw new Error('E-mail-bibliotheek niet geladen — controleer internet.');
-    const s = Settings.all();
-    emailjs.init({ publicKey: s.emailjs_public_key });
-    return emailjs.send(s.emailjs_service_id, s.emailjs_template_id, {
-      to_email: toEmail,
-      subject: subject,
-      message: message,
-      from_name: s.app_name || 'Uitvaartleider',
-      reply_to: '',
+
+  // base64-URL → Uint8Array (vereist door PushManager.subscribe)
+  _urlBase64ToUint8Array(b64) {
+    const padding = '='.repeat((4 - b64.length % 4) % 4);
+    const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  },
+
+  async supported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window &&
+           'Notification' in window;
+  },
+
+  async currentSubscription() {
+    if (!await PushNotificaties.supported()) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return reg.pushManager.getSubscription();
+  },
+
+  async permission() {
+    return Notification.permission; // 'default' | 'granted' | 'denied'
+  },
+
+  async subscribe() {
+    if (!await PushNotificaties.supported()) {
+      throw new Error('Deze browser ondersteunt geen push-notificaties.');
+    }
+    const key = PushNotificaties.vapidPublicKey;
+    if (!key) {
+      throw new Error('Push is nog niet ingesteld. Voer de VAPID public key in via Account → Push-notificaties.');
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      throw new Error('Toestemming voor notificaties geweigerd. Pas dit aan in de browser-instellingen.');
+    }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: PushNotificaties._urlBase64ToUint8Array(key),
     });
+    // Sla op in Supabase zodat Edge Function ons kan bereiken.
+    // Zonder ingelogde user hoort er GEEN push-abonnement in de tabel te
+    // komen (RLS zou een null-user_id sowieso weigeren, maar we voorkomen
+    // ook lokaal een verwarrende error-toast).
+    const u = Auth.current();
+    if (!u || !u.id) {
+      console.warn('PushNotificaties.subscribe: geen ingelogde user, sla over');
+      return null;
+    }
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+      ? ActiveProfile.current().name : null;
+    const payload = {
+      user_id: u.id,
+      profiel: profielNaam,
+      endpoint: sub.endpoint,
+      p256dh: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('p256dh')))),
+      auth: btoa(String.fromCharCode(...new Uint8Array(sub.getKey('auth')))),
+      user_agent: navigator.userAgent.slice(0, 200),
+    };
+    const { data, error } = await sb.from('push_subscriptions')
+      .upsert(payload, { onConflict: 'endpoint' })
+      .select().single();
+    if (error) throw error;
+    localStorage.setItem(PushNotificaties.STORAGE_KEY, String(data.id));
+    return data;
+  },
+
+  async unsubscribe() {
+    const sub = await PushNotificaties.currentSubscription();
+    if (sub) await sub.unsubscribe();
+    const id = localStorage.getItem(PushNotificaties.STORAGE_KEY);
+    if (id) {
+      await sb.from('push_subscriptions').delete().eq('id', parseInt(id, 10)).catch(() => {});
+      localStorage.removeItem(PushNotificaties.STORAGE_KEY);
+    }
+  },
+
+  // Lokaal een test-notificatie tonen (zonder push-server)
+  async testLocal() {
+    if (Notification.permission !== 'granted') {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') return false;
+    }
+    const reg = await navigator.serviceWorker.ready;
+    reg.showNotification('OZN · test', {
+      body: 'Push-notificaties werken op dit apparaat. Je krijgt voortaan herinneringen voor aankomende uitvaarten.',
+      icon: './icon.svg',
+      badge: './icon.svg',
+      tag: 'sok-test',
+    });
+    return true;
+  },
+};
+
+// ─── E-mail-service (Resend via send-email Edge Function) ───────────────────
+// Server-side verzenden vanuit info@ozn.nl (of wat er in RESEND_FROM staat).
+// De sleutel + FROM-adres zitten uitsluitend in de Edge Function-secrets,
+// niet in de client — dus geen sleutel-lek en geen per-user config.
+const EmailService = {
+  // Server-side altijd 'geconfigureerd' zolang je online bent — de
+  // beschikbaarheid van de sleutels is een server-verantwoordelijkheid.
+  // We geven wél 'false' terug wanneer we niet ingelogd zijn, zodat de
+  // caller op de mailto-fallback kan vallen.
+  isConfigured() {
+    try {
+      // Naast een geldige sb-client moeten we ook echt online zijn EN een
+      // sessie hebben. Anders geeft de call naar de edge function toch een
+      // fout, en is de mailto-fallback beter. Dit voorkomt dat de knop
+      // 'verstuur via server' fantoom-succes toont.
+      if (typeof sb === 'undefined' || !sb || !sb.auth || !sb.auth.getSession) return false;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+      if (typeof Auth !== 'undefined' && Auth.current && !Auth.current()) return false;
+      return true;
+    } catch (_) { return false; }
+  },
+
+  // to    = string of array van adressen
+  // html  = volledige HTML-body (zoals buildDossierEmail teruggeeft)
+  // Optioneel: opts.replyTo, opts.plainFallback (voor toekomstig gebruik).
+  async send(to, subject, html, opts = {}) {
+    const s = (typeof sb !== 'undefined') ? sb : null;
+    if (!s) throw new Error('Supabase-client niet geladen.');
+    const payload = {
+      to:      Array.isArray(to) ? to : [to],
+      subject: subject || '',
+      html:    html    || '',
+    };
+    if (opts.replyTo) payload.replyTo = opts.replyTo;
+    // BCC — ontvangers zien elkaars adres niet. Server geeft door aan Brevo.
+    if (Array.isArray(opts.bcc) && opts.bcc.length) {
+      payload.bcc = opts.bcc;
+    }
+    // Bijlagen: array van { name, contentBase64 }. De server accepteert
+    // ze en geeft ze 1-op-1 door aan Brevo als paperclip-attachment.
+    if (Array.isArray(opts.attachments) && opts.attachments.length) {
+      payload.attachments = opts.attachments;
+    }
+
+    // supabase.functions.invoke geeft bij een non-2xx alleen een generieke
+    // 'Edge Function returned a non-2xx status code'. Om de échte fout uit
+    // de body te krijgen doen we handmatig fetch met dezelfde JWT.
+    const { data: sess } = await s.auth.getSession();
+    const jwt = sess?.session?.access_token;
+    if (!jwt) throw new Error('Niet ingelogd (geen sessie).');
+
+    const url = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : '') + '/functions/v1/send-email';
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + jwt,
+          'apikey': (typeof SUPABASE_ANON_KEY !== 'undefined' ? SUPABASE_ANON_KEY : ''),
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (netErr) {
+      throw new Error('Netwerkfout: ' + (netErr.message || String(netErr)));
+    }
+
+    let bodyJson = null;
+    try { bodyJson = await resp.json(); } catch (_) {}
+
+    if (!resp.ok || (bodyJson && bodyJson.error)) {
+      const parts = [];
+      if (bodyJson?.error)  parts.push(bodyJson.error);
+      if (bodyJson?.detail) parts.push(typeof bodyJson.detail === 'string' ? bodyJson.detail : JSON.stringify(bodyJson.detail));
+      if (bodyJson?.code)   parts.push('(' + bodyJson.code + ')');
+      if (!parts.length)    parts.push('HTTP ' + resp.status);
+      throw new Error(parts.join(' — '));
+    }
+    return bodyJson;
   },
 };
 
@@ -506,12 +841,22 @@ const Updater = {
     let remoteVersion = null;
     let remoteBuild = null;
     try {
-      // Vraag app.js opnieuw op met cache-bypass om de versie te lezen
-      const r = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
-      const text = await r.text();
-      // Pak APP_BUILD (monotoon nummer) — ondubbelzinnig voor update-detectie.
-      // APP_VERSION (semver) is voor weergave; voor cache-vergelijking gebruiken
-      // we het buildnummer.
+      // Alleen de eerste 800 bytes van app.js ophalen — bevat APP_BUILD +
+      // APP_VERSION, en scheelt honderden KB downloaden per check.
+      // Bij servers die Range niet honoreren valt fetch terug op de volle
+      // body; we werken alsnog met .text() en kappen zelf af.
+      let text = '';
+      try {
+        const r = await fetch('./js/app.js?_check=' + Date.now(), {
+          cache: 'no-store',
+          headers: { 'Range': 'bytes=0-800' },
+        });
+        text = await r.text();
+      } catch (_) {
+        // Fallback zonder Range
+        const r2 = await fetch('./js/app.js?_check=' + Date.now(), { cache: 'no-store' });
+        text = (await r2.text()).slice(0, 1500);
+      }
       const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
       const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
       if (mb) {
@@ -524,33 +869,16 @@ const Updater = {
 
     const hasUpdate = !!(remoteBuild && remoteBuild > APP_BUILD);
 
-    // Niet de moeite om de SW te triggeren als er sowieso geen update is
-    let swReady = false;
+    // SW-update in de achtergrond triggeren — de UI hoeft niet te wachten.
+    // reloadHard() dat hierna volgt haalt de nieuwe files sowieso met een
+    // cache-buster op, dus we hoeven niet meer op controllerchange te
+    // wachten voordat we returnen.
     if (hasUpdate && 'serviceWorker' in navigator) {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        if (reg) {
-          await reg.update();
-          // Wacht eerst tot een eventueel installerende SW de installed-fase haalt
-          if (reg.installing) {
-            await new Promise(resolve => {
-              const sw = reg.installing;
-              const onchange = () => {
-                if (sw.state === 'installed' || sw.state === 'activated' || sw.state === 'redundant') {
-                  sw.removeEventListener('statechange', onchange);
-                  resolve();
-                }
-              };
-              sw.addEventListener('statechange', onchange);
-              setTimeout(resolve, 5000); // safety timeout
-            });
-          }
-          if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-            swReady = true;
-          }
-        }
-      } catch (_) {}
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (!reg) return;
+        reg.update().catch(() => {});
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }).catch(() => {});
     }
 
     const currentLabel = `${APP_VERSION} (build ${APP_BUILD})`;
@@ -558,41 +886,200 @@ const Updater = {
       currentVersion: currentLabel,
       remoteVersion,
       hasUpdate,
-      swUpdated: swReady,
+      // Geen aparte SW-only-flow meer: de SW-update loopt fire-and-forget
+      // in de achtergrond en de reloadHard() bij hasUpdate=true haalt de
+      // verse files sowieso op met een cache-buster.
+      swUpdated: false,
     };
   },
 
-  // Reload pas wanneer de NIEUWE service-worker daadwerkelijk de pagina
-  // overneemt (controllerchange). Voorkomt de "1 build per klik"-bug
-  // waarbij de oude SW nog reload-requests serveert vanuit zijn oude cache.
+  // Nucleaire reset: unregister service-worker + wis alle caches + reload.
+  // Voor het geval dat de SW vast blijft zitten op een oude versie en
+  // de gewone Update-knop het niet meer trekt. Verliest alleen de
+  // offline-cache — dossiers staan veilig in de cloud.
+  async hardReset() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch (e) { console.warn('hardReset issue:', e); }
+    // Bypass HTTP-cache met query-param + force reload
+    const u = new URL(location.href);
+    u.searchParams.set('_reset', Date.now());
+    location.replace(u.toString());
+  },
+
+  // Reload de pagina met cache-buster. Updater.check() wacht inmiddels al
+  // op controllerchange dus tegen de tijd dat dit wordt aangeroepen is
+  // de nieuwe SW al in control en zal de reload verse files ophalen.
   async reloadHard() {
-    const doReload = () => {
-      // Cache-buster query param zodat eventuele edge/CDN-caches deze
-      // ene navigatie ook overslaan
-      const u = new URL(location.href);
-      u.searchParams.set('_v', Date.now());
-      location.replace(u.toString());
-    };
+    const u = new URL(location.href);
+    u.searchParams.set('_v', Date.now());
+    location.replace(u.toString());
+  },
+};
 
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      doReload();
-      return;
+// ─── APK-updater (alleen native Android via Capacitor) ─────────────────────
+// Vraagt de GitHub-release 'app-latest' op en vergelijkt de asset-publicatie
+// met APP_BUILD_DATE. Als de asset nieuwer is, tonen we een banner boven aan
+// het scherm met een 'Installeer'-knop die de APK downloadt. Voor de web-versie
+// doet dit niks — daar is Updater al voor.
+const ApkUpdater = {
+  RELEASE_API: 'https://api.github.com/repos/idkmanLool9/OZN/releases/tags/app-latest',
+  CHECK_INTERVAL_MS: 6 * 60 * 60 * 1000, // 6 uur
+  LAST_CHECK_KEY: 'ozn_apk_last_check',
+  DISMISSED_KEY:  'ozn_apk_dismissed_ts',
+
+  isApp() {
+    try { return !!(window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()); }
+    catch (_) { return false; }
+  },
+
+  async check({ force = false } = {}) {
+    if (!ApkUpdater.isApp()) return null;
+    if (!navigator.onLine)  return null;
+    if (!force) {
+      const last = parseInt(localStorage.getItem(ApkUpdater.LAST_CHECK_KEY) || '0', 10);
+      if (Date.now() - last < ApkUpdater.CHECK_INTERVAL_MS) return null;
     }
+    try {
+      // Haal APP_BUILD uit de release-source. Probeer meerdere branches in
+      // volgorde: eerst de huidige WIP-branch (heeft altijd de nieuwste code),
+      // dan main/master als fallback voor wanneer de WIP-branch merget.
+      // Zo blijft de check werken als het release-proces verandert.
+      const BRANCHES = ['claude/app-scan-analysis-huhgss', 'main', 'master'];
+      let text = '';
+      for (const br of BRANCHES) {
+        try {
+          const r = await fetch(
+            `https://raw.githubusercontent.com/idkmanLool9/OZN/${br}/js/app.js?_ts=` + Date.now(),
+            { cache: 'no-store' }
+          );
+          if (r.ok) { text = (await r.text()).slice(0, 1500); break; }
+        } catch (_) {}
+      }
+      if (!text) return null;
+      const mb = text.match(/APP_BUILD\s*=\s*(\d+)/);
+      const mv = text.match(/APP_VERSION\s*=\s*['"]([\d.]+)['"]/);
+      const remoteBuild = mb ? parseInt(mb[1], 10) : null;
+      const remoteVersion = mv ? mv[1] : null;
+      localStorage.setItem(ApkUpdater.LAST_CHECK_KEY, String(Date.now()));
 
-    let reloaded = false;
-    const reloadOnce = () => { if (!reloaded) { reloaded = true; doReload(); } };
+      // Voor de download-URL de release-API pakken. Probeer eerst 'app-latest'
+      // tag, dan 'latest'-release. Als de asset nog niet is gepubliceerd
+      // (workflow bezig) gebruiken we een default die via redirect vanzelf
+      // naar de juiste tag verwijst.
+      let downloadUrl = 'https://github.com/idkmanLool9/OZN/releases/latest/download/ozn-app.apk';
+      let assetReady = false;
+      const RELEASE_TAGS = [
+        ApkUpdater.RELEASE_API,
+        'https://api.github.com/repos/idkmanLool9/OZN/releases/latest',
+      ];
+      for (const apiUrl of RELEASE_TAGS) {
+        try {
+          const rApi = await fetch(apiUrl, { cache: 'no-store', headers: { 'Accept': 'application/vnd.github+json' } });
+          if (!rApi.ok) continue;
+          const j = await rApi.json();
+          const asset = (j.assets || []).find(a => a && a.name && a.name.toLowerCase().endsWith('.apk'));
+          if (asset && asset.browser_download_url) {
+            downloadUrl = asset.browser_download_url;
+            assetReady = true;
+            break;
+          }
+        } catch (_) {}
+      }
 
-    navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true });
-    // Safety: als controllerchange te lang uitblijft, gewoon reloaden
-    setTimeout(reloadOnce, 3500);
+      const nieuwer = !!(remoteBuild && remoteBuild > APP_BUILD);
+      const info = {
+        hasUpdate:     nieuwer,
+        localBuild:    APP_BUILD,
+        remoteBuild,
+        remoteVersion,
+        downloadUrl,
+        assetReady, // false = release-workflow nog bezig, download-URL kan 404 geven
+      };
+      if (nieuwer) ApkUpdater.showBanner(info);
+      return info;
+    } catch (_) { return null; }
+  },
+
+  showBanner(info) {
+    const dismissed = localStorage.getItem(ApkUpdater.DISMISSED_KEY);
+    if (dismissed && dismissed === String(info.remoteBuild)) return; // gebruiker heeft déze versie al weggeklikt
+    // Als de release-workflow nog bezig is, wachten we — anders krijgt de
+    // gebruiker een banner met een download-URL die 404 geeft.
+    if (info.assetReady === false) return;
+    const el = document.getElementById('apk-update-banner');
+    const txt = document.getElementById('apk-update-banner-info');
+    const btn = document.getElementById('apk-update-banner-install');
+    const dis = document.getElementById('apk-update-banner-dismiss');
+    if (!el || !txt || !btn) return;
+    const versieStr = info.remoteVersion ? `v${info.remoteVersion}` : `build ${info.remoteBuild}`;
+    txt.textContent = `Nieuwe versie beschikbaar: ${versieStr} (jij: build ${info.localBuild}). Installeer om de laatste verbeteringen te krijgen.`;
+    btn.href = info.downloadUrl;
+    btn.setAttribute('target', '_blank');
+    btn.setAttribute('rel', 'noopener');
+    btn.onclick = (e) => {
+      // In de APK: gebruik systeem-browser via intent:// zodat de APK-
+      // download door Android's DownloadManager gaat en de installer-prompt
+      // verschijnt. Chrome Custom Tab (Browser.open) download 'm silent
+      // waardoor de gebruiker niets ziet gebeuren.
+      try {
+        if (typeof Native !== 'undefined' && Native.isApp()) {
+          e.preventDefault();
+          Native.openExternalUrl(info.downloadUrl);
+        }
+      } catch (_) {}
+    };
+    el.hidden = false;
+    document.body.classList.add('has-apk-banner');
+    if (dis) dis.onclick = () => {
+      localStorage.setItem(ApkUpdater.DISMISSED_KEY, String(info.remoteBuild));
+      el.hidden = true;
+      document.body.classList.remove('has-apk-banner');
+    };
+    const helpBtn = document.getElementById('apk-update-banner-help');
+    if (helpBtn) helpBtn.onclick = (e) => {
+      e.preventDefault();
+      try {
+        Modal.show({
+          type: 'info',
+          title: '📖 Hoe installeer ik de update?',
+          message:
+            'MAKKELIJKE MANIER\n' +
+            '─────────────────\n' +
+            'Tik op "Installeer" — Chrome opent en de download start vanzelf. Bij notificatie "Download voltooid" tik je erop → Installeren.\n\n' +
+            'WERKT DE INSTALLEER-KNOP NIET?\n' +
+            '─────────────────\n' +
+            'Ga naar Account → "Check op updates" → "🔗 Kopieer download-link". Daar staan volledige stappen: link kopiëren, in Chrome plakken, downloaden, installeren.\n\n' +
+            'BELANGRIJK\n' +
+            '─────────────────\n' +
+            '· Je gegevens (dossiers, foto\'s, instellingen) blijven bewaard.\n' +
+            '· Eerste keer: sta "Onbekende bronnen" toe voor Chrome (Android vraagt dat automatisch).',
+        });
+      } catch (_) {}
+    };
   },
 };
 
 function updateOfflineUI() {
   const offline = !navigator.onLine || !!Cloud.offline;
+  const leesmodus = typeof Auth !== 'undefined' && Auth.isOfflineAuth && Auth.isOfflineAuth();
   const badge = document.getElementById('offline-badge');
-  if (badge) badge.hidden = !offline;
+  if (badge) {
+    badge.hidden = !(offline || leesmodus);
+    badge.textContent = leesmodus ? 'leesmodus' : 'offline';
+    badge.title = leesmodus
+      ? 'Offline-sessie — schrijf-acties worden geblokkeerd tot je weer online bent'
+      : 'Geen internet — leesmodus';
+  }
   document.body.classList.toggle('is-offline', offline);
+  document.body.classList.toggle('is-leesmodus', leesmodus);
 }
 window.addEventListener('online', () => {
   updateOfflineUI();
@@ -602,17 +1089,46 @@ window.addEventListener('online', () => {
 });
 window.addEventListener('offline', updateOfflineUI);
 
+// Auto-archief: afgehandelde dossiers (rouwauto geweest + alle datums voorbij)
+// automatisch naar het archief. Alleen beheerder, alleen als ingeschakeld in
+// de instellingen. Medewerkers zien het archief niet (server-side RLS).
+async function autoArchiveer() {
+  try {
+    if (typeof Auth === 'undefined' || !Auth.isBeheerder()) return;
+    if (!Settings.get('auto_archief_actief')) return;
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
+    const planning = DB.list(KEYS.PLANNING) || [];
+    const kandidaten = (DB.list(KEYS.DOSSIERS) || []).filter(d => {
+      if (d.gearchiveerd) return false;
+      // Alleen wanneer geen rouwauto is gekozen (leeg) is 't dossier
+      // "niet klaar". Bewuste 'nee' is ook een gemaakte keuze.
+      if (!d.rouwauto) return false;
+      const dates = [];
+      if (d.thuis_opbaren_datum) dates.push(new Date(d.thuis_opbaren_datum + 'T00:00:00'));
+      if (d.thuis_opbaren_einddatum) dates.push(new Date(d.thuis_opbaren_einddatum + 'T00:00:00'));
+      if (d.ophalen_datum) dates.push(new Date(d.ophalen_datum + 'T00:00:00'));
+      planning.forEach(p => { if (p.dossier_id === d.id && p.start_ts) dates.push(new Date(p.start_ts)); });
+      if (!dates.length) return false;             // geen datum → niet 'afgehandeld'
+      return dates.every(dt => !isNaN(dt.getTime()) && dt < vandaag);
+    });
+    for (const d of kandidaten) {
+      try { await DB.update(KEYS.DOSSIERS, d.id, { gearchiveerd: true, gearchiveerd_op: new Date().toISOString() }); } catch (_) {}
+    }
+  } catch (_) {}
+}
+
 Router.add('/', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers', (p, full) => renderDossierList(p, full));
 Router.add('/dossiers/nieuw', () => renderDossierForm({}));
 Router.add('/dossiers/:id', p => renderDossierDetail(p));
 Router.add('/dossiers/:id/bewerken', p => renderDossierForm(p));
 Router.add('/dossiers/:id/factuur', p => renderFactuur(p));
-Router.add('/dossiers/:id/rouwkaart', p => renderRouwkaart(p));
 Router.add('/kisten', () => renderKistenBeheer());
-Router.add('/bloemen', () => renderBloemenBeheer());
-Router.add('/eten-drinken', () => renderEtenDrinkenBeheer());
+Router.add('/kisten/voorraad', () => renderKistenVoorraad());
+Router.add('/kisten/bestellijst', () => renderKistenBestellijst());
+Router.add('/planning', () => renderPlanning());
 Router.add('/account', () => renderAccount());
+Router.add('/logboek', () => renderLogboek());
 
 (async function init() {
   // Branding meteen toepassen — vóór de splash zichtbaar wordt
@@ -643,8 +1159,12 @@ Router.add('/account', () => renderAccount());
       await Settings.loadFromCloud();
       Branding.apply();
     } catch (e) { console.warn('Settings laden faalde:', e.message || e); }
+    // Bij elke app-start opnieuw laten kiezen wie er vandaag werkt —
+    // profiel-keuze wordt niet meer over sessies heen bewaard.
+    try { ActiveProfile.clear(); } catch (_) {}
   }
   updateOfflineUI();
+  autoArchiveer();   // afgehandelde dossiers naar archief (indien ingeschakeld)
 
   // Auto-keepalive: voorkomt dat het gratis Supabase-project pauzeert
   // bij inactiviteit. Doet elke 5+ dagen een mini-query.
@@ -662,6 +1182,13 @@ Router.add('/account', () => renderAccount());
   // Offline: blijft staan tot de gebruiker op "Verder" klikt.
   if (splashOn && navigator.onLine && !Cloud.offline) {
     Splash.autoDismiss();
+  }
+
+  // R2 auto-sync op de achtergrond (beheerder-only). Migreert losse
+  // Supabase-Storage-bestanden naar R2 en zet R2-bestanden in dossier-
+  // submappen zonder dat de beheerder ergens op hoeft te klikken.
+  if (sess && navigator.onLine && typeof autoSyncNaarR2 === 'function') {
+    setTimeout(() => { try { autoSyncNaarR2(); } catch (_) {} }, 5000);
   }
 
   const clearBtn = document.getElementById('login-clear');
@@ -713,33 +1240,89 @@ Router.add('/account', () => renderAccount());
       return;
     }
     document.getElementById('login-password').value = '';
-    try { await Cloud.loadAll(); } catch (e2) { alert('Laden mislukt: ' + (e2.message || e2)); }
+    try { await Cloud.loadAll(); } catch (e2) { Modal.show({ type: 'error', title: 'Laden mislukt', message: e2.message || String(e2) }); }
     try { await Settings.loadFromCloud(); Branding.apply(); } catch (_) {}
     updateOfflineUI();
     if (!location.hash || location.hash === '#/login') location.hash = '#/';
     Router.handle();
   });
 
-  document.getElementById('btn-logout').addEventListener('click', async () => {
+  const doLogout = async () => {
+    const ok = await Modal.confirm({
+      type: 'warning',
+      title: 'Uitloggen?',
+      message: 'Weet je zeker dat je wilt uitloggen? Niet-opgeslagen wijzigingen kunnen verloren gaan.',
+      confirmText: 'Uitloggen',
+      cancelText: 'Annuleren',
+    });
+    if (!ok) return;
     await Auth.logout();
-    ActiveProfile.clear();
-    Cloud.cache = { dossiers: [], taken: [], kosten: [], notities: [], documenten: [] };
-    Cloud.loaded = false;
+    cleanSessionStorage();
     location.hash = '';
     Router.handle();
-  });
+  };
+  document.getElementById('btn-logout').addEventListener('click', doLogout);
+  const btnLogoutSide = document.getElementById('btn-logout-side');
+  if (btnLogoutSide) btnLogoutSide.addEventListener('click', doLogout);
 
   // ─── Profielkeuze: Rume of Robert ────────────────────────────
-  document.querySelectorAll('#profile-screen .profile-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-profile');
-      ActiveProfile.set(id);
-      Router.handle();
-    });
-  });
-  document.getElementById('profile-logout').addEventListener('click', async () => {
-    await Auth.logout();
+  function cleanSessionStorage() {
     ActiveProfile.clear();
+    Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], planning_items: [], kist_voorraad: [] };
+    Cloud.loaded = false;
+    // Sessie-specifieke localStorage opruimen — voorkomt dat de volgende
+    // gebruiker op een gedeelde iPad de cache/voorkeuren van de vorige ziet
+    // Gevoelige per-account instellingen uit het geheugen halen zodat het
+    // volgende account op dit toestel ze niet ziet (opnieuw geladen bij login).
+    Settings._secretCache = null;
+    try {
+      const sessieKeys = ['sok_mirror', 'sok_kosten_collapsed', 'sok_last_ping', 'sok_id_show_color'];
+      sessieKeys.forEach(k => localStorage.removeItem(k));
+      // Alle draft-keys (per-dossier intake-formulier autosave) én de
+      // per-account gevoelige spiegels (sok_secrets_<id>) ook weg
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('sok_draft_') || k.startsWith('sok_wizard_step_') || k.startsWith('sok_wizard_max_') || k.startsWith(Settings.SECRET_KEY_PREFIX))) localStorage.removeItem(k);
+      }
+    } catch (_) {}
+  }
+
+  // Event delegation — profielknoppen worden dynamisch gerenderd per opening
+  document.getElementById('profile-screen').addEventListener('click', async e => {
+    const btn = e.target.closest('.profile-option[data-profile]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-profile');
+    const prof = ActiveProfile.byId(id);
+    if (prof && prof.rol === 'beheerder' && prof.pincode) {
+      const res = await PincodePrompt.open(prof);
+      if (!res) return;
+      // Startpincode '0000' (of allemaal nullen) → gebruiker dwingen een
+      // eigen pincode te kiezen vóór het profiel actief mag worden.
+      if (res === 'setup') {
+        const nieuw = await PincodePrompt.setup(prof);
+        if (!nieuw) return;
+        try {
+          const lijst = (Settings.get('profielen') || []).map(p =>
+            p.id === prof.id ? Object.assign({}, p, { pincode: nieuw }) : p);
+          Settings.set({ profielen: lijst });
+          Toast.show('Nieuwe pincode ingesteld — voortaan hiermee inloggen.', 'success');
+        } catch (err) {
+          Toast.show('Pincode-opslag mislukt: ' + (err.message || err), 'error');
+          return;
+        }
+      }
+    }
+    ActiveProfile.set(id);
+    Router.handle();
+    try {
+      const p = ActiveProfile.current();
+      if (p && p.name) setTimeout(() => Toast.show('Ingelogd als: ' + p.name, 'success'), 60);
+    } catch (_) {}
+  });
+  const btnProfLogout = document.getElementById('profile-logout');
+  if (btnProfLogout) btnProfLogout.addEventListener('click', async () => {
+    await Auth.logout();
+    cleanSessionStorage();
     location.hash = '';
     Router.handle();
   });
@@ -750,4 +1333,11 @@ Router.add('/account', () => renderAccount());
   });
 
   Router.start();
+
+  // APK-update-check op de achtergrond. Doet alleen iets als de app als
+  // APK draait (Capacitor native platform). Wacht 4s zodat de app eerst
+  // rustig laadt en de gebruiker niet meteen een banner in beeld krijgt.
+  setTimeout(() => { try { ApkUpdater.check(); } catch (_) {} }, 4000);
+  // En elk uur opnieuw kijken zolang de tablet aanstaat.
+  setInterval(() => { try { ApkUpdater.check(); } catch (_) {} }, 60 * 60 * 1000);
 })();

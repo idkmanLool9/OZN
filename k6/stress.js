@@ -16,7 +16,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || 'https://uitvaart.pages.dev';
-const SUPABASE_URL = __ENV.SUPABASE_URL || 'https://mpuejmkhmlbkaelqbnae.supabase.co';
+const SUPABASE_URL = __ENV.SUPABASE_URL || 'https://cmcbmcyxdndymxgpxmed.supabase.co';
 
 export const options = {
   stages: [

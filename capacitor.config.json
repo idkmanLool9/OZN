@@ -1,14 +1,14 @@
 {
-  "appId": "nl.sok.uitvaartbeheer",
-  "appName": "Uitvaartbeheer",
+  "appId": "nl.ozn.overledenenzorg",
+  "appName": "OZN",
   "webDir": "www",
   "ios": {
-    "scheme": "Uitvaartbeheer",
-    "contentInset": "automatic",
-    "preferredContentMode": "mobile"
+    "scheme": "OZN",
+    "contentInset": "never",
+    "preferredContentMode": "recommended"
   },
   "server": {
-    "iosScheme": "uitvaartbeheer",
+    "iosScheme": "ozn",
     "androidScheme": "https"
   }
 }

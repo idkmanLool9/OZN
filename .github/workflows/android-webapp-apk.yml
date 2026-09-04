@@ -1,0 +1,141 @@
+name: Build OZN Android APK (webapp)
+
+# Bouwt de web-app als Android-APK (Capacitor) en hangt 'm aan een GitHub
+# Release, zodat je 'm direct op de Samsung-tablets kunt downloaden en
+# installeren (sideload — geen Play Store / developer-account nodig).
+#
+# Download op de tablet: open de release 'app-latest' en tik op de .apk.
+# Eerste keer: sta 'installeren van onbekende bronnen' toe voor je browser.
+
+on:
+  push:
+    branches:
+      - claude/app-scan-analysis-huhgss
+    paths:
+      - 'js/**'
+      - 'index.html'
+      - 'style.css'
+      - 'print.css'
+      - 'service-worker.js'
+      - 'manifest.webmanifest'
+      - 'capacitor.config.json'
+      - 'scripts/**'
+      - 'local-plugins/**'
+      - 'package.json'
+      - '.github/workflows/android-webapp-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Laat iOS-only lokale plugins weg (Android-build)
+        run: |
+          node -e "const p=require('./package.json'); \
+            delete p.dependencies['capacitor-document-scanner-sok']; \
+            delete p.dependencies['capacitor-live-activity-sok']; \
+            require('fs').writeFileSync('package.json', JSON.stringify(p,null,2));"
+          echo '--- package.json na strippen ---'; cat package.json
+
+      - name: Installeer dependencies
+        run: npm install --no-package-lock
+
+      - name: Installeer sharp voor icoon-conversie
+        run: npm install --no-save sharp @capacitor/assets
+
+      - name: Genereer OZN-icoon (SVG → PNG 1024×1024)
+        run: node scripts/generate-android-icon.mjs
+
+      - name: Build web-app (www)
+        run: npm run build
+
+      - name: Capacitor Android-project genereren
+        run: npx cap add android || npx cap sync android
+
+      - name: Bak Android-icoontjes uit assets/icon.png
+        run: npx @capacitor/assets generate --android --iconBackgroundColor '#f6f2e7'
+
+      - name: Vaste signing-keystore koppelen (voorkomt update-mismatch)
+        run: |
+          # De keystore in ../android-signing/ozn.keystore is gecommit in het
+          # repo. Alle builds signeren voortaan met dezelfde key, zodat een
+          # update over een oudere APK niet meer geblokkeerd wordt met
+          # "conflicteert met bestaand pakket" (signature mismatch).
+          mkdir -p android/app
+          cp android-signing/ozn.keystore android/app/ozn.keystore
+          cat >> android/app/build.gradle <<'GRADLE'
+
+          android {
+              signingConfigs {
+                  debug {
+                      storeFile file('ozn.keystore')
+                      storePassword 'ozn2026debug'
+                      keyAlias 'ozn'
+                      keyPassword 'ozn2026debug'
+                  }
+              }
+              buildTypes {
+                  debug {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          GRADLE
+
+      - name: APK bouwen (debug, gesigneerd met vaste keystore)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: APK hernoemen
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk ozn-app.apk
+          ls -lh ozn-app.apk
+
+      - name: Upload APK als workflow-artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozn-app-apk
+          path: ozn-app.apk
+
+      - name: Publiceer naar Release 'app-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: "OZN-app (Android)"
+          body: |
+            Automatisch gebouwde Android-APK van de web-app (commit `${{ github.sha }}`).
+
+            **Installeren op de Samsung-tablet:**
+            1. Open deze pagina op de tablet en tik op `ozn-app.apk`.
+            2. Sta 'installeren van onbekende bronnen' toe voor je browser (eenmalig).
+            3. Open de app.
+
+            > ⚠️ **Alleen bij deze update éénmaal**: als je een OZN-app van vóór
+            > 28 jul 2026 hebt geïnstalleerd, deïnstalleer die eerst (signing
+            > key is gewijzigd naar een vaste). Toekomstige updates gaan
+            > gewoon normaal over de bestaande installatie.
+          files: ozn-app.apk
+          prerelease: false
+          make_latest: 'false'

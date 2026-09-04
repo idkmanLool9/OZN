@@ -6,37 +6,169 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 const KEYS = {
   DOSSIERS: 'dossiers',
-  TAKEN: 'taken',
   KOSTEN: 'kosten',
   NOTITIES: 'notities',
-  DOCUMENTEN: 'documenten',
   KIST_AFBEELDINGEN: 'kist_afbeeldingen',
-  BLOEMEN: 'bloemen_catalogus',
-  ETEN_DRINKEN: 'eten_drinken_catalogus',
+  PROFIELEN: 'profiles',
+  PLANNING: 'planning_items',
+  KIST_VOORRAAD: 'kist_voorraad', // voorraad per kist-naam (beheerder-only)
 };
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 let _session = null;
+let _rol = null;   // 'beheerder' | 'medewerker' — uit public.profiles
+let _offlineAuth = false;  // draai je op een offline-fallback-sessie?
+
+const AUTH_SNAP_KEY = 'sok_auth_snapshot';
+
+function _saveAuthSnapshot() {
+  try {
+    if (!_session || !_session.user) return;
+    const u = _session.user;
+    localStorage.setItem(AUTH_SNAP_KEY, JSON.stringify({
+      userId:   u.id,
+      email:    u.email,
+      fullName: (u.user_metadata && u.user_metadata.full_name) || u.email,
+      role:     _rol || 'medewerker',
+      savedAt:  Date.now(),
+    }));
+  } catch (_) {}
+}
+
+function _restoreAuthSnapshot() {
+  try {
+    const raw = localStorage.getItem(AUTH_SNAP_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (_) { return null; }
+}
 
 const Auth = {
   async init() {
     const { data } = await sb.auth.getSession();
     _session = data.session || null;
-    sb.auth.onAuthStateChange((_evt, sess) => { _session = sess || null; });
+    sb.auth.onAuthStateChange((_evt, sess) => {
+      _session = sess || null;
+      _rol = null;
+      _offlineAuth = false;
+      if (_session) {
+        Auth.loadRol().then(_saveAuthSnapshot);
+      } else if (_evt === 'SIGNED_OUT') {
+        // Bij uitloggen ook de data-mirror wissen — anders blijven alle
+        // dossiers/kosten/notities/profielen incl. pincodes zichtbaar voor
+        // een volgende gebruiker die de app opent op hetzelfde toestel.
+        try { localStorage.removeItem(AUTH_SNAP_KEY); } catch (_) {}
+        try { localStorage.removeItem('sok_mirror'); } catch (_) {}
+        try { Cloud.cache = { dossiers: [], kosten: [], notities: [], kist_voorraad: [] }; } catch (_) {}
+        // Push-abonnement afmelden — anders blijven notificaties bedoeld voor
+        // de oude gebruiker binnenkomen op dit toestel (privacy-lek op
+        // gedeelde iPad).
+        try {
+          if (typeof PushNotificaties !== 'undefined' && PushNotificaties.unsubscribe) {
+            PushNotificaties.unsubscribe().catch(() => {});
+          }
+        } catch (_) {}
+        // Ook kosten-buffer keys wissen (bevatten dossier-data)
+        try {
+          const keys = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('sok_kosten_buffer_') || k.startsWith('sok_draft_') || k.startsWith('sok_snap_'))) {
+              keys.push(k);
+            }
+          }
+          keys.forEach(k => localStorage.removeItem(k));
+        } catch (_) {}
+        try { if (typeof location !== 'undefined') location.reload(); } catch (_) {}
+      }
+    });
+    if (_session) {
+      await Auth.loadRol();
+      _saveAuthSnapshot();
+    } else if (!navigator.onLine) {
+      // Offline: fallback op de opgeslagen snapshot zodat de gebruiker
+      // gewoon door de app kan bladeren (leesmodus). Als 'ie weer online
+      // is, herstelt Supabase de echte sessie en overschrijft deze.
+      const snap = _restoreAuthSnapshot();
+      if (snap && snap.userId) {
+        _session = {
+          user: {
+            id: snap.userId,
+            email: snap.email,
+            user_metadata: { full_name: snap.fullName },
+          },
+          access_token: '',
+          refresh_token: '',
+        };
+        _rol = snap.role || 'medewerker';
+        _offlineAuth = true;
+      }
+    }
     return _session;
+  },
+  // Ben je nu op een offline-fallback-sessie? Views kunnen dit gebruiken om
+  // schrijf-acties te blokkeren of een 'leesmodus'-badge te tonen.
+  isOfflineAuth() { return _offlineAuth; },
+  // Haal de rol van de ingelogde gebruiker op uit profiles (RLS: eigen rij).
+  async loadRol() {
+    try {
+      const uid = _session && _session.user && _session.user.id;
+      if (!uid) { _rol = null; return; }
+      const { data } = await sb.from('profiles').select('rol').eq('id', uid).maybeSingle();
+      _rol = (data && data.rol) || 'medewerker';
+    } catch (_) { _rol = 'medewerker'; }
+  },
+  // Effectieve rol = laagste van (account-rol, actieve profiel-rol). Zo kan
+  // een beheerder-account per profiel worden beperkt tot medewerker-view.
+  // Een medewerker-account kan nooit ineens beheerder worden — server-side
+  // (RLS) blijft de account-rol de baas.
+  _effectieveRol() {
+    const acc = _rol || 'medewerker';
+    let prof = 'beheerder';
+    try {
+      if (typeof ActiveProfile !== 'undefined') {
+        const p = ActiveProfile.current();
+        if (p && p.rol) prof = p.rol;
+      }
+    } catch (_) {}
+    return (acc === 'beheerder' && prof === 'beheerder') ? 'beheerder' : 'medewerker';
+  },
+  rol() { return Auth._effectieveRol(); },
+  isBeheerder() { return Auth._effectieveRol() === 'beheerder'; },
+  // Rauwe account-rol (zonder profiel-beperking) — voor UI-plekken die
+  // moeten weten of het account onderliggend beheerder is (bv. om aan te
+  // geven waarom een medewerker-profiel is gekozen).
+  accountRol() { return _rol || 'medewerker'; },
+  // Mag deze gebruiker prijzen/bedragen zien? Effectieve beheerder altijd;
+  // effectieve medewerker alleen als de gedeelde instelling het toestaat.
+  // (Server dwingt dit óók af via mag_prijzen_zien() als het account
+  // medewerker is; als het account beheerder is, is server sowieso open.)
+  magPrijzenZien() {
+    if (Auth._effectieveRol() === 'beheerder') return true;
+    try { return !!(typeof Settings !== 'undefined' && Settings.get('medewerker_ziet_prijzen')); }
+    catch (_) { return false; }
   },
   current() {
     if (!_session) return null;
     const u = _session.user;
-    return { id: u.id, email: u.email, fullName: u.user_metadata?.full_name || u.email, role: 'beheerder' };
+    return { id: u.id, email: u.email, fullName: u.user_metadata?.full_name || u.email, role: _rol || 'medewerker' };
   },
   async login(email, password) {
     const { data, error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
     if (error) return error.message;
     _session = data.session;
+    await Auth.loadRol();
+    try { if (typeof AuditLog !== 'undefined') AuditLog.log('login', null, null, { email: email.trim() }); } catch (_) {}
     return null;
   },
-  async logout() { await sb.auth.signOut(); _session = null; },
+  async logout() {
+    try { if (typeof AuditLog !== 'undefined') await AuditLog.log('logout', null, null, null); } catch (_) {}
+    await sb.auth.signOut(); _session = null;
+  },
+  // Auth-metadata van de huidige gebruiker (per-account; alleen zichtbaar voor
+  // deze ingelogde gebruiker). Wordt gebruikt voor gevoelige, per-account
+  // instellingen zoals API-sleutels.
+  metadata() { return (_session && _session.user && _session.user.user_metadata) || {}; },
   async changePassword(newPw) {
     const { error } = await sb.auth.updateUser({ password: newPw });
     return error ? error.message : null;
@@ -55,31 +187,37 @@ const Auth = {
 
 // ─── Cloud DB met in-memory cache (sync reads, async writes) ────────────────
 const Cloud = {
-  cache: { dossiers: [], taken: [], kosten: [], notities: [], documenten: [], kist_afbeeldingen: [], bloemen_catalogus: [], eten_drinken_catalogus: [] },
+  cache: { dossiers: [], kosten: [], notities: [], kist_afbeeldingen: [], profiles: [], planning_items: [], kist_voorraad: [] },
   loaded: false,
   offline: false,
 
   async loadAll() {
+    // Demo-/review-account: nooit de echte dossiers laden, maar fictieve.
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.loadAll();
     try {
-      const [d, t, k, n, doc, kim, blm, ed] = await Promise.all([
+      const [d, k, n, kim, pf, pl, kv] = await Promise.all([
         sb.from('dossiers').select('*').order('updated_at', { ascending: false }),
-        sb.from('taken').select('*').order('volgorde', { ascending: true }),
-        sb.from('kosten').select('*').order('id', { ascending: true }),
+        // Kosten via SECURITY DEFINER-RPC (bedrag gemaskeerd voor medewerker,
+        // rij-filter gelijk aan dossiers_select).
+        sb.rpc('get_kosten_zicht'),
         sb.from('notities').select('*').order('created_at', { ascending: false }),
-        sb.from('documenten').select('*').order('geupload_op', { ascending: false }),
         sb.from('kist_afbeeldingen').select('*'),
-        sb.from('bloemen_catalogus').select('*').order('naam', { ascending: true }),
-        sb.from('eten_drinken_catalogus').select('*').order('naam', { ascending: true }),
+        // Accounts + rollen (RLS: medewerker ziet enkel eigen rij, beheerder alle)
+        sb.from('profiles').select('*').order('naam', { ascending: true }),
+        // Planning-agenda (tolerant als de tabel nog niet bestaat)
+        sb.from('planning_items').select('*').order('start_ts', { ascending: true }),
+        // Kist-voorraad (RLS: beheerder-only; medewerker krijgt lege lijst)
+        sb.from('kist_voorraad').select('*'),
       ]);
       if (d.error) throw d.error;
       Cloud.cache.dossiers = (d.data || []).map(normRow);
-      Cloud.cache.taken = (t.data || []).map(normRow);
-      Cloud.cache.kosten = (k.data || []).map(normKosten);
+      // RPC returns unordered; sorteer in JS op id
+      Cloud.cache.kosten = ((k.data || []).slice().sort((a, b) => (a.id||0) - (b.id||0))).map(normKosten);
       Cloud.cache.notities = (n.data || []).map(normRow);
-      Cloud.cache.documenten = (doc.data || []).map(normRow);
       Cloud.cache.kist_afbeeldingen = (kim.data || []).map(normRow);
-      Cloud.cache.bloemen_catalogus = (blm.data || []).map(normBloem);
-      Cloud.cache.eten_drinken_catalogus = (ed.data || []).map(normBloem);
+      Cloud.cache.profiles = ((pf && pf.data) || []).map(normRow);
+      Cloud.cache.planning_items = ((pl && pl.data) || []).map(normRow);
+      Cloud.cache.kist_voorraad = ((kv && kv.data) || []).map(normRow);
       Cloud.loaded = true;
       Cloud.offline = false;
       try { localStorage.setItem('sok_mirror', JSON.stringify({ cache: Cloud.cache, savedAt: new Date().toISOString() })); } catch (_) {}
@@ -102,7 +240,7 @@ const Cloud = {
 };
 
 // Tabellen die een 'bijgewerkt_door' kolom hebben (zie supabase-schema.sql)
-const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten']);
+const TRACK_TABLES = new Set(['dossiers', 'kosten', 'documenten', 'gezinnen', 'leden']);
 
 // Wrapper rond insert/update: als de DB nog geen bijgewerkt_door kolom heeft
 // (oude schema, gebruiker heeft migratie nog niet gedraaid), proberen we het
@@ -161,34 +299,52 @@ function logTrackColumnHint() {
 function normRow(r) { return r; }
 function normKosten(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
 function normBloem(r) { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
+function normEten(r)  { return Object.assign({}, r, { bedrag: parseFloat(r.bedrag) || 0 }); }
 function normalize(tbl, row) {
   if (tbl === 'kosten') return normKosten(row);
-  if (tbl === 'bloemen_catalogus' || tbl === 'eten_drinken_catalogus') return normBloem(row);
+  if (tbl === 'bloemen_catalogus') return normBloem(row);
+  if (tbl === 'eten_drinken_catalogus') return normEten(row);
   return row;
 }
 
 // DB façade — sync reads uit cache, async writes naar Supabase
+// LET OP: id-vergelijking gebeurt ALTIJD als string. Router levert ids als
+// string uit URL, Supabase levert ze als number. Zonder deze coercie mist
+// findIndex zelfs bij een simpele update — zie audit 2026-07-09 bug J.
+function _idEq(a, b) { return String(a) === String(b); }
 const DB = {
   list(tbl) { return Cloud.cache[tbl] || []; },
-  byId(tbl, id) { return (Cloud.cache[tbl] || []).find(x => x.id === id); },
+  byId(tbl, id) { return (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id)); },
   where(tbl, fn) { return (Cloud.cache[tbl] || []).filter(fn); },
 
   async insert(tbl, payload) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.insert(tbl, payload);
     if (!navigator.onLine) {
-      Modal.show({
-        type: 'offline',
-        title: 'Geen internetverbinding',
-        message: 'Wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.',
-      });
+      try { Toast.show('Offline — wijziging niet opgeslagen. Concept blijft in de wizard bewaard.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
+    if (_offlineAuth) {
+      try { Toast.show('Leesmodus — log opnieuw in om te kunnen opslaan.', 'error'); } catch (_) {}
+      throw new Error('offline_auth');
+    }
     const u = Auth.current();
-    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+    // Dev-profiel wordt NIET meegeschreven in bijgewerkt_door of auteur —
+    // anders ziet het team 'Dev' als laatst gewijzigd op elk dossier waar
+    // de maker een test op heeft gedaan.
+    const isDev = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current() && !isDev)
       ? ActiveProfile.current().name : null;
     const row = Object.assign({}, payload);
     if (tbl === 'dossiers' && u) row.created_by = u.id;
     if (tbl === 'notities' && u) row.auteur_id = u.id;
     if (tbl === 'documenten' && u) row.geupload_door = u.id;
+    // Aangemaakt door = actieve profielnaam op het moment van INSERT.
+    // Blijft ongewijzigd bij latere updates — zo weet je wie de eerste
+    // versie van het dossier heeft aangemaakt (ook nadat een collega 'm
+    // later bijwerkt). Skip voor dev-profiel (isDev = true → geen naam).
+    if (tbl === 'dossiers' && profielNaam && row.aangemaakt_door == null) {
+      row.aangemaakt_door = profielNaam;
+    }
     // Auto-track: welk profiel (Rume / Robert) deed de wijziging?
     if (TRACK_TABLES.has(tbl) && profielNaam && row.bijgewerkt_door == null) {
       row.bijgewerkt_door = profielNaam;
@@ -200,50 +356,62 @@ const DB = {
     const data = await insertWithTrackFallback(tbl, row);
     const norm = normalize(tbl, data);
     Cloud.cache[tbl].push(norm);
+    AuditLog.log('insert', tbl, norm && norm.id, { row: sanitizeForAudit(row) });
+    _triggerDossierR2Sync(tbl, norm);
     return norm;
   },
 
   async update(tbl, id, patch) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.update(tbl, id, patch);
     if (!navigator.onLine) {
-      Modal.show({
-        type: 'offline',
-        title: 'Geen internetverbinding',
-        message: 'Wijziging niet bewaard. Bestaande dossiers blijven veilig in de cloud staan. Probeer opnieuw zodra je weer online bent.',
-      });
+      try { Toast.show('Offline — wijziging niet opgeslagen. Concept blijft in de wizard bewaard.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
+    if (_offlineAuth) {
+      try { Toast.show('Leesmodus — log opnieuw in om te kunnen opslaan.', 'error'); } catch (_) {}
+      throw new Error('offline_auth');
+    }
     const p = Object.assign({}, patch);
-    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+    const isDev = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+    const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current() && !isDev)
       ? ActiveProfile.current().name : null;
     if (TRACK_TABLES.has(tbl) && profielNaam && p.bijgewerkt_door === undefined) {
       p.bijgewerkt_door = profielNaam;
     }
     cleanEmpty(p);
+    const oud = (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id));
     const data = await updateWithTrackFallback(tbl, id, p);
     const norm = normalize(tbl, data);
-    const i = Cloud.cache[tbl].findIndex(x => x.id === id);
+    const i = Cloud.cache[tbl].findIndex(x => _idEq(x.id, id));
     if (i >= 0) Cloud.cache[tbl][i] = norm;
+    AuditLog.log('update', tbl, id, { patch: sanitizeForAudit(p), oud: oud ? diffKeys(oud, norm) : null });
+    _triggerDossierR2Sync(tbl, norm);
     return norm;
   },
 
   async remove(tbl, id) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.remove(tbl, id);
     if (!navigator.onLine) {
-      Modal.show({
-        type: 'offline',
-        title: 'Geen internetverbinding',
-        message: 'Verwijderen kan niet zolang je offline bent. Probeer opnieuw zodra je weer online bent.',
-      });
+      try { Toast.show('Offline — verwijderen kan niet zolang je geen internet hebt.', 'error'); } catch (_) {}
       throw new Error('offline');
     }
+    if (_offlineAuth) {
+      try { Toast.show('Leesmodus — log opnieuw in om te kunnen verwijderen.', 'error'); } catch (_) {}
+      throw new Error('offline_auth');
+    }
+    const oud = (Cloud.cache[tbl] || []).find(x => _idEq(x.id, id));
     const { error } = await sb.from(tbl).delete().eq('id', id);
     if (error) {
       Modal.show({ type: 'error', title: 'Verwijderen mislukt', message: error.message });
       throw error;
     }
-    Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => x.id !== id);
+    Cloud.cache[tbl] = Cloud.cache[tbl].filter(x => !_idEq(x.id, id));
+    AuditLog.log('delete', tbl, id, { was: oud ? sanitizeForAudit(oud) : null });
+    _triggerDossierR2Sync(tbl, oud);
   },
 
   async removeWhere(tbl, fn) {
+    if (typeof Demo !== 'undefined' && Demo.isActive()) return Demo.removeWhere(tbl, fn);
     const ids = Cloud.cache[tbl].filter(fn).map(x => x.id);
     if (ids.length === 0) return;
     const { error } = await sb.from(tbl).delete().in('id', ids);
@@ -288,30 +456,849 @@ async function handleStaleCache() {
   });
 }
 
-// ─── Storage (documenten-uploads, privé) ────────────────────────────────────
-const Storage = {
-  async upload(dossierId, file) {
-    const compressed = await compressImage(file, 2200, 0.9); // images compressed; PDFs etc. blijven onveranderd
-    const safe = compressed.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${dossierId}/${Date.now()}-${safe}`;
-    const { error } = await sb.storage.from('documenten').upload(path, compressed, { upsert: false });
-    if (error) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
-      throw error;
-    }
-    return path;
+// ─── R2 (Cloudflare, bucket 'ozn-dossiers') ────────────────────────────────
+// Nieuwe uploads gaan hierheen. Paden krijgen prefix 'r2:' zodat we ze in de
+// database kunnen onderscheiden van de oude Supabase Storage-paden. Het
+// systeem valt terug op Supabase Storage voor paden zonder prefix, zodat
+// bestaande dossiers blijven werken tot ze zijn gemigreerd.
+const R2_PREFIX_TAG = 'r2:';
+const R2 = {
+  isR2(path) { return typeof path === 'string' && path.startsWith(R2_PREFIX_TAG); },
+  key(path) { return R2.isR2(path) ? path.slice(R2_PREFIX_TAG.length) : path; },
+  tag(key)  { return R2_PREFIX_TAG + key; },
+
+  async _sign(op, key, opts = {}) {
+    const { data, error } = await sb.functions.invoke('r2-sign', {
+      body: { op, key, contentType: opts.contentType, expires: opts.expires },
+    });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error + (data.detail ? ': ' + data.detail : ''));
+    return data;
   },
-  async signedUrl(path, seconds = 60) {
-    const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
-    if (error) {
-      Modal.show({ type: 'error', title: 'Download-link mislukt', message: error.message });
-      throw error;
+
+  // Sanitize een naam voor gebruik als map-naam op R2 (alleen a-z0-9._-)
+  folderName(dossier) {
+    if (!dossier) return null;
+    const clean = (s) => String(s || '').trim().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+    const naam = clean([dossier.achternaam, dossier.voornaam].filter(Boolean).join(' '));
+    const nummer = clean(dossier.dossier_nummer || (dossier.id ? 'D' + dossier.id : ''));
+    const parts = [naam, nummer].filter(Boolean);
+    if (!parts.length) return null;
+    return parts.join('_');
+  },
+
+  // Bestand uploaden. keyPrefix = type ('artsverklaring/', 'bezittingen/'…).
+  // Nieuwe structuur (dossier-first):
+  //   dossiers/<Achternaam_Dnummer>/<type>/<timestamp>-<random>-<safeName>
+  // Voor dossier-snapshots (keyPrefix = 'dossiers/' of leeg) komt het
+  // bestand direct in de dossier-map: dossiers/<sub>/<filename>.
+  // Zonder dossier-context gebruiken we tijdelijke map _nieuw_<timestamp>;
+  // de auto-reorder verplaatst 'm zodra het dossier een naam/ID heeft.
+  //
+  // Twee-stappen strategie:
+  //  1) Probeer presigned URL (snel, geen server-bandwidth). Faalt vaak
+  //     met "Failed to fetch" wanneer R2-bucket geen CORS-config heeft
+  //     voor de app-origin — vooral in Capacitor WebViews.
+  //  2) Bij netwerkfout: fallback naar edge function `r2-upload` die de
+  //     bytes server-side naar R2 pusht (geen browser-CORS in het spel).
+  async upload(file, keyPrefix, dossier) {
+    const rawName = (file && file.name) || 'bestand';
+    const safe = String(rawName).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+    const rand = Math.random().toString(36).slice(2, 8);
+    const sub = R2.folderName(dossier) || `_nieuw_${Date.now()}_${rand}`;
+    const type = String(keyPrefix || '').replace(/\/$/, '');
+    const filename = `${Date.now()}-${rand}-${safe}`;
+    const key = (!type || type === 'dossiers')
+      ? `dossiers/${sub}/${filename}`
+      : `dossiers/${sub}/${type}/${filename}`;
+    const contentType = file.type || 'application/octet-stream';
+
+    // Stap 1: presigned URL — snelste pad
+    try {
+      const { url, method } = await R2._sign('put', key, { contentType });
+      const resp = await fetch(url, {
+        method,
+        body: file,
+        headers: { 'content-type': contentType },
+      });
+      if (!resp.ok) {
+        const txt = await resp.text().catch(() => '');
+        // 400/403 = signature/permission fout → NIET terugvallen (dan
+        // zit het probleem in de credentials, niet in CORS).
+        throw new Error(`R2 upload faalde (${resp.status}): ${txt.slice(0, 200)}`);
+      }
+      return R2.tag(key);
+    } catch (e) {
+      // "Failed to fetch" = netwerk of CORS. Alleen dan retry via EF.
+      const msg = String(e && e.message || e);
+      const isNetOrCors = /failed to fetch|network|cors|typeerror/i.test(msg);
+      if (!isNetOrCors) throw e;
+      console.warn('R2 direct upload faalde, probeer EF-proxy…', msg);
     }
+
+    // Stap 2: EF-proxy fallback
+    try {
+      const fd = new FormData();
+      fd.append('key', key);
+      fd.append('file', file, safe);
+      const { data, error } = await sb.functions.invoke('r2-upload', { body: fd });
+      if (error) throw new Error(error.message || String(error));
+      if (data && data.error) throw new Error(data.error + (data.detail ? ': ' + data.detail : ''));
+      if (!data || !data.ok) throw new Error('r2-upload EF gaf onverwacht antwoord');
+      return R2.tag(key);
+    } catch (e) {
+      const msg = String(e && e.message || e);
+      // Als de EF niet bestaat (404 / not-found) → verwijs naar CORS.
+      if (/not.found|404|invocation/i.test(msg)) {
+        throw new Error(
+          'Upload lukt niet (browser blokkeert directe R2-verbinding). ' +
+          'Vraag de beheerder om óf de R2-bucket CORS-config toe te voegen, ' +
+          'óf de nieuwe edge function `r2-upload` te deployen ' +
+          '(supabase functions deploy r2-upload).'
+        );
+      }
+      throw e;
+    }
+  },
+
+  // Presigned GET URL — te gebruiken als <img src>, downloadlink of fetch().
+  async signedUrl(pathOrKey, seconds = 900) {
+    const key = R2.key(pathOrKey);
+    const { url } = await R2._sign('get', key, { expires: seconds });
+    return url;
+  },
+
+  async remove(pathOrKey) {
+    try {
+      const key = R2.key(pathOrKey);
+      const { url, method } = await R2._sign('delete', key);
+      await fetch(url, { method }).catch(() => {});
+    } catch (_) { /* stil */ }
+  },
+};
+
+// ─── Artsverklaring (nieuw → R2, oud → Supabase 'documenten') ───────────────
+// Scan/foto van de artsverklaring of overdraagformulier. Privé opgeslagen;
+// bekijken via tijdelijke signed URL. Bestaande paden zonder 'r2:'-prefix
+// blijven werken via de oude Supabase Storage.
+const ArtsVerklaring = {
+  async upload(file, keyPrefix = 'artsverklaring/', dossier = null) {
+    const compressed = await compressImage(file, 2200, 0.9);
+    try {
+      return await R2.upload(compressed, keyPrefix, dossier);
+    } catch (e) {
+      Modal.show({
+        type: 'error',
+        title: 'Upload naar R2 mislukt',
+        message: (e && e.message)
+          + '\n\nMogelijke oorzaken:'
+          + '\n1) R2-bucket heeft geen CORS-config voor de app-origin'
+          + '\n   (fix: Cloudflare dashboard → R2 → bucket → Settings → CORS Policy,'
+          + '   voeg regel toe met AllowedOrigins:["*"], AllowedMethods:["PUT","GET","DELETE"],'
+          + '   AllowedHeaders:["*"]).'
+          + '\n2) Edge function `r2-upload` niet gedeployed'
+          + '\n   (fix: supabase functions deploy r2-upload).'
+          + '\n3) Verkeerde/verlopen R2-credentials in Supabase secrets.'
+          + '\n\nHet bestand is NIET opgeslagen.',
+      });
+      throw e;
+    }
+  },
+  async signedUrl(path, seconds = 300) {
+    if (!path) return null;
+    if (R2.isR2(path)) return R2.signedUrl(path, Math.max(60, seconds));
+    const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
+    if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
     return data.signedUrl;
   },
   async remove(path) {
-    const { error } = await sb.storage.from('documenten').remove([path]);
-    if (error) console.warn('Bestand verwijderen faalde:', error.message);
+    if (!path) return;
+    if (R2.isR2(path)) return R2.remove(path);
+    await sb.storage.from('documenten').remove([path]).catch(() => {});
+  },
+};
+
+// ─── Archief-compressie: foto's van een gearchiveerd dossier verkleinen ─────
+// Doel: storage sparen zonder de foto's kwijt te raken. We downloaden elke
+// foto via een tijdelijke signed URL, comprimeren agressief (400 px, 60%
+// JPEG — typisch 8-10× kleiner), en overschrijven het bestand op dezelfde
+// storage-pad. Het pad in de dossier-rij blijft dus geldig.
+const ArchiefCompressie = {
+  MAX_DIM: 400,
+  QUALITY: 0.60,
+
+  // Verzamel alle storage-paden die bij een dossier horen.
+  padenVan(dossier) {
+    const paden = [];
+    if (dossier.artsverklaring_pad)     paden.push(dossier.artsverklaring_pad);
+    if (dossier.overdraagformulier_pad) paden.push(dossier.overdraagformulier_pad);
+    if (dossier.bezit_oorbellen_foto)   paden.push(dossier.bezit_oorbellen_foto);
+    if (dossier.bezit_ringen_foto)      paden.push(dossier.bezit_ringen_foto);
+    if (dossier.bezit_armbanden_foto)   paden.push(dossier.bezit_armbanden_foto);
+    if (Array.isArray(dossier.extra_bezittingen)) {
+      dossier.extra_bezittingen.forEach(b => { if (b && b.foto_pad) paden.push(b.foto_pad); });
+    }
+    return paden;
+  },
+
+  // Één foto comprimeren: download, hercomprimeer, upload (upsert=true) op
+  // hetzelfde pad. Retourneer besparing in bytes (of 0). Alleen voor
+  // Supabase Storage-paden; R2-uploads worden al bij het uploaden agressief
+  // gecomprimeerd door compressImage(), dus daar is een tweede ronde onnodig.
+  async comprimeer1(pad) {
+    if (!pad) return 0;
+    if (R2.isR2(pad)) return 0;
+    try {
+      const { data: sign, error: sErr } = await sb.storage.from('documenten').createSignedUrl(pad, 300);
+      if (sErr || !sign) return 0;
+      const resp = await fetch(sign.signedUrl);
+      if (!resp.ok) return 0;
+      const blob = await resp.blob();
+      const oud = blob.size;
+      if (!blob.type || !blob.type.startsWith('image/')) return 0; // PDF/svg overslaan
+      // File nodig voor compressImage
+      const file = new File([blob], (pad.split('/').pop() || 'foto.jpg'), { type: blob.type });
+      const kleiner = await compressImage(file, ArchiefCompressie.MAX_DIM, ArchiefCompressie.QUALITY);
+      if (!kleiner || kleiner.size >= oud) return 0;
+      const { error: upErr } = await sb.storage.from('documenten').upload(pad, kleiner, {
+        upsert: true, contentType: 'image/jpeg', cacheControl: '3600',
+      });
+      if (upErr) return 0;
+      return Math.max(0, oud - kleiner.size);
+    } catch (_) { return 0; }
+  },
+
+  // Alle foto's van een dossier comprimeren. Retourneer {aantal, bespaardMB}.
+  async comprimeerDossier(dossier) {
+    const paden = ArchiefCompressie.padenVan(dossier);
+    if (!paden.length) return { aantal: 0, bespaard: 0 };
+    let totaal = 0;
+    let aantal = 0;
+    for (const p of paden) {
+      const b = await ArchiefCompressie.comprimeer1(p);
+      if (b > 0) { totaal += b; aantal++; }
+    }
+    return { aantal, bespaard: totaal };
+  },
+};
+
+// ─── Bezittingen-foto's (privé, bucket 'documenten', prefix 'bezittingen/') ─
+// Foto's van sieraden e.d. Zelfde patroon als ArtsVerklaring — signed URLs
+// om te bekijken; RLS op documenten (documenten_zicht) beperkt tot zichtbare
+// dossiers.
+const BezittingenFotos = {
+  async upload(file, tag = 'item', dossier = null) {
+    const compressed = await compressImage(file, 1600, 0.85);
+    const safe = (tag || 'item').replace(/[^a-zA-Z0-9._-]/g, '_');
+    // Bestandsnaam-hint voor R2 (compressImage geeft geen name terug)
+    const named = new File([compressed], `${safe}.jpg`, { type: 'image/jpeg' });
+    try {
+      return await R2.upload(named, 'bezittingen/', dossier);
+    } catch (e) {
+      Modal.show({
+        type: 'error',
+        title: 'Foto niet opgeslagen',
+        message: (e && e.message)
+          + '\n\nMogelijke oorzaken:'
+          + '\n1) R2-bucket heeft geen CORS-config (Cloudflare dashboard → R2 → bucket → Settings → CORS Policy).'
+          + '\n2) Edge function `r2-upload` niet gedeployed (supabase functions deploy r2-upload).'
+          + '\n3) Slechte verbinding.',
+      });
+      throw e;
+    }
+  },
+  async signedUrl(path, seconds = 300) {
+    if (!path) return null;
+    if (R2.isR2(path)) return R2.signedUrl(path, Math.max(60, seconds));
+    const { data, error } = await sb.storage.from('documenten').createSignedUrl(path, seconds);
+    if (error) { Modal.show({ type: 'error', title: 'Link mislukt', message: error.message }); throw error; }
+    return data.signedUrl;
+  },
+  async remove(path) {
+    if (!path) return;
+    if (R2.isR2(path)) return R2.remove(path);
+    await sb.storage.from('documenten').remove([path]).catch(() => {});
+  },
+};
+
+// ─── R2-migratie: Supabase Storage → R2 voor bestaande dossier-bestanden ───
+// Loopt door alle dossiers, pakt de _pad-kolommen die nog op Supabase staan
+// (geen r2:-prefix), kopieert het bestand naar R2 en werkt het pad in de DB
+// bij. Idempotent: bestaat het bestand al in R2 (r2:-prefix), skip.
+// Retourneert per iteratie een progress-callback zodat de UI live kan updaten.
+const R2Migratie = {
+  // Alle _pad-kolommen die we ondersteunen. Bezittingen-foto's (bezit_X_foto)
+  // en extra_bezittingen zitten in aparte structuren.
+  DOSSIER_PAD_COLUMNS: [
+    'artsverklaring_pad', 'overdraagformulier_pad',
+    'bezit_oorbellen_foto', 'bezit_ringen_foto', 'bezit_armbanden_foto',
+    'bezit_ketting_foto',   'bezit_bril_foto',   'bezit_horloge_foto',
+  ],
+
+  // Verzamel alles wat nog op Supabase staat. Retourneert:
+  //   [{ dossierId, veld, pad, extraIdx? }]
+  verzamel() {
+    const werk = [];
+    (Cloud.cache.dossiers || []).forEach(d => {
+      R2Migratie.DOSSIER_PAD_COLUMNS.forEach(veld => {
+        const p = d[veld];
+        if (p && !R2.isR2(p)) werk.push({ dossierId: d.id, veld, pad: p });
+      });
+      // extra_bezittingen: array met foto_pad-velden
+      if (Array.isArray(d.extra_bezittingen)) {
+        d.extra_bezittingen.forEach((b, i) => {
+          if (b && b.foto_pad && !R2.isR2(b.foto_pad)) {
+            werk.push({ dossierId: d.id, veld: '__extra__', pad: b.foto_pad, extraIdx: i });
+          }
+        });
+      }
+    });
+    return werk;
+  },
+
+  // Eén bestand migreren via de r2-migrate-one Edge Function:
+  //  1) bereken de nieuwe R2-key mét dossier-submap zodat de mappenstructuur
+  //     op R2 direct netjes is (artsverklaring/Achternaam_Dnummer/xxx.jpg)
+  //  2) EF haalt file uit Supabase Storage en zet 'm op de nieuwe R2-key
+  //  3) client update de DB en verwijdert het origineel uit Supabase Storage
+  async migreer1(item) {
+    const { dossierId, veld, pad, extraIdx } = item;
+    const dossier = DB.byId(KEYS.DOSSIERS, dossierId);
+    const sub = dossier ? R2.folderName(dossier) : null;
+    // pad = 'artsverklaring/1234-x.jpg' → prefix = 'artsverklaring/', rest = '1234-x.jpg'
+    const firstSlash = pad.indexOf('/');
+    const prefix = firstSlash >= 0 ? pad.slice(0, firstSlash + 1) : '';
+    const restRaw = firstSlash >= 0 ? pad.slice(firstSlash + 1) : pad;
+    // Als het bestaande pad al een submap heeft, pak alleen het laatste segment
+    const filename = restRaw.split('/').pop();
+    const destKey = sub ? `${prefix}${sub}/${filename}` : pad;
+    // 1) migreer via Edge Function
+    const { data, error } = await sb.functions.invoke('r2-migrate-one', {
+      body: { key: pad, destKey },
+    });
+    if (error) throw new Error('edge-function faalde: ' + (error.message || String(error)));
+    if (!data || !data.ok) {
+      const det = data && (data.detail || data.error) || 'onbekend';
+      throw new Error(det);
+    }
+    const nieuwPad = R2.tag(data.newKey);
+    // 2) DB bijwerken
+    if (veld === '__extra__') {
+      const d = DB.byId(KEYS.DOSSIERS, dossierId);
+      if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
+      const arr = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.map(x => ({ ...x })) : [];
+      if (arr[extraIdx]) arr[extraIdx].foto_pad = nieuwPad;
+      await DB.update(KEYS.DOSSIERS, dossierId, { extra_bezittingen: arr });
+    } else {
+      await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
+    }
+    // 3) origineel weghalen uit Supabase Storage (best-effort)
+    await sb.storage.from('documenten').remove([pad]).catch(() => {});
+    return { pad, nieuwPad, bytes: data.bytes || 0 };
+  },
+
+  // Batch-migratie. onProgress({ done, totaal, huidig, resultaat, error }).
+  async migreerAlles(onProgress) {
+    const werk = R2Migratie.verzamel();
+    const totaal = werk.length;
+    let done = 0;
+    let bytesTotaal = 0;
+    const errors = [];
+    for (const item of werk) {
+      onProgress && onProgress({ done, totaal, huidig: item.pad });
+      try {
+        const r = await R2Migratie.migreer1(item);
+        bytesTotaal += r.bytes || 0;
+        done++;
+        onProgress && onProgress({ done, totaal, huidig: item.pad, resultaat: r });
+      } catch (e) {
+        errors.push({ pad: item.pad, error: e.message || String(e) });
+        onProgress && onProgress({ done, totaal, huidig: item.pad, error: e.message || String(e) });
+      }
+    }
+    return { totaal, done, errors, bytesTotaal };
+  },
+};
+
+// ─── R2Reorg: bestaande R2-bestanden verplaatsen naar dossier-first schema
+// Nieuw pad: dossiers/<Achternaam_Dnummer>/<type>/<filename>
+// Oud patroon (nog aanwezig na eerdere migraties):
+//   <type>/<filename>              — plat
+//   <type>/<sub>/<filename>        — type-first
+// Beide worden geïdentificeerd en server-side (r2-move) verplaatst.
+const R2Reorg = {
+  DOSSIER_PAD_COLUMNS: [
+    'artsverklaring_pad', 'overdraagformulier_pad',
+    'bezit_oorbellen_foto', 'bezit_ringen_foto', 'bezit_armbanden_foto',
+    'bezit_ketting_foto',   'bezit_bril_foto',   'bezit_horloge_foto',
+  ],
+
+  _typeVoorVeld(veld) {
+    if (veld === 'artsverklaring_pad')     return 'artsverklaring';
+    if (veld === 'overdraagformulier_pad') return 'overdraagformulier';
+    if (veld === '__extra__')              return 'bezittingen';
+    if (veld && veld.indexOf('bezit_') === 0) return 'bezittingen';
+    return 'overig';
+  },
+
+  _computeDest(sub, type, sourceKey) {
+    const parts = sourceKey.split('/');
+    const filename = parts[parts.length - 1];
+    return `dossiers/${sub}/${type}/${filename}`;
+  },
+
+  verzamel() {
+    const werk = [];
+    (Cloud.cache.dossiers || []).forEach(d => {
+      const sub = R2.folderName(d);
+      if (!sub) return; // dossier zonder naam/nummer: submap kunnen we niet bepalen
+      R2Reorg.DOSSIER_PAD_COLUMNS.forEach(veld => {
+        const p = d[veld];
+        if (!p || !R2.isR2(p)) return;
+        const sourceKey = R2.key(p);
+        const type = R2Reorg._typeVoorVeld(veld);
+        const expectedPrefix = `dossiers/${sub}/${type}/`;
+        if (sourceKey.startsWith(expectedPrefix)) return; // al goed
+        const destKey = R2Reorg._computeDest(sub, type, sourceKey);
+        werk.push({ dossierId: d.id, veld, oldPath: p, sourceKey, destKey });
+      });
+      if (Array.isArray(d.extra_bezittingen)) {
+        d.extra_bezittingen.forEach((b, i) => {
+          if (!b || !b.foto_pad || !R2.isR2(b.foto_pad)) return;
+          const sourceKey = R2.key(b.foto_pad);
+          const type = 'bezittingen';
+          const expectedPrefix = `dossiers/${sub}/${type}/`;
+          if (sourceKey.startsWith(expectedPrefix)) return;
+          const destKey = R2Reorg._computeDest(sub, type, sourceKey);
+          werk.push({ dossierId: d.id, veld: '__extra__', extraIdx: i, oldPath: b.foto_pad, sourceKey, destKey });
+        });
+      }
+    });
+    return werk;
+  },
+
+  async verplaats1(item) {
+    const { dossierId, veld, extraIdx, sourceKey, destKey } = item;
+    const { data, error } = await sb.functions.invoke('r2-move', {
+      body: { sourceKey, destKey },
+    });
+    if (error) throw new Error('edge-function faalde: ' + (error.message || String(error)));
+    if (!data || !data.ok) throw new Error((data && (data.detail || data.error)) || 'onbekend');
+    const nieuwPad = R2.tag(destKey);
+    // Markeer dat we bezig zijn met reorg-updates op dit dossier — voorkomt
+    // dat _triggerDossierR2Sync een verse snapshot inplant voor élke padwissel.
+    _r2ReorgInProgress.add(dossierId);
+    try {
+      if (veld === '__extra__') {
+        const d = DB.byId(KEYS.DOSSIERS, dossierId);
+        if (!d) throw new Error(`dossier ${dossierId} niet gevonden`);
+        const arr = Array.isArray(d.extra_bezittingen) ? d.extra_bezittingen.map(x => ({ ...x })) : [];
+        if (arr[extraIdx]) arr[extraIdx].foto_pad = nieuwPad;
+        await DB.update(KEYS.DOSSIERS, dossierId, { extra_bezittingen: arr });
+      } else {
+        await DB.update(KEYS.DOSSIERS, dossierId, { [veld]: nieuwPad });
+      }
+    } finally {
+      _r2ReorgInProgress.delete(dossierId);
+    }
+    return { sourceKey, destKey };
+  },
+
+  async reorganiseerAlles(onProgress) {
+    const werk = R2Reorg.verzamel();
+    const totaal = werk.length;
+    let done = 0;
+    const errors = [];
+    for (const item of werk) {
+      onProgress && onProgress({ done, totaal, huidig: item.sourceKey });
+      try {
+        await R2Reorg.verplaats1(item);
+        done++;
+        onProgress && onProgress({ done, totaal, huidig: item.sourceKey, resultaat: { destKey: item.destKey } });
+      } catch (e) {
+        errors.push({ key: item.sourceKey, error: e.message || String(e) });
+        onProgress && onProgress({ done, totaal, huidig: item.sourceKey, error: e.message || String(e) });
+      }
+    }
+    return { totaal, done, errors };
+  },
+};
+
+// ─── Autonome R2-sync: draait stil op de achtergrond ───────────────────────
+// 1) Migreer alles wat nog op Supabase Storage staat → R2
+// 2) Order alle R2-bestanden in dossier-submappen
+// Faalt stil (niet blokkerend voor de gebruiker); alleen console-log.
+// Wordt aangeroepen:
+//   - eenmalig per sessie, ~5 sec na login (voor beheerders)
+//   - na elke dossier-save, alleen voor dat ene dossier (fijn na intake)
+let _r2AutoSyncBusy = false;
+async function autoSyncNaarR2() {
+  if (_r2AutoSyncBusy) return;
+  if (!navigator.onLine) return;
+  // Server-side RLS bepaalt of upload/reorg mag; client-side isBeheerder()
+  // blokkeerde per ongeluk beheerder-accounts met een medewerker-profiel actief.
+  // Server-side RLS bepaalt uploads/mutaties; skip alleen als er geen sessie is.
+  if (typeof Auth === 'undefined' || Auth.isOfflineAuth()) return;
+  _r2AutoSyncBusy = true;
+  try {
+    // Migratie SB Storage → R2 (max 20 tegelijk om lange kliks te voorkomen)
+    const mig = R2Migratie.verzamel().slice(0, 20);
+    for (const item of mig) {
+      try { await R2Migratie.migreer1(item); }
+      catch (e) { console.warn('R2 auto-migratie faalde voor', item.pad, e && e.message); }
+    }
+    // Reorder R2 → dossier-first submap (max 40)
+    const reorg = R2Reorg.verzamel().slice(0, 40);
+    for (const item of reorg) {
+      try { await R2Reorg.verplaats1(item); }
+      catch (e) { console.warn('R2 auto-reorder faalde voor', item.sourceKey, e && e.message); }
+    }
+    // Snapshot-backfill: voor elk dossier dat nog geen recente snapshot
+    // in localStorage staat (of ouder dan de dossier.updated_at) maken we
+    // er één. Max 5 per app-start om niet te veel PDF-werk in één keer te
+    // doen. Zo krijgen bestaande dossiers automatisch hun snapshot zodra
+    // je de app een paar keer opent.
+    let snapCount = 0;
+    for (const d of (Cloud.cache.dossiers || [])) {
+      if (snapCount >= 5) break;
+      if (!d || !d.id) continue;
+      const key = 'sok_snap_' + d.id;
+      let last = null;
+      try { last = localStorage.getItem(key); } catch (_) {}
+      const dossierStamp = d.updated_at || d.created_at || '';
+      if (last && last === dossierStamp) continue; // al gedaan voor deze versie
+      try {
+        const res = await uploadDossierPdfNaarR2(d);
+        if (res && res.jsonOk) {
+          try { localStorage.setItem(key, dossierStamp); } catch (_) {}
+          snapCount++;
+        }
+      } catch (e) { console.warn('R2 snapshot-backfill faalde voor dossier', d.id, e && e.message); }
+    }
+    if (mig.length || reorg.length || snapCount) {
+      console.log(`R2 auto-sync: ${mig.length} gemigreerd, ${reorg.length} geordend, ${snapCount} snapshots.`);
+    }
+    // Als alle reorg klaar is (geen items meer over), verwijder dan de
+    // legacy top-level prefixes (artsverklaring/, overdraagformulier/,
+    // bezittingen/, ...). Alle geldige bestanden zitten dan onder
+    // dossiers/. De EF weigert als er nog DB-verwijzingen zijn.
+    if (R2Reorg.verzamel().length === 0 && R2Migratie.verzamel().length === 0) {
+      try {
+        const { data } = await sb.functions.invoke('r2-cleanup-orphans');
+        if (data && data.ok && data.deletedCount > 0) {
+          console.log(`R2 cleanup: ${data.deletedCount} legacy-orphan(s) verwijderd.`);
+        }
+      } catch (e) { console.warn('R2 cleanup-orphans faalde:', e && e.message); }
+    }
+  } finally {
+    _r2AutoSyncBusy = false;
+  }
+}
+
+// Debounced trigger: elke DB-mutatie op dossiers / kosten / notities zet
+// een R2-snapshot voor het bijhorende dossier op de rol. Meerdere snelle
+// wijzigingen tellen mee tot één upload (5 sec na de laatste).
+const _r2SyncDebounce = new Map();
+// Dossiers waar op dit moment een R2Reorg actief is. DB.update binnen die
+// reorg zou anders opnieuw een snapshot triggeren → oneindige lus van 3-4
+// snapshots per save. Reorg zet de id vóór DB.update in de set en haalt
+// 'm er na afloop weer uit; _triggerDossierR2Sync slaat over zolang de id
+// erin staat.
+const _r2ReorgInProgress = new Set();
+function _triggerDossierR2Sync(tbl, row) {
+  try {
+    if (!row) return;
+    if (!navigator.onLine) return;
+    let dossierId = null;
+    if (tbl === 'dossiers') dossierId = row.id;
+    else if (tbl === 'kosten' || tbl === 'notities') dossierId = row.dossier_id;
+    if (!dossierId) return;
+    if (_r2ReorgInProgress.has(dossierId)) return; // reorg loopt — snapshot komt straks vanzelf
+    const existing = _r2SyncDebounce.get(dossierId);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(async () => {
+      _r2SyncDebounce.delete(dossierId);
+      try {
+        const d = DB.byId(KEYS.DOSSIERS, dossierId);
+        if (!d) return;
+        // 1) losse R2-bestanden van dit dossier in de juiste submap zetten
+        if (typeof autoSyncDossierNaarR2 === 'function') {
+          try { await autoSyncDossierNaarR2(dossierId); } catch (_) {}
+        }
+        // 2) volledige PDF + JSON snapshot uploaden
+        const kostenLijst = DB.where(KEYS.KOSTEN, k => k.dossier_id === dossierId) || [];
+        const res = await uploadDossierPdfNaarR2(d, kostenLijst);
+        // 3) alleen markeren als 'snapshot up-to-date' als de JSON écht is
+        //    geüpload (die is essentieel — de PDF is nice-to-have). Bij PDF-
+        //    fail probeert de startup-backfill 'm later opnieuw ipv stil te
+        //    denken dat het gelukt is.
+        if (res && res.jsonOk) {
+          try { localStorage.setItem('sok_snap_' + dossierId, d.updated_at || d.created_at || ''); } catch (_) {}
+        }
+      } catch (e) { console.warn('Auto-R2 snapshot faalde voor dossier', dossierId, e && e.message); }
+    }, 5000);
+    _r2SyncDebounce.set(dossierId, t);
+  } catch (_) {}
+}
+
+// Reorder alleen bestanden die bij één specifiek dossier horen. Handig na
+// een dossier-save: nieuwe uploads onder 'Achternaam/xxx' krijgen dan meteen
+// hun D-nummer erbij ('Achternaam_D42/xxx').
+async function autoSyncDossierNaarR2(dossierId) {
+  if (!navigator.onLine) return;
+  // Server-side RLS bepaalt uploads/mutaties; skip alleen als er geen sessie is.
+  if (typeof Auth === 'undefined' || Auth.isOfflineAuth()) return;
+  try {
+    const werk = R2Reorg.verzamel().filter(i => i.dossierId === dossierId);
+    for (const item of werk) {
+      try { await R2Reorg.verplaats1(item); }
+      catch (e) { console.warn('R2 dossier-reorder faalde voor', item.sourceKey, e && e.message); }
+    }
+  } catch (e) { console.warn('autoSyncDossierNaarR2:', e && e.message); }
+}
+
+// ─── Dossier-snapshot naar R2 (na elke save én background-backfill) ────────
+// Zet TWEE bestanden neer per snapshot:
+//  1) dossier-<yyyy-mm-dd-hhmm>.pdf  — gelayoute PDF (menselijk leesbaar)
+//  2) dossier-<yyyy-mm-dd-hhmm>.json — raw data (elk veld met waarde,
+//     kosten-regels en notities inclusief) voor archivering/leesbaarheid
+async function uploadDossierPdfNaarR2(dossier, kostenLijst) {
+  const result = { pdfOk: false, jsonOk: false };
+  try {
+    if (!dossier || !dossier.id) return result;
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    const kosten = kostenLijst || DB.where(KEYS.KOSTEN, k => k.dossier_id === dossier.id) || [];
+    const notities = DB.where(KEYS.NOTITIES, n => n.dossier_id === dossier.id) || [];
+
+    // 1) PDF (bevat alle intake-velden via dossierSpec)
+    if (typeof PdfGen !== 'undefined' && typeof dossierSpec !== 'undefined') {
+      try {
+        const blob = await PdfGen.blobFromSpec(dossierSpec(dossier, kosten));
+        if (blob) {
+          const named = new File([blob], `dossier-${stamp}.pdf`, { type: 'application/pdf' });
+          await R2.upload(named, 'dossiers/', dossier);
+          result.pdfOk = true;
+        }
+      } catch (e) { console.warn('Dossier-PDF-upload faalde:', e && e.message); }
+    }
+
+    // 2) JSON snapshot — alle rauwe velden. Slaat gevoelige onderliggende
+    // opslag-paden ook op zodat je later kunt terugvinden welk bestand bij
+    // welke versie hoorde.
+    try {
+      const _isDevExport = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+      const _profielNaamExport = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+        ? ActiveProfile.current().name : null;
+      const snapshot = {
+        exported_at: new Date().toISOString(),
+        // Dev-profiel mag geen sporen achterlaten in R2-archief.
+        exported_by: _isDevExport ? null : (_profielNaamExport
+          || ((typeof Auth !== 'undefined' && Auth.current()) ? Auth.current().email : null)),
+        dossier: dossier,
+        kosten: kosten,
+        notities: notities,
+      };
+      const jsonBlob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const jsonFile = new File([jsonBlob], `dossier-${stamp}.json`, { type: 'application/json' });
+      await R2.upload(jsonFile, 'dossiers/', dossier);
+      result.jsonOk = true;
+    } catch (e) { console.warn('Dossier-JSON-upload faalde:', e && e.message); }
+  } catch (e) {
+    console.warn('Dossier-snapshot faalde:', e && e.message);
+  }
+  return result;
+}
+
+// ─── Kist-voorraad (beheerder-only) ─────────────────────────────────────────
+const KistVoorraad = {
+  // Alles synchroon uit de cache: welke rij hoort bij deze kist-naam?
+  byNaam(naam) { return (Cloud.cache.kist_voorraad || []).find(r => r.naam === naam); },
+  all() { return Cloud.cache.kist_voorraad || []; },
+  // Alle kisten die onder hun minimum zitten (of geen voorraad hebben).
+  laag() {
+    return KistVoorraad.all().filter(r => (r.aantal || 0) < (r.min_aantal || 0));
+  },
+  // Upsert per kist. Werkt met SEL/UPSERT op de 'naam'-PK.
+  async upsert(naam, patch) {
+    if (!navigator.onLine) throw new Error('offline');
+    const bestaand = KistVoorraad.byNaam(naam);
+    const row = Object.assign({ naam }, bestaand || {}, patch);
+    // Wie wijzigde: actief profiel of e-mail. Dev-profiel laat geen sporen na
+    // (eis van eigenaar): zowel de naam als de fallback-email worden weggelaten.
+    const isDev = (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev());
+    if (isDev) {
+      row.bijgewerkt_door = null;
+    } else {
+      const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+        ? ActiveProfile.current().name : null;
+      const u = Auth.current();
+      row.bijgewerkt_door = profielNaam || (u ? (u.fullName || u.email) : null);
+    }
+    const { data, error } = await sb.from('kist_voorraad')
+      .upsert(row, { onConflict: 'naam' }).select().single();
+    if (error) throw error;
+    // Cache bijwerken
+    const arr = Cloud.cache.kist_voorraad;
+    const i = arr.findIndex(x => x.naam === naam);
+    if (i >= 0) arr[i] = data; else arr.push(data);
+    // Log de handmatige mutatie (aantal / min_aantal wijzigingen)
+    try {
+      const was = bestaand ? { aantal: bestaand.aantal, min_aantal: bestaand.min_aantal } : null;
+      const nu  = { aantal: data.aantal, min_aantal: data.min_aantal };
+      AuditLog.log('voorraad', 'kist_voorraad', naam, {
+        naam, was, nu, delta: was ? (data.aantal - was.aantal) : data.aantal, reden: 'handmatig',
+      });
+    } catch (_) {}
+    return data;
+  },
+  // Reserveer 1 stuk (bij dossier-koppeling). Fout is niet-fataal.
+  async reserveer1(naam, ctx) { return KistVoorraad._delta(naam, -1, ctx || { reden: 'dossier-koppeling' }); },
+  // Omgekeerde van reserveer1: als een dossier van kist wisselt of een kist
+  // verwijderd wordt, geeft de oude voorraad +1 terug.
+  async terug1(naam, ctx) { return KistVoorraad._delta(naam, +1, ctx || { reden: 'dossier-ontkoppeling' }); },
+  // Bijvullen: atomair +N via RPC (geen read-modify-write race met parallelle
+  // reserveringen) + partial UPDATE voor de metadata (alléén laatst_besteld /
+  // besteld_aantal — dus NIET aantal, wat de RPC net server-side heeft
+  // aangepast en anders overschreven zou worden met een stale cache-waarde).
+  async bijvul(naam, aantal) {
+    const n = Math.max(1, parseInt(aantal, 10) || 0);
+    if (!n) return;
+    // 1) Atomaire delta op aantal (server-side)
+    await KistVoorraad._delta(naam, +n, { reden: 'bijvullen' });
+    // 2) Metadata: partial update alleen op deze 2 kolommen
+    try {
+      const { data, error } = await sb.from('kist_voorraad')
+        .update({ laatst_besteld: new Date().toISOString().slice(0, 10), besteld_aantal: n })
+        .eq('naam', naam).select().single();
+      if (error) throw error;
+      const arr = Cloud.cache.kist_voorraad;
+      const i = arr.findIndex(x => x.naam === naam);
+      if (i >= 0) arr[i] = data;
+    } catch (e) { console.warn('bijvul-metadata faalde:', e && e.message); }
+  },
+  // Atomair: 1 RPC-call, oud terug + nieuw gereserveerd binnen één transactie.
+  // Voorkomt drift als reserveer1 faalt nadat terug1 al slaagde.
+  async wissel(oud, nieuw, ctx) {
+    const oudN = (oud || '').trim();
+    const nwN  = (nieuw || '').trim();
+    if (oudN === nwN) return;
+    try {
+      const { data, error } = await sb.rpc('kist_voorraad_wissel', { p_oud: oudN || null, p_nieuw: nwN || null });
+      if (error) throw error;
+      const arr = Cloud.cache.kist_voorraad;
+      if (data && data.oud_nieuw != null && oudN) {
+        const i = arr.findIndex(r => r.naam === oudN);
+        if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: data.oud_nieuw });
+      }
+      if (data && data.nieuw_nieuw != null && nwN) {
+        const i = arr.findIndex(r => r.naam === nwN);
+        if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: data.nieuw_nieuw });
+      }
+      // Audit-entries voor beide zijden
+      try {
+        const dossierId = ctx && ctx.dossier_id != null ? String(ctx.dossier_id) : null;
+        if (oudN) AuditLog.log('voorraad', 'kist_voorraad', oudN, { naam: oudN, delta: 1, nu: data?.oud_nieuw, reden: 'kist-wissel (oud terug)', dossier_id: dossierId });
+        if (nwN)  AuditLog.log('voorraad', 'kist_voorraad', nwN,  { naam: nwN,  delta: -1, nu: data?.nieuw_nieuw, reden: 'kist-wissel (nieuw gereserveerd)', dossier_id: dossierId });
+      } catch (_) {}
+    } catch (e) {
+      // Voorheen silent — nu een duidelijke waarschuwing zodat de beheerder
+      // de voorraad handmatig kan corrigeren i.p.v. onopgemerkte drift.
+      console.warn('KistVoorraad.wissel faalde:', e && e.message);
+      try {
+        Toast.show(`Kist-wissel voorraad kon niet bijgewerkt worden${e && e.message ? ': ' + e.message : ''}. Controleer voorraad handmatig.`, 'error');
+      } catch (_) {}
+    }
+  },
+  // Atomaire delta via RPC — voorkomt race tussen twee gelijktijdige
+  // reserveringen die anders beide dezelfde 'was'-waarde zouden lezen.
+  async _delta(naam, delta, ctx) {
+    if (!naam) return;
+    const cur = KistVoorraad.byNaam(naam);
+    if (!cur) return; // nog geen voorraadregel = niet bijhouden
+    try {
+      const { data, error } = await sb.rpc('kist_voorraad_delta', { p_naam: naam, p_delta: delta });
+      if (error) throw error;
+      const nieuw = (typeof data === 'number') ? data : Math.max(0, (cur.aantal || 0) + delta);
+      const arr = Cloud.cache.kist_voorraad;
+      const i = arr.findIndex(r => r.naam === naam);
+      if (i >= 0) arr[i] = Object.assign({}, arr[i], { aantal: nieuw });
+      // Auditlog: 'voorraad' actie met naam, delta en context (welk dossier).
+      try {
+        AuditLog.log('voorraad', 'kist_voorraad', naam, {
+          naam, delta,
+          was: cur.aantal,
+          nu: nieuw,
+          reden: (ctx && ctx.reden) || (delta < 0 ? 'reservering' : 'teruggave'),
+          dossier_id: ctx && ctx.dossier_id != null ? String(ctx.dossier_id) : null,
+        });
+      } catch (_) {}
+    } catch (e) {
+      console.warn('KistVoorraad._delta faalde:', e && e.message);
+      try {
+        const richting = delta < 0 ? 'reserveren' : 'teruggeven';
+        Toast.show(`Voorraad ${richting} mislukt (${naam})${e && e.message ? ': ' + e.message : ''}. Controleer voorraad handmatig.`, 'error');
+      } catch (_) {}
+    }
+  },
+};
+
+// ─── Audit-log ──────────────────────────────────────────────────────────────
+// Alle mutaties, logins, logouts en profielwissels worden via de RPC
+// `audit_log_schrijf` in de tabel `audit_log` geschreven. Alleen beheerders
+// mogen lezen (RLS). Client-side hulp om entries te loggen én op te halen.
+function sanitizeForAudit(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const OUT_MAX = 5000;
+  const out = {};
+  for (const k in obj) {
+    const v = obj[k];
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'string' && v.length > 400) out[k] = v.slice(0, 400) + '…';
+    else if (Array.isArray(v)) out[k] = v.length > 20 ? v.slice(0, 20).concat(['…+' + (v.length - 20)]) : v;
+    else out[k] = v;
+  }
+  const s = JSON.stringify(out);
+  return s.length > OUT_MAX ? { _truncated: true, keys: Object.keys(out) } : out;
+}
+function diffKeys(oud, nieuw) {
+  if (!oud || !nieuw) return null;
+  const changed = {};
+  for (const k in nieuw) {
+    if (k === 'updated_at' || k === 'bijgewerkt_door') continue;
+    if (JSON.stringify(oud[k]) !== JSON.stringify(nieuw[k])) {
+      changed[k] = { was: oud[k], nu: nieuw[k] };
+    }
+  }
+  return Object.keys(changed).length ? sanitizeForAudit(changed) : null;
+}
+const AuditLog = {
+  async log(actie, tabel, recordId, detail) {
+    try {
+      if (!navigator.onLine) return; // stil overslaan als offline; niet blokkerend
+      // Dev-profiel mag geen audit-spoor achterlaten (eis van eigenaar).
+      if (typeof ActiveProfile !== 'undefined' && ActiveProfile.isDev && ActiveProfile.isDev()) return;
+      const profielNaam = (typeof ActiveProfile !== 'undefined' && ActiveProfile.current())
+        ? ActiveProfile.current().name : null;
+      const rid = recordId != null ? String(recordId) : null;
+      await sb.rpc('audit_log_schrijf', {
+        p_actie: actie,
+        p_tabel: tabel || null,
+        p_record_id: rid,
+        p_detail: detail || null,
+        p_profiel_naam: profielNaam,
+      });
+    } catch (_) { /* logging faalt nooit hard */ }
+  },
+  async fetch({ limit = 200, offset = 0, actie = null, tabel = null, sinds = null } = {}) {
+    if (!navigator.onLine) return [];
+    let q = sb.from('audit_log').select('*').order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (actie) q = q.eq('actie', actie);
+    if (tabel) q = q.eq('tabel', tabel);
+    if (sinds) q = q.gte('created_at', sinds);
+    const { data, error } = await q;
+    if (error) return [];
+    return data || [];
   },
 };
 
@@ -326,6 +1313,9 @@ const KistFotos = {
   },
   publicUrl(path) {
     if (!path) return null;
+    // Volledige URL (bv. hergebruikte kistfoto's uit het andere project) →
+    // rechtstreeks gebruiken. Anders bouwen we de URL uit de eigen bucket.
+    if (/^https?:\/\//i.test(path)) return path;
     const { data } = sb.storage.from('kisten').getPublicUrl(path);
     return data?.publicUrl || null;
   },
@@ -437,59 +1427,8 @@ const BloemenFotos = {
   },
 };
 
-// ─── Foto van overledene (publieke bucket 'documenten' — privé via signed URLs zou ook kunnen, maar voor weergave op rouwkaart maken we een aparte bucket) ───
-const FotoOverledene = {
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  urlVoor(path) {
-    if (!path) return null;
-    const base = FotoOverledene.publicUrl(path);
-    if (!base) return null;
-    return base + '?v=' + Date.now();
-  },
-  async upload(dossierId, file) {
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-    const path = `${dossierId}/foto.${ext}`;
-    const { error } = await sb.storage.from('overledenen').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (error) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: error.message });
-      throw error;
-    }
-    return path;
-  },
-  async remove(path) {
-    if (!path) return;
-    await sb.storage.from('overledenen').remove([path]).catch(() => {});
-  },
-};
-
-// ─── Paspoort-kaart visualisatie (door Android NFC-scanner app gemaakt) ──
-// Zelfde 'overledenen' bucket; pad staat in dossiers.paspoort_kaart_pad
-const PaspoortKaart = {
-  publicUrl(path) {
-    if (!path) return null;
-    const { data } = sb.storage.from('overledenen').getPublicUrl(path);
-    return data?.publicUrl || null;
-  },
-  urlVoor(path) {
-    if (!path) return null;
-    const base = PaspoortKaart.publicUrl(path);
-    if (!base) return null;
-    return base + '?v=' + Date.now();
-  },
-  async remove(path) {
-    if (!path) return;
-    await sb.storage.from('overledenen').remove([path]).catch(() => {});
-  },
-};
-
-// ─── Eten & drinken-catalogus + foto's (publieke bucket) ────────────────────
-const EtenDrinkenFotos = {
+// ─── Eten & drinken-catalogus + foto's (publieke bucket) ───────────────────
+const EtenFotos = {
   slug(naam) {
     return naam.toLowerCase()
       .replace(/[\s/]+/g, '-')
@@ -506,9 +1445,9 @@ const EtenDrinkenFotos = {
     return (Cloud.cache.eten_drinken_catalogus || []).find(b => b.naam === naam);
   },
   urlVoor(naam) {
-    const r = EtenDrinkenFotos.byNaam(naam);
+    const r = EtenFotos.byNaam(naam);
     if (!r || !r.storage_pad) return null;
-    const base = EtenDrinkenFotos.publicUrl(r.storage_pad);
+    const base = EtenFotos.publicUrl(r.storage_pad);
     if (!base) return null;
     const ts = r.updated_at ? new Date(r.updated_at).getTime() : Date.now();
     return base + '?v=' + ts;
@@ -516,20 +1455,15 @@ const EtenDrinkenFotos = {
   async uploadFoto(naam, file) {
     file = await compressImage(file, 1600, 0.85);
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const path = `${EtenDrinkenFotos.slug(naam)}.${ext}`;
+    const path = `${EtenFotos.slug(naam)}.${ext}`;
     const oude = (Cloud.cache.eten_drinken_catalogus || []).filter(b => b.naam === naam);
     for (const o of oude) {
       if (o.storage_pad && o.storage_pad !== path) {
         await sb.storage.from('eten_drinken').remove([o.storage_pad]).catch(() => {});
       }
     }
-    const { error: upErr } = await sb.storage.from('eten_drinken').upload(path, file, {
-      upsert: true, cacheControl: '3600', contentType: file.type || undefined,
-    });
-    if (upErr) {
-      Modal.show({ type: 'error', title: 'Upload mislukt', message: upErr.message });
-      throw upErr;
-    }
+    const { error } = await sb.storage.from('eten_drinken').upload(path, file, { upsert: true, cacheControl: '3600' });
+    if (error) throw error;
     return path;
   },
   async removeFoto(b) {

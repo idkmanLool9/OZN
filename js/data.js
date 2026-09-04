@@ -1,15 +1,7 @@
 // Constanten + catalogi gebaseerd op intake-template St. Ephrem de Syriër Klooster
 // en Unigra-tarievenlijst.
 
-const PAROCHIES = [
-  'St. Ephrem de Syriër Klooster — Glane/Losser',
-  'Mor Ephrem — Glanerbrug',
-  'Mor Severios — Hengelo',
-  'Mor Kuryakos — Enschede',
-  'Mor Aday — Rijssen',
-  'Sint Maria — Amsterdam',
-  'Mor Gabriël — Holland',
-];
+const PAROCHIES = [];
 
 // Vaste tarieven uit het intake-formulier
 // Categorieën voor kostenposten — volgorde + nette labels worden gebruikt
@@ -20,11 +12,7 @@ const KOSTEN_CATEGORIEEN = [
   { id: 'verzorging',    label: 'Verzorging',           icon: '🧴' },
   { id: 'kist',          label: 'Kist',                 icon: '⚰️' },
   { id: 'aula',          label: 'Aula',                 icon: '🏛️' },
-  { id: 'kerk',          label: 'Kerk',                 icon: '✝️' },
-  { id: 'begraafplaats', label: 'Begraafplaats & graf', icon: '🪦' },
-  { id: 'bloemen',       label: 'Bloemen',              icon: '💐' },
   { id: 'rouwkaarten',   label: 'Rouwkaarten',          icon: '✉️' },
-  { id: 'catering',      label: 'Catering',             icon: '🍽️' },
   { id: 'schoonmaak',    label: 'Schoonmaak',           icon: '🧹' },
   { id: 'administratie', label: 'Administratie',        icon: '📝' },
   { id: 'overig',        label: 'Overig',               icon: '•'   },
@@ -38,43 +26,93 @@ function categorieIcon(id) {
   return c ? c.icon : '•';
 }
 
+// Volgorde komt 1-op-1 overeen met de gewenste volgorde van de
+// gebruiker. Items met een 'nav'-veld zijn navigatie-tegels die in de
+// wizard naar een andere pagina linken (Kisten/Bloemen) of het formulier
+// voor 'eigen invoer' openen ('extra').
 const KOSTEN_PRESETS = [
-  // Aanname & uitvoering
-  { categorie: 'aannametarief', omschrijving: 'Aannametarief — benodigd personeel en uitvoering', bedrag: 622.00 },
-  // Vervoer
-  { categorie: 'vervoer',       omschrijving: 'Ziekenhuismortuarium (Almelo / Enschede)',           bedrag: 146.00 },
-  { categorie: 'vervoer',       omschrijving: 'Overbrengen overledene (0–40 km vanaf Oldenzaal)',   bedrag: 231.00 },
-  { categorie: 'vervoer',       omschrijving: 'Rouwauto op de dag van de uitvaart',                  bedrag: 242.00 },
-  // Kist
-  { categorie: 'kist',          omschrijving: 'Basismodel kist (incl. opbaardekentje)',              bedrag: 615.40 },
-  // Aula & verzorging
-  { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                                bedrag: 446.00 },
-  { categorie: 'verzorging',    omschrijving: 'Verzorging door extern bedrijf',                      bedrag: 111.00 },
-  { categorie: 'verzorging',    omschrijving: 'Inkisten',                                            bedrag:  63.00 },
-  // Kerk
-  { categorie: 'kerk',          omschrijving: 'Gebruik Kerk en Dolabani Zaal',                       bedrag: 500.00 },
-  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud messing',                            bedrag:  31.00 },
-  { categorie: 'kerk',          omschrijving: 'Kruis 115/25 oud koper',                              bedrag:  31.00 },
-  // Begraafplaats / graf
-  { categorie: 'begraafplaats', omschrijving: 'Algemeen graf',                                       bedrag: 1250.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Grafmonument verwijderen en terugplaatsen incl. tekst + foto', bedrag: 1368.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Graf delven',                                         bedrag: 410.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Openen graf',                                         bedrag: 250.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Naamsteen',                                           bedrag: 295.00 },
-  { categorie: 'begraafplaats', omschrijving: 'Onderhoudskosten',                                    bedrag: 600.00 },
-  // Administratie
-  { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                                 bedrag:  17.80 },
-  // Catering
-  { categorie: 'catering',      omschrijving: 'Smiet broodje',          bedrag:   0.80, perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Duitse broodje wit incl. kaas', bedrag:   0,    perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Duits broodje bruin incl. kaas', bedrag:   0,    perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Warme maaltijd: rijst met kipfilet & kebab + koolsalade', bedrag: 0, perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Warme maaltijd: rijst met visfilet + koolsalade', bedrag: 0, perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Koffie / thee / water',  bedrag:   0,    perStuk: true },
-  { categorie: 'catering',      omschrijving: 'Papier op tafels',       bedrag:  60.00 },
-  // Overig
-  { categorie: 'schoonmaak',    omschrijving: 'Schoonmaken Dolabani-zaal',                           bedrag: 100.00 },
+  { categorie: 'aannametarief', omschrijving: 'Benodigd personeel en uitvoering',                bedrag: 622.00 },
+  { categorie: 'vervoer',       omschrijving: 'Kosten ziekenhuismortuarium (Almelo / Enschede)', bedrag: 146.00 },
+  { categorie: 'vervoer',       omschrijving: 'Transport overledene (0–40 km vanaf Oldenzaal)',  bedrag: 231.00 },
+  { nav: 'kist',     categorie: 'kist',          omschrijving: '🪦 Kist — kies in catalogus',     bedrag: null   },
+  { categorie: 'aula',          omschrijving: 'Gebruik aula 3 dagen',                            bedrag: 446.00 },
+  { categorie: 'verzorging',    omschrijving: 'Verzorging & Inkisten',                           bedrag: 174.00 },
+  { categorie: 'administratie', omschrijving: 'Akte van Overlijden',                             bedrag:  17.80 },
+  { nav: 'extra',    categorie: 'overig',        omschrijving: '＋ Extra uitgave (zelf invullen)', bedrag: null },
 ];
+
+// Beheermodus-overrides: prijzen + verberg-vlag worden in Settings
+// opgeslagen. Helpers passen ze toe op de "view" van de catalogus
+// zonder de constante zelf te muteren — zo blijven de fabrieksprijzen
+// bewaard en kan een gebruiker eenvoudig terugzetten.
+function effectieveKostenPresets({ includeHidden = false } = {}) {
+  const ov = (typeof Settings !== 'undefined' && Settings.get('kosten_overrides')) || {};
+  const extra = (typeof Settings !== 'undefined' && Array.isArray(Settings.get('kosten_extra')))
+    ? Settings.get('kosten_extra') : [];
+  const base = KOSTEN_PRESETS
+    .filter(p => p.nav || includeHidden || !(ov[p.omschrijving] && ov[p.omschrijving].hidden))
+    .map(p => {
+      if (p.nav) return p;
+      const o = ov[p.omschrijving];
+      if (!o) return p;
+      const out = Object.assign({}, p);
+      if (o.bedrag != null) { out.bedrag = Number(o.bedrag); out._customBedrag = true; }
+      if (o.hidden) out._hidden = true;
+      return out;
+    });
+  // Beheerder-aangemaakte kostenposten toevoegen na de standaardlijst.
+  const eigen = extra
+    .filter(p => p && p.omschrijving)
+    .filter(p => includeHidden || !(ov[p.omschrijving] && ov[p.omschrijving].hidden))
+    .map(p => {
+      const out = { omschrijving: p.omschrijving, categorie: p.categorie || 'overig', bedrag: p.bedrag != null ? Number(p.bedrag) : null, _custom: true };
+      const o = ov[p.omschrijving];
+      if (o) {
+        if (o.bedrag != null) { out.bedrag = Number(o.bedrag); out._customBedrag = true; }
+        if (o.hidden) out._hidden = true;
+      }
+      return out;
+    });
+  const insertIdx = base.findIndex(p => p.nav === 'extra');
+  if (insertIdx >= 0) return [...base.slice(0, insertIdx), ...eigen, ...base.slice(insertIdx)];
+  return [...base, ...eigen];
+}
+function effectieveKistenCatalogus({ includeHidden = false } = {}) {
+  const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};
+  const eigen = ((typeof Settings !== 'undefined' && Settings.get('kisten_eigen')) || [])
+    .filter(x => x && x.naam)
+    .map(x => ({
+      naam: String(x.naam),
+      materiaal: String(x.materiaal || ''),
+      bedrag: Number(x.bedrag) || 0,
+      kleur: String(x.kleur || ''),
+      _eigen: true,
+    }));
+  const basis = KISTEN_CATALOGUS.concat(eigen);
+  return basis
+    .filter(k => includeHidden || !(ov[k.naam] && ov[k.naam].hidden))
+    .map(k => {
+      const o = ov[k.naam];
+      if (!o) return k;
+      const out = Object.assign({}, k);
+      if (o.bedrag != null) { out.bedrag = Number(o.bedrag); out._customBedrag = true; }
+      if (o.hidden) out._hidden = true;
+      return out;
+    });
+}
+function vindKist(naam) {
+  // Lookup-by-naam met override toegepast (ook voor verborgen kisten —
+  // zodat oude dossiers nog correct hun kist-prijs vertonen).
+  const ov = (typeof Settings !== 'undefined' && Settings.get('kisten_overrides')) || {};
+  const eigen = ((typeof Settings !== 'undefined' && Settings.get('kisten_eigen')) || [])
+    .filter(x => x && x.naam);
+  const k = KISTEN_CATALOGUS.find(x => x.naam === naam)
+    || eigen.find(x => x.naam === naam);
+  if (!k) return null;
+  const o = ov[naam];
+  if (!o || o.bedrag == null) return k;
+  return Object.assign({}, k, { bedrag: Number(o.bedrag), _customBedrag: true });
+}
 
 // Unigra kistencatalogus (adviesprijzen per nov 2025)
 const KISTEN_CATALOGUS = [
@@ -178,86 +216,74 @@ function kistSVG(materiaal) {
     </svg>`;
 }
 
-const STANDAARD_TAKEN_GEMEEN = [
-  'Familie informeren en intake afnemen',
-  'Overlijdensakte opvragen bij gemeente',
-  'Parochie en priester aanstellen',
-  'Datum en tijd uitvaartdienst vastleggen',
-  'Kerk reserveren en koster informeren',
-  'Begraafplaats en graf reserveren',
-  'Kist bestellen en ophalen',
-  'Rouwvervoer regelen (rouwauto + volgauto\'s)',
-  'Dragers regelen',
-  'Rouwkaarten ontwerpen en versturen',
-  'Bloemstukken bestellen',
-  'Avondwake / huisbezoek inplannen',
-  'Condoleance en catering organiseren',
-  'Aangifte bij Burgerzaken',
+// Belangrijke velden die WEL moeten worden ingevuld voor een compleet dossier
+// — wordt gebruikt om een ⚠-badge te tonen op de lijst en detail-pagina als
+// een dossier al 'in behandeling' is maar er nog gaten zitten in de basis.
+const DOSSIER_BELANGRIJKE_VELDEN = [
+  { veld: 'opdrachtgever_naam',  label: 'opdrachtgever' },
+  { veld: 'voornaam',            label: 'voornaam' },
+  { veld: 'achternaam',          label: 'achternaam' },
+  { veld: 'geboortedatum',       label: 'geboortedatum' },
+  { veld: 'overlijdensdatum',    label: 'overlijdensdatum' },
+  { veld: 'opbaring_type',       label: 'ophalen/thuis-keuze' },
+  { veld: 'kist_type',           label: 'kist' },
+  { veld: 'rouwauto',            label: 'rouwauto', test: v => v && v !== 'nee' },
 ];
+// Label-helper: respecteert eventuele oude overrides uit Settings.dossier_labels
+// (van vóór de feature werd verwijderd) maar biedt geen edit-UI meer.
+function dLabel(key, defaultTxt) {
+  const overrides = (typeof Settings !== 'undefined' && Settings.get('dossier_labels')) || {};
+  return overrides[key] || defaultTxt;
+}
+function dLabelSpan(key, defaultTxt, tag = 'span', extraClass = '') {
+  const txt = dLabel(key, defaultTxt);
+  const clsAttr = extraClass ? ' class="' + esc(extraClass) + '"' : '';
+  return `<${tag}${clsAttr}>${esc(txt)}</${tag}>`;
+}
 
-const STANDAARD_TAKEN_MET_VERZEKERING = [
-  ...STANDAARD_TAKEN_GEMEEN,
-  'Polis controleren bij verzekeraar',
-  'Declaratie / aanmelding indienen',
-  'Akkoord en pakketinhoud bevestigen',
-  'Meerprijs met familie afstemmen indien dekking onvoldoende',
-];
-
-const STANDAARD_TAKEN_ZONDER_VERZEKERING = [
-  ...STANDAARD_TAKEN_GEMEEN,
-  'Budget bespreken met familie',
-  'Aanbetaling vragen vóór de uitvaart',
-  'Eindfactuur opstellen',
-  'Eindbetaling ontvangen / voldaan',
-];
-
-// Velden die we als 'aangeraden in te vullen' beschouwen — bij opslaan
-// zonder deze waardes verschijnt een waarschuwingspop-up.
-const AANBEVOLEN_VELDEN = [
-  { name: 'voornaam',              label: 'Voornaam overledene' },
-  { name: 'achternaam',            label: 'Achternaam overledene' },
-  { name: 'geboortedatum',         label: 'Geboortedatum' },
-  { name: 'overlijdensdatum',      label: 'Overlijdensdatum' },
-  { name: 'adres_overledene',      label: 'Adres overledene' },
-  { name: 'woonplaats_overledene', label: 'Woonplaats overledene' },
-  { name: 'contact_naam',          label: 'Achternaam contactpersoon' },
-  { name: 'contact_telefoon',      label: 'Telefoon contactpersoon' },
-  { name: 'parochie',              label: 'Parochie' },
-  { name: 'uitvaart_type',         label: 'Type uitvaart' },
-  { name: 'uitvaart_datum',        label: 'Datum uitvaart' },
-  { name: 'kerk_locatie',          label: 'Kerk / dienstlocatie' },
-  { name: 'begraafplaats',         label: 'Begraafplaats' },
-  { name: 'verzekering_status',    label: 'Verzekering ja/nee' },
-];
-
-// Backwards compat: oude lijst gebruikt voor onbekende status (pre-bestaande dossiers)
-const STANDAARD_TAKEN = [
-  ...STANDAARD_TAKEN_GEMEEN,
-  'Verzekering / financiële afhandeling regelen',
-  'Eindafrekening opstellen',
-];
+function dossierMissendeBelangrijkeVelden(d) {
+  if (!d) return [];
+  // Voltooid of geannuleerd → geen waarschuwing meer
+  if (['voltooid', 'geannuleerd'].includes(d.status)) return [];
+  const missend = [];
+  DOSSIER_BELANGRIJKE_VELDEN.forEach(({ veld, label, test }) => {
+    const v = d[veld];
+    const ok = test
+      ? test(v)
+      : (v != null && String(v).trim() !== '');
+    if (!ok) missend.push(label);
+  });
+  return missend;
+}
 
 const DOSSIER_VELDEN = [
+  'dossier_nummer','registratienummer_uitvaartleider',
+  'opdrachtgever_naam',
+  'bsn',
   'voornaam','achternaam','geslacht','geboortedatum','geboorteplaats',
-  'overlijdensdatum','overlijdenstijd','overlijdensplaats',
+  'overlijdensdatum','overlijdensplaats',
   'adres_overledene','postcode_overledene','woonplaats_overledene',
-  'bsn','nationaliteit','syrisch_orthodox_lid',
-  'gezinsnummer','grafnummer',
-  'partner_naam','kinderen_status','minderjarige_kinderen','kinderen_namen',
-  'contact_naam','contact_voornaam','contact_relatie','contact_telefoon','contact_email',
-  'contact_adres','contact_huisnummer','contact_postcode','contact_woonplaats',
-  'contact_bsn','contact_geboortedatum',
-  'parochie','priester','huisbezoek_datum','huisbezoek_tijd',
-  'uitvaart_type','uitvaart_datum','uitvaart_tijd','kerk_locatie',
-  'begraafplaats','graf_type',
-  'kist_type','rouwauto','aantal_volgauto','dragers','bloemstukken',
-  'rouwkaarten_aantal','condoleance_locatie','catering',
-  'verzekering_status','verzekering_maatschappij','polisnummer',
-  'verzekering_polishouder','verzekering_dekking','verzekering_pakket',
-  'verzekering_aanmelding_status','verzekering_contact_naam','verzekering_contact_telefoon',
-  'betaalwijze','aanbetaling_bedrag','aanbetaling_datum',
-  'eindafrekening_bedrag','eindafrekening_status','betalingstermijn',
-  'verantwoordelijke_persoon',
-  'opdrachtgever_naam','opdrachtgever_telefoon',
-  'bijzonderheden','status'
+  'bezit_oorbellen','bezit_oorbellen_aantal','bezit_oorbellen_foto',
+  'bezit_ringen','bezit_ringen_aantal','bezit_ringen_foto',
+  'bezit_armbanden','bezit_armbanden_aantal','bezit_armbanden_foto',
+  'bezit_ketting','bezit_ketting_aantal','bezit_ketting_foto',
+  'bezit_bril','bezit_bril_aantal','bezit_bril_foto',
+  'bezit_horloge','bezit_horloge_aantal','bezit_horloge_foto',
+  'artsverklaring_pad','overdraagformulier_pad',
+  'opbaring_type',
+  'opbaring_bed','opbaring_kist','aula_gebruikt',
+  'ophalen_datum','ophalen_tijd',
+  'thuis_opbaren_datum','thuis_opbaren_tijd',
+  'thuis_opbaren_einddatum','thuis_opbaren_eindtijd','benodigde_rouwgoederen',
+  'opbaarlocatie_type','centrale_koeling_vanaf','familiekamer_vanaf',
+  'verzorgd_gekleed_datum','verzorgd_gekleed_waar','verzorgd_gekleed_familie',
+  'gekist_datum','gekist_waar',
+  'mond_gehecht','oogkapjes',
+  'peacemaker_verwijderd','peacemaker_verwijderd_datum',
+  'thanatopraxie','thanatopraxie_datum','thanatopraxie_waar',
+  'buikpunctie',
+  'kist_type','rouwauto',
+  'aanbetaling_bedrag','aanbetaling_datum',
+  'eindafrekening_bedrag','eindafrekening_status',
+  'bijzonderheden','status','aangemaakt_door'
 ];

@@ -1,5 +1,13 @@
 // Dossierlijst, account, 404
 
+// Statusbadge met passend icoon (✓ Voltooid, etc.)
+function dossierStatusBadge(st) {
+  const s = st || 'nieuw';
+  const ico = { nieuw: '✦', in_behandeling: '◷', voltooid: '✓', geannuleerd: '✕' };
+  const lbl = { nieuw: 'Nieuw', in_behandeling: 'In behandeling', voltooid: 'Voltooid', geannuleerd: 'Geannuleerd' };
+  return `<span class="status status-${esc(s)}"><span class="status-ico">${ico[s] || ''}</span>${esc(lbl[s] || s.replace('_', ' '))}</span>`;
+}
+
 function renderDossierList(params, path) {
   const url = new URL(location.href);
   const q = (url.hash.split('?')[1] ? new URLSearchParams(url.hash.split('?')[1]).get('q') : '') || '';
@@ -19,75 +27,369 @@ function renderDossierList(params, path) {
       return false;
     });
   }
-  if (status) dossiers = dossiers.filter(d => d.status === status);
-  dossiers.sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || ''));
+  if (status === 'gearchiveerd') {
+    dossiers = dossiers.filter(d => d.gearchiveerd);
+  } else {
+    dossiers = dossiers.filter(d => !d.gearchiveerd);   // archief standaard verborgen
+    if (status) dossiers = dossiers.filter(d => d.status === status);
+  }
+  // Sorteer op aanmaak-datum (nieuwste bovenaan) — niet op laatst gewijzigd,
+  // anders schieten oude dossiers naar boven zodra iemand ze even aanraakt.
+  dossiers.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
 
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head">
-        <h1>Dossiers</h1>
-        <div class="page-actions">
-          <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
+        <div>
+          <h1>Dossiers</h1>
+          <p class="muted">Beheer en overzicht van alle dossiers.</p>
         </div>
+        <a href="#/dossiers/nieuw" class="btn btn-primary">+ Nieuw dossier</a>
       </div>
-      <form class="filter-bar" id="filter-form">
-        <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam, dossiernummer, gezinsnummer, contactpersoon..." />
-        <select name="status">
+
+
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder() && typeof KistVoorraad !== 'undefined') ? (() => {
+        const laag = KistVoorraad.laag();
+        if (!laag.length) return '';
+        const leeg = laag.filter(r => (r.aantal || 0) === 0).length;
+        return `
+        <div class="alert alert-warn kist-voorraad-banner" style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <div>
+            <strong>⚠ Voorraad laag${leeg ? ` · ${leeg} kist${leeg === 1 ? '' : 'en'} leeg` : ''}</strong>
+            <span class="muted small">${laag.length} kist${laag.length === 1 ? '' : 'en'} onder minimum.</span>
+          </div>
+          <a href="#/kisten/bestellijst" class="btn btn-sm btn-primary">Open bestellijst</a>
+        </div>`;
+      })() : ''}
+
+      <form class="dossiers-filterbar" id="filter-form">
+        <div class="catalog-search">
+          <input type="search" name="q" value="${esc(q)}" placeholder="Zoek op naam of dossiernummer…" autocomplete="off">
+        </div>
+        <select name="status" class="dossiers-control" id="dossiers-status">
           <option value="">Alle statussen</option>
           <option value="nieuw" ${status==='nieuw'?'selected':''}>Nieuw</option>
           <option value="in_behandeling" ${status==='in_behandeling'?'selected':''}>In behandeling</option>
           <option value="voltooid" ${status==='voltooid'?'selected':''}>Voltooid</option>
           <option value="geannuleerd" ${status==='geannuleerd'?'selected':''}>Geannuleerd</option>
+          ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `<option value="gearchiveerd" ${status==='gearchiveerd'?'selected':''}>📦 Archief</option>` : ''}
         </select>
-        <button type="submit" class="btn">Filteren</button>
-        ${q || status ? '<a href="#/dossiers" class="btn btn-ghost">Wissen</a>' : ''}
+        <button type="button" class="dossiers-control dossiers-filter-btn" id="dossiers-filter-toggle" aria-expanded="false" aria-controls="dossiers-filter-paneel">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+          Filteren <span class="filter-badge" id="dossiers-filter-count" hidden></span>
+        </button>
+        ${q || status ? '<a href="#/dossiers" class="dossiers-wis">↺ Wis</a>' : ''}
       </form>
-      ${dossiers.length === 0 ? '<div class="card"><p class="muted">Geen dossiers gevonden.</p></div>' :
-      `<table class="table"><thead><tr>
-        <th>Dossier</th><th>Overledene</th><th>Contactpersoon</th><th>Gezinsnr.</th><th>Overlijden</th><th>Uitvaart</th><th>Status</th><th>Laatst gewijzigd</th>
-      </tr></thead><tbody>
-        ${dossiers.map(d => `<tr>
-          <td><a href="#/dossiers/${d.id}">${esc(d.dossier_nummer)}</a></td>
-          <td><strong>${esc(fullName(d) || '—')}</strong></td>
-          <td>${esc(d.contact_naam || '—')}${d.contact_telefoon ? `<br><span class="muted small">${esc(d.contact_telefoon)}</span>` : ''}</td>
-          <td>${esc(d.gezinsnummer || '—')}</td>
-          <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
-          <td>${esc(fmtDate(d.uitvaart_datum) || '—')}${d.uitvaart_tijd ? ' <span class="muted">' + esc(d.uitvaart_tijd) + '</span>' : ''}</td>
-          <td><span class="status status-${esc(d.status||'nieuw')}">${esc((d.status||'nieuw').replace('_',' '))}</span></td>
-          <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? ' · ' + esc(d.bijgewerkt_door) : ''}</span></td>
-        </tr>`).join('')}
-      </tbody></table>`}
+
+      ${(() => {
+        // Verzamel filter-dimensies uit Settings en huidige dossierset.
+        const opdrLijst = (Settings.get('opdrachtgevers') || []).map(o => o.naam || o).filter(Boolean);
+        const kistLijst = [...new Set(DB.list(KEYS.DOSSIERS).map(d => d.kist_type).filter(Boolean))].sort();
+        const persLijst = (Settings.get('profielen') || []).map(p => p.name).filter(Boolean);
+        const rouwLijst = (Settings.get('rouwauto_lijst') || []).filter(Boolean);
+        const cb = (naam, waarde, label) => `
+          <label class="dfilter-chip">
+            <input type="checkbox" data-filter="${esc(naam)}" value="${esc(waarde)}">
+            <span>${esc(label)}</span>
+          </label>`;
+        const groep = (titel, items) => items.length ? `
+          <div class="dfilter-groep">
+            <div class="dfilter-titel">${esc(titel)}</div>
+            <div class="dfilter-chips">${items}</div>
+          </div>` : '';
+        return `
+        <div class="dfilter-paneel" id="dossiers-filter-paneel" hidden>
+          <div class="dfilter-groep">
+            <div class="dfilter-titel">Snel</div>
+            <div class="dfilter-chips">
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="onvolledig" value="1">
+                <span>⚠ Onvolledig ingevuld</span>
+              </label>
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="openkosten" value="1">
+                <span>💶 Nog openstaande kosten</span>
+              </label>
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="mijnzaken" value="1">
+                <span>👤 Alleen mijn dossiers</span>
+              </label>
+              <label class="dfilter-chip">
+                <input type="checkbox" data-filter="geenkist" value="1">
+                <span>📦 Kist nog niet gekozen</span>
+              </label>
+            </div>
+          </div>
+          ${groep('Opdrachtgever', opdrLijst.map(v => cb('opdrachtgever', v, v)).join(''))}
+          ${groep('Kist',          kistLijst.map(v => cb('kist',          v, v)).join(''))}
+          ${groep('Personeel',     persLijst.map(v => cb('personeel',     v, v)).join(''))}
+          ${groep('Rouwauto',      rouwLijst.map(v => cb('rouwauto',      v, v)).join(''))}
+          <div class="dfilter-actions">
+            <button type="button" class="btn btn-sm btn-ghost" id="dfilter-wis">↺ Wis alle filters</button>
+            <span class="muted small" id="dfilter-resultaat"></span>
+          </div>
+        </div>`;
+      })()}
+
+      ${dossiers.length === 0
+        ? '<div class="dossiers-kaart"><p class="muted center" style="padding:2.5rem;">Geen dossiers gevonden.</p></div>'
+        : `<div class="dossiers-kaart">
+            <table class="table dossiers-table">
+              <thead><tr>
+                <th>Dossier</th><th>Overledene</th><th>Opdrachtgever</th><th>Overlijden</th><th>Status</th><th>Laatst gewijzigd</th><th aria-hidden="true"></th>
+              </tr></thead>
+              <tbody>
+                ${dossiers.map(d => {
+                  // 'Niet ingevuld'-melding is verwijderd op verzoek: de badge
+                  // gaf te vaak alarm terwijl velden bewust leeg werden gelaten.
+                  const missend = [];
+                  const warn = '';
+                  // Kostenposten voor deze dossier — voor 'openkosten'-filter
+                  const kostenD = DB.where(KEYS.KOSTEN, k => k.dossier_id === d.id) || [];
+                  const heeftOpenKosten = kostenD.some(k => !k.betaald && Number(k.bedrag) > 0);
+                  const persoonNamen = Array.isArray(d.extra_personeel) ? d.extra_personeel.join('|') : '';
+                  return `<tr data-id="${d.id}"
+                    class="${missend.length ? 'is-incompleet' : ''}"
+                    data-opdrachtgever="${esc((d.opdrachtgever_naam || '').toLowerCase())}"
+                    data-kist="${esc((d.kist_type || '').toLowerCase())}"
+                    data-rouwauto="${esc((d.rouwauto || '').toLowerCase())}"
+                    data-personeel="${esc(persoonNamen.toLowerCase())}"
+                    data-onvolledig="${missend.length ? '1' : '0'}"
+                    data-openkosten="${heeftOpenKosten ? '1' : '0'}"
+                    data-geenkist="${d.kist_type ? '0' : '1'}">
+                  <td><a href="#/dossiers/${d.id}" class="dossier-link">${esc(d.dossier_nummer)}</a></td>
+                  <td><strong>${esc(fullName(d) || '—')}</strong> ${warn}</td>
+                  <td>${esc(d.opdrachtgever_naam || '—')}</td>
+                  <td>${esc(fmtDate(d.overlijdensdatum) || '—')}</td>
+                  <td>${dossierStatusBadge(d.status)}</td>
+                  <td><span class="muted small" title="${esc(d.updated_at ? new Date(d.updated_at).toLocaleString('nl-NL') : '')}">${esc(fmtRelative(d.updated_at || d.created_at))}${d.bijgewerkt_door ? '<br>- ' + esc(d.bijgewerkt_door) : ''}</span></td>
+                  <td class="dossiers-chevron" aria-hidden="true">›</td>
+                </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`}
     </div>`;
 
-  $('#filter-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const f = e.target;
+  const navigeerFilter = (f) => {
     const params = new URLSearchParams();
     if (f.q.value) params.set('q', f.q.value);
     if (f.status.value) params.set('status', f.status.value);
     location.hash = '#/dossiers' + (params.toString() ? '?' + params.toString() : '');
+  };
+  $('#filter-form').addEventListener('submit', e => {
+    e.preventDefault();
+    navigeerFilter(e.target);
+  });
+  // Statuskeuze meteen toepassen
+  const statusSel = $('#dossiers-status');
+  if (statusSel) statusSel.addEventListener('change', () => navigeerFilter(statusSel.form));
+
+  // Live filteren: zoekterm + checkbox-filters worden direct in de DOM
+  // toegepast, geen re-render. Submit (Enter) commit alleen de zoekterm
+  // + status naar de URL, zodat delen/back blijft werken.
+  const zoekInput = $('#filter-form input[type="search"]');
+  const rijen = $$('#view tbody tr[data-id]');
+  const _me = (typeof Auth !== 'undefined' && Auth.current()) || {};
+  const mijnNaam = (_me.fullName || _me.email || '').trim();
+  const filterPaneel = $('#dossiers-filter-paneel');
+
+  function pasFiltersToe() {
+    const term = zoekInput ? zoekInput.value.trim().toLowerCase() : '';
+    // Verzamel actieve checkbox-filters per dimensie.
+    const actief = {};
+    if (filterPaneel) {
+      filterPaneel.querySelectorAll('input[type=checkbox]:checked').forEach(cb => {
+        const dim = cb.getAttribute('data-filter');
+        (actief[dim] = actief[dim] || []).push(cb.value);
+      });
+    }
+    const heeft = (dim) => Array.isArray(actief[dim]) && actief[dim].length > 0;
+    const bevat = (dim, val) => actief[dim].some(v => (val || '').toLowerCase() === v.toLowerCase());
+
+    let zichtbaar = 0;
+    rijen.forEach(tr => {
+      let match = true;
+      if (term && !tr.textContent.toLowerCase().includes(term)) match = false;
+      if (match && actief.onvolledig)  match = tr.dataset.onvolledig === '1';
+      if (match && actief.openkosten)  match = tr.dataset.openkosten === '1';
+      if (match && actief.geenkist)    match = tr.dataset.geenkist === '1';
+      if (match && actief.mijnzaken)   match = mijnNaam && (tr.dataset.personeel || '').includes(mijnNaam.toLowerCase());
+      if (match && heeft('opdrachtgever')) match = bevat('opdrachtgever', tr.dataset.opdrachtgever);
+      if (match && heeft('kist'))          match = bevat('kist', tr.dataset.kist);
+      if (match && heeft('rouwauto'))      match = bevat('rouwauto', tr.dataset.rouwauto);
+      if (match && heeft('personeel'))     match = actief.personeel.some(n => (tr.dataset.personeel || '').includes(n.toLowerCase()));
+      tr.hidden = !match;
+      if (match) zichtbaar++;
+    });
+
+    // Filter-badge bijwerken
+    const totActief = Object.values(actief).reduce((s, arr) => s + arr.length, 0);
+    const badge = $('#dossiers-filter-count');
+    if (badge) {
+      badge.hidden = totActief === 0;
+      badge.textContent = totActief > 0 ? totActief : '';
+    }
+    const resTekst = $('#dfilter-resultaat');
+    if (resTekst) resTekst.textContent = `${zichtbaar} dossier${zichtbaar === 1 ? '' : 's'} zichtbaar`;
+
+    // Leeg-state onder de tabel tonen/verbergen
+    let legeMelding = $('#dossiers-live-leeg');
+    if (zichtbaar === 0 && (term || totActief > 0)) {
+      if (!legeMelding) {
+        const kaart = $('.dossiers-kaart');
+        if (kaart) {
+          legeMelding = document.createElement('p');
+          legeMelding.id = 'dossiers-live-leeg';
+          legeMelding.className = 'muted center';
+          legeMelding.style.padding = '1.5rem';
+          legeMelding.textContent = 'Geen dossiers gevonden met deze filters.';
+          kaart.appendChild(legeMelding);
+        }
+      }
+    } else if (legeMelding) {
+      legeMelding.remove();
+    }
+  }
+
+  if (zoekInput) zoekInput.addEventListener('input', pasFiltersToe);
+
+  // Filter-paneel toggle
+  const filterToggle = $('#dossiers-filter-toggle');
+  if (filterToggle && filterPaneel) {
+    filterToggle.addEventListener('click', () => {
+      const open = !filterPaneel.hidden;
+      filterPaneel.hidden = open;
+      filterToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+    });
+    filterPaneel.addEventListener('change', pasFiltersToe);
+    const wisBtn = $('#dfilter-wis');
+    if (wisBtn) wisBtn.addEventListener('click', () => {
+      filterPaneel.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = false; });
+      pasFiltersToe();
+    });
+  }
+
+  // Hele rij klikbaar → naar dossier-detail (behalve op links/knoppen)
+  $$('#view tr[data-id]').forEach(tr => {
+    tr.addEventListener('click', e => {
+      if (e.target.closest('a, button')) return;
+      Router.go('/dossiers/' + tr.getAttribute('data-id'));
+    });
   });
 }
 
 function renderAccount(msg) {
   const u = Auth.current();
+  // Alleen beheerders mogen bij de account-instellingen. Medewerkers krijgen
+  // een korte melding — hun profiel-instellingen (naam / wachtwoord) doen we
+  // niet in deze view; die kunnen via een beheerder.
+  if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) {
+    $('#view').innerHTML = `
+      <div class="page">
+        <div class="page-head"><h1>Mijn account</h1></div>
+        <section class="card narrow">
+          <p>Account-instellingen zijn alleen beschikbaar voor beheerders. Neem contact op met een beheerder als je iets wilt aanpassen.</p>
+          <p class="muted small">Ingelogd als: <strong>${esc(u && u.email || '')}</strong></p>
+          <div class="form-actions" style="margin-top:1rem;">
+            <button type="button" class="btn" id="btn-medewerker-logout">Uitloggen</button>
+          </div>
+        </section>
+      </div>`;
+    const bo = document.getElementById('btn-medewerker-logout');
+    if (bo) bo.addEventListener('click', async () => {
+      const ok = await Modal.confirm({
+        type: 'warning',
+        title: 'Uitloggen?',
+        message: 'Weet je zeker dat je wilt uitloggen?',
+        confirmText: 'Uitloggen',
+        cancelText: 'Annuleren',
+      });
+      if (!ok) return;
+      try { await Auth.logout(); } catch (_) {}
+      Router.go('/');
+    });
+    return;
+  }
+  // Instellingen op functieniveau beschikbaar. Losse secties definiëren hun
+  // eigen `s` in een IIFE; de Factuur-sectie leunt op deze buitenste `s`.
+  const s = Settings.all();
   $('#view').innerHTML = `
     <div class="page">
       <div class="page-head"><h1>Mijn account</h1></div>
-      <section class="card narrow">
+
+      <nav class="account-nav" aria-label="Snelnavigatie instellingen">
+        <a href="#/account#acc-beheer" style="background:#fdf3d8;border-color:#e6c46b;color:#7a5100;font-weight:700;">🛠 Beheermodus</a>
+        <a href="#/account#acc-versie">App &amp; updates</a>
+        <a href="#/account#acc-gegevens">Mijn gegevens</a>
+        <a href="#/account#acc-wachtwoord">Wachtwoord</a>
+        <a href="#/account#acc-weergave">Weergave</a>
+        <a href="#/account#acc-branding">Branding</a>
+        <a href="#/account#login-instellingen">Loginscherm</a>
+        <a href="#/account#acc-welkom">Welkomscherm</a>
+        <a href="#/account#email-instellingen">E-mail</a>
+        <a href="#/account#factuur-instellingen">Factuur</a>
+        <a href="#/account#push-instellingen">Push-notificaties</a>
+        <a href="#/account#snelstart-instellingen">SnelStart</a>
+        <a href="#/account#kostenposten">Kostenposten</a>
+        <a href="#/account#profielen">Profielen</a>
+        <a href="#/account#opdrachtgevers">Opdrachtgevers</a>
+        <a href="#/account#acc-data">Data &amp; sync</a>
+        <a href="#/logboek">Logboek</a>
+      </nav>
+
+      <section class="card narrow" id="acc-versie">
         <h2>App-versie &amp; updates</h2>
         <dl class="dl">
           <div><dt>Huidige versie</dt><dd><strong id="cur-version">${esc(APP_VERSION)}</strong> — ${esc(APP_BUILD_DATE)}</dd></div>
           <div><dt>Service worker</dt><dd id="sw-status" class="muted small">${'serviceWorker' in navigator ? 'actief' : 'niet beschikbaar'}</dd></div>
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Documentscanner</dt><dd id="scanner-status" class="muted small">controleren…</dd></div>' : ''}
+          ${(typeof Native !== 'undefined' && Native.isApp()) ? '<div><dt>Live Activity</dt><dd id="la-status" class="muted small">controleren…</dd></div>' : ''}
+          ${(typeof Native !== 'undefined' && Native.isApp() && Native.platform && Native.platform() === 'android') ? '<div><dt>Google-diensten</dt><dd id="gs-status" class="muted small">controleren…</dd></div>' : ''}
         </dl>
+        ${(typeof Native !== 'undefined' && Native.isApp()) ? `
+          <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .75rem;">
+            <button type="button" class="btn btn-sm" id="btn-la-test">▶︎ Test Live Activity</button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-la-stop">Stop</button>
+          </div>
+          <div id="la-test-result" class="muted small" style="margin-bottom:.5rem;"></div>
+          ${Native.platform && Native.platform() === 'android' ? `
+            <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .5rem;">
+              <button type="button" class="btn btn-sm" id="btn-gs-install">🛠 Zet alle Google-diensten aan</button>
+            </div>
+            <p class="muted small" style="margin-bottom:.75rem;">Vraagt Google Play Services om álle optionele modules (nu: documentscanner) én toekomstige uitbreidingen te downloaden en te activeren. Handig als je de vraag eerder hebt weggeklikt.</p>
+            <div id="gs-install-result" class="muted small" style="margin-bottom:.5rem;"></div>
+          ` : ''}
+        ` : ''}
         <div id="update-result"></div>
-        <div class="form-actions" style="justify-content:flex-start;">
+        <div class="form-actions" style="justify-content:flex-start;gap:.5rem;flex-wrap:wrap;">
           <button type="button" class="btn btn-primary" id="btn-check-update">Check op updates</button>
+          <button type="button" class="btn btn-ghost" id="btn-hard-reset" title="Wis alle lokale cache en service-worker, en herlaad alles vanaf de server">🧹 Reset volledig</button>
         </div>
-        <p class="muted small" style="margin-top:.5rem;">Forceert een controle op een nieuwere versie en herlaadt de service-worker. Daarna automatisch verversen.</p>
+        <p class="muted small" style="margin-top:.5rem;">
+          <strong>Check op updates</strong> haalt de laatste versie binnen.<br>
+          <strong>Reset volledig</strong> gebruik je alleen als de app vast blijft hangen op een oude versie — dossiers blijven veilig staan, alleen de offline-kopie wordt gewist.
+        </p>
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-beheer" style="border:2px solid #e6c46b;background:linear-gradient(180deg,#fffaee 0%,#fdf3d8 100%);">
+        <h2 style="display:flex;align-items:center;gap:.5rem;color:#7a5100;">🛠 Beheerdersmodus</h2>
+        <p class="muted" style="margin:.25rem 0 1rem;">Alleen zichtbaar voor beheerders. Schakel deze modus in om de kistencatalogus aan te passen.</p>
+        <form id="frm-beheermodus" style="display:flex;flex-direction:column;gap:.75rem;">
+          <label class="beheer-toggle" style="display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1rem;background:var(--surface);border-radius:.5rem;border:1px solid #e6c46b;cursor:pointer;">
+            <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''} style="margin-top:.2rem;width:1.2rem;height:1.2rem;flex:none;">
+            <div>
+              <strong style="display:block;margin-bottom:.15rem;">📦 Kistencatalogus beheren</strong>
+              <span class="muted small">Voeg nieuwe kisten toe, wijzig prijzen, upload foto's of verberg kisten die je niet meer gebruikt. Toont een "+ Kist toevoegen" knop en bewerk-icoontjes op elke kist-kaart.</span>
+            </div>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;">
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card narrow" id="acc-gegevens">
         <h2>Mijn gegevens</h2>
         <form id="profile-form" class="form" autocomplete="off">
           <label>
@@ -108,7 +410,7 @@ function renderAccount(msg) {
           </div>
         </form>
       </section>
-      <section class="card narrow">
+      <section class="card narrow" id="acc-wachtwoord">
         <h2>Wachtwoord wijzigen</h2>
         ${msg && msg.error ? `<div class="alert alert-error">${esc(msg.error)}</div>` : ''}
         ${msg && msg.success ? `<div class="alert alert-success">${esc(msg.success)}</div>` : ''}
@@ -118,7 +420,7 @@ function renderAccount(msg) {
           <button type="submit" class="btn btn-primary">Wachtwoord wijzigen</button>
         </form>
       </section>
-      <section class="card narrow">
+      <section class="card narrow" id="acc-branding">
         <h2>Branding</h2>
         <p class="muted small">Logo, naam en kleuren van de app aanpassen.</p>
         ${(() => {
@@ -154,7 +456,7 @@ function renderAccount(msg) {
                 <div class="logo-preview" id="logo-preview">
                   ${s.logo_data_url
                     ? `<img src="${esc(s.logo_data_url)}" alt="Logo">`
-                    : '<span>✝</span>'}
+                    : '<span>OZN</span>'}
                 </div>
                 <div class="logo-actions">
                   <label class="btn btn-sm">Bestand kiezen<input type="file" name="logo_file" accept="image/*" hidden id="logo-input"></label>
@@ -217,12 +519,21 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-weergave">
         <h2>Weergave</h2>
         ${(() => {
           const s = Settings.all();
           return `
           <form id="ui-form" class="form" autocomplete="off">
+            <label>
+              <span>Ontwerp</span>
+              <select name="design_version">
+                <option value="v1" ${(s.design_version||'v1')==='v1'?'selected':''}>v1 — klassieke bovenbalk (zoals vanouds)</option>
+                <option value="v2" ${s.design_version==='v2'?'selected':''}>v2 — nieuw ontwerp met zijbalk</option>
+              </select>
+              <span class="muted small">Wissel tussen het nieuwe ontwerp met zijbalk (v2) en de vertrouwde bovenbalk-indeling (v1).</span>
+            </label>
+
             <label>
               <span>Lettertype</span>
               <select name="font_id" id="font-select">
@@ -242,8 +553,8 @@ function renderAccount(msg) {
               <span class="muted small">Past de grootte van invulvelden en spacing in formulieren aan.</span>
             </label>
             <div class="font-preview" id="font-preview">
-              <h3 style="margin:0 0 .25rem;">In den naam van de Vader</h3>
-              <p style="margin:0;">De familie nodigt u uit voor de uitvaart van een geliefde. <em>Mor Severios</em> · 14:00 uur · Hengelo. Aansluitend condoleance met koffie en simit.</p>
+              <h3 style="margin:0 0 .25rem;">Overledenenzorg Nederland</h3>
+              <p style="margin:0;">Voorbeeldtekst — zo ziet dit lettertype eruit in de app. <em>Dossier 2026-001</em> · opbaren, verzorging en vervoer op één plek.</p>
             </div>
             <label class="checkbox-inline" style="font-size:.95rem;">
               <input type="checkbox" name="compact_mode" ${s.compact_mode ? 'checked' : ''}>
@@ -253,10 +564,10 @@ function renderAccount(msg) {
               <input type="checkbox" name="rounded_cards" ${s.rounded_cards ? 'checked' : ''}>
               Afgeronde hoeken (uit = strakke vierkante stijl)
             </label>
-            <label class="checkbox-inline" style="font-size:.95rem;">
-              <input type="checkbox" name="catalog_admin_mode" ${s.catalog_admin_mode ? 'checked' : ''}>
-              Beheermodus voor catalogi (toont knoppen om foto's te vervangen, bloemen/eten-producten toe te voegen of te verwijderen)
-            </label>
+            <p class="muted small" style="margin:.5rem 0 0;padding:.5rem;background:#fdf3d8;border-radius:.35rem;border:1px solid #e6c46b;">
+              🛠 <strong>Beheerdersmodus</strong> (kistencatalogus / formulier-labels bewerken)
+              staat nu bovenaan deze pagina in een aparte sectie. <a href="#/account#acc-beheer">Ga daarheen →</a>
+            </p>
             <div class="form-actions" style="justify-content:flex-end;">
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
@@ -265,39 +576,40 @@ function renderAccount(msg) {
       </section>
 
       <section class="card narrow" id="email-instellingen">
-        <h2>E-mail verzenden (automatisch)</h2>
+        <h2>E-mail verzenden (server-side)</h2>
         <p class="muted small">
-          Standaard openen de e-mail-knoppen je mail-app met de tekst klaar.
-          Wil je dat de app de e-mail <strong>direct verstuurt</strong> (geen mail-app nodig),
-          koppel dan een gratis EmailJS-account.
+          De app stuurt e-mails direct via <strong>Brevo</strong> (voorheen
+          Sendinblue) vanuit een geverifieerd adres. Werkt met elk e-mailadres
+          (ook @hotmail.com/@gmail.com) na een simpele click-verificatie.
+          Geen mail-app openen, geen 2FA-gedoe.
         </p>
-
         <details style="margin: .5rem 0 1rem;">
-          <summary style="cursor:pointer; font-weight:600;">Eenmalige setup (5 minuten) — klik voor instructies</summary>
+          <summary style="cursor:pointer; font-weight:600;">Eenmalige serversetup (beheerder)</summary>
           <ol class="muted small" style="padding-left:1.5rem; line-height:1.55; margin-top:.5rem;">
-            <li>Maak een gratis account op <a href="https://emailjs.com" target="_blank" rel="noopener">emailjs.com</a> (200 mails/maand gratis)</li>
-            <li>In <strong>Email Services</strong>: voeg je Gmail of Outlook toe en klik <em>Connect Account</em>. Onthoud de <strong>Service ID</strong> (begint met <code>service_</code>)</li>
-            <li>In <strong>Email Templates</strong>: maak een nieuw template aan
-              <ul>
-                <li>To Email: <code>{{to_email}}</code></li>
-                <li>From Name: <code>{{from_name}}</code></li>
-                <li>Subject: <code>{{subject}}</code></li>
-                <li>Content: <code>{{message}}</code></li>
-              </ul>
-              Sla op en onthoud de <strong>Template ID</strong> (begint met <code>template_</code>)
+            <li>Maak een gratis account op <a href="https://www.brevo.com" target="_blank" rel="noopener">brevo.com</a> (300 mails/dag gratis).</li>
+            <li>Ga naar <strong>Senders, Domains &amp; Dedicated IPs</strong> → <em>Senders</em> → <em>Add a sender</em>. Vul je e-mailadres in (bv. <code>ozndossier@hotmail.com</code>). Brevo stuurt je een verificatiemail — klik de link.</li>
+            <li>Ga naar <strong>SMTP &amp; API</strong> → tab <em>API Keys</em> → <em>Generate a new API key</em>. Kopieer 'm.</li>
+            <li>Stel de secrets in bij Supabase (Project Settings → Edge Functions → Secrets):
+              <pre style="background:#f6f4ef;padding:.5rem .75rem;border-radius:6px;overflow-x:auto;">BREVO_API_KEY   = xkeysib-xxxxx...
+EMAIL_FROM      = ozndossier@hotmail.com
+EMAIL_FROM_NAME = OZN</pre>
             </li>
-            <li>In <strong>Account → General</strong>: kopieer je <strong>Public Key</strong></li>
-            <li>Plak alle drie hieronder en klik <em>Test verzenden</em></li>
+            <li>Test onderaan met <em>Test verzenden</em>.</li>
           </ol>
+          <p class="muted small" style="margin-top:.5rem;">
+            Brevo-limieten: 300 mails/dag gratis (geen dagcap in Edge Function; deze zit ingebouwd op 60/uur/user).
+          </p>
         </details>
 
         ${(() => {
           const s = Settings.all();
           return `
           <form id="email-form" class="form" autocomplete="off">
-            <label><span>EmailJS Public Key</span><input type="text" name="emailjs_public_key" value="${esc(s.emailjs_public_key)}" placeholder="bv. xK_abc123..."></label>
-            <label><span>EmailJS Service ID</span><input type="text" name="emailjs_service_id" value="${esc(s.emailjs_service_id)}" placeholder="bv. service_abc123"></label>
-            <label><span>EmailJS Template ID</span><input type="text" name="emailjs_template_id" value="${esc(s.emailjs_template_id)}" placeholder="bv. template_abc123"></label>
+            <label>
+              <span>📧 Auto-mail dossier bij opslaan naar</span>
+              <input type="email" name="auto_send_dossier_email" value="${esc(s.auto_send_dossier_email)}" placeholder="leeg = uit">
+              <span class="muted small">Elke keer dat een dossier wordt aangemaakt of bewerkt, wordt er automatisch een kopie verstuurd naar dit adres. Laat leeg om uit te schakelen.</span>
+            </label>
             <label><span>Test-e-mailadres (voor verificatie)</span><input type="email" name="email_test_to" placeholder="bv. je eigen e-mail"></label>
             <div id="email-test-result"></div>
             <div class="form-actions" style="justify-content:space-between;">
@@ -308,95 +620,392 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow" id="parochies">
-        <h2>Parochies &amp; priesters</h2>
-        <p class="muted small">Bepaal welke parochies in de intake-dropdown verschijnen. Vul per parochie een vaste priester (Aboona) in — die wordt automatisch overgenomen in het dossier zodra de parochie is gekozen.</p>
+      <section class="card narrow" id="email-footer-instellingen">
+        <h2>E-mail handtekening / footer</h2>
+        <p class="muted small">Donker balkje onderaan élke verzonden mail (dossier &amp; factuur). Laat een veld leeg om dat onderdeel weg te laten.</p>
         ${(() => {
-          const lijst = Settings.get('parochies') || [];
+          const s = Settings.all();
           return `
-          <form id="parochie-form" class="form" autocomplete="off">
-            <div id="parochie-rows" class="parochie-rows">
-              ${lijst.map((p, i) => `
-                <div class="parochie-row" data-idx="${i}">
-                  <input type="text" class="parochie-naam" value="${esc(p.naam || '')}" placeholder="bv. Mor Severios — Hengelo">
-                  <input type="text" class="parochie-priester" value="${esc(p.priester || '')}" placeholder="standaard-priester (optioneel)">
-                  <button type="button" class="btn-icon" data-action="del-parochie" title="verwijderen">×</button>
-                </div>`).join('')}
-            </div>
-            <div class="grid-3" style="margin-top:.85rem;gap:.75rem;">
-              <label class="span-2"><span>Standaard kerk / dienstlocatie</span>
-                <input type="text" name="default_kerk_locatie" value="${esc(Settings.get('default_kerk_locatie') || '')}" placeholder="bv. Maria kathedraal">
-                <span class="muted small">Wordt vooraf ingevuld bij elk nieuw dossier.</span>
-              </label>
-              <label><span>Standaard begraafplaats</span>
-                <input type="text" name="default_begraafplaats" value="${esc(Settings.get('default_begraafplaats') || '')}" placeholder="bv. St. Ephrem">
-              </label>
-            </div>
-            <div class="form-actions" style="justify-content:space-between;">
-              <button type="button" class="btn btn-ghost" id="btn-add-parochie">+ Parochie toevoegen</button>
-              <button type="submit" class="btn btn-primary">Opslaan</button>
-            </div>
-          </form>`;
-        })()}
-      </section>
-
-      <section class="card narrow" id="verzekeringen">
-        <h2>Verzekeringsmaatschappijen &amp; pakketten</h2>
-        <p class="muted small">Suggesties die in de intake-dropdown verschijnen wanneer een dossier 'met verzekering' is. Vul per pakket een standaard-dekkingsbedrag in — dat wordt automatisch overgenomen in het dossier zodra het pakket is gekozen.</p>
-        ${(() => {
-          const ms = Settings.get('verzekering_maatschappijen') || [];
-          const pk = (Settings.get('verzekering_pakketten') || []).map(p =>
-            typeof p === 'string' ? { naam: p, dekking: '' } : p);
-          return `
-          <form id="verz-form" class="form" autocomplete="off">
-            <label><span>Maatschappijen (één per regel)</span>
-              <textarea name="maatschappijen" rows="6" placeholder="DELA&#10;Monuta&#10;...">${esc(ms.join('\n'))}</textarea>
+          <form id="email-footer-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="email_footer_enabled" ${s.email_footer_enabled ? 'checked' : ''}>
+              Footer toevoegen aan uitgaande e-mails
             </label>
-            <div>
-              <span class="muted small" style="display:block;margin-bottom:.35rem;">Pakketten + standaard-dekking</span>
-              <div id="pakket-rows" class="parochie-rows">
-                ${pk.map(p => `
-                  <div class="parochie-row">
-                    <input type="text" class="pakket-naam" value="${esc(p.naam || '')}" placeholder="bv. Uitgebreid pakket">
-                    <input type="text" class="pakket-dekking" value="${esc(p.dekking || '')}" inputmode="decimal" placeholder="standaard-dekking €">
-                    <button type="button" class="btn-icon" data-action="del-pakket" title="verwijderen">×</button>
-                  </div>`).join('')}
-              </div>
+            <label>
+              <span>Adres (één regel)</span>
+              <input type="text" name="email_footer_address" value="${esc(s.email_footer_address)}" placeholder="OZN Vastgoed B.V. · Oldenzaal" maxlength="200">
+            </label>
+            <div class="grid-2" style="gap:.85rem;">
+              <label>
+                <span>Telefoon</span>
+                <input type="tel" name="email_footer_phone" value="${esc(s.email_footer_phone)}" placeholder="bv. 053 538 4054">
+              </label>
+              <label>
+                <span>E-mail</span>
+                <input type="email" name="email_footer_email" value="${esc(s.email_footer_email)}" placeholder="info@ozn.nl">
+              </label>
+              <label class="span-2">
+                <span>Website</span>
+                <input type="text" name="email_footer_website" value="${esc(s.email_footer_website)}" placeholder="www.ozn.nl">
+              </label>
+              <label>
+                <span>Algemene Voorwaarden (URL)</span>
+                <input type="url" name="email_footer_terms_url" value="${esc(s.email_footer_terms_url)}" placeholder="https://...">
+              </label>
+              <label>
+                <span>Privacy Voorwaarden (URL)</span>
+                <input type="url" name="email_footer_privacy_url" value="${esc(s.email_footer_privacy_url)}" placeholder="https://...">
+              </label>
+              <label>
+                <span>Facebook (URL)</span>
+                <input type="url" name="email_footer_facebook_url" value="${esc(s.email_footer_facebook_url)}" placeholder="https://facebook.com/...">
+              </label>
+              <label>
+                <span>Instagram (URL)</span>
+                <input type="url" name="email_footer_instagram_url" value="${esc(s.email_footer_instagram_url)}" placeholder="https://instagram.com/...">
+              </label>
             </div>
-            <div class="form-actions" style="justify-content:space-between;">
-              <button type="button" class="btn btn-ghost" id="btn-add-pakket">+ Pakket toevoegen</button>
+            <div class="form-actions" style="justify-content:flex-end;">
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
           </form>`;
         })()}
       </section>
 
-      <section class="card narrow" id="handtekeningen">
-        <h2>Handtekening-velden</h2>
-        <p class="muted small">Bepaal welke handtekeningen worden gevraagd bij het aanmaken/bewerken van een dossier. Verplichte velden moeten ingevuld zijn voor opslaan.</p>
+      <section class="card narrow" id="factuur-instellingen">
+        <h2>Factuurgegevens</h2>
+        <p class="muted small">Deze gegevens staan bovenaan de PDF-factuur (bedrijfskop + betaalgegevens).</p>
+        <form id="factuur-form" class="form" autocomplete="off">
+          <label><span>Bedrijfsnaam</span><input type="text" name="factuur_bedrijfsnaam" value="${esc(s.factuur_bedrijfsnaam || '')}"></label>
+          <label><span>Adres (2 regels toegestaan)</span><textarea name="factuur_adres" rows="2">${esc(s.factuur_adres || '')}</textarea></label>
+          <div class="grid-2" style="gap:.75rem;">
+            <label><span>Telefoon</span><input type="text" name="factuur_telefoon" value="${esc(s.factuur_telefoon || '')}"></label>
+            <label><span>E-mail</span><input type="text" name="factuur_email" value="${esc(s.factuur_email || '')}"></label>
+          </div>
+          <label><span>IBAN</span><input type="text" name="factuur_iban" value="${esc(s.factuur_iban || '')}"></label>
+          <div class="grid-3" style="gap:.75rem;">
+            <label><span>Btw-nr</span><input type="text" name="factuur_btw" value="${esc(s.factuur_btw || '')}"></label>
+            <label><span>KvK</span><input type="text" name="factuur_kvk" value="${esc(s.factuur_kvk || '')}"></label>
+            <label><span>Betalingstermijn (dagen)</span><input type="number" name="factuur_betalingstermijn_dagen" value="${esc(s.factuur_betalingstermijn_dagen || 30)}" min="0" step="1"></label>
+          </div>
+          <div class="form-actions" style="justify-content:space-between;align-items:center;">
+            <span class="muted small">Laatste factuurnummer: <strong>${esc(Settings.get('factuur_volgnr') || 0)}</strong></span>
+            <button type="submit" class="btn btn-primary">Opslaan</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card narrow" id="push-instellingen">
+        <h2>Push-notificaties</h2>
+        <p class="muted small">
+          Krijg een melding op je telefoon/iPad wanneer er een uitvaart aankomt (standaard 1 dag van tevoren).
+          Werkt op Chrome, Safari (iOS 16.4+, app moet 'op beginscherm' staan) en Android.
+        </p>
+        <div id="push-status" class="alert" style="margin-bottom:.75rem;">Laden…</div>
         ${(() => {
-          const fields = Settings.get('signature_fields') || [];
+          const s = Settings.all();
           return `
-          <form id="sig-form" class="form" autocomplete="off">
-            <div id="sig-rows">
-              ${fields.map((f, i) => `
-                <div class="sig-row" data-idx="${i}">
-                  <input type="text" class="sig-label" value="${esc(f.label)}" placeholder="bv. Handtekening opdrachtgever">
-                  <label class="checkbox-inline" style="font-size:.85rem;white-space:nowrap;">
-                    <input type="checkbox" class="sig-required" ${f.required ? 'checked' : ''}> verplicht
-                  </label>
-                  <button type="button" class="btn-icon" data-action="del-sig" data-idx="${i}" title="verwijderen">×</button>
+          <form id="push-form" class="form" autocomplete="off">
+            <label>
+              <span>VAPID public key</span>
+              <input type="text" name="push_vapid_public_key" value="${esc(s.push_vapid_public_key)}" placeholder="bv. BNb1...long base64-url string">
+              <span class="muted small">Eenmalig in te stellen. Zie <code>docs/push-setup.md</code> voor hoe je deze sleutels maakt.</span>
+            </label>
+            <label>
+              <span>Aantal dagen vooraf herinneren</span>
+              <input type="number" name="push_remind_days_ahead" value="${esc(s.push_remind_days_ahead)}" min="0" max="14" step="1">
+            </label>
+            <div class="form-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-ghost" id="btn-push-enable">🔔 Inschakelen op dit apparaat</button>
+                <button type="button" class="btn btn-ghost" id="btn-push-disable" hidden>🔕 Uitschakelen</button>
+                <button type="button" class="btn btn-ghost" id="btn-push-test">Test-melding</button>
+              </div>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow" id="snelstart-instellingen">
+        <h2>SnelStart-koppeling (boekhouding)</h2>
+        <p class="muted small">
+          Koppel je SnelStart-administratie om straks facturen/boekingen te kunnen versturen.
+          Vraag in je SnelStart-account de <strong>B2B API-sleutels</strong> aan: een
+          <strong>Subscription key</strong> (API-gateway) en een <strong>Client key</strong>
+          (per administratie). Vul ze hieronder in en klik op <strong>Test verbinding</strong>.
+        </p>
+        ${(() => {
+          const s = Settings.all();
+          return `
+          <form id="snelstart-form" class="form" autocomplete="off">
+            <label class="checkbox-inline" style="font-size:.95rem;">
+              <input type="checkbox" name="snelstart_actief" ${s.snelstart_actief ? 'checked' : ''}>
+              Koppeling actief
+            </label>
+            <label>
+              <span>Subscription key</span>
+              <input type="password" name="snelstart_subscription_key" value="${esc(s.snelstart_subscription_key)}" placeholder="Ocp-Apim-Subscription-Key" autocomplete="off">
+            </label>
+            <label>
+              <span>Client key</span>
+              <input type="password" name="snelstart_client_key" value="${esc(s.snelstart_client_key)}" placeholder="clientkey van je administratie" autocomplete="off">
+              <span class="muted small">De sleutels worden veilig in de cloud-instellingen bewaard en alleen via een beveiligde server-functie naar SnelStart gestuurd (nooit rechtstreeks vanuit de browser).</span>
+            </label>
+            <div id="snelstart-result"></div>
+            <div class="form-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-ghost" id="btn-snelstart-test">⇄ Test verbinding</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      <section class="card narrow" id="profielen">
+        <h2>Profielen — "Wie werkt vandaag?"</h2>
+        <p class="muted small">De namen die verschijnen op het profielkeuze-scherm. Elke profiel heeft ook een <strong>rol</strong> — die bepaalt of dat profiel prijzen en archief mag zien. Een medewerker-profiel op een beheerder-account krijgt de medewerker-view.</p>
+        ${(() => {
+          const lijst = (Settings.get('profielen') || []);
+          return `
+          <form id="profielen-form" class="form" autocomplete="off">
+            <p class="muted small" style="margin:0 0 .5rem;">Beheerder-profielen kunnen een 4- of 6-cijferige pincode krijgen. De pincode wordt gevraagd zodra iemand op het profiel tikt bij "Wie werkt vandaag?". Elke beheerder kan alleen z'n eigen pincode wijzigen — de andere pincodes staan op slot.</p>
+            <div id="profielen-rows" class="profielen-rows">
+              ${(() => {
+                const actiefId = (ActiveProfile.current() || {}).id;
+                return lijst.map((p, i) => {
+                  const isEigen = actiefId && p.id === actiefId;
+                  const heeftPin = !!(p.pincode);
+                  // Zichtbare waarde: alleen bij eigen profiel de echte pincode
+                  // tonen; bij andermans profielen tonen we asterisken (of leeg)
+                  // en staat het veld op read-only zodat je hem niet kunt wissen.
+                  const shownPin = isEigen ? (p.pincode || '') : (heeftPin ? '••••' : '');
+                  const pinAttrs = isEigen
+                    ? ''
+                    : 'readonly tabindex="-1" title="Alleen de eigenaar van dit profiel kan de pincode wijzigen"';
+                  return `
+                <div class="profielen-row" data-idx="${i}" data-profiel-id="${esc(p.id)}">
+                  <span class="profielen-avatar" style="background:${esc(p.color || '#6b1e2a')};">${esc((p.name || '?').charAt(0).toUpperCase())}</span>
+                  <input type="text" class="profielen-naam" value="${esc(p.name || '')}" placeholder="Naam" maxlength="40">
+                  <select class="profielen-rol" title="Rol van dit profiel">
+                    <option value="medewerker" ${p.rol !== 'beheerder' ? 'selected' : ''}>Medewerker</option>
+                    <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
+                  </select>
+                  <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" value="${esc(shownPin)}" placeholder="pincode" ${pinAttrs} style="width:6rem;${p.rol === 'beheerder' ? '' : 'visibility:hidden;'}${isEigen ? '' : 'background:#f0ede4;color:var(--muted);cursor:not-allowed;'}">
+                  <input type="color" class="profielen-kleur" value="${esc(p.color || '#6b1e2a')}" title="Kleur van de avatar">
+                  <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${i}" title="Verwijderen">×</button>
+                </div>`;
+                }).join('');
+              })()}
+            </div>
+            <div class="form-actions" style="justify-content:space-between;">
+              <button type="button" class="btn btn-ghost" id="btn-add-profiel">+ Profiel toevoegen</button>
+              <button type="submit" class="btn btn-primary">Opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>
+
+      ${Auth.isBeheerder() ? `
+      <section class="card narrow" id="rollen">
+        <h2>Medewerkers &amp; rollen</h2>
+        <p class="muted small">Beheerders zien alles. Medewerkers zien geen afgesloten dossiers en geen prijzen.</p>
+        <details style="margin-bottom:.75rem;">
+          <summary style="cursor:pointer; font-weight:600; color:var(--primary,#2563eb);">+ Nieuwe medewerker toevoegen</summary>
+          <form id="nieuwe-medewerker-form" class="form" autocomplete="off" style="margin-top:.5rem; display:flex; flex-direction:column; gap:.5rem;">
+            <label><span>Naam</span><input type="text" name="naam" required placeholder="bv. Rume"></label>
+            <label><span>E-mail</span><input type="email" name="email" required placeholder="rume@ozn.nl"></label>
+            <label><span>Tijdelijk wachtwoord <span class="muted small">(min. 8 tekens — deel per SMS/mondeling met de medewerker)</span></span>
+              <input type="text" name="password" required minlength="8" placeholder="min. 8 tekens">
+            </label>
+            <label><span>Rol</span>
+              <select name="rol">
+                <option value="medewerker" selected>Medewerker</option>
+                <option value="beheerder">Beheerder</option>
+              </select>
+            </label>
+            <div class="form-actions" style="justify-content:flex-end;">
+              <button type="submit" class="btn btn-primary">Account aanmaken</button>
+            </div>
+            <div id="nieuwe-medewerker-status" class="muted small"></div>
+          </form>
+        </details>
+        ${(() => {
+          const lijst = DB.list(KEYS.PROFIELEN) || [];
+          const mij = (Auth.current() || {}).id;
+          if (!lijst.length) return '<p class="muted">Nog geen accounts geladen.</p>';
+          return `<form id="rollen-form" class="form" autocomplete="off">
+            <div style="display:flex; flex-direction:column; gap:.5rem;">
+              ${lijst.map(p => `
+                <div class="parochie-row" style="align-items:center;">
+                  <span style="flex:1;">${esc(p.naam || p.id)}${p.id === mij ? ' <span class="muted small">(jij)</span>' : ''}</span>
+                  <select class="rol-select" data-id="${esc(p.id)}" ${p.id === mij ? 'disabled title="Je kunt je eigen rol niet wijzigen"' : ''}>
+                    <option value="medewerker" ${p.rol === 'medewerker' ? 'selected' : ''}>Medewerker</option>
+                    <option value="beheerder" ${p.rol === 'beheerder' ? 'selected' : ''}>Beheerder</option>
+                  </select>
+                </div>`).join('')}
+            </div>
+            <div class="form-actions" style="justify-content:flex-end; margin-top:.75rem;">
+              <button type="submit" class="btn btn-primary">Rollen opslaan</button>
+            </div>
+          </form>`;
+        })()}
+      </section>` : ''}
+
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="cloud-storage">
+        <h2>Cloudflare R2 (dossier-opslag)</h2>
+        <p class="muted small">10 GB opslag voor dossier-PDF's, foto's en scans op Cloudflare R2 (EU-jurisdictie). Nieuwe uploads gaan automatisch naar R2. Bestaande bestanden staan nog op Supabase Storage tot je ze migreert.</p>
+        <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+          <span id="r2-test-status" class="muted small">Klik Testen om de verbinding te checken.</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-r2-test">🔌 Test R2-verbinding</button>
+        </div>
+        <hr style="margin:.85rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
+        ${(() => {
+          const werk = (typeof R2Migratie !== 'undefined') ? R2Migratie.verzamel().length : 0;
+          const rework = (typeof R2Reorg !== 'undefined') ? R2Reorg.verzamel().length : 0;
+          return `
+            <p class="small" style="margin:0 0 .5rem;">
+              <strong>Migratie Supabase Storage → R2</strong><br>
+              <span class="muted">Verplaatst alle bestaande dossier-bestanden (artsverklaringen, overdraagformulieren, bezittingen-foto's) naar R2 en verwijdert ze uit Supabase Storage.</span>
+            </p>
+            <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+              <span id="r2-migratie-status" class="muted small">${werk === 0 ? '✓ Alles staat al op R2.' : `${werk} bestand${werk === 1 ? '' : 'en'} nog op Supabase Storage.`}</span>
+              <button type="button" class="btn ${werk === 0 ? 'btn-ghost' : ''}" id="btn-r2-migreer" ${werk === 0 ? 'disabled' : ''}>${werk === 0 ? 'Niks te migreren' : `🚀 Migreer ${werk} naar R2`}</button>
+            </div>
+            <div id="r2-migratie-log" class="muted small" style="margin-top:.5rem; max-height:200px; overflow-y:auto; font-family:monospace; font-size:.72rem; white-space:pre-wrap;"></div>
+            <hr style="margin:.85rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
+            <p class="small" style="margin:0 0 .5rem;">
+              <strong>Opnieuw ordenen op dossier</strong><br>
+              <span class="muted">Verplaatst losse R2-bestanden naar submap per dossier (bv. artsverklaring/Achternaam_D42/). Server-side kopie, snel.</span>
+            </p>
+            <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+              <span id="r2-reorg-status" class="muted small">${rework === 0 ? '✓ Alles staat al in de juiste submap.' : `${rework} bestand${rework === 1 ? '' : 'en'} nog los.`}</span>
+              <button type="button" class="btn ${rework === 0 ? 'btn-ghost' : ''}" id="btn-r2-reorg" ${rework === 0 ? 'disabled' : ''}>${rework === 0 ? 'Niks te ordenen' : `📁 Order ${rework} in submappen`}</button>
+            </div>
+            <div id="r2-reorg-log" class="muted small" style="margin-top:.5rem; max-height:200px; overflow-y:auto; font-family:monospace; font-size:.72rem; white-space:pre-wrap;"></div>
+          `;
+        })()}
+      </section>
+
+      <section class="card narrow" id="archief">
+        <h2>Archief</h2>
+        <p class="muted small">Dossiers kunnen handmatig gearchiveerd worden vanuit het detailscherm. Wil je dat afgehandelde dossiers (rouwauto geweest + alle datums voorbij) automatisch naar het archief gaan? Zet 't hieronder aan. Medewerkers zien het archief niet — tenzij je dat toestaat (server-side afgedwongen).</p>
+        <form id="archief-form" class="form" autocomplete="off">
+          <label class="checkbox-inline"><input type="checkbox" name="auto_archief_actief" ${Settings.get('auto_archief_actief') ? 'checked' : ''}> Automatisch archiveren aanzetten <span class="muted small">(standaard uit)</span></label>
+          <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_archief" ${Settings.get('medewerker_ziet_archief') ? 'checked' : ''}> Medewerkers mogen het archief zien</label>
+          <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+        <hr style="margin:1rem 0; border:none; border-top:1px solid var(--border,#e5e0d6);">
+        <p class="muted small">Foto's en scans van archief-dossiers worden bij archivering automatisch flink kleiner opgeslagen. Als je oude dossiers hebt die dat nog niet zijn (van vóór deze update), kun je alles hieronder ineens comprimeren.</p>
+        <div class="form-actions" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+          <span id="archief-compressie-status" class="muted small">${(() => {
+            const n = DB.where(KEYS.DOSSIERS, x => x.gearchiveerd).length;
+            return `${n} dossier${n === 1 ? '' : 's'} in archief`;
+          })()}</span>
+          <button type="button" class="btn" id="btn-comprimeer-archief">🗜 Comprimeer archief-foto's</button>
+        </div>
+      </section>` : ''}
+
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="prijzen">
+        <h2>Prijzen</h2>
+        <p class="muted small">Gewone medewerkers zien standaard geen bedragen: ze zien de kostenposten wél (en kunnen ze aftikken), maar zonder euro's en zonder totalen. Dit wordt server-side afgedwongen.</p>
+        <form id="prijzen-form" class="form" autocomplete="off">
+          <label class="checkbox-inline"><input type="checkbox" name="medewerker_ziet_prijzen" ${Settings.get('medewerker_ziet_prijzen') ? 'checked' : ''}> Medewerkers mogen prijzen zien</label>
+          <div class="form-actions" style="justify-content:flex-end; margin-top:.5rem;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+      </section>
+
+      <section class="card narrow" id="kostenposten">
+        <h2>Kostenposten beheren</h2>
+        <p class="muted small">Beheer hier de standaard-kostenposten die medewerkers via 'Snel toevoegen' in een dossier kunnen prikken. Pas prijs aan, verberg posten die je niet meer gebruikt, of voeg een eigen post toe. Wijzigingen gelden voor alle dossiers.</p>
+        ${(() => {
+          const lijst = effectieveKostenPresets({ includeHidden: true }).filter(p => !p.nav);
+          return `
+          <table class="table kosten-beheer-table">
+            <thead><tr><th>Omschrijving</th><th>Categorie</th><th class="num">Prijs</th><th></th></tr></thead>
+            <tbody>
+              ${lijst.map(p => {
+                const bedrag = p.bedrag != null ? (Number(p.bedrag) || 0).toFixed(2).replace('.', ',') : '';
+                return `<tr class="${p._hidden ? 'is-verborgen' : ''}" data-oms="${esc(p.omschrijving)}">
+                  <td><strong>${esc(p.omschrijving)}</strong>${p._custom ? ' <span class="badge badge-amber" title="Zelf toegevoegd">eigen</span>' : ''}${p.vraagPrijs ? ' <span class="badge badge-amber" title="Richtprijs">±</span>' : ''}${p.food ? ' <span class="badge badge-amber" title="Aantal × prijs per stuk">×N</span>' : ''}</td>
+                  <td class="muted small">${esc(categorieLabel(p.categorie))}</td>
+                  <td class="num"><input type="text" inputmode="decimal" class="kb-prijs" value="${esc(bedrag)}" placeholder="0,00" style="max-width:110px;text-align:right;"></td>
+                  <td class="row-form" style="justify-content:flex-end;gap:.35rem;">
+                    <button type="button" class="btn btn-sm" data-kb-save title="Prijs opslaan">💾</button>
+                    ${p._customBedrag ? '<button type="button" class="btn btn-sm btn-ghost" data-kb-reset title="Terug naar standaardprijs">↺</button>' : ''}
+                    ${p._hidden
+                      ? '<button type="button" class="btn btn-sm btn-ghost" data-kb-show title="Weer tonen">👁</button>'
+                      : '<button type="button" class="btn btn-sm btn-ghost" data-kb-hide title="Verbergen uit lijst">🗑</button>'}
+                    ${p._custom ? '<button type="button" class="btn btn-sm btn-ghost btn-danger" data-kb-del title="Definitief verwijderen (alleen eigen posten)">✕</button>' : ''}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <details style="margin-top:.75rem;">
+            <summary style="cursor:pointer;"><strong>+ Nieuwe kostenpost aanmaken</strong></summary>
+            <form id="kb-add-form" class="row-form" style="margin-top:.5rem;flex-wrap:wrap;gap:.4rem;">
+              <input type="text" name="omschrijving" placeholder="Omschrijving..." required style="flex:1;min-width:180px;">
+              <select name="categorie">
+                <option value="">Categorie</option>
+                ${KOSTEN_CATEGORIEEN.map(c => `<option value="${c.id}">${esc(c.label)}</option>`).join('')}
+              </select>
+              <input type="text" name="bedrag" placeholder="Prijs" inputmode="decimal" style="max-width:110px;">
+              <button type="submit" class="btn btn-sm btn-primary">+ Toevoegen</button>
+            </form>
+          </details>`;
+        })()}
+      </section>` : ''}
+
+      <section class="card narrow" id="opdrachtgevers">
+        <h2>Opdrachtgevers</h2>
+        <p class="muted small">De uitvaartleiders / klanten waarvoor jullie werken. Deze verschijnen in de opdrachtgever-dropdown bovenaan het dossier.</p>
+        ${(() => {
+          const lijst = Settings.get('opdrachtgevers') || [];
+          return `
+          <form id="opdrachtgever-form" class="form" autocomplete="off">
+            <p class="muted small" style="margin:.25rem 0 .5rem;">Sleep aan de <strong>≡</strong>-greep om de volgorde te veranderen. Klik Opslaan om te bewaren.</p>
+            <div id="opdrachtgever-rows" class="parochie-rows">
+              ${lijst.map((o, i) => `
+                <div class="parochie-row opdr-drag-row" draggable="true" data-idx="${i}">
+                  <span class="drag-grip" title="Sleep om te verplaatsen">≡</span>
+                  <input type="text" class="opdrachtgever-naam" value="${esc(o.naam || o || '')}" placeholder="bv. Uitvaartzorg Jansen">
+                  <button type="button" class="btn-icon" data-action="del-opdrachtgever" title="verwijderen">×</button>
                 </div>`).join('')}
             </div>
             <div class="form-actions" style="justify-content:space-between;">
-              <button type="button" class="btn btn-ghost" id="btn-add-sig">+ Veld toevoegen</button>
+              <button type="button" class="btn btn-ghost" id="btn-add-opdrachtgever">+ Opdrachtgever toevoegen</button>
               <button type="submit" class="btn btn-primary">Opslaan</button>
             </div>
           </form>`;
         })()}
       </section>
 
-      <section class="card narrow">
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="rouwauto-lijst-sectie">
+        <h2>Rouwauto's</h2>
+        <p class="muted small">De rouwauto's van OZN — deze verschijnen in de dropdown "Rouwauto" in het dossier. Eén per regel.</p>
+        <form id="rouwauto-form" class="form" autocomplete="off">
+          <label>
+            <textarea name="rouwauto_lijst" rows="4" placeholder="bv.&#10;Mercedes E-klasse (grijs)&#10;Volvo XC90 (zwart)">${esc((Settings.get('rouwauto_lijst') || []).join('\n'))}</textarea>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+      </section>
+
+      <section class="card narrow" id="rouwgoederen-sectie">
+        <h2>Rouwgoederen (thuis opbaren)</h2>
+        <p class="muted small">De vinkjes die in het dossier verschijnen bij "Benodigde rouwgoederen". Eén per regel.</p>
+        <form id="rouwgoederen-form" class="form" autocomplete="off">
+          <label>
+            <textarea name="rouwgoederen_opties" rows="6" placeholder="Airco&#10;Opbaarplank&#10;Koelplaat&#10;Schermen&#10;Kaarsen/Kruis&#10;Schragen&#10;Baarwagen&#10;Rok">${esc((Settings.get('rouwgoederen_opties') || []).join('\n'))}</textarea>
+          </label>
+          <div class="form-actions" style="justify-content:flex-end;"><button type="submit" class="btn btn-primary">Opslaan</button></div>
+        </form>
+      </section>` : ''}
+
+      <section class="card narrow" id="acc-welkom">
         <h2>Welkomscherm-instellingen</h2>
         <p class="muted small">Het welkomscherm verschijnt wanneer je de app opent. Online verdwijnt het automatisch; offline blijft het staan totdat je op "Verder" klikt.</p>
         ${(() => {
@@ -453,7 +1062,7 @@ function renderAccount(msg) {
         })()}
       </section>
 
-      <section class="card narrow">
+      <section class="card narrow" id="acc-data">
         <h2>Data &amp; synchronisatie</h2>
         ${(() => {
           const m = (() => { try { return JSON.parse(localStorage.getItem('sok_mirror') || '{}'); } catch (_) { return {}; } })();
@@ -461,19 +1070,15 @@ function renderAccount(msg) {
           const offline = !!Cloud.offline || !navigator.onLine;
           const cnt = {
             dossiers: DB.list(KEYS.DOSSIERS).length,
-            taken: DB.list(KEYS.TAKEN).length,
             kosten: DB.list(KEYS.KOSTEN).length,
             notities: DB.list(KEYS.NOTITIES).length,
-            documenten: DB.list(KEYS.DOCUMENTEN).length,
             kisten_fotos: DB.list(KEYS.KIST_AFBEELDINGEN).length,
-            bloemen: DB.list(KEYS.BLOEMEN).length,
-            eten_drinken: DB.list(KEYS.ETEN_DRINKEN).length,
           };
           return `
           <div class="alert ${offline ? 'alert-error' : 'alert-success'}" style="margin-bottom:.75rem;">
             <strong>${offline ? '⚠ Offline — leesmodus' : '✓ Veilig in de cloud'}</strong>
             <p class="muted small" style="margin:.35rem 0 0;color:inherit;opacity:.9;">
-              Alle dossiers, taken, kosten, notities, documenten, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
+              Alle dossiers, kosten, notities, foto's én instellingen worden opgeslagen in Supabase (EU-regio).
               ${offline
                 ? 'Op dit moment offline — wijzigingen kunnen pas worden opgeslagen zodra je weer internet hebt. Bestaande gegevens blijven veilig staan.'
                 : 'Op elk apparaat zichtbaar zodra je inlogt. localStorage wordt enkel als offline-kopie gebruikt — niets gaat verloren bij cache wissen of nieuwe browser.'}
@@ -481,15 +1086,15 @@ function renderAccount(msg) {
           </div>
           <dl class="dl" style="grid-template-columns: 1fr 1fr;">
             <div><dt>Dossiers</dt><dd><strong>${cnt.dossiers}</strong></dd></div>
-            <div><dt>Taken</dt><dd>${cnt.taken}</dd></div>
             <div><dt>Kostenposten</dt><dd>${cnt.kosten}</dd></div>
             <div><dt>Notities</dt><dd>${cnt.notities}</dd></div>
-            <div><dt>Documenten</dt><dd>${cnt.documenten}</dd></div>
-            <div><dt>Bloemstukken</dt><dd>${cnt.bloemen}</dd></div>
-            <div><dt>Eten &amp; drinken</dt><dd>${cnt.eten_drinken}</dd></div>
             <div><dt>Kistfoto's</dt><dd>${cnt.kisten_fotos}</dd></div>
             <div style="grid-column:span 2;"><dt>Laatst gesynchroniseerd</dt><dd>${lastSync ? lastSync.toLocaleString('nl-NL') : '—'}</dd></div>
           </dl>
+          ${(typeof Auth === 'undefined' || Auth.isBeheerder()) ? `
+          <div id="opslag-live" style="margin:.25rem 0 1rem;">
+            <div class="muted small">Opslaggebruik (Supabase Free-plan) laden…</div>
+          </div>` : ''}
           <div class="form-actions" style="justify-content:flex-start; gap:.5rem; flex-wrap:wrap;">
             <button type="button" class="btn btn-primary" id="btn-sync-now" ${offline ? 'disabled' : ''}>Sync nu opnieuw</button>
             <button type="button" class="btn" id="btn-export">Exporteer alle data (JSON)</button>
@@ -497,6 +1102,15 @@ function renderAccount(msg) {
           <p class="muted small" style="margin-top:.75rem;">
             Een JSON-export geeft je een volledig lokaal back-upbestand met alle dossiergegevens — voor in een veilige map of op een externe schijf, los van Supabase.
           </p>
+
+          ${(typeof Auth === 'undefined' || Auth.isBeheerder()) ? `
+          <div id="backup-lijst" style="margin-top:1rem;">
+            <h3 style="margin:0 0 .35rem;font-size:.95rem;">Automatische backups</h3>
+            <div class="muted small">Wordt elke maandag om 03:00 UTC automatisch gemaakt (laatste 12 bewaard).</div>
+            <ul id="backup-items" class="muted small" style="margin:.4rem 0 0;padding:0;list-style:none;">
+              <li>laden…</li>
+            </ul>
+          </div>` : ''}
 
           <details style="margin-top:1rem;">
             <summary style="cursor:pointer; font-weight:600;">Wat zijn de limieten van het Supabase Free-plan?</summary>
@@ -517,6 +1131,15 @@ function renderAccount(msg) {
           </details>`;
         })()}
       </section>
+
+      ${(typeof Auth !== 'undefined' && Auth.isBeheerder()) ? `
+      <section class="card narrow" id="acc-logboek" style="margin-top:1rem;">
+        <h2>Logboek</h2>
+        <p class="muted small">Volledig audit-log van alle wijzigingen, logins en profielwissels. Alleen zichtbaar voor beheerders.</p>
+        <div class="form-actions" style="justify-content:flex-start;">
+          <a href="#/logboek" class="btn btn-primary">📖 Open logboek</a>
+        </div>
+      </section>` : ''}
     </div>`;
 
   // Branding-instellingen
@@ -527,34 +1150,52 @@ function renderAccount(msg) {
     $('#logo-input').addEventListener('change', async e => {
       const file = e.target.files[0];
       if (!file) return;
-      if (!file.type.startsWith('image/')) return alert('Alleen afbeeldingen toegestaan.');
-      if (file.size > 1024 * 1024) return alert('Logo te groot (max. 1 MB).');
-      if (!navigator.onLine) return alert('Logo uploaden kan alleen met internet (gaat naar de cloud).');
+      if (!file.type.startsWith('image/')) return Modal.show({ type: 'warning', title: 'Ongeldig bestand', message: 'Alleen afbeeldingen toegestaan.' });
+      if (file.size > 1024 * 1024) return Modal.show({ type: 'warning', title: 'Logo te groot', message: 'Maximaal 1 MB.' });
+      // Demo-/review-account: geen cloud-upload (dat zou het gedeelde app-logo
+      // overschrijven). Lokaal als verkleinde data-URL inlezen — alleen op dit
+      // toestel, en het overleeft een herstart via de demo-instellingen.
+      if (typeof Demo !== 'undefined' && Demo.isActive()) {
+        try {
+          const small = await compressImage(file, 256, 0.85);
+          pendingLogo = await new Promise((res, rej) => {
+            const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(small);
+          });
+          const prev = $('#logo-preview');
+          if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
+        } catch (err) {
+          Modal.show({ type: 'error', title: 'Kon logo niet laden', message: err.message || String(err) });
+        }
+        return;
+      }
+      if (!navigator.onLine) return Modal.show({ type: 'offline', title: 'Geen internet', message: 'Logo uploaden kan alleen met een actieve internetverbinding.' });
       const lbl = e.target.closest('label');
-      if (lbl) { lbl.style.opacity = .55; lbl.textContent = 'Bezig met uploaden...'; }
+      // NIET textContent zetten — dat vernietigt de nested <input type="file">.
+      // Alleen opacity aanpassen als visuele feedback, of via een span-child.
+      if (lbl) lbl.style.opacity = .55;
       try {
         pendingLogo = await BrandingFotos.uploadLogo(file);
         const prev = $('#logo-preview');
         if (prev) prev.innerHTML = `<img src="${pendingLogo}" alt="Logo">`;
       } catch (err) {
-        alert('Upload mislukt: ' + (err.message || err));
+        Modal.show({ type: 'error', title: 'Upload mislukt', message: err.message || String(err) });
       } finally {
-        if (lbl) { lbl.style.opacity = 1; }
+        if (lbl) lbl.style.opacity = 1;
       }
     });
 
     const removeBtn = $('#btn-remove-logo');
     if (removeBtn) {
-      removeBtn.addEventListener('click', async () => {
+      removeBtn.addEventListener('click', () => {
+        // Alleen pending-state zetten; storage-delete gebeurt pas bij Opslaan
+        // zodat Annuleren / weg-navigeren geen data-verlies veroorzaakt.
         pendingLogo = '';
         const prev = $('#logo-preview');
-        if (prev) prev.innerHTML = '<span>✝</span>';
-        // Bestand uit storage verwijderen (best-effort)
-        if (navigator.onLine) await BrandingFotos.removeLogo().catch(() => {});
+        if (prev) prev.innerHTML = '<span>OZN</span>';
       });
     }
 
-    brandForm.addEventListener('submit', e => {
+    brandForm.addEventListener('submit', async e => {
       e.preventDefault();
       const f = e.target;
       const patch = {
@@ -563,18 +1204,28 @@ function renderAccount(msg) {
         primary_color: f.primary_color.value || Settings.defaults.primary_color,
         accent_color: f.accent_color.value || Settings.defaults.accent_color,
       };
+      const oudLogo = Settings.get('logo_data_url') || '';
       if (pendingLogo !== null) patch.logo_data_url = pendingLogo;
       try {
         Settings.set(patch);
       } catch (err) {
         return renderAccount({ error: 'Opslaan mislukt — logo is mogelijk te groot voor lokale opslag.' });
       }
+      // Storage-delete PAS als Settings-write is gelukt EN de user 'verwijderen'
+      // koos (pendingLogo === '' en er was een oud logo).
+      if (pendingLogo === '' && oudLogo) {
+        const demo = (typeof Demo !== 'undefined' && Demo.isActive());
+        if (!demo && navigator.onLine) {
+          await BrandingFotos.removeLogo().catch(() => {});
+        }
+      }
       Branding.apply();
       renderAccount({ success: 'Branding opgeslagen.' });
     });
 
-    $('#btn-reset-brand').addEventListener('click', () => {
-      if (!confirm('Branding terugzetten naar standaard? (logo wordt verwijderd)')) return;
+    $('#btn-reset-brand').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Branding herstellen?', message: 'Alle branding-instellingen worden teruggezet en het logo verdwijnt.', confirmText: 'Herstellen' });
+      if (!ok) return;
       Settings.set({
         app_name: Settings.defaults.app_name,
         app_tagline: Settings.defaults.app_tagline,
@@ -606,8 +1257,9 @@ function renderAccount(msg) {
       Branding.apply();
       renderAccount({ success: 'Loginscherm-teksten opgeslagen.' });
     });
-    $('#btn-reset-login').addEventListener('click', () => {
-      if (!confirm('Loginscherm-teksten terugzetten naar standaard?')) return;
+    $('#btn-reset-login').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Loginscherm herstellen?', message: 'Alle teksten op het loginscherm worden teruggezet naar de standaard.', confirmText: 'Herstellen' });
+      if (!ok) return;
       Settings.set({
         login_brand_title:    Settings.defaults.login_brand_title,
         login_brand_subtitle: Settings.defaults.login_brand_subtitle,
@@ -641,30 +1293,83 @@ function renderAccount(msg) {
       e.preventDefault();
       const f = e.target;
       Settings.set({
+        design_version: f.design_version.value,
         compact_mode: f.compact_mode.checked,
         rounded_cards: f.rounded_cards.checked,
         font_id: f.font_id.value,
         form_density: f.form_density.value,
-        catalog_admin_mode: f.catalog_admin_mode.checked,
       });
       Branding.apply();
       renderAccount({ success: 'Weergave-instellingen opgeslagen.' });
     });
   }
+  // ── Beheermodus (aparte prominent-card onder App-versie) ──
+  const beheerForm = document.getElementById('frm-beheermodus');
+  if (beheerForm) {
+    beheerForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({ catalog_admin_mode: f.catalog_admin_mode.checked });
+      renderAccount({
+        success: f.catalog_admin_mode.checked
+          ? 'Beheerdersmodus AAN — je kunt nu de kistencatalogus bewerken.'
+          : 'Beheerdersmodus UIT.',
+      });
+    });
+  }
 
-  // EmailJS-instellingen
+  // E-mail-instellingen (Resend)
   const emailForm = $('#email-form');
   if (emailForm) {
     emailForm.addEventListener('submit', e => {
       e.preventDefault();
       const f = e.target;
       Settings.set({
-        emailjs_public_key: f.emailjs_public_key.value.trim(),
-        emailjs_service_id: f.emailjs_service_id.value.trim(),
-        emailjs_template_id: f.emailjs_template_id.value.trim(),
+        auto_send_dossier_email: f.auto_send_dossier_email.value.trim(),
       });
       renderAccount({ success: 'E-mail-instellingen opgeslagen.' });
     });
+
+    // Footer / handtekening
+    const emailFooterForm = $('#email-footer-form');
+    if (emailFooterForm) {
+      emailFooterForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = e.target;
+        Settings.set({
+          email_footer_enabled:       f.email_footer_enabled.checked,
+          email_footer_address:       f.email_footer_address.value.trim(),
+          email_footer_phone:         f.email_footer_phone.value.trim(),
+          email_footer_email:         f.email_footer_email.value.trim(),
+          email_footer_website:       f.email_footer_website.value.trim(),
+          email_footer_terms_url:     f.email_footer_terms_url.value.trim(),
+          email_footer_privacy_url:   f.email_footer_privacy_url.value.trim(),
+          email_footer_facebook_url:  f.email_footer_facebook_url.value.trim(),
+          email_footer_instagram_url: f.email_footer_instagram_url.value.trim(),
+        });
+        renderAccount({ success: 'E-mail-footer opgeslagen.' });
+      });
+    }
+
+    // Factuurgegevens
+    const factuurForm = $('#factuur-form');
+    if (factuurForm) {
+      factuurForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = e.target;
+        Settings.set({
+          factuur_bedrijfsnaam: f.factuur_bedrijfsnaam.value.trim(),
+          factuur_adres:        f.factuur_adres.value.replace(/\r/g, '').trim(),
+          factuur_telefoon:     f.factuur_telefoon.value.trim(),
+          factuur_email:        f.factuur_email.value.trim(),
+          factuur_iban:         f.factuur_iban.value.trim(),
+          factuur_btw:          f.factuur_btw.value.trim(),
+          factuur_kvk:          f.factuur_kvk.value.trim(),
+          factuur_betalingstermijn_dagen: parseInt(f.factuur_betalingstermijn_dagen.value, 10) || 30,
+        });
+        renderAccount({ success: 'Factuurgegevens opgeslagen.' });
+      });
+    }
 
     $('#btn-email-test').addEventListener('click', async () => {
       const f = emailForm;
@@ -672,27 +1377,111 @@ function renderAccount(msg) {
       const result = $('#email-test-result');
       result.innerHTML = '';
       if (!to) { result.innerHTML = '<div class="alert alert-error">Vul eerst een test-e-mailadres in.</div>'; return; }
-      // Tijdelijk toepassen wat in het formulier staat (zonder eerst opslaan)
-      Settings.set({
-        emailjs_public_key: f.emailjs_public_key.value.trim(),
-        emailjs_service_id: f.emailjs_service_id.value.trim(),
-        emailjs_template_id: f.emailjs_template_id.value.trim(),
-      });
+      // Strengere e-mail-validatie: local@domain.tld met tld ≥2 letters,
+      // geen dubbele punten, geen trailing punt in domain.
+      const EMAIL_STRICT = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+      if (!EMAIL_STRICT.test(to)) {
+        result.innerHTML = '<div class="alert alert-error">Ongeldig e-mailadres. Formaat: naam@domein.nl</div>';
+        return;
+      }
       const btn = $('#btn-email-test');
       btn.disabled = true; const orig = btn.textContent;
       btn.textContent = 'Bezig met verzenden...';
       try {
-        await EmailService.send(to,
-          'Test — ' + (Settings.get('app_name') || 'Uitvaartbeheer'),
-          'Dit is een test-e-mail vanuit je Uitvaartbeheer-app. Als je dit ontvangt, werkt de EmailJS-koppeling correct.');
-        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Check de inbox (en spam-map).</div>`;
+        const appName = esc(Settings.get('app_name') || 'OZN');
+        const html = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+          <h2 style="color:#6b1e2a;margin:0 0 12px;">Test-e-mail</h2>
+          <p>Dit is een test-e-mail vanuit <strong>${appName}</strong>. Als je dit ontvangt, werkt de Resend-koppeling correct.</p>
+          <p style="color:#8a847b;font-size:13px;margin-top:24px;">Verstuurd via Supabase Edge Function → Resend.</p>
+        </div>`;
+        await EmailService.send(to, 'Test — ' + (Settings.get('app_name') || 'OZN'), html);
+        result.innerHTML = `<div class="alert alert-success">Test verstuurd naar ${esc(to)}. Controleer de inbox (en spam-map).</div>`;
       } catch (e) {
-        result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.text ? e.text : (e.message || String(e)))}</div>`;
+        result.innerHTML = `<div class="alert alert-error">Verzenden mislukt: ${esc(e && e.message ? e.message : String(e))}</div>`;
       } finally {
         btn.disabled = false; btn.textContent = orig;
       }
     });
   }
+
+  // Diagnose: is de native documentscanner-plugin geladen in deze app-build?
+  const scanEl = $('#scanner-status');
+  if (scanEl && typeof Native !== 'undefined' && Native.scannerStatus) {
+    const isAndroid = Native.platform && Native.platform() === 'android';
+    Native.scannerStatus().then(st => {
+      if (st === 'native') {
+        scanEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ actief</span> — ' +
+          (isAndroid ? 'ML Kit scanner beschikbaar' : 'Apple VisionKit scanner beschikbaar');
+      } else if (st === 'native-unsupported') {
+        scanEl.textContent = 'plugin geladen, maar dit toestel ondersteunt de scanner niet';
+      } else if (st === 'unavailable') {
+        scanEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet in deze build</span> — maak een nieuwe ' +
+          (isAndroid ? 'APK' : 'TestFlight-build');
+      } else {
+        scanEl.textContent = 'alleen in de app (niet in de browser)';
+      }
+    }).catch(() => { scanEl.textContent = 'kon status niet bepalen'; });
+  }
+
+  // Diagnose + installer: Google Play Services (alleen Android-app)
+  const gsEl = $('#gs-status');
+  if (gsEl && typeof Native !== 'undefined' && Native.googleServicesStatus) {
+    Native.googleServicesStatus().then(st => {
+      if (st.unavailable) gsEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ plugin niet in deze build</span>';
+      else if (st.available === true) gsEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ beschikbaar</span>';
+      else if (st.available === false) gsEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet beschikbaar</span> — ' + esc(st.description || 'onbekende reden');
+      else gsEl.textContent = 'kon status niet bepalen';
+    }).catch(() => { gsEl.textContent = 'kon status niet bepalen'; });
+  }
+  const gsInstallBtn = $('#btn-gs-install');
+  if (gsInstallBtn) gsInstallBtn.addEventListener('click', async () => {
+    const res = $('#gs-install-result');
+    gsInstallBtn.disabled = true; const orig = gsInstallBtn.textContent;
+    gsInstallBtn.textContent = 'Bezig — volg de systeem-dialoog…';
+    if (res) res.textContent = '';
+    try {
+      const r = await Native.installGoogleServices();
+      if (r && r.nothingToDo) {
+        if (res) res.innerHTML = '<span style="color:#1f7a3a;">✓ Niets te installeren — deze build gebruikt geen optionele Google-modules.</span>';
+      } else if (r && r.alreadyInstalled) {
+        if (res) res.innerHTML = '<span style="color:#1f7a3a;">✓ Alle Google-modules stonden al aan.</span>';
+      } else {
+        if (res) res.innerHTML = '<span style="color:#1f7a3a;">✓ Installatie aangevraagd — Google Play Services regelt de download op de achtergrond.</span>';
+      }
+    } catch (e) {
+      if (res) res.innerHTML = '<span style="color:#b34;">' + esc((e && e.message) || String(e)) + '</span>';
+    } finally {
+      gsInstallBtn.disabled = false; gsInstallBtn.textContent = orig;
+    }
+  });
+
+  // Diagnose + test: Live Activity
+  const laEl = $('#la-status');
+  if (laEl && typeof Native !== 'undefined' && Native.liveActivityStatus) {
+    Native.liveActivityStatus().then(st => {
+      if (st === 'on') laEl.innerHTML = '<span style="color:#1f7a3a;font-weight:600;">✓ aan</span> — widget kan getoond worden';
+      else if (st === 'off') laEl.innerHTML = '<span style="color:#b8860b;font-weight:600;">uit</span> — zet aan bij Instellingen → Uitvaart Intake → Live activiteiten';
+      else if (st === 'unavailable') laEl.innerHTML = '<span style="color:#b34;font-weight:600;">⚠ niet beschikbaar</span>' + (Native._laLastError ? ' <span class="muted small">(' + esc(Native._laLastError) + ')</span>' : '');
+      else laEl.textContent = 'alleen in de app';
+    }).catch(() => { laEl.textContent = 'kon status niet bepalen'; });
+  }
+  const laTestBtn = $('#btn-la-test');
+  if (laTestBtn) laTestBtn.addEventListener('click', async () => {
+    const res = $('#la-test-result');
+    laTestBtn.disabled = true; const orig = laTestBtn.textContent; laTestBtn.textContent = 'Bezig…';
+    try {
+      const msg = await Native.testLiveActivity();
+      if (res) res.innerHTML = '<span style="color:#1f7a3a;">' + esc(msg) + '</span>';
+    } catch (e) {
+      if (res) res.innerHTML = '<span style="color:#b34;">' + esc(e.message || String(e)) + '</span>';
+    } finally {
+      laTestBtn.disabled = false; laTestBtn.textContent = orig;
+    }
+  });
+  const laStopBtn = $('#btn-la-stop');
+  if (laStopBtn) laStopBtn.addEventListener('click', async () => {
+    try { await Native.endUitvaartActivities(); const r = $('#la-test-result'); if (r) r.textContent = 'Gestopt.'; } catch (_) {}
+  });
 
   // Update-check
   const updBtn = $('#btn-check-update');
@@ -703,13 +1492,106 @@ function renderAccount(msg) {
       updBtn.textContent = 'Bezig met controleren...';
       result.innerHTML = '';
       try {
+        // In de APK: check op nieuwere APK i.p.v. de web-versie.
+        if (typeof ApkUpdater !== 'undefined' && ApkUpdater.isApp()) {
+          const info = await ApkUpdater.check({ force: true });
+          if (info && info.hasUpdate) {
+            const versieStr = info.remoteVersion ? `v${info.remoteVersion}` : `build ${info.remoteBuild}`;
+            const notReadyNote = info.assetReady ? '' :
+              `<p class="alert alert-warn small" style="margin:.5rem 0 0;padding:.5rem;">
+                ⏳ Build ${info.remoteBuild} is klaar in de code, maar de APK-workflow op GitHub is nog bezig.
+                Wacht 1–2 minuten en probeer opnieuw als "download &amp; installeer" een 404 geeft.
+              </p>`;
+            result.innerHTML = `<div class="alert alert-info">
+              📦 Nieuwe APK beschikbaar: <strong>${esc(versieStr)}</strong> (jij: build ${info.localBuild}).
+              <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm btn-primary" id="btn-apk-install">📥 Download &amp; installeer</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="btn-apk-copy">🔗 Kopieer download-link</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="btn-apk-help">❓ Hulp bij installeren</button>
+              </div>
+              ${notReadyNote}
+              <details style="margin-top:.75rem;background:var(--surface);border-radius:.4rem;padding:.5rem .75rem;border:1px solid var(--border);">
+                <summary style="cursor:pointer;font-weight:600;">📖 Stappen als de download niet lukt</summary>
+                <ol style="margin:.5rem 0 0 1.25rem;padding:0;line-height:1.55;">
+                  <li>Tik op <strong>🔗 Kopieer download-link</strong> hierboven.</li>
+                  <li>Open <strong>Chrome</strong> of <strong>Firefox</strong> op je toestel.</li>
+                  <li>Plak de link in de <em>adresbalk</em> (lang indrukken → Plakken) en druk Enter.</li>
+                  <li>De download start automatisch. Zie je een notificatie <em>"Download voltooid"</em>? Tik erop.</li>
+                  <li>De eerste keer vraagt Android om <strong>"Onbekende bronnen toestaan"</strong> voor de app die de APK opent (meestal Chrome of Bestanden). Zet de schakelaar aan → terug.</li>
+                  <li>Bevestig <strong>"Installeren"</strong>. De app werkt zichzelf bij zonder dat je iets kwijtraakt.</li>
+                </ol>
+                <p class="muted small" style="margin:.5rem 0 0;">Werkt het nog niet? Zoek de gedownloade APK in <strong>Downloads</strong> (via de Bestanden-app) en tik hem daar aan.</p>
+              </details>
+            </div>`;
+            const inst = document.getElementById('btn-apk-install');
+            if (inst) inst.onclick = () => {
+              try { Native.openExternalUrl(info.downloadUrl); } catch (_) {
+                try { window.location.href = info.downloadUrl; } catch (__) {}
+              }
+            };
+            const cp = document.getElementById('btn-apk-copy');
+            if (cp) cp.onclick = async () => {
+              try {
+                await navigator.clipboard.writeText(info.downloadUrl);
+                // Duidelijke pop-up met de exacte stappen na kopiëren
+                Modal.show({
+                  type: 'info',
+                  title: '✅ Link gekopieerd',
+                  message:
+                    'Wat nu doen:\n\n' +
+                    '1️⃣  Open Chrome of Firefox op je telefoon.\n\n' +
+                    '2️⃣  Druk lang in de adresbalk → tik "Plakken".\n\n' +
+                    '3️⃣  Druk Enter — de download start vanzelf.\n\n' +
+                    '4️⃣  Bij notificatie "Download voltooid": tik erop.\n\n' +
+                    '5️⃣  Eerste keer: sta "Onbekende bronnen" toe voor Chrome (of de app die vraagt) → tik "Installeren".\n\n' +
+                    'De app werkt bij zonder dat er iets kwijt raakt.',
+                });
+              } catch (_) {
+                Modal.show({
+                  type: 'warning',
+                  title: 'Kopiëren mislukt',
+                  message: 'Selecteer en kopieer de link hieronder handmatig:\n\n' + info.downloadUrl,
+                });
+              }
+            };
+            const help = document.getElementById('btn-apk-help');
+            if (help) help.onclick = () => {
+              Modal.show({
+                type: 'info',
+                title: '📖 Hoe installeer ik de update?',
+                message:
+                  'MAKKELIJKE MANIER\n' +
+                  '─────────────────\n' +
+                  'Tik op "📥 Download & installeer" — de app opent Chrome, download start vanzelf en Android vraagt om te installeren.\n\n' +
+                  'ALS DAT NIET WERKT\n' +
+                  '─────────────────\n' +
+                  '1. Tik op "🔗 Kopieer download-link"\n' +
+                  '2. Open Chrome of Firefox\n' +
+                  '3. Lang in de adresbalk drukken → Plakken → Enter\n' +
+                  '4. Bij notificatie "Download voltooid": tik erop\n' +
+                  '5. Eerste keer: sta "Onbekende bronnen" toe voor Chrome → tik Installeren\n\n' +
+                  'BELANGRIJK\n' +
+                  '─────────────────\n' +
+                  '· Je gegevens (dossiers, foto\'s, instellingen) blijven staan.\n' +
+                  '· Als je meerdere apps van "OZN" ziet, kies degene met hetzelfde icoon.\n' +
+                  '· Werkt Chrome niet? Probeer Firefox, of open de Bestanden-app en zoek de APK in Downloads.',
+              });
+            };
+          } else if (info) {
+            result.innerHTML = `<div class="alert alert-success">Je draait al de laatste APK (${esc(APP_VERSION)}, ${esc(APP_BUILD_DATE)}).</div>`;
+          } else {
+            result.innerHTML = `<div class="alert alert-error">Kon niet controleren — offline of GitHub-release onbereikbaar.</div>`;
+          }
+          updBtn.disabled = false; updBtn.textContent = orig;
+          return;
+        }
         const r = await Updater.check();
         if (r.hasUpdate) {
           result.innerHTML = `<div class="alert alert-info">Nieuwe versie beschikbaar: <strong>${esc(r.remoteVersion)}</strong> (jij draait ${esc(r.currentVersion)}). De pagina wordt over enkele seconden ververst.</div>`;
-          setTimeout(() => Updater.reloadHard(), 1800);
+          setTimeout(() => Updater.reloadHard(), 700);
         } else if (r.swUpdated) {
           result.innerHTML = `<div class="alert alert-success">Service-worker bijgewerkt naar de laatste versie. Pagina wordt ververst...</div>`;
-          setTimeout(() => Updater.reloadHard(), 1200);
+          setTimeout(() => Updater.reloadHard(), 500);
         } else {
           result.innerHTML = `<div class="alert alert-success">Je draait al de laatste versie (<strong>${esc(r.currentVersion)}</strong>).</div>`;
           updBtn.disabled = false; updBtn.textContent = orig;
@@ -720,6 +1602,693 @@ function renderAccount(msg) {
       }
     });
   }
+
+  const resetBtn = $('#btn-hard-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      const ok = await Modal.confirm({
+        title: 'Volledig resetten?',
+        message: 'De service-worker en alle lokale cache worden gewist. Dossiers blijven veilig in de cloud staan. Daarna wordt de app opnieuw vanaf de server geladen.',
+        confirmText: 'Resetten',
+        cancelText: 'Annuleren',
+      });
+      if (!ok) return;
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Bezig...';
+      await Updater.hardReset();
+    });
+  }
+
+  // ─── Push-notificaties beheer ─────────────────────────────────
+  const pushForm = $('#push-form');
+  if (pushForm) {
+    const refreshPushStatus = async () => {
+      const statusEl = $('#push-status');
+      const enableBtn = $('#btn-push-enable');
+      const disableBtn = $('#btn-push-disable');
+      if (!await PushNotificaties.supported()) {
+        statusEl.className = 'alert alert-error';
+        statusEl.textContent = 'Deze browser ondersteunt geen push-notificaties.';
+        enableBtn.disabled = true;
+        return;
+      }
+      const perm = await PushNotificaties.permission();
+      const sub = await PushNotificaties.currentSubscription();
+      if (sub && perm === 'granted') {
+        statusEl.className = 'alert alert-success';
+        statusEl.innerHTML = '✓ <strong>Ingeschakeld</strong> op dit apparaat.';
+        enableBtn.hidden = true;
+        disableBtn.hidden = false;
+      } else if (perm === 'denied') {
+        statusEl.className = 'alert alert-error';
+        statusEl.innerHTML = '⚠ Notificaties geblokkeerd door de browser. Sta ze handmatig toe via de adresbalk (slot-icoontje).';
+        enableBtn.hidden = false;
+        disableBtn.hidden = true;
+      } else {
+        statusEl.className = 'alert';
+        statusEl.textContent = 'Nog niet ingeschakeld op dit apparaat.';
+        enableBtn.hidden = false;
+        disableBtn.hidden = true;
+      }
+    };
+    refreshPushStatus();
+
+    pushForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        push_vapid_public_key: f.push_vapid_public_key.value.trim(),
+        push_remind_days_ahead: parseInt(f.push_remind_days_ahead.value, 10) || 1,
+      });
+      renderAccount({ success: 'Push-instellingen opgeslagen.' });
+    });
+
+    $('#btn-push-enable').addEventListener('click', async () => {
+      const btn = $('#btn-push-enable');
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Bezig...';
+      try {
+        await PushNotificaties.subscribe();
+        Modal.show({ type: 'success', title: 'Notificaties aan', message: 'Je krijgt nu meldingen op dit apparaat.' });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Inschakelen mislukt', message: e.message || String(e) });
+      } finally {
+        btn.disabled = false; btn.textContent = orig;
+        refreshPushStatus();
+      }
+    });
+
+    $('#btn-push-disable').addEventListener('click', async () => {
+      try { await PushNotificaties.unsubscribe(); } catch (_) {}
+      refreshPushStatus();
+    });
+
+    $('#btn-push-test').addEventListener('click', async () => {
+      try {
+        const ok = await PushNotificaties.testLocal();
+        if (!ok) Modal.show({ type: 'warning', title: 'Toestemming nodig', message: 'Sta notificaties toe in de browser.' });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Test mislukt', message: e.message || String(e) });
+      }
+    });
+  }
+
+  // ─── SnelStart-koppeling (boekhouding) ───────────────────────
+  const snelstartForm = $('#snelstart-form');
+  if (snelstartForm) {
+    snelstartForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      Settings.set({
+        snelstart_actief: f.snelstart_actief.checked,
+        snelstart_subscription_key: f.snelstart_subscription_key.value.trim(),
+        snelstart_client_key: f.snelstart_client_key.value.trim(),
+      });
+      renderAccount({ success: 'SnelStart-instellingen opgeslagen.' });
+      location.hash = '#/account#snelstart-instellingen';
+    });
+
+    const testBtn = $('#btn-snelstart-test');
+    if (testBtn) testBtn.addEventListener('click', async () => {
+      const f = snelstartForm;
+      const sub = f.snelstart_subscription_key.value.trim();
+      const cli = f.snelstart_client_key.value.trim();
+      const out = $('#snelstart-result');
+      if (!sub || !cli) {
+        if (out) out.innerHTML = '<div class="alert alert-error">Vul eerst beide sleutels in.</div>';
+        return;
+      }
+      // Sleutels tijdelijk opslaan zodat de test ze meeneemt
+      Settings.set({ snelstart_subscription_key: sub, snelstart_client_key: cli });
+      if (out) out.innerHTML = '<div class="alert">Bezig met testen…</div>';
+      testBtn.disabled = true;
+      try {
+        const res = await SnelStart.test();
+        if (res && res.ok) {
+          if (out) out.innerHTML = `<div class="alert alert-success">✓ ${esc(res.msg || 'Verbinding geslaagd.')}</div>`;
+        } else {
+          const detail = res && (res.msg || res.error) ? (res.msg || res.error) : 'Onbekende fout.';
+          if (out) out.innerHTML = `<div class="alert alert-error">Verbinding mislukt: ${esc(detail)}</div>`;
+        }
+      } catch (err) {
+        if (out) out.innerHTML = `<div class="alert alert-error">Kon de testfunctie niet bereiken: ${esc(err.message || String(err))}</div>`;
+      } finally {
+        testBtn.disabled = false;
+      }
+    });
+  }
+
+  // ─── Profielen-beheer (Wie werkt vandaag?) ───────────────────
+  const profielenForm = $('#profielen-form');
+  if (profielenForm) {
+    const slugify = s => String(s || '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'profiel';
+
+    function makeProfielRow(naam = '', kleur = '#6b1e2a') {
+      const rows = $('#profielen-rows');
+      const idx = rows.querySelectorAll('.profielen-row').length;
+      const letter = (naam || '?').charAt(0).toUpperCase() || '?';
+      const div = document.createElement('div');
+      div.className = 'profielen-row';
+      div.dataset.idx = idx;
+      div.innerHTML = `
+        <span class="profielen-avatar" style="background:${esc(kleur)};">${esc(letter)}</span>
+        <input type="text" class="profielen-naam" value="${esc(naam)}" placeholder="Naam" maxlength="40">
+        <select class="profielen-rol" title="Rol van dit profiel">
+          <option value="medewerker" selected>Medewerker</option>
+          <option value="beheerder">Beheerder</option>
+        </select>
+        <input type="text" inputmode="numeric" pattern="[0-9]{0,6}" maxlength="6" class="profielen-pincode" placeholder="pincode" title="4–6 cijfers (alleen beheerder)" style="width:6rem;visibility:hidden;">
+        <input type="color" class="profielen-kleur" value="${esc(kleur)}" title="Kleur van de avatar">
+        <button type="button" class="btn-icon" data-action="del-profiel" data-idx="${idx}" title="Verwijderen">×</button>`;
+      rows.appendChild(div);
+      bindRowEvents(div);
+    }
+    function bindRowEvents(row) {
+      const naamInp = row.querySelector('.profielen-naam');
+      const kleurInp = row.querySelector('.profielen-kleur');
+      const avatar = row.querySelector('.profielen-avatar');
+      const rolSel = row.querySelector('.profielen-rol');
+      const pinInp = row.querySelector('.profielen-pincode');
+      naamInp.addEventListener('input', () => {
+        const c = (naamInp.value || '?').trim().charAt(0).toUpperCase() || '?';
+        avatar.textContent = c;
+      });
+      kleurInp.addEventListener('input', () => {
+        avatar.style.background = kleurInp.value;
+      });
+      if (rolSel && pinInp) {
+        const syncPin = () => {
+          const beh = rolSel.value === 'beheerder';
+          pinInp.style.visibility = beh ? 'visible' : 'hidden';
+          if (!beh) pinInp.value = '';
+        };
+        rolSel.addEventListener('change', syncPin);
+        pinInp.addEventListener('input', () => {
+          pinInp.value = pinInp.value.replace(/\D/g, '').slice(0, 6);
+        });
+      }
+    }
+    profielenForm.querySelectorAll('.profielen-row').forEach(bindRowEvents);
+
+    $('#btn-add-profiel').addEventListener('click', () => makeProfielRow('', '#6b1e2a'));
+
+    profielenForm.addEventListener('click', e => {
+      const del = e.target.closest('[data-action="del-profiel"]');
+      if (!del) return;
+      const row = del.closest('.profielen-row');
+      if (!row) return;
+      const blijft = profielenForm.querySelectorAll('.profielen-row').length - 1;
+      if (blijft < 1) {
+        Modal.show({ type: 'warning', title: 'Minstens één profiel nodig', message: 'Voeg eerst een nieuw profiel toe voordat je dit verwijdert.' });
+        return;
+      }
+      row.remove();
+    });
+
+    profielenForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const rows = profielenForm.querySelectorAll('.profielen-row');
+      const huidigLijst = Settings.get('profielen') || [];
+      const profielen = [];
+      const gebruikteIds = new Set();
+      // Map: lowercased naam -> bestaand id, zodat een rij die dezelfde
+      // naam heeft z'n oude id houdt (i.p.v. de id van dezelfde INDEX
+      // — die shiftt bij verwijderen/insert en veroorzaakte data-corruptie
+      // in dossier-auteur-referenties).
+      const idByNaam = new Map();
+      huidigLijst.forEach(p => {
+        if (p && p.id && p.name) idByNaam.set(p.name.trim().toLowerCase(), p.id);
+      });
+      const actiefId = (ActiveProfile.current() || {}).id;
+      // Bestaande pincodes indexeren op profiel-id (niet op naam!), zodat we
+      // andermans pincodes NOOIT verliezen bij het opslaan — ook niet als de
+      // beheerder z'n eigen naam of een van de anderen aanpast.
+      const pincodeById = new Map();
+      huidigLijst.forEach(p => {
+        if (p && p.id && p.pincode) pincodeById.set(p.id, p.pincode);
+      });
+      rows.forEach(r => {
+        const naam = r.querySelector('.profielen-naam').value.trim();
+        if (!naam) return;
+        const kleur = r.querySelector('.profielen-kleur').value || '#6b1e2a';
+        const rolSel = r.querySelector('.profielen-rol');
+        const rol = rolSel && rolSel.value === 'beheerder' ? 'beheerder' : 'medewerker';
+        const pinInp = r.querySelector('.profielen-pincode');
+        // Wie een read-only pincode-veld ziet (andermans profiel) mag de
+        // waarde niet overschrijven — we pakken de opgeslagen pincode terug.
+        // Alleen de eigenaar van het actieve profiel mag z'n eigen pincode
+        // wijzigen of wissen. Medewerker-profielen krijgen geen pincode.
+        const rowProfielId = r.dataset.profielId || null;
+        const isEigen = actiefId && rowProfielId === actiefId;
+        let pincode = '';
+        if (rol === 'beheerder') {
+          if (isEigen && pinInp) {
+            pincode = pinInp.value.replace(/\D/g, '').slice(0, 6);
+          } else if (rowProfielId) {
+            pincode = pincodeById.get(rowProfielId) || '';
+          }
+        }
+        let id = idByNaam.get(naam.toLowerCase());
+        if (!id || gebruikteIds.has(id)) {
+          const base = slugify(naam);
+          id = base;
+          let n = 2;
+          while (gebruikteIds.has(id)) id = base + '_' + (n++);
+        }
+        gebruikteIds.add(id);
+        const item = { id, name: naam, color: kleur, rol };
+        if (pincode) item.pincode = pincode;
+        profielen.push(item);
+      });
+      if (profielen.length === 0) {
+        Modal.show({ type: 'warning', title: 'Geen profielen', message: 'Voeg minstens één profiel toe.' });
+        return;
+      }
+      Settings.set({ profielen });
+      // Als het actieve profiel niet meer bestaat: wissen
+      if (actiefId && !profielen.some(p => p.id === actiefId)) ActiveProfile.clear();
+      renderAccount({ success: 'Profielen opgeslagen.' });
+    });
+  }
+
+  // Medewerkers & rollen (alleen beheerder)
+  const rollenForm = $('#rollen-form');
+  if (rollenForm) {
+    rollenForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const selects = $$('#rollen-form .rol-select').filter(s => !s.disabled);
+      try {
+        await Promise.all(selects.map(s => DB.update(KEYS.PROFIELEN, s.dataset.id, { rol: s.value })));
+        renderAccount({ success: 'Rollen opgeslagen.' });
+      } catch (err) {
+        Modal.show({ type: 'error', title: 'Opslaan mislukt', message: err.message || String(err) });
+      }
+    });
+  }
+
+  // Nieuw medewerker-account aanmaken via Edge Function 'nieuwe-medewerker'
+  const nwForm = $('#nieuwe-medewerker-form');
+  if (nwForm) {
+    nwForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const f = e.target;
+      const statusEl = $('#nieuwe-medewerker-status');
+      const btn = f.querySelector('button[type=submit]');
+      btn.disabled = true; btn.textContent = 'Bezig…';
+      if (statusEl) statusEl.textContent = '';
+      try {
+        const { data, error } = await sb.functions.invoke('nieuwe-medewerker', {
+          body: {
+            naam:     f.naam.value.trim(),
+            email:    f.email.value.trim(),
+            password: f.password.value,
+            rol:      f.rol.value,
+          },
+        });
+        if (error) throw error;
+        if (data && data.error) throw new Error(data.error);
+        // Ververs de profiles-cache zodat de nieuwe medewerker meteen zichtbaar is
+        await Cloud.loadAll();
+        renderAccount({ success: `Account aangemaakt voor ${f.email.value.trim()}. Deel het wachtwoord met de medewerker — ze kunnen direct inloggen.` });
+      } catch (err) {
+        btn.disabled = false; btn.textContent = 'Account aanmaken';
+        if (statusEl) { statusEl.textContent = '⚠ ' + (err.message || String(err)); statusEl.style.color = '#c0392b'; }
+      }
+    });
+  }
+
+  // Archief-instellingen (alleen beheerder)
+  const archiefForm = $('#archief-form');
+  if (archiefForm) {
+    archiefForm.addEventListener('submit', e => {
+      e.preventDefault();
+      Settings.set({
+        auto_archief_actief: e.target.auto_archief_actief.checked,
+        medewerker_ziet_archief: e.target.medewerker_ziet_archief.checked,
+      });
+      renderAccount({ success: 'Archief-instellingen opgeslagen.' });
+    });
+  }
+
+  // R2 smoke-test — controleert of de Cloudflare R2 credentials werken
+  const r2Btn = $('#btn-r2-test');
+  const r2Status = $('#r2-test-status');
+  if (r2Btn) {
+    r2Btn.addEventListener('click', async () => {
+      r2Btn.disabled = true;
+      r2Status.textContent = 'Bezig…';
+      r2Status.style.color = '';
+      try {
+        const { data, error } = await sb.functions.invoke('r2-smoke-test');
+        r2Btn.disabled = false;
+        if (error) {
+          r2Status.textContent = 'Fout';
+          r2Status.style.color = '#b32020';
+          Modal.show({
+            type: 'error',
+            title: 'R2-test mislukt',
+            message: (error.message || String(error)) +
+              '\n\nZorg dat R2_ACCOUNT_ID, R2_ACCESS_KEY_ID en R2_SECRET_ACCESS_KEY in Supabase Edge Function Secrets staan.',
+          });
+          return;
+        }
+        if (data && data.ok) {
+          r2Status.textContent = '✓ Verbinding OK — ' + (data.bucket || '');
+          r2Status.style.color = '#2ea862';
+          const stepsTxt = (data.steps || []).map(s =>
+            `• ${s.step}${s.status ? ' (' + s.status + ')' : ''} → ${s.ok === false ? '❌' : s.match === false ? '❌ content-mismatch' : '✓'}`
+          ).join('\n');
+          Modal.show({
+            type: 'success',
+            title: 'R2-verbinding OK',
+            message: `Endpoint: ${data.endpoint}\nBucket: ${data.bucket}\nContent-match: ${data.contentMatched ? 'ja' : 'nee'}\n\nStappen:\n${stepsTxt}`,
+          });
+        } else {
+          r2Status.textContent = 'Fout: ' + ((data && data.step) || '?');
+          r2Status.style.color = '#b32020';
+          const stepsTxt = (data && data.steps || []).map(s =>
+            `• ${s.step}${s.status ? ' (' + s.status + ')' : ''}${s.error ? ' — ' + s.error : ''}`
+          ).join('\n');
+          const missing = (data && data.missing) ? '\n\nOntbrekende secrets: ' + data.missing.join(', ') : '';
+          const err = (data && data.error) ? '\n\nDetail: ' + String(data.error).slice(0, 400) : '';
+          Modal.show({
+            type: 'error',
+            title: 'R2-test mislukt in stap: ' + ((data && data.step) || 'onbekend'),
+            message: `Endpoint: ${data && data.endpoint || 'n.v.t.'}\nBucket: ${data && data.bucket || 'n.v.t.'}${missing}${err}\n\nStappen:\n${stepsTxt || '(geen)'}`,
+          });
+        }
+      } catch (e) {
+        r2Btn.disabled = false;
+        r2Status.textContent = 'Fout';
+        r2Status.style.color = '#b32020';
+        Modal.show({ type: 'error', title: 'R2-test crashte', message: e.message || String(e) });
+      }
+    });
+  }
+
+  // R2-migratie: alle bestaande Supabase-Storage bestanden naar R2 verhuizen
+  const migBtn = $('#btn-r2-migreer');
+  const migStatus = $('#r2-migratie-status');
+  const migLog = $('#r2-migratie-log');
+  if (migBtn && typeof R2Migratie !== 'undefined') {
+    migBtn.addEventListener('click', async () => {
+      const werk = R2Migratie.verzamel();
+      if (!werk.length) {
+        Modal.show({ type: 'info', title: 'Niks te migreren', message: 'Alle dossier-bestanden staan al op R2.' });
+        return;
+      }
+      const ok = await Modal.confirm({
+        type: 'info',
+        title: `${werk.length} bestand${werk.length === 1 ? '' : 'en'} migreren?`,
+        message: `De bestanden worden gedownload van Supabase Storage, geüpload naar Cloudflare R2, en vervolgens uit Supabase verwijderd. Dit kan een paar minuten duren.\n\nBij een fout blijft het originele bestand op Supabase staan; de app blijft dan gewoon werken.`,
+        confirmText: `Ja, migreer ${werk.length}`,
+      });
+      if (!ok) return;
+      migBtn.disabled = true;
+      migLog.textContent = '';
+      const t0 = Date.now();
+      try {
+        const r = await R2Migratie.migreerAlles(({ done, totaal, huidig, resultaat, error }) => {
+          migStatus.textContent = `${done}/${totaal} — bezig met ${huidig}`;
+          if (resultaat) migLog.textContent += `✓ ${resultaat.pad} → ${resultaat.nieuwPad}\n`;
+          if (error)     migLog.textContent += `✗ ${huidig}: ${error}\n`;
+          migLog.scrollTop = migLog.scrollHeight;
+        });
+        const secs = Math.round((Date.now() - t0) / 1000);
+        const mb = (r.bytesTotaal / 1048576).toFixed(2);
+        Modal.show({
+          type: r.errors.length ? 'warning' : 'success',
+          title: `Migratie klaar${r.errors.length ? ' met fouten' : ''}`,
+          message:
+            `${r.done}/${r.totaal} bestanden gemigreerd (${mb} MB) in ${secs}s.\n` +
+            (r.errors.length ? `\n${r.errors.length} fout(en):\n` + r.errors.map(e => `• ${e.pad}: ${e.error}`).join('\n') : ''),
+        });
+        // Ververs de UI zodat de teller klopt
+        renderAccount({ success: `Migratie afgerond: ${r.done}/${r.totaal} bestanden.` });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Migratie crashte', message: e.message || String(e) });
+        migBtn.disabled = false;
+      }
+    });
+  }
+
+  // R2-reorganize: losse R2-bestanden in dossier-submap plaatsen
+  const reorgBtn = $('#btn-r2-reorg');
+  const reorgStatus = $('#r2-reorg-status');
+  const reorgLog = $('#r2-reorg-log');
+  if (reorgBtn && typeof R2Reorg !== 'undefined') {
+    reorgBtn.addEventListener('click', async () => {
+      const werk = R2Reorg.verzamel();
+      if (!werk.length) {
+        Modal.show({ type: 'info', title: 'Niks te doen', message: 'Alle R2-bestanden staan al in de juiste submap.' });
+        return;
+      }
+      const ok = await Modal.confirm({
+        type: 'info',
+        title: `${werk.length} bestand${werk.length === 1 ? '' : 'en'} herordenen?`,
+        message: `Elk bestand wordt server-side gekopieerd naar de dossier-submap (bv. artsverklaring/Achternaam_Dnummer/) en het origineel wordt verwijderd. Geen data-transfer via jouw browser.`,
+        confirmText: `Ja, order ${werk.length}`,
+      });
+      if (!ok) return;
+      reorgBtn.disabled = true;
+      reorgLog.textContent = '';
+      const t0 = Date.now();
+      try {
+        const r = await R2Reorg.reorganiseerAlles(({ done, totaal, huidig, resultaat, error }) => {
+          reorgStatus.textContent = `${done}/${totaal} — bezig met ${huidig}`;
+          if (resultaat) reorgLog.textContent += `✓ ${huidig} → ${resultaat.destKey}\n`;
+          if (error)     reorgLog.textContent += `✗ ${huidig}: ${error}\n`;
+          reorgLog.scrollTop = reorgLog.scrollHeight;
+        });
+        const secs = Math.round((Date.now() - t0) / 1000);
+        Modal.show({
+          type: r.errors.length ? 'warning' : 'success',
+          title: `Ordenen klaar${r.errors.length ? ' met fouten' : ''}`,
+          message:
+            `${r.done}/${r.totaal} bestanden verplaatst in ${secs}s.\n` +
+            (r.errors.length ? `\n${r.errors.length} fout(en):\n` + r.errors.map(e => `• ${e.key}: ${e.error}`).join('\n') : ''),
+        });
+        renderAccount({ success: `Ordenen afgerond: ${r.done}/${r.totaal} bestanden.` });
+      } catch (e) {
+        Modal.show({ type: 'error', title: 'Ordenen crashte', message: e.message || String(e) });
+        reorgBtn.disabled = false;
+      }
+    });
+  }
+
+  // Bulk-compressie van alle bestaande archief-foto's
+  const compBtn = $('#btn-comprimeer-archief');
+  const compStatus = $('#archief-compressie-status');
+  if (compBtn && typeof ArchiefCompressie !== 'undefined') {
+    compBtn.addEventListener('click', async () => {
+      const gearchiveerd = DB.where(KEYS.DOSSIERS, x => x.gearchiveerd);
+      if (!gearchiveerd.length) {
+        Modal.show({ type:'info', title:'Niks te doen', message:'Geen dossiers in het archief.' });
+        return;
+      }
+      const ok = await Modal.confirm({
+        type:'info',
+        title:`${gearchiveerd.length} dossiers comprimeren?`,
+        message:`Alle foto's en scans van de gearchiveerde dossiers worden agressief verkleind (${ArchiefCompressie.MAX_DIM} px, JPEG ${Math.round(ArchiefCompressie.QUALITY*100)}%). De originelen worden overschreven; dit kun je niet ongedaan maken. Doorgaan?`,
+        confirmText:'Ja, comprimeer',
+      });
+      if (!ok) return;
+      compBtn.disabled = true;
+      let totaalFotos = 0, totaalBespaard = 0, verwerkt = 0;
+      for (const d of gearchiveerd) {
+        if (compStatus) compStatus.textContent = `Bezig: ${++verwerkt}/${gearchiveerd.length} · ${totaalFotos} foto's · ${Math.round(totaalBespaard/1024)} KB bespaard`;
+        try {
+          const r = await ArchiefCompressie.comprimeerDossier(d);
+          totaalFotos   += r.aantal;
+          totaalBespaard += r.bespaard;
+        } catch (_) {}
+      }
+      compBtn.disabled = false;
+      const mb = (totaalBespaard / (1024*1024)).toFixed(2);
+      Modal.show({
+        type:'success',
+        title:'Klaar',
+        message:`${totaalFotos} foto's uit ${gearchiveerd.length} dossiers gecomprimeerd. Bespaard: ${mb} MB.`,
+      });
+      renderAccount();
+    });
+  }
+
+  // Prijzen-instellingen (alleen beheerder)
+  const prijzenForm = $('#prijzen-form');
+  if (prijzenForm) {
+    prijzenForm.addEventListener('submit', e => {
+      e.preventDefault();
+      Settings.set({ medewerker_ziet_prijzen: e.target.medewerker_ziet_prijzen.checked });
+      renderAccount({ success: 'Prijs-instellingen opgeslagen.' });
+    });
+  }
+
+  // Kostenposten beheren (alleen beheerder)
+  const kostenSectie = $('#kostenposten');
+  if (kostenSectie) {
+    function _kostenPatchOverride(oms, patch) {
+      const cur = Object.assign({}, Settings.get('kosten_overrides') || {});
+      const entry = Object.assign({}, cur[oms] || {}, patch);
+      if (entry.bedrag == null) delete entry.bedrag;
+      if (!entry.hidden)        delete entry.hidden;
+      if (Object.keys(entry).length === 0) delete cur[oms];
+      else                                  cur[oms] = entry;
+      Settings.set({ kosten_overrides: cur });
+    }
+    kostenSectie.querySelectorAll('tbody tr').forEach(tr => {
+      const oms = tr.dataset.oms;
+      const inp = tr.querySelector('.kb-prijs');
+      const btnSave = tr.querySelector('[data-kb-save]');
+      const btnReset = tr.querySelector('[data-kb-reset]');
+      const btnHide  = tr.querySelector('[data-kb-hide]');
+      const btnShow  = tr.querySelector('[data-kb-show]');
+      const btnDel   = tr.querySelector('[data-kb-del]');
+      if (btnSave) btnSave.addEventListener('click', () => {
+        const bedrag = parseEUR(inp.value);
+        if (!isFinite(bedrag) || bedrag < 0) {
+          Modal.show({ type:'warning', title:'Ongeldige prijs', message:'Vul een geldig bedrag in (bv. 45,00).' });
+          return;
+        }
+        // Bij eigen kostenposten schrijven we direct in kosten_extra, niet override
+        const extra = (Settings.get('kosten_extra') || []).slice();
+        const idx = extra.findIndex(x => x.omschrijving === oms);
+        if (idx >= 0) {
+          extra[idx] = Object.assign({}, extra[idx], { bedrag });
+          Settings.set({ kosten_extra: extra });
+        } else {
+          _kostenPatchOverride(oms, { bedrag });
+        }
+        renderAccount({ success: `Prijs van "${oms}" opgeslagen.` });
+      });
+      if (btnReset) btnReset.addEventListener('click', () => {
+        _kostenPatchOverride(oms, { bedrag: null });
+        renderAccount({ success: `Standaardprijs voor "${oms}" hersteld.` });
+      });
+      if (btnHide) btnHide.addEventListener('click', () => {
+        _kostenPatchOverride(oms, { hidden: true });
+        renderAccount({ success: `"${oms}" verborgen uit de lijst.` });
+      });
+      if (btnShow) btnShow.addEventListener('click', () => {
+        _kostenPatchOverride(oms, { hidden: false });
+        renderAccount({ success: `"${oms}" weer toegevoegd aan de lijst.` });
+      });
+      if (btnDel) btnDel.addEventListener('click', async () => {
+        const ok = await Modal.confirm({
+          type:'warning',
+          title:'Kostenpost definitief verwijderen?',
+          message:`"${oms}" wordt uit je eigen lijst verwijderd. Bestaande kostenposten in dossiers blijven staan.`,
+          confirmText:'Verwijderen',
+        });
+        if (!ok) return;
+        const extra = (Settings.get('kosten_extra') || []).filter(x => x.omschrijving !== oms);
+        Settings.set({ kosten_extra: extra });
+        renderAccount({ success: `"${oms}" verwijderd.` });
+      });
+    });
+    const kbAddForm = $('#kb-add-form');
+    if (kbAddForm) kbAddForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const f = e.target;
+      const oms = f.omschrijving.value.trim();
+      if (!oms) return;
+      const cat = f.categorie.value || 'overig';
+      const bedragRaw = f.bedrag.value.trim();
+      const bedrag = bedragRaw ? parseEUR(bedragRaw) : null;
+      if (bedragRaw && (!isFinite(bedrag) || bedrag < 0)) {
+        Modal.show({ type:'warning', title:'Ongeldige prijs', message:'Vul een geldig bedrag in (bv. 45,00) of laat leeg.' });
+        return;
+      }
+      const alle = effectieveKostenPresets({ includeHidden: true });
+      if (alle.some(p => (p.omschrijving || '').toLowerCase() === oms.toLowerCase())) {
+        Modal.show({ type:'warning', title:'Bestaat al', message:`Er bestaat al een kostenpost met de omschrijving "${oms}". Pas de bestaande post aan in plaats van een nieuwe aan te maken.` });
+        return;
+      }
+      const extra = (Settings.get('kosten_extra') || []).slice();
+      extra.push({ omschrijving: oms, categorie: cat, bedrag });
+      Settings.set({ kosten_extra: extra });
+      renderAccount({ success: `Kostenpost "${oms}" aangemaakt.` });
+    });
+  }
+
+  // Opdrachtgevers beheer (met drag-and-drop volgorde)
+  const opdrForm = $('#opdrachtgever-form');
+  if (opdrForm) {
+    $('#btn-add-opdrachtgever').addEventListener('click', () => {
+      const rows = $('#opdrachtgever-rows');
+      const div = document.createElement('div');
+      div.className = 'parochie-row opdr-drag-row';
+      div.draggable = true;
+      div.innerHTML = `
+        <span class="drag-grip" title="Sleep om te verplaatsen">≡</span>
+        <input type="text" class="opdrachtgever-naam" value="" placeholder="bv. Uitvaartzorg Jansen">
+        <button type="button" class="btn-icon" data-action="del-opdrachtgever" title="verwijderen">×</button>`;
+      rows.appendChild(div);
+      div.querySelector('.opdrachtgever-naam').focus();
+    });
+
+    // Drag-and-drop: sleep rijen om ze te herordenen
+    const rowsEl = $('#opdrachtgever-rows');
+    if (rowsEl) {
+      let dragEl = null;
+      rowsEl.addEventListener('dragstart', (e) => {
+        const row = e.target.closest('.opdr-drag-row');
+        if (!row) return;
+        dragEl = row;
+        row.classList.add('is-dragging');
+        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (_) {}
+      });
+      rowsEl.addEventListener('dragend', () => {
+        if (dragEl) dragEl.classList.remove('is-dragging');
+        dragEl = null;
+      });
+      rowsEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const na = [...rowsEl.querySelectorAll('.opdr-drag-row:not(.is-dragging)')];
+        const boven = na.find(r => {
+          const box = r.getBoundingClientRect();
+          return e.clientY < box.top + box.height / 2;
+        });
+        if (!dragEl) return;
+        if (boven) rowsEl.insertBefore(dragEl, boven);
+        else rowsEl.appendChild(dragEl);
+      });
+    }
+    opdrForm.addEventListener('click', e => {
+      const del = e.target.closest('button[data-action="del-opdrachtgever"]');
+      if (!del) return;
+      const row = del.closest('.parochie-row');
+      if (row) row.remove();
+    });
+    opdrForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const lijst = $$('#opdrachtgever-rows .parochie-row').map(row => ({
+        naam: (row.querySelector('.opdrachtgever-naam').value || '').trim(),
+      })).filter(o => o.naam);
+      Settings.set({ opdrachtgevers: lijst });
+      renderAccount({ success: 'Opdrachtgevers opgeslagen.' });
+    });
+  }
+
+  // Rouwauto-lijst
+  const rauForm = $('#rouwauto-form');
+  if (rauForm) rauForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const lijst = (e.target.rouwauto_lijst.value || '')
+      .split('\n').map(s => s.trim()).filter(Boolean);
+    Settings.set({ rouwauto_lijst: lijst });
+    renderAccount({ success: `Rouwauto's opgeslagen (${lijst.length}).` });
+  });
+
+  // Rouwgoederen-opties
+  const rgForm = $('#rouwgoederen-form');
+  if (rgForm) rgForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const lijst = (e.target.rouwgoederen_opties.value || '')
+      .split('\n').map(s => s.trim()).filter(Boolean);
+    Settings.set({ rouwgoederen_opties: lijst });
+    renderAccount({ success: `Rouwgoederen-opties opgeslagen (${lijst.length}).` });
+  });
 
   // Parochies + priesters beheer
   const parochieForm = $('#parochie-form');
@@ -866,8 +2435,9 @@ function renderAccount(msg) {
       renderAccount({ success: 'Welkomscherm-instellingen opgeslagen.' });
     });
 
-    $('#btn-reset-splash').addEventListener('click', () => {
-      if (!confirm('Welkomscherm-instellingen terugzetten naar standaard?')) return;
+    $('#btn-reset-splash').addEventListener('click', async () => {
+      const ok = await Modal.confirm({ title: 'Welkomscherm herstellen?', message: 'Alle welkomscherm-instellingen worden teruggezet naar de standaard.', confirmText: 'Herstellen' });
+      if (!ok) return;
       // Reset alleen splash-instellingen
       Settings.set({
         splash_enabled: Settings.defaults.splash_enabled,
@@ -978,6 +2548,103 @@ function renderAccount(msg) {
     }
   });
 
+  // Live opslaggebruik (Supabase) ophalen en tonen met balkjes.
+  const opslagBox = $('#opslag-live');
+  if (opslagBox && typeof sb !== 'undefined' && navigator.onLine
+      && !(typeof Demo !== 'undefined' && Demo.isActive())) {
+    (async () => {
+      try {
+        const { data, error } = await sb.rpc('opslag_gebruik');
+        if (error || !data) throw error || new Error('geen data');
+        const MB = 1024 * 1024, GB = 1024 * MB;
+        const fmtBytes = (b) => b >= GB ? (b / GB).toFixed(2) + ' GB'
+                              : b >= MB ? (b / MB).toFixed(1) + ' MB'
+                              : Math.max(1, Math.round(b / 1024)) + ' KB';
+        const DB_LIMIT = 500 * MB, ST_LIMIT = 1 * GB;
+        const dbPct = Math.min(100, (data.db_bytes / DB_LIMIT) * 100);
+        const stPct = Math.min(100, (data.storage_bytes / ST_LIMIT) * 100);
+        const perDossier = data.dossiers > 0 ? data.storage_bytes / data.dossiers : 0;
+        const bar = (pct, kleur) => `
+          <div style="height:9px;border-radius:6px;background:var(--border,#e5e0d6);overflow:hidden;margin:.2rem 0 .1rem;">
+            <div style="height:100%;width:${pct.toFixed(1)}%;background:${pct >= 90 ? '#c0392b' : pct >= 70 ? '#d68910' : kleur};"></div>
+          </div>`;
+        // R2-teller: aantal R2-paden in de cache (indicatief; bytes weten we
+        // niet direct — daarvoor zou een aparte edge function moeten pollen).
+        let r2Count = 0;
+        try {
+          (Cloud.cache.dossiers || []).forEach(d => {
+            ['artsverklaring_pad','overdraagformulier_pad',
+             'bezit_oorbellen_foto','bezit_ringen_foto','bezit_armbanden_foto',
+             'bezit_ketting_foto','bezit_bril_foto','bezit_horloge_foto']
+              .forEach(k => { if (d[k] && typeof R2 !== 'undefined' && R2.isR2(d[k])) r2Count++; });
+            if (Array.isArray(d.extra_bezittingen)) {
+              d.extra_bezittingen.forEach(b => { if (b && b.foto_pad && typeof R2 !== 'undefined' && R2.isR2(b.foto_pad)) r2Count++; });
+            }
+          });
+        } catch (_) {}
+        opslagBox.innerHTML = `
+          <h3 style="margin:.25rem 0 .5rem;font-size:.95rem;">Opslaggebruik</h3>
+          <div class="muted small" style="display:flex;justify-content:space-between;">
+            <span>Database · Supabase (tekstgegevens)</span><span>${fmtBytes(data.db_bytes)} / 500 MB</span>
+          </div>
+          ${bar(dbPct, 'var(--primary,#2563eb)')}
+          <div class="muted small" style="display:flex;justify-content:space-between;margin-top:.5rem;">
+            <span>Bestanden · Supabase Storage (${data.files} bestand${data.files === 1 ? '' : 'en'})</span><span>${fmtBytes(data.storage_bytes)} / 1 GB</span>
+          </div>
+          ${bar(stPct, 'var(--accent,#c9a24a)')}
+          <div class="muted small" style="display:flex;justify-content:space-between;margin-top:.5rem;">
+            <span>Bestanden · Cloudflare R2 (${r2Count} bestand${r2Count === 1 ? '' : 'en'})</span><span>ruimte: 10 GB</span>
+          </div>
+          ${bar(Math.min(100, r2Count > 0 ? 1 : 0), '#f38020')}
+          <p class="muted small" style="margin:.5rem 0 0;">
+            ${data.dossiers} dossier${data.dossiers === 1 ? '' : 's'} in gebruik${perDossier > 0 ? ` · gemiddeld ± ${fmtBytes(perDossier)} aan scans/foto's per dossier` : ' · nog geen scans geüpload'}.
+            Nieuwe uploads gaan naar Cloudflare R2 (10 GB, EU-jurisdictie). Bestanden op Supabase Storage kun je via de knop hieronder migreren.
+          </p>`;
+      } catch (e) {
+        opslagBox.innerHTML = `<p class="muted small">Opslaggebruik kon niet worden geladen${e && e.message ? ' (' + esc(e.message) + ')' : ''}.</p>`;
+      }
+    })();
+  }
+
+  // Automatische backups tonen (alleen beheerder — RLS zorgt daar server-side voor)
+  const backupItems = $('#backup-items');
+  if (backupItems && typeof sb !== 'undefined' && navigator.onLine
+      && !(typeof Demo !== 'undefined' && Demo.isActive())) {
+    (async () => {
+      try {
+        const { data, error } = await sb.storage.from('backups').list('', {
+          limit: 20, sortBy: { column: 'name', order: 'desc' },
+        });
+        if (error) throw error;
+        if (!data || !data.length) { backupItems.innerHTML = '<li>Nog geen backup gemaakt — verschijnt na de eerstvolgende maandag om 03:00.</li>'; return; }
+        backupItems.innerHTML = data.map(f => {
+          const kb = f.metadata && f.metadata.size ? Math.round(f.metadata.size / 1024) : null;
+          return `<li style="display:flex;justify-content:space-between;gap:.5rem;padding:.2rem 0;">
+            <span><strong>${esc(f.name)}</strong>${kb ? ' · ' + kb + ' KB' : ''}</span>
+            <button type="button" class="link-btn" data-backup-dl="${esc(f.name)}">⬇ Download</button>
+          </li>`;
+        }).join('');
+        backupItems.querySelectorAll('[data-backup-dl]').forEach(btn => {
+          btn.addEventListener('click', async () => {
+            const naam = btn.getAttribute('data-backup-dl');
+            btn.disabled = true; btn.textContent = '…';
+            try {
+              const { data: sign, error: sErr } = await sb.storage.from('backups').createSignedUrl(naam, 300);
+              if (sErr || !sign) throw sErr || new Error('Geen signed URL');
+              window.open(sign.signedUrl, '_blank');
+            } catch (e) {
+              Modal.show({ type:'error', title:'Download mislukt', message: (e && e.message) || String(e) });
+            } finally {
+              btn.disabled = false; btn.textContent = '⬇ Download';
+            }
+          });
+        });
+      } catch (e) {
+        backupItems.innerHTML = `<li>Backups niet geladen (${esc(e.message || String(e))}).</li>`;
+      }
+    })();
+  }
+
   const syncBtn = $('#btn-sync-now');
   if (syncBtn) {
     syncBtn.addEventListener('click', async () => {
@@ -1000,10 +2667,8 @@ function renderAccount(msg) {
   $('#btn-export').addEventListener('click', () => {
     const data = {
       dossiers: DB.list(KEYS.DOSSIERS),
-      taken: DB.list(KEYS.TAKEN),
       kosten: DB.list(KEYS.KOSTEN),
       notities: DB.list(KEYS.NOTITIES),
-      documenten: DB.list(KEYS.DOCUMENTEN),
       exported_at: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1015,4 +2680,219 @@ function renderAccount(msg) {
 
 function render404() {
   $('#view').innerHTML = `<div class="page"><div class="card narrow center"><h1>404</h1><p>Deze pagina bestaat niet.</p><a href="#/" class="btn btn-primary">Terug naar dashboard</a></div></div>`;
+}
+
+// ─── Logboek (audit-log) — alleen beheerder ───────────────────────────────
+async function renderLogboek() {
+  if (typeof Auth !== 'undefined' && !Auth.isBeheerder()) {
+    $('#view').innerHTML = `<div class="page"><section class="card narrow"><h1>Logboek</h1>
+      <p>Het logboek is alleen zichtbaar voor beheerders.</p>
+      <a href="#/account" class="btn">← Terug naar Account</a></section></div>`;
+    return;
+  }
+  const url = new URL(location.href);
+  const params = url.hash.split('?')[1] ? new URLSearchParams(url.hash.split('?')[1]) : new URLSearchParams();
+  const filterActie = params.get('actie') || '';
+  const filterTabel = params.get('tabel') || '';
+
+  $('#view').innerHTML = `
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <a href="#/account" class="back-link">← Account</a>
+          <h1>Logboek</h1>
+          <p class="muted">Volledig audit-log — mutaties, logins, profielwissels. Nieuwste bovenaan.</p>
+        </div>
+      </div>
+      <form id="logboek-filters" class="dossiers-controls" style="margin-bottom:1rem;">
+        <select name="actie" class="dossiers-control">
+          <option value="">Alle acties</option>
+          ${['insert','update','delete','login','logout','profiel'].map(a =>
+            `<option value="${a}" ${filterActie === a ? 'selected' : ''}>${a}</option>`).join('')}
+        </select>
+        <select name="tabel" class="dossiers-control">
+          <option value="">Alle tabellen</option>
+          ${['dossiers','kosten','notities','planning_items','kist_voorraad','profiles'].map(t =>
+            `<option value="${t}" ${filterTabel === t ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <button type="submit" class="dossiers-control dossiers-filter-btn">Filter</button>
+        ${(filterActie || filterTabel) ? '<a href="#/logboek" class="dossiers-wis">↺ Wis</a>' : ''}
+      </form>
+      <div class="dossiers-kaart">
+        <div id="logboek-body" style="padding:1rem;">
+          <p class="muted">Laden…</p>
+        </div>
+      </div>
+    </div>`;
+
+  const filterForm = $('#logboek-filters');
+  if (filterForm) filterForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const p = new URLSearchParams();
+    if (e.target.actie.value) p.set('actie', e.target.actie.value);
+    if (e.target.tabel.value) p.set('tabel', e.target.tabel.value);
+    location.hash = '#/logboek' + (p.toString() ? '?' + p.toString() : '');
+  });
+
+  const body = $('#logboek-body');
+  try {
+    const rows = await AuditLog.fetch({
+      limit: 500,
+      actie: filterActie || null,
+      tabel: filterTabel || null,
+    });
+    if (!rows.length) {
+      body.innerHTML = '<p class="muted center" style="padding:1rem;">Nog geen logboek-entries voor deze filters.</p>';
+      return;
+    }
+    // Groepeer op datum voor leesbaarheid ("Vandaag", "Gisteren", "9 juli 2026")
+    const groepen = new Map();
+    rows.forEach(r => {
+      const dag = _logDagLabel(r.created_at);
+      if (!groepen.has(dag)) groepen.set(dag, []);
+      groepen.get(dag).push(r);
+    });
+    body.innerHTML = `<ul class="logboek-list">
+      ${[...groepen.entries()].map(([dag, items]) => `
+        <li class="logboek-dag">
+          <h3 class="logboek-dag-kop">${esc(dag)}</h3>
+          <ol class="logboek-items">
+            ${items.map(r => {
+              const tijd = r.created_at ? new Date(r.created_at).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' }) : '';
+              const wieNaam = r.profiel_naam || (r.user_email ? r.user_email.split('@')[0] : 'Onbekend');
+              const zin = _logZinSchrijf(r, wieNaam);
+              const kleur = logActieKleur(r.actie);
+              return `<li class="logboek-item logboek-item-${esc(kleur)}">
+                <span class="logboek-tijd">${esc(tijd)}</span>
+                <span class="logboek-punt" aria-hidden="true"></span>
+                <span class="logboek-zin">${zin}</span>
+              </li>`;
+            }).join('')}
+          </ol>
+        </li>`).join('')}
+    </ul>
+    <p class="muted small" style="padding:.75rem 1rem;">${rows.length} entries getoond.</p>`;
+  } catch (e) {
+    body.innerHTML = `<p class="alert alert-error">Logboek laden mislukt: ${esc(e.message || String(e))}</p>`;
+  }
+}
+
+// Datum-label voor de dag-koppen (Vandaag / Gisteren / '9 juli 2026')
+function _logDagLabel(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const nu = new Date(); nu.setHours(0,0,0,0);
+  const dan = new Date(d); dan.setHours(0,0,0,0);
+  const dagenGeleden = Math.floor((nu.getTime() - dan.getTime()) / 86400000);
+  if (dagenGeleden === 0) return 'Vandaag';
+  if (dagenGeleden === 1) return 'Gisteren';
+  return d.toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Zin bouwen zoals "Kevin heeft dossier #12 aangemaakt"
+function _logZinSchrijf(r, wieNaam) {
+  const wie = `<strong>${esc(wieNaam)}</strong>`;
+  const detail = r.detail || {};
+  const tabelLabel = _logTabelLabel(r.tabel);
+  const id = r.record_id || '';
+  const link = id && r.tabel === 'dossiers' ? ` <a href="#/dossiers/${esc(id)}">#${esc(id)}</a>` : (id ? ` <span class="muted">#${esc(id)}</span>` : '');
+  const dossierRef = (r.tabel === 'dossiers') ? '' : (detail.row && detail.row.dossier_id ? ` (dossier <a href="#/dossiers/${esc(detail.row.dossier_id)}">#${esc(detail.row.dossier_id)}</a>)` : '');
+
+  switch (r.actie) {
+    case 'login':
+      return `${wie} heeft <em>ingelogd</em>${detail.email ? ' als <span class="muted">' + esc(detail.email) + '</span>' : ''}.`;
+    case 'logout':
+      return `${wie} heeft <em>uitgelogd</em>.`;
+    case 'profiel':
+      return `${wie} is <em>overgeschakeld naar profiel</em> <strong>${esc(detail.naam || wieNaam)}</strong>.`;
+    case 'insert':
+      return `${wie} heeft een nieuw ${esc(tabelLabel)}${link} <em>aangemaakt</em>${dossierRef}.`;
+    case 'delete':
+      return `${wie} heeft ${esc(tabelLabel)}${link} <em>verwijderd</em>${dossierRef}.`;
+    case 'voorraad': {
+      const naam = detail.naam || id || 'kist';
+      const delta = detail.delta;
+      const nu  = (detail.nu != null) ? detail.nu : (detail.was != null && typeof delta === 'number' ? detail.was + delta : null);
+      const was = detail.was;
+      const dossierLink = detail.dossier_id
+        ? ` (dossier <a href="#/dossiers/${esc(detail.dossier_id)}">#${esc(detail.dossier_id)}</a>)`
+        : '';
+      const reden = detail.reden ? ` — <span class="muted small">${esc(detail.reden)}</span>` : '';
+      if (typeof delta === 'number' && delta !== 0) {
+        const sign = delta > 0 ? '+' : '';
+        const stukTxt = (was != null && nu != null) ? ` (${was} → ${nu})` : '';
+        return `${wie} — <em>voorraad</em> <strong>${esc(naam)}</strong> <strong>${sign}${delta}</strong>${stukTxt}${dossierLink}${reden}.`;
+      }
+      // Handmatige upsert: was/nu-objecten, toon aantal en min_aantal
+      const wasA = (was && typeof was === 'object') ? was.aantal : was;
+      const nuA  = (nu  && typeof nu  === 'object') ? nu.aantal  : nu;
+      return `${wie} heeft voorraad van <strong>${esc(naam)}</strong> bijgewerkt${(wasA != null && nuA != null) ? ` (${wasA} → ${nuA})` : ''}${reden}.`;
+    }
+    case 'update': {
+      // Toon de daadwerkelijk gewijzigde velden
+      const oud = detail.oud || {};
+      const kortelijst = Object.keys(oud).slice(0, 4);
+      if (!kortelijst.length) {
+        return `${wie} heeft ${esc(tabelLabel)}${link} <em>bijgewerkt</em>${dossierRef}.`;
+      }
+      const veldenTxt = kortelijst.map(k => {
+        const v = oud[k];
+        const was = _fmtWaarde(v && v.was);
+        const nu  = _fmtWaarde(v && v.nu);
+        return `<span class="log-veld"><strong>${esc(_veldLabel(k))}</strong>: ${esc(was)} → ${esc(nu)}</span>`;
+      }).join(', ');
+      const meer = Object.keys(oud).length > kortelijst.length ? ` (+${Object.keys(oud).length - kortelijst.length} meer)` : '';
+      return `${wie} heeft ${esc(tabelLabel)}${link} <em>bijgewerkt</em>: ${veldenTxt}${meer}${dossierRef}.`;
+    }
+    default:
+      return `${wie} — <em>${esc(r.actie)}</em> ${esc(tabelLabel)}${link}`;
+  }
+}
+function _logTabelLabel(t) {
+  return ({
+    dossiers: 'dossier',
+    kosten: 'kostenpost',
+    notities: 'notitie',
+    planning_items: 'planning-item',
+    kist_voorraad: 'kist-voorraad',
+    profiles: 'profiel',
+    documenten: 'document',
+  })[t] || (t || 'item');
+}
+function _veldLabel(k) {
+  return ({
+    status: 'status',
+    kist_type: 'kist',
+    rouwauto: 'rouwauto',
+    opbaring_type: 'ophalen/thuis',
+    opdrachtgever_naam: 'opdrachtgever',
+    bedrag: 'bedrag',
+    aantal: 'aantal',
+    betaald: 'betaald',
+    thuis_opbaren_datum: 'startdatum thuis',
+    gearchiveerd: 'gearchiveerd',
+  })[k] || k;
+}
+function _fmtWaarde(v) {
+  if (v == null || v === '') return '—';
+  if (v === true) return 'ja';
+  if (v === false) return 'nee';
+  if (typeof v === 'object') {
+    try { const s = JSON.stringify(v); return s.length > 40 ? s.slice(0, 40) + '…' : s; }
+    catch (_) { return '[object]'; }
+  }
+  const s = String(v);
+  return s.length > 40 ? s.slice(0, 40) + '…' : s;
+}
+function logActieKleur(a) {
+  switch (a) {
+    case 'insert':   return 'green';
+    case 'update':   return 'amber';
+    case 'delete':   return 'red';
+    case 'login':    return 'blue';
+    case 'logout':   return 'grey';
+    case 'profiel':  return 'blue';
+    case 'voorraad': return 'amber';
+    default:         return 'grey';
+  }
 }
